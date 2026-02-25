@@ -14,6 +14,7 @@ import { Privacy } from '../pages/Privacy';
 import { NotFound } from '../pages/NotFound';
 import { OrganizationSettings } from '../pages/OrganizationSettings';
 import { AcceptInvite } from '../pages/AcceptInvite';
+import { Profile } from '../pages/Profile';
 
 export function AppRouter() {
     return (
@@ -31,6 +32,14 @@ export function AppRouter() {
                     element={
                         <ProtectedRoute>
                             <OrganizationSettings />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/profile"
+                    element={
+                        <ProtectedRoute>
+                            <Profile />
                         </ProtectedRoute>
                     }
                 />

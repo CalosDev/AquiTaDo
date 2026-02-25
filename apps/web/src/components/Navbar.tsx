@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/useAuth';
 import { useState } from 'react';
+import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
 
 export function Navbar() {
@@ -19,7 +19,6 @@ export function Navbar() {
         <nav className="glass sticky top-0 z-50 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
-                    {/* Logo */}
                     <Link to="/" className="flex items-center gap-2 group">
                         <div className="w-9 h-9 rounded-xl gradient-hero flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-primary-500/30 group-hover:shadow-xl transition-all">
                             A
@@ -29,7 +28,6 @@ export function Navbar() {
                         </span>
                     </Link>
 
-                    {/* Desktop Nav */}
                     <div className="hidden md:flex items-center gap-6">
                         <Link to="/businesses" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
                             Negocios
@@ -42,7 +40,10 @@ export function Navbar() {
                                     </Link>
                                 )}
                                 <Link to="/organization" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
-                                    Organización
+                                    Organizacion
+                                </Link>
+                                <Link to="/profile" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                    Perfil
                                 </Link>
                                 {isAdmin && (
                                     <Link to="/admin" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
@@ -70,7 +71,7 @@ export function Navbar() {
                         ) : (
                             <div className="flex items-center gap-3">
                                 <Link to="/login" className="btn-secondary text-sm">
-                                    Iniciar Sesión
+                                    Iniciar Sesion
                                 </Link>
                                 <Link to="/register" className="btn-primary text-sm">
                                     Registrarse
@@ -79,7 +80,6 @@ export function Navbar() {
                         )}
                     </div>
 
-                    {/* Mobile Menu Toggle */}
                     <button
                         className="md:hidden p-2 rounded-lg hover:bg-gray-100"
                         onClick={() => setMenuOpen(!menuOpen)}
@@ -94,7 +94,6 @@ export function Navbar() {
                     </button>
                 </div>
 
-                {/* Mobile Menu */}
                 {menuOpen && (
                     <div className="md:hidden py-4 border-t border-gray-100 animate-slide-down">
                         <div className="flex flex-col gap-3">
@@ -112,7 +111,10 @@ export function Navbar() {
                                         </Link>
                                     )}
                                     <Link to="/organization" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
-                                        Organización
+                                        Organizacion
+                                    </Link>
+                                    <Link to="/profile" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                        Perfil
                                     </Link>
                                     {isAdmin && (
                                         <Link to="/admin" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
@@ -126,7 +128,7 @@ export function Navbar() {
                             ) : (
                                 <>
                                     <Link to="/login" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
-                                        Iniciar Sesión
+                                        Iniciar Sesion
                                     </Link>
                                     <Link to="/register" className="py-2 text-primary-600 font-medium" onClick={() => setMenuOpen(false)}>
                                         Registrarse

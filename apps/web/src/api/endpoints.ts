@@ -13,6 +13,13 @@ export const authApi = {
     getProfile: () => api.get('/users/me'),
 };
 
+// ---- Users ----
+export const usersApi = {
+    getMyProfileDetails: () => api.get('/users/me/profile'),
+    updateMyProfile: (data: { name?: string; phone?: string; avatarUrl?: string }) =>
+        api.patch('/users/me', data),
+};
+
 // ---- Businesses ----
 export const businessApi = {
     getAll: (params?: Record<string, string | number | boolean>) =>
