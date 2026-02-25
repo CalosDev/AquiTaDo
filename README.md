@@ -1,5 +1,8 @@
 # 🇩🇴 AquiTa.do — Directorio Inteligente de Negocios Locales
 
+[![CI](https://github.com/CalosDev/AquiTaDo/actions/workflows/ci.yml/badge.svg)](https://github.com/CalosDev/AquiTaDo/actions/workflows/ci.yml)
+
+
 Plataforma de directorio de negocios locales en República Dominicana. Permite a usuarios buscar negocios, dejar reseñas, y a dueños de negocios registrar y gestionar sus establecimientos.
 
 ## Stack Tecnológico
