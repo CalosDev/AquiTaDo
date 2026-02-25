@@ -58,14 +58,14 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Apply Prisma migrations
+        run: pnpm db:migrate:deploy
+
       - name: Test
         run: pnpm test
 
       - name: Build
         run: pnpm build
-
-      - name: Apply Prisma migrations
-        run: pnpm db:migrate:deploy
 
       - name: Smoke test API
         run: |
