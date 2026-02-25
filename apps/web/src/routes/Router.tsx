@@ -12,6 +12,8 @@ import { AdminDashboard } from '../pages/AdminDashboard';
 import { Terms } from '../pages/Terms';
 import { Privacy } from '../pages/Privacy';
 import { NotFound } from '../pages/NotFound';
+import { OrganizationSettings } from '../pages/OrganizationSettings';
+import { AcceptInvite } from '../pages/AcceptInvite';
 
 export function AppRouter() {
     return (
@@ -24,6 +26,22 @@ export function AppRouter() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route
+                    path="/organization"
+                    element={
+                        <ProtectedRoute>
+                            <OrganizationSettings />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/invites/:token"
+                    element={
+                        <ProtectedRoute>
+                            <AcceptInvite />
+                        </ProtectedRoute>
+                    }
+                />
                 <Route
                     path="/register-business"
                     element={

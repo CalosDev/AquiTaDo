@@ -61,3 +61,39 @@ export const uploadApi = {
     deleteBusinessImage: (imageId: string) =>
         api.delete(`/upload/business-image/${imageId}`),
 };
+
+// ---- Organizations ----
+export const organizationApi = {
+    getMine: () => api.get('/organizations/mine'),
+    create: (data: { name: string }) => api.post('/organizations', data),
+    getById: (organizationId: string) => api.get(`/organizations/${organizationId}`),
+    update: (organizationId: string, data: { name?: string }) =>
+        api.patch(`/organizations/${organizationId}`, data),
+    getSubscription: (organizationId: string) =>
+        api.get(`/organizations/${organizationId}/subscription`),
+    updateSubscription: (
+        organizationId: string,
+        data: {
+            plan: 'FREE' | 'GROWTH' | 'SCALE';
+            subscriptionStatus?: 'ACTIVE' | 'PAST_DUE' | 'CANCELED';
+            subscriptionRenewsAt?: string;
+        },
+    ) => api.patch(`/organizations/${organizationId}/subscription`, data),
+    getUsage: (organizationId: string) => api.get(`/organizations/${organizationId}/usage`),
+    getAuditLogs: (organizationId: string, params?: { limit?: number }) =>
+        api.get(`/organizations/${organizationId}/audit-logs`, { params }),
+    getMembers: (organizationId: string) => api.get(`/organizations/${organizationId}/members`),
+    getInvites: (organizationId: string) => api.get(`/organizations/${organizationId}/invites`),
+    inviteMember: (
+        organizationId: string,
+        data: { email: string; role?: 'OWNER' | 'MANAGER' | 'STAFF' },
+    ) => api.post(`/organizations/${organizationId}/invites`, data),
+    acceptInvite: (token: string) => api.post(`/organizations/invites/${token}/accept`),
+    updateMemberRole: (
+        organizationId: string,
+        userId: string,
+        data: { role: 'OWNER' | 'MANAGER' | 'STAFF' },
+    ) => api.patch(`/organizations/${organizationId}/members/${userId}/role`, data),
+    removeMember: (organizationId: string, userId: string) =>
+        api.delete(`/organizations/${organizationId}/members/${userId}`),
+};

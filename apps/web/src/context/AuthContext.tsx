@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
+        localStorage.removeItem('activeOrganizationId');
     }, []);
 
     const refreshProfile = useCallback(async () => {

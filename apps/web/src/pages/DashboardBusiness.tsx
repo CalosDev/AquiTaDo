@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { businessApi, uploadApi } from '../api/endpoints';
+import { useOrganization } from '../context/useOrganization';
 
 interface BusinessImage {
     id: string;
@@ -38,6 +39,7 @@ const EMPTY_EDIT_FORM: EditBusinessForm = {
 };
 
 export function DashboardBusiness() {
+    const { activeOrganizationId } = useOrganization();
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploadingBusinessId, setUploadingBusinessId] = useState<string | null>(null);
@@ -50,6 +52,13 @@ export function DashboardBusiness() {
     const [successMessage, setSuccessMessage] = useState('');
 
     const loadBusinesses = useCallback(async () => {
+        if (!activeOrganizationId) {
+            setBusinesses([]);
+            setLoading(false);
+            setErrorMessage('Selecciona o crea una organización para ver tu dashboard');
+            return;
+        }
+
         setErrorMessage('');
         try {
             const res = await businessApi.getMine();
@@ -59,7 +68,7 @@ export function DashboardBusiness() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [activeOrganizationId]);
 
     useEffect(() => {
         void loadBusinesses();
@@ -218,6 +227,15 @@ export function DashboardBusiness() {
             {loading ? (
                 <div className="flex justify-center py-20">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                </div>
+            ) : !activeOrganizationId ? (
+                <div className="card p-8 text-center">
+                    <p className="text-gray-500 mb-4">
+                        Necesitas una organización activa para administrar negocios.
+                    </p>
+                    <Link to="/organization" className="btn-primary inline-block">
+                        Ir a Organización
+                    </Link>
                 </div>
             ) : businesses.length > 0 ? (
                 <div className="space-y-4">

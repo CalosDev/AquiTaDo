@@ -1,9 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import { useState } from 'react';
+import { useOrganization } from '../context/useOrganization';
 
 export function Navbar() {
     const { isAuthenticated, user, logout, isAdmin, isBusinessOwner } = useAuth();
+    const { activeOrganization } = useOrganization();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -38,6 +40,9 @@ export function Navbar() {
                                         Dashboard
                                     </Link>
                                 )}
+                                <Link to="/organization" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                    Organización
+                                </Link>
                                 {isAdmin && (
                                     <Link to="/admin" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
                                         Admin
@@ -47,6 +52,11 @@ export function Navbar() {
                                     + Registrar Negocio
                                 </Link>
                                 <div className="flex items-center gap-3">
+                                    {activeOrganization && (
+                                        <span className="text-xs px-2 py-1 rounded-full bg-primary-50 text-primary-700 font-medium">
+                                            {activeOrganization.name}
+                                        </span>
+                                    )}
                                     <span className="text-sm text-gray-500">Hola, {user?.name?.split(' ')[0]}</span>
                                     <button
                                         onClick={handleLogout}
@@ -100,6 +110,9 @@ export function Navbar() {
                                             Dashboard
                                         </Link>
                                     )}
+                                    <Link to="/organization" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                        Organización
+                                    </Link>
                                     {isAdmin && (
                                         <Link to="/admin" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
                                             Admin

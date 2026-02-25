@@ -29,6 +29,11 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        const activeOrganizationId = localStorage.getItem('activeOrganizationId');
+        if (activeOrganizationId) {
+            config.headers['x-organization-id'] = activeOrganizationId;
+        }
         return config;
     },
     (error) => Promise.reject(error)
@@ -42,6 +47,7 @@ api.interceptors.response.use(
             const hadToken = !!localStorage.getItem('accessToken');
             localStorage.removeItem('accessToken');
             localStorage.removeItem('user');
+            localStorage.removeItem('activeOrganizationId');
             window.dispatchEvent(new CustomEvent('auth:unauthorized'));
 
             if (hadToken && window.location.pathname !== '/login') {
