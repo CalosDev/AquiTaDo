@@ -8,10 +8,11 @@ import {
 } from '@nestjs/common';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { Prisma } from '../generated/prisma/client';
+import { OrganizationRole, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
 import slugify from 'slugify';
+import { getOrganizationPlanLimits } from '../organizations/organization-plan-limits';
 
 @Injectable()
 export class BusinessesService {
@@ -23,6 +24,9 @@ export class BusinessesService {
     private readonly includeRelations = {
         owner: {
             select: { id: true, name: true },
+        },
+        organization: {
+            select: { id: true, name: true, slug: true },
         },
         province: true,
         city: true,
@@ -90,15 +94,20 @@ export class BusinessesService {
         };
     }
 
-    async findMine(userId: string) {
+    async findMine(_userId: string, _userRole: string, organizationId: string) {
         return this.prisma.business.findMany({
-            where: { ownerId: userId },
+            where: { organizationId },
             include: this.includeRelations,
             orderBy: { createdAt: 'desc' },
         });
     }
 
-    async findById(id: string, userId?: string, userRole?: string) {
+    async findById(
+        id: string,
+        userId?: string,
+        userRole?: string,
+        currentOrganizationId?: string,
+    ) {
         const business = await this.prisma.business.findUnique({
             where: { id },
             include: {
@@ -117,14 +126,28 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        if (!business.verified && !this.canAccessUnverified(business.ownerId, userId, userRole)) {
+        if (
+            !business.verified &&
+            !this.canAccessUnverified(
+                business.ownerId,
+                business.organizationId,
+                userId,
+                userRole,
+                currentOrganizationId,
+            )
+        ) {
             throw new NotFoundException('Negocio no encontrado');
         }
 
         return business;
     }
 
-    async findBySlug(slug: string, userId?: string, userRole?: string) {
+    async findBySlug(
+        slug: string,
+        userId?: string,
+        userRole?: string,
+        currentOrganizationId?: string,
+    ) {
         const business = await this.prisma.business.findUnique({
             where: { slug },
             include: {
@@ -143,14 +166,29 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        if (!business.verified && !this.canAccessUnverified(business.ownerId, userId, userRole)) {
+        if (
+            !business.verified &&
+            !this.canAccessUnverified(
+                business.ownerId,
+                business.organizationId,
+                userId,
+                userRole,
+                currentOrganizationId,
+            )
+        ) {
             throw new NotFoundException('Negocio no encontrado');
         }
 
         return business;
     }
 
-    async create(dto: CreateBusinessDto, userId: string) {
+    async create(
+        dto: CreateBusinessDto,
+        userId: string,
+        userRole: string,
+        organizationId?: string,
+        organizationRole?: OrganizationRole,
+    ) {
         const baseSlug = slugify(dto.name, { lower: true, strict: true });
         if (!baseSlug) {
             throw new BadRequestException('El nombre del negocio no es válido para generar un slug');
@@ -163,7 +201,19 @@ export class BusinessesService {
         try {
             return await this.prisma.$transaction(async (tx) => {
                 await this.assertCityBelongsToProvince(tx, dto.provinceId, dto.cityId);
-                const organizationId = await this.ensureOwnerOrganization(tx, userId);
+                const effectiveOrganizationId = organizationId ?? await this.ensureOwnerOrganization(tx, userId);
+
+                if (organizationId && userRole !== 'ADMIN') {
+                    if (!organizationRole) {
+                        throw new ForbiddenException('No tienes permisos para crear negocios en esta organización');
+                    }
+
+                    if (organizationRole === 'STAFF') {
+                        throw new ForbiddenException('El rol STAFF no puede crear negocios');
+                    }
+                }
+
+                await this.assertOrganizationCanCreateBusiness(tx, effectiveOrganizationId);
 
                 const business = await tx.business.create({
                     data: {
@@ -178,7 +228,7 @@ export class BusinessesService {
                         latitude: dto.latitude,
                         longitude: dto.longitude,
                         ownerId: userId,
-                        organizationId,
+                        organizationId: effectiveOrganizationId,
                         categories: categoryIds
                             ? {
                                 create: categoryIds.map((categoryId) => ({
@@ -211,20 +261,42 @@ export class BusinessesService {
         }
     }
 
-    async update(id: string, dto: UpdateBusinessDto, userId: string, userRole: string) {
+    async update(
+        id: string,
+        dto: UpdateBusinessDto,
+        _userId: string,
+        userRole: string,
+        organizationId: string,
+        organizationRole: OrganizationRole,
+    ) {
         const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
 
         try {
             return await this.prisma.$transaction(async (tx) => {
-                const business = await tx.business.findUnique({ where: { id } });
+                const business = await tx.business.findUnique({
+                    where: { id },
+                    select: {
+                        id: true,
+                        ownerId: true,
+                        organizationId: true,
+                        provinceId: true,
+                        cityId: true,
+                    },
+                });
 
                 if (!business) {
                     throw new NotFoundException('Negocio no encontrado');
                 }
 
-                if (business.ownerId !== userId && userRole !== 'ADMIN') {
-                    throw new ForbiddenException('No tienes permisos para editar este negocio');
+                if (userRole !== 'ADMIN') {
+                    if (business.organizationId !== organizationId) {
+                        throw new NotFoundException('Negocio no encontrado');
+                    }
+
+                    if (organizationRole === 'STAFF') {
+                        throw new ForbiddenException('No tienes permisos para editar este negocio');
+                    }
                 }
 
                 const targetProvinceId = dto.provinceId ?? business.provinceId;
@@ -275,7 +347,13 @@ export class BusinessesService {
         }
     }
 
-    async delete(id: string, userId: string, userRole: string) {
+    async delete(
+        id: string,
+        _userId: string,
+        userRole: string,
+        organizationId: string,
+        organizationRole: OrganizationRole,
+    ) {
         const business = await this.prisma.business.findUnique({
             where: { id },
             include: {
@@ -289,8 +367,14 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        if (business.ownerId !== userId && userRole !== 'ADMIN') {
-            throw new ForbiddenException('No tienes permisos para eliminar este negocio');
+        if (userRole !== 'ADMIN') {
+            if (business.organizationId !== organizationId) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            if (organizationRole === 'STAFF') {
+                throw new ForbiddenException('No tienes permisos para eliminar este negocio');
+            }
         }
 
         await this.deleteBusinessImageFiles(business.images.map((image) => image.url));
@@ -383,6 +467,33 @@ export class BusinessesService {
             return ownerMembership.organizationId;
         }
 
+        const ownerOrganization = await tx.organization.findFirst({
+            where: { ownerUserId: userId },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+        });
+
+        if (ownerOrganization) {
+            await tx.organizationMember.upsert({
+                where: {
+                    organizationId_userId: {
+                        organizationId: ownerOrganization.id,
+                        userId,
+                    },
+                },
+                update: {
+                    role: 'OWNER',
+                },
+                create: {
+                    organizationId: ownerOrganization.id,
+                    userId,
+                    role: 'OWNER',
+                },
+            });
+
+            return ownerOrganization.id;
+        }
+
         const user = await tx.user.findUnique({
             where: { id: userId },
             select: { id: true, name: true },
@@ -434,6 +545,43 @@ export class BusinessesService {
         });
 
         return organization.id;
+    }
+
+    private async assertOrganizationCanCreateBusiness(
+        tx: Prisma.TransactionClient,
+        organizationId: string,
+    ): Promise<void> {
+        const organization = await tx.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                id: true,
+                plan: true,
+                subscriptionStatus: true,
+            },
+        });
+
+        if (!organization) {
+            throw new NotFoundException('Organización no encontrada');
+        }
+
+        if (organization.subscriptionStatus === 'CANCELED') {
+            throw new ForbiddenException('La suscripción de la organización está cancelada');
+        }
+
+        const limits = getOrganizationPlanLimits(organization.plan);
+        if (limits.maxBusinesses === null) {
+            return;
+        }
+
+        const businessCount = await tx.business.count({
+            where: { organizationId },
+        });
+
+        if (businessCount >= limits.maxBusinesses) {
+            throw new BadRequestException(
+                'La organización alcanzó el límite de negocios de su plan. Actualiza la suscripción para continuar.',
+            );
+        }
     }
 
     private buildWhere(query: BusinessQueryDto, includeUnverified: boolean): Record<string, unknown> {
@@ -527,11 +675,21 @@ export class BusinessesService {
         }
     }
 
-    private canAccessUnverified(ownerId: string, userId?: string, userRole?: string): boolean {
+    private canAccessUnverified(
+        ownerId: string,
+        businessOrganizationId: string,
+        userId?: string,
+        userRole?: string,
+        currentOrganizationId?: string,
+    ): boolean {
         if (!userId) {
             return false;
         }
 
-        return ownerId === userId || userRole === 'ADMIN';
+        if (ownerId === userId || userRole === 'ADMIN') {
+            return true;
+        }
+
+        return currentOrganizationId === businessOrganizationId;
     }
 }

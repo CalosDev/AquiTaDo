@@ -11,6 +11,7 @@ import { LocationsModule } from './locations/locations.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { HealthModule } from './health/health.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -41,6 +42,7 @@ import { validateEnv } from './config/env.validation';
         ReviewsModule,
         UploadsModule,
         HealthModule,
+        OrganizationsModule,
     ],
     providers: [
         {

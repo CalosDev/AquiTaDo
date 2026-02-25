@@ -23,6 +23,18 @@ enum OrganizationRole {
   STAFF
 }
 
+enum OrganizationPlan {
+  FREE
+  GROWTH
+  SCALE
+}
+
+enum OrganizationSubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)
@@ -38,6 +50,7 @@ model User {
   organizationsOwned      Organization[]      @relation("OrganizationOwner")
   organizationMemberships OrganizationMember[]
   organizationInvitesSent OrganizationInvite[] @relation("OrganizationInvitedBy")
+  auditLogs               AuditLog[]          @relation("AuditActor")
 
   @@index([email])
   @@map("users")
@@ -86,14 +99,19 @@ model Organization {
   slug        String   @unique @db.VarChar(180)
   ownerUserId String
   ownerUser   User     @relation("OrganizationOwner", fields: [ownerUserId], references: [id])
+  plan        OrganizationPlan               @default(FREE)
+  subscriptionStatus OrganizationSubscriptionStatus @default(ACTIVE)
+  subscriptionRenewsAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   businesses Business[]
   members    OrganizationMember[]
   invites    OrganizationInvite[]
+  auditLogs  AuditLog[]
 
   @@index([ownerUserId])
+  @@index([plan, subscriptionStatus])
   @@map("organizations")
 }
 
@@ -129,6 +147,24 @@ model OrganizationInvite {
   @@index([email])
   @@index([expiresAt])
   @@map("organization_invites")
+}
+
+model AuditLog {
+  id             String        @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actorUserId    String?
+  actorUser      User?         @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action         String        @db.VarChar(120)
+  targetType     String        @db.VarChar(80)
+  targetId       String?       @db.VarChar(191)
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
 }
 
 model Category {
