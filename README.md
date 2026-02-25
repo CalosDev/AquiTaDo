@@ -111,6 +111,8 @@ pnpm dev:web    # Frontend en http://localhost:5173
 | GET | /api/provinces/:id/cities | ❌ | Ciudades por provincia |
 | POST | /api/reviews | ✅ | Crear reseña |
 | POST | /api/upload/business-image | ✅ | Subir imagen |
+| GET | /api/health | ❌ | Liveness check |
+| GET | /api/health/ready | ❌ | Readiness check (DB) |
 
 ## Roles de Usuario
 
@@ -140,6 +142,7 @@ GET /api/businesses/nearby?lat=18.48&lng=-69.90&radius=5
 | `pnpm dev:web` | Solo frontend |
 | `pnpm dev:api` | Solo backend |
 | `pnpm build` | Build de producción |
+| `pnpm smoke:api` | Smoke test de health/readiness |
 | `pnpm db:migrate` | Ejecutar migraciones |
 | `pnpm db:seed` | Seed de datos |
 

@@ -12,6 +12,7 @@
     "build:api": "pnpm --filter @aquita/api build",
     "lint": "pnpm --parallel -r run lint",
     "test": "pnpm --parallel -r --if-present run test",
+    "smoke:api": "node scripts/smoke-api.mjs",
     "db:migrate": "pnpm --filter @aquita/api prisma:migrate",
     "db:generate": "pnpm --filter @aquita/api prisma:generate",
     "db:seed": "pnpm --filter @aquita/api prisma:seed"

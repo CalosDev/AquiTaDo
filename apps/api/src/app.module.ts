@@ -10,6 +10,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { LocationsModule } from './locations/locations.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { HealthModule } from './health/health.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -35,6 +36,7 @@ import { validateEnv } from './config/env.validation';
         LocationsModule,
         ReviewsModule,
         UploadsModule,
+        HealthModule,
     ],
     providers: [
         {
