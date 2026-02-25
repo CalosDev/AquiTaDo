@@ -22,5 +22,19 @@ export function validateEnv(config: EnvRecord): EnvRecord {
         }
     }
 
+    if (config.THROTTLE_TTL_MS !== undefined) {
+        const parsedTtl = Number(config.THROTTLE_TTL_MS);
+        if (!Number.isInteger(parsedTtl) || parsedTtl <= 0) {
+            throw new Error('THROTTLE_TTL_MS must be a positive integer');
+        }
+    }
+
+    if (config.THROTTLE_LIMIT !== undefined) {
+        const parsedLimit = Number(config.THROTTLE_LIMIT);
+        if (!Number.isInteger(parsedLimit) || parsedLimit <= 0) {
+            throw new Error('THROTTLE_LIMIT must be a positive integer');
+        }
+    }
+
     return config;
 }
