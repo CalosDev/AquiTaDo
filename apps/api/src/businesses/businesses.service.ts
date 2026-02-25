@@ -1,11 +1,14 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
 import slugify from 'slugify';
 
 @Injectable()
 export class BusinessesService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        @Inject(PrismaService)
+        private prisma: PrismaService,
+    ) { }
 
     private readonly includeRelations = {
         owner: {

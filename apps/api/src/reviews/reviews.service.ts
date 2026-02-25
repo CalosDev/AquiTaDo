@@ -1,11 +1,14 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { CreateReviewDto } from './dto/review.dto';
 
 @Injectable()
 export class ReviewsService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        @Inject(PrismaService)
+        private prisma: PrismaService,
+    ) { }
 
     async create(dto: CreateReviewDto, userId: string) {
         // Check if user already reviewed this business

@@ -1,5 +1,5 @@
 import {
-    Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards,
+    Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Inject,
 } from '@nestjs/common';
 import { BusinessesService } from './businesses.service';
 import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
@@ -11,7 +11,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('businesses')
 export class BusinessesController {
-    constructor(private readonly businessesService: BusinessesService) { }
+    constructor(
+        @Inject(BusinessesService)
+        private readonly businessesService: BusinessesService,
+    ) { }
 
     @Get()
     async findAll(@Query() query: BusinessQueryDto) {

@@ -1,9 +1,12 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Inject, Param } from '@nestjs/common';
 import { LocationsService } from './locations.service';
 
 @Controller()
 export class LocationsController {
-    constructor(private readonly locationsService: LocationsService) { }
+    constructor(
+        @Inject(LocationsService)
+        private readonly locationsService: LocationsService,
+    ) { }
 
     @Get('provinces')
     async findAllProvinces() {
