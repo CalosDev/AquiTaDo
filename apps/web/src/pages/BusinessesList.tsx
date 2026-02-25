@@ -41,13 +41,15 @@ export function BusinessesList() {
     const currentSearch = searchParams.get('search') || '';
     const currentCategory = searchParams.get('categoryId') || '';
     const currentProvince = searchParams.get('provinceId') || '';
-    const currentPage = parseInt(searchParams.get('page') || '1');
+    const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
+    const currentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+    const [searchInput, setSearchInput] = useState(currentSearch);
 
     useEffect(() => {
-        loadFilters();
-    }, []);
+        setSearchInput(currentSearch);
+    }, [currentSearch]);
 
-    const loadFilters = async () => {
+    const loadFilters = useCallback(async () => {
         try {
             const [catRes, provRes] = await Promise.all([
                 categoryApi.getAll(),
@@ -58,7 +60,11 @@ export function BusinessesList() {
         } catch (error) {
             setLoadError(getApiErrorMessage(error, 'No se pudieron cargar los filtros'));
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        void loadFilters();
+    }, [loadFilters]);
 
     const loadBusinesses = useCallback(async () => {
         setLoading(true);
@@ -84,16 +90,36 @@ export function BusinessesList() {
         void loadBusinesses();
     }, [loadBusinesses]);
 
-    const updateFilter = (key: string, value: string) => {
-        const params = new URLSearchParams(searchParams);
-        if (value) {
-            params.set(key, value);
-        } else {
-            params.delete(key);
-        }
-        params.set('page', '1');
-        setSearchParams(params);
-    };
+    const updateFilter = useCallback((
+        key: string,
+        value: string,
+        options: { resetPage?: boolean } = {},
+    ) => {
+        setSearchParams((prev) => {
+            const params = new URLSearchParams(prev);
+            if (value) {
+                params.set(key, value);
+            } else {
+                params.delete(key);
+            }
+
+            if (options.resetPage ?? true) {
+                params.set('page', '1');
+            }
+
+            return params;
+        });
+    }, [setSearchParams]);
+
+    useEffect(() => {
+        const debounceTimer = window.setTimeout(() => {
+            if (searchInput !== currentSearch) {
+                updateFilter('search', searchInput, { resetPage: true });
+            }
+        }, 350);
+
+        return () => window.clearTimeout(debounceTimer);
+    }, [searchInput, currentSearch, updateFilter]);
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
@@ -115,8 +141,8 @@ export function BusinessesList() {
                             <input
                                 type="text"
                                 placeholder="Nombre o descripción..."
-                                value={currentSearch}
-                                onChange={(e) => updateFilter('search', e.target.value)}
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
                                 className="input-field text-sm"
                             />
                         </div>
@@ -156,7 +182,10 @@ export function BusinessesList() {
                         </div>
 
                         <button
-                            onClick={() => setSearchParams({})}
+                            onClick={() => {
+                                setSearchInput('');
+                                setSearchParams({});
+                            }}
                             className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                         >
                             Limpiar filtros
@@ -215,7 +244,9 @@ export function BusinessesList() {
                                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                                         <button
                                             key={page}
-                                            onClick={() => updateFilter('page', String(page))}
+                                            onClick={() =>
+                                                updateFilter('page', String(page), { resetPage: false })
+                                            }
                                             className={`w-10 h-10 rounded-xl text-sm font-medium transition-all ${page === currentPage
                                                     ? 'bg-primary-600 text-white shadow-lg'
                                                     : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-500'

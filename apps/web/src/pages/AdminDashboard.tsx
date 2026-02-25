@@ -18,6 +18,29 @@ interface Category {
     _count?: { businesses: number };
 }
 
+type CategoryForm = {
+    name: string;
+    slug: string;
+    icon: string;
+};
+
+const EMPTY_CATEGORY_FORM: CategoryForm = {
+    name: '',
+    slug: '',
+    icon: '',
+};
+
+function toSlug(value: string): string {
+    return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+}
+
 export function AdminDashboard() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -27,16 +50,20 @@ export function AdminDashboard() {
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
+    const [newCategoryForm, setNewCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
+    const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+    const [editingCategoryForm, setEditingCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
+
     const loadData = useCallback(async () => {
         setErrorMessage('');
 
         try {
-            const [bizRes, catRes] = await Promise.all([
+            const [businessesResponse, categoriesResponse] = await Promise.all([
                 businessApi.getAllAdmin({ limit: 100 }),
                 categoryApi.getAll(),
             ]);
-            setBusinesses(bizRes.data.data || []);
-            setCategories(catRes.data);
+            setBusinesses(businessesResponse.data.data || []);
+            setCategories(categoriesResponse.data);
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el panel admin'));
         } finally {
@@ -48,13 +75,13 @@ export function AdminDashboard() {
         void loadData();
     }, [loadData]);
 
-    const handleVerify = async (id: string) => {
-        setProcessingId(id);
+    const handleVerifyBusiness = async (businessId: string) => {
+        setProcessingId(businessId);
         setErrorMessage('');
         setSuccessMessage('');
 
         try {
-            await businessApi.verify(id);
+            await businessApi.verify(businessId);
             await loadData();
             setSuccessMessage('Negocio aprobado correctamente');
         } catch (error) {
@@ -64,17 +91,17 @@ export function AdminDashboard() {
         }
     };
 
-    const handleDeleteBusiness = async (id: string) => {
-        if (!confirm('Seguro que deseas eliminar este negocio?')) {
+    const handleDeleteBusiness = async (businessId: string) => {
+        if (!window.confirm('Seguro que deseas eliminar este negocio?')) {
             return;
         }
 
-        setProcessingId(id);
+        setProcessingId(businessId);
         setErrorMessage('');
         setSuccessMessage('');
 
         try {
-            await businessApi.delete(id);
+            await businessApi.delete(businessId);
             await loadData();
             setSuccessMessage('Negocio eliminado correctamente');
         } catch (error) {
@@ -84,15 +111,109 @@ export function AdminDashboard() {
         }
     };
 
+    const handleCreateCategory = async (event: React.FormEvent) => {
+        event.preventDefault();
+
+        const slug = newCategoryForm.slug.trim() || toSlug(newCategoryForm.name);
+        if (!newCategoryForm.name.trim() || !slug) {
+            setErrorMessage('Nombre y slug son obligatorios');
+            return;
+        }
+
+        setProcessingId('create-category');
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await categoryApi.create({
+                name: newCategoryForm.name.trim(),
+                slug,
+                icon: newCategoryForm.icon.trim() || undefined,
+            });
+            setNewCategoryForm(EMPTY_CATEGORY_FORM);
+            await loadData();
+            setSuccessMessage('Categoría creada correctamente');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la categoría'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const startCategoryEdit = (category: Category) => {
+        setEditingCategoryId(category.id);
+        setEditingCategoryForm({
+            name: category.name,
+            slug: category.slug,
+            icon: category.icon || '',
+        });
+        setErrorMessage('');
+        setSuccessMessage('');
+    };
+
+    const cancelCategoryEdit = () => {
+        setEditingCategoryId(null);
+        setEditingCategoryForm(EMPTY_CATEGORY_FORM);
+    };
+
+    const saveCategoryEdit = async (categoryId: string) => {
+        if (!editingCategoryForm.name.trim() || !editingCategoryForm.slug.trim()) {
+            setErrorMessage('Nombre y slug son obligatorios');
+            return;
+        }
+
+        setProcessingId(categoryId);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await categoryApi.update(categoryId, {
+                name: editingCategoryForm.name.trim(),
+                slug: toSlug(editingCategoryForm.slug.trim()),
+                icon: editingCategoryForm.icon.trim() || undefined,
+            });
+            await loadData();
+            cancelCategoryEdit();
+            setSuccessMessage('Categoría actualizada correctamente');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la categoría'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const deleteCategory = async (categoryId: string) => {
+        if (!window.confirm('Seguro que deseas eliminar esta categoría?')) {
+            return;
+        }
+
+        setProcessingId(categoryId);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await categoryApi.delete(categoryId);
+            await loadData();
+            if (editingCategoryId === categoryId) {
+                cancelCategoryEdit();
+            }
+            setSuccessMessage('Categoría eliminada correctamente');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar la categoría'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     const tabs = [
         { key: 'businesses', label: 'Negocios', icon: '🏪' },
-        { key: 'categories', label: 'Categorias', icon: '📁' },
+        { key: 'categories', label: 'Categorías', icon: '📁' },
     ] as const;
 
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
             <h1 className="font-display text-3xl font-bold text-gray-900 mb-2">Panel Admin</h1>
-            <p className="text-gray-500 mb-8">Gestion de negocios y categorias</p>
+            <p className="text-gray-500 mb-8">Gestión de negocios y categorías</p>
 
             {errorMessage && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -113,19 +234,19 @@ export function AdminDashboard() {
                 </div>
                 <div className="card p-4 text-center">
                     <div className="text-2xl font-bold text-green-600">
-                        {businesses.filter((b) => b.verified).length}
+                        {businesses.filter((business) => business.verified).length}
                     </div>
                     <div className="text-xs text-gray-500">Verificados</div>
                 </div>
                 <div className="card p-4 text-center">
                     <div className="text-2xl font-bold text-yellow-600">
-                        {businesses.filter((b) => !b.verified).length}
+                        {businesses.filter((business) => !business.verified).length}
                     </div>
                     <div className="text-xs text-gray-500">Pendientes</div>
                 </div>
                 <div className="card p-4 text-center">
                     <div className="text-2xl font-bold text-accent-600">{categories.length}</div>
-                    <div className="text-xs text-gray-500">Categorias</div>
+                    <div className="text-xs text-gray-500">Categorías</div>
                 </div>
             </div>
 
@@ -134,10 +255,11 @@ export function AdminDashboard() {
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
-                        className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${activeTab === tab.key
-                            ? 'bg-primary-600 text-white shadow-lg'
-                            : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-400'
-                            }`}
+                        className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                            activeTab === tab.key
+                                ? 'bg-primary-600 text-white shadow-lg'
+                                : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-400'
+                        }`}
                     >
                         {tab.icon} {tab.label}
                     </button>
@@ -156,46 +278,69 @@ export function AdminDashboard() {
                                 <table className="w-full">
                                     <thead className="bg-gray-50 border-b">
                                         <tr>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">Negocio</th>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">Propietario</th>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">Estado</th>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">Fecha</th>
-                                            <th className="text-right text-xs font-semibold text-gray-500 uppercase p-4">Acciones</th>
+                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                                Negocio
+                                            </th>
+                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                                Propietario
+                                            </th>
+                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                                Estado
+                                            </th>
+                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                                Fecha
+                                            </th>
+                                            <th className="text-right text-xs font-semibold text-gray-500 uppercase p-4">
+                                                Acciones
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {businesses.map((biz) => (
-                                            <tr key={biz.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="p-4 font-medium text-gray-900">{biz.name}</td>
-                                                <td className="p-4 text-sm text-gray-500">{biz.owner?.name || '-'}</td>
+                                        {businesses.map((business) => (
+                                            <tr key={business.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="p-4 font-medium text-gray-900">{business.name}</td>
+                                                <td className="p-4 text-sm text-gray-500">
+                                                    {business.owner?.name || '-'}
+                                                </td>
                                                 <td className="p-4">
                                                     <span
-                                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${biz.verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                                            }`}
+                                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                                            business.verified
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : 'bg-yellow-100 text-yellow-700'
+                                                        }`}
                                                     >
-                                                        {biz.verified ? 'Verificado' : 'Pendiente'}
+                                                        {business.verified ? 'Verificado' : 'Pendiente'}
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-sm text-gray-400">
-                                                    {new Date(biz.createdAt).toLocaleDateString('es-DO')}
+                                                    {new Date(business.createdAt).toLocaleDateString('es-DO')}
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <div className="flex justify-end gap-2">
-                                                        {!biz.verified && (
+                                                        {!business.verified && (
                                                             <button
-                                                                onClick={() => handleVerify(biz.id)}
-                                                                disabled={processingId === biz.id}
+                                                                onClick={() =>
+                                                                    void handleVerifyBusiness(business.id)
+                                                                }
+                                                                disabled={processingId === business.id}
                                                                 className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-lg hover:bg-green-200 transition-colors font-medium disabled:opacity-50"
                                                             >
-                                                                {processingId === biz.id ? 'Procesando...' : 'Aprobar'}
+                                                                {processingId === business.id
+                                                                    ? 'Procesando...'
+                                                                    : 'Aprobar'}
                                                             </button>
                                                         )}
                                                         <button
-                                                            onClick={() => handleDeleteBusiness(biz.id)}
-                                                            disabled={processingId === biz.id}
+                                                            onClick={() =>
+                                                                void handleDeleteBusiness(business.id)
+                                                            }
+                                                            disabled={processingId === business.id}
                                                             className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50"
                                                         >
-                                                            {processingId === biz.id ? 'Procesando...' : 'Eliminar'}
+                                                            {processingId === business.id
+                                                                ? 'Procesando...'
+                                                                : 'Eliminar'}
                                                         </button>
                                                     </div>
                                                 </td>
@@ -205,7 +350,9 @@ export function AdminDashboard() {
                                 </table>
                             </div>
                             {businesses.length === 0 && (
-                                <div className="p-10 text-center text-gray-400">No hay negocios registrados</div>
+                                <div className="p-10 text-center text-gray-400">
+                                    No hay negocios registrados
+                                </div>
                             )}
                         </div>
                     )}
@@ -213,18 +360,152 @@ export function AdminDashboard() {
                     {activeTab === 'categories' && (
                         <div className="space-y-4">
                             <div className="card p-5">
-                                <h3 className="font-display font-semibold mb-3">Categorias actuales</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {categories.map((cat) => (
+                                <h3 className="font-display font-semibold mb-3">Crear categoría</h3>
+                                <form onSubmit={handleCreateCategory} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <input
+                                        type="text"
+                                        className="input-field text-sm"
+                                        placeholder="Nombre"
+                                        value={newCategoryForm.name}
+                                        onChange={(event) =>
+                                            setNewCategoryForm((prev) => ({
+                                                ...prev,
+                                                name: event.target.value,
+                                                slug:
+                                                    prev.slug.trim().length > 0
+                                                        ? prev.slug
+                                                        : toSlug(event.target.value),
+                                            }))
+                                        }
+                                    />
+                                    <input
+                                        type="text"
+                                        className="input-field text-sm"
+                                        placeholder="slug"
+                                        value={newCategoryForm.slug}
+                                        onChange={(event) =>
+                                            setNewCategoryForm((prev) => ({
+                                                ...prev,
+                                                slug: toSlug(event.target.value),
+                                            }))
+                                        }
+                                    />
+                                    <input
+                                        type="text"
+                                        className="input-field text-sm"
+                                        placeholder="Icono (opcional)"
+                                        value={newCategoryForm.icon}
+                                        onChange={(event) =>
+                                            setNewCategoryForm((prev) => ({
+                                                ...prev,
+                                                icon: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="btn-primary text-sm"
+                                        disabled={processingId === 'create-category'}
+                                    >
+                                        {processingId === 'create-category' ? 'Creando...' : 'Crear'}
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="card p-5">
+                                <h3 className="font-display font-semibold mb-3">Categorías actuales</h3>
+                                <div className="space-y-3">
+                                    {categories.map((category) => (
                                         <div
-                                            key={cat.id}
-                                            className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl text-sm"
+                                            key={category.id}
+                                            className="p-3 rounded-xl border border-gray-100 bg-gray-50"
                                         >
-                                            <span>{cat.icon}</span>
-                                            <span className="font-medium">{cat.name}</span>
-                                            <span className="text-xs text-gray-400">
-                                                ({cat._count?.businesses || 0})
-                                            </span>
+                                            {editingCategoryId === category.id ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                    <input
+                                                        type="text"
+                                                        className="input-field text-sm"
+                                                        value={editingCategoryForm.name}
+                                                        onChange={(event) =>
+                                                            setEditingCategoryForm((prev) => ({
+                                                                ...prev,
+                                                                name: event.target.value,
+                                                            }))
+                                                        }
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        className="input-field text-sm"
+                                                        value={editingCategoryForm.slug}
+                                                        onChange={(event) =>
+                                                            setEditingCategoryForm((prev) => ({
+                                                                ...prev,
+                                                                slug: toSlug(event.target.value),
+                                                            }))
+                                                        }
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        className="input-field text-sm"
+                                                        value={editingCategoryForm.icon}
+                                                        onChange={(event) =>
+                                                            setEditingCategoryForm((prev) => ({
+                                                                ...prev,
+                                                                icon: event.target.value,
+                                                            }))
+                                                        }
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            className="btn-primary text-xs"
+                                                            onClick={() =>
+                                                                void saveCategoryEdit(category.id)
+                                                            }
+                                                            disabled={processingId === category.id}
+                                                        >
+                                                            Guardar
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-secondary text-xs"
+                                                            onClick={cancelCategoryEdit}
+                                                        >
+                                                            Cancelar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                        <span>{category.icon || '📁'}</span>
+                                                        <span className="font-medium text-gray-800">
+                                                            {category.name}
+                                                        </span>
+                                                        <span className="text-gray-400">({category.slug})</span>
+                                                        <span className="text-xs text-gray-500">
+                                                            {category._count?.businesses || 0} negocios
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            className="btn-secondary text-xs"
+                                                            onClick={() => startCategoryEdit(category)}
+                                                        >
+                                                            Editar
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50"
+                                                            onClick={() => void deleteCategory(category.id)}
+                                                            disabled={processingId === category.id}
+                                                        >
+                                                            Eliminar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

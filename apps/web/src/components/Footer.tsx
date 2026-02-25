@@ -52,8 +52,8 @@ export function Footer() {
                         © {new Date().getFullYear()} AquiTa.do — Hecho con ❤️ en República Dominicana
                     </p>
                     <div className="flex gap-4 text-sm text-gray-500">
-                        <a href="#" className="hover:text-white transition-colors">Términos</a>
-                        <a href="#" className="hover:text-white transition-colors">Privacidad</a>
+                        <Link to="/terms" className="hover:text-white transition-colors">Términos</Link>
+                        <Link to="/privacy" className="hover:text-white transition-colors">Privacidad</Link>
                     </div>
                 </div>
             </div>

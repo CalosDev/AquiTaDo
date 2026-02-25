@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { getApiErrorMessage } from '../api/error';
 import { businessApi, reviewApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 
@@ -32,6 +33,9 @@ export function BusinessDetails() {
     const [activeImage, setActiveImage] = useState(0);
     const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
     const [submittingReview, setSubmittingReview] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const [reviewErrorMessage, setReviewErrorMessage] = useState('');
+    const [reviewSuccessMessage, setReviewSuccessMessage] = useState('');
 
     const loadBusiness = useCallback(async () => {
         if (!id) {
@@ -42,8 +46,10 @@ export function BusinessDetails() {
         try {
             const res = await businessApi.getById(id);
             setBusiness(res.data);
+            setErrorMessage('');
         } catch (error) {
-            console.error('Error loading business:', error);
+            setBusiness(null);
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el negocio'));
         } finally {
             setLoading(false);
         }
@@ -57,6 +63,8 @@ export function BusinessDetails() {
         e.preventDefault();
         if (!id) return;
         setSubmittingReview(true);
+        setReviewErrorMessage('');
+        setReviewSuccessMessage('');
         try {
             await reviewApi.create({
                 rating: reviewForm.rating,
@@ -65,8 +73,9 @@ export function BusinessDetails() {
             });
             setReviewForm({ rating: 5, comment: '' });
             await loadBusiness();
+            setReviewSuccessMessage('Reseña publicada correctamente');
         } catch (error) {
-            console.error('Error submitting review:', error);
+            setReviewErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la reseña'));
         } finally {
             setSubmittingReview(false);
         }
@@ -87,15 +96,23 @@ export function BusinessDetails() {
 
     if (!business) {
         return (
-            <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-                <p className="text-5xl mb-4">😕</p>
+            <div className="max-w-7xl mx-auto px-4 py-20 text-center space-y-4">
+                <p className="text-5xl">😕</p>
                 <h2 className="text-2xl font-bold text-gray-900">Negocio no encontrado</h2>
+                {errorMessage && (
+                    <p className="text-sm text-red-600">{errorMessage}</p>
+                )}
             </div>
         );
     }
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+            {errorMessage && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {errorMessage}
+                </div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
@@ -202,6 +219,12 @@ export function BusinessDetails() {
                         </h3>
 
                         {/* Review Form */}
+                        {!isAuthenticated && (
+                            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                                Inicia sesión para dejar tu reseña. <Link to="/login" className="underline font-medium">Ir a login</Link>
+                            </div>
+                        )}
+
                         {isAuthenticated && (
                             <form onSubmit={handleReviewSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl">
                                 <div className="flex items-center gap-3 mb-3">
@@ -235,6 +258,18 @@ export function BusinessDetails() {
                                     {submittingReview ? 'Enviando...' : 'Enviar Reseña'}
                                 </button>
                             </form>
+                        )}
+
+                        {reviewErrorMessage && (
+                            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                {reviewErrorMessage}
+                            </div>
+                        )}
+
+                        {reviewSuccessMessage && (
+                            <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                                {reviewSuccessMessage}
+                            </div>
                         )}
 
                         {/* Reviews List */}

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getApiErrorMessage } from '../api/error';
 import { businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { useAuth } from '../context/useAuth';
 
 interface Category {
     id: string;
@@ -20,11 +22,13 @@ interface City {
 
 export function RegisterBusiness() {
     const navigate = useNavigate();
+    const { refreshProfile } = useAuth();
     const [categories, setCategories] = useState<Category[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [cities, setCities] = useState<City[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -49,6 +53,7 @@ export function RegisterBusiness() {
     }, [formData.provinceId]);
 
     const loadFormData = async () => {
+        setLoadingData(true);
         try {
             const [catRes, provRes] = await Promise.all([
                 categoryApi.getAll(),
@@ -56,8 +61,10 @@ export function RegisterBusiness() {
             ]);
             setCategories(catRes.data);
             setProvinces(provRes.data);
-        } catch (err) {
-            console.error(err);
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, 'No se pudieron cargar categorías y provincias'));
+        } finally {
+            setLoadingData(false);
         }
     };
 
@@ -65,8 +72,8 @@ export function RegisterBusiness() {
         try {
             const res = await locationApi.getCities(provinceId);
             setCities(res.data);
-        } catch (err) {
-            console.error(err);
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, 'No se pudieron cargar las ciudades de la provincia'));
         }
     };
 
@@ -96,14 +103,30 @@ export function RegisterBusiness() {
             if (formData.phone) payload.phone = formData.phone;
             if (formData.whatsapp) payload.whatsapp = formData.whatsapp;
             if (formData.cityId) payload.cityId = formData.cityId;
-            if (formData.latitude) payload.latitude = parseFloat(formData.latitude);
-            if (formData.longitude) payload.longitude = parseFloat(formData.longitude);
+            if (formData.latitude) {
+                const parsedLatitude = Number.parseFloat(formData.latitude);
+                if (!Number.isFinite(parsedLatitude)) {
+                    setError('La latitud ingresada no es válida');
+                    setLoading(false);
+                    return;
+                }
+                payload.latitude = parsedLatitude;
+            }
+            if (formData.longitude) {
+                const parsedLongitude = Number.parseFloat(formData.longitude);
+                if (!Number.isFinite(parsedLongitude)) {
+                    setError('La longitud ingresada no es válida');
+                    setLoading(false);
+                    return;
+                }
+                payload.longitude = parsedLongitude;
+            }
 
             const res = await businessApi.create(payload);
+            await refreshProfile();
             navigate(`/businesses/${res.data.id}`);
         } catch (err: unknown) {
-            const error = err as { response?: { data?: { message?: string } } };
-            setError(error.response?.data?.message || 'Error al registrar negocio');
+            setError(getApiErrorMessage(err, 'Error al registrar negocio'));
         } finally {
             setLoading(false);
         }
@@ -125,7 +148,12 @@ export function RegisterBusiness() {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                {loadingData ? (
+                    <div className="flex justify-center py-12">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Basic Info */}
                     <div>
                         <h3 className="font-display font-semibold text-gray-800 mb-3">Información Básica</h3>
@@ -277,7 +305,8 @@ export function RegisterBusiness() {
                     <button type="submit" disabled={loading} className="btn-primary w-full text-lg py-3.5">
                         {loading ? 'Registrando...' : 'Registrar Negocio'}
                     </button>
-                </form>
+                    </form>
+                )}
             </div>
         </div>
     );

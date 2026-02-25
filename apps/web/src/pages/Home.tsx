@@ -34,6 +34,7 @@ export function Home() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [recentBusinesses, setRecentBusinesses] = useState<Business[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
+    const [totalBusinesses, setTotalBusinesses] = useState(0);
     const [loadError, setLoadError] = useState('');
     const navigate = useNavigate();
 
@@ -51,6 +52,7 @@ export function Home() {
             ]);
             setCategories(catRes.data);
             setRecentBusinesses(bizRes.data.data || []);
+            setTotalBusinesses(Number(bizRes.data.total || 0));
             setProvinces(provRes.data);
         } catch (error) {
             setLoadError(getApiErrorMessage(error, 'No se pudo cargar la informacion inicial'));
@@ -115,15 +117,17 @@ export function Home() {
                         {/* Quick Stats */}
                         <div className="flex justify-center gap-8 mt-10">
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-white">1,000+</div>
+                                <div className="text-2xl font-bold text-white">
+                                    {totalBusinesses.toLocaleString('es-DO')}
+                                </div>
                                 <div className="text-sm text-blue-200">Negocios</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-white">32</div>
+                                <div className="text-2xl font-bold text-white">{provinces.length}</div>
                                 <div className="text-sm text-blue-200">Provincias</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-white">15</div>
+                                <div className="text-2xl font-bold text-white">{categories.length}</div>
                                 <div className="text-sm text-blue-200">Categorías</div>
                             </div>
                         </div>

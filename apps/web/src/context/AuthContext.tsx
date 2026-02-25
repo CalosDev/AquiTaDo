@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useCallback, useState, useEffect, ReactNode } from 'react';
 import { authApi } from '../api/endpoints';
 
 interface User {
@@ -16,6 +16,7 @@ interface AuthContextType {
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
+    refreshProfile: () => Promise<void>;
     logout: () => void;
     isAuthenticated: boolean;
     isAdmin: boolean;
@@ -29,28 +30,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const savedToken = localStorage.getItem('accessToken');
-        const savedUser = localStorage.getItem('user');
+    const clearSession = useCallback(() => {
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+    }, []);
 
-        if (savedToken && savedUser) {
-            setToken(savedToken);
-            setUser(JSON.parse(savedUser));
-        }
-        setLoading(false);
+    const refreshProfile = useCallback(async () => {
+        const response = await authApi.getProfile();
+        const profile = response.data as User;
+        setUser(profile);
+        localStorage.setItem('user', JSON.stringify(profile));
     }, []);
 
     useEffect(() => {
+        const bootstrapAuth = async () => {
+            const savedToken = localStorage.getItem('accessToken');
+
+            if (!savedToken) {
+                setLoading(false);
+                return;
+            }
+
+            setToken(savedToken);
+
+            try {
+                await refreshProfile();
+            } catch {
+                clearSession();
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        void bootstrapAuth();
+    }, [clearSession, refreshProfile]);
+
+    useEffect(() => {
         const handleUnauthorized = () => {
-            setToken(null);
-            setUser(null);
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('user');
+            clearSession();
         };
 
         window.addEventListener('auth:unauthorized', handleUnauthorized);
         return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
-    }, []);
+    }, [clearSession]);
 
     const login = async (email: string, password: string) => {
         const response = await authApi.login({ email, password });
@@ -71,10 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = () => {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('user');
+        clearSession();
     };
 
     return (
@@ -85,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 loading,
                 login,
                 register,
+                refreshProfile,
                 logout,
                 isAuthenticated: !!token,
                 isAdmin: user?.role === 'ADMIN',

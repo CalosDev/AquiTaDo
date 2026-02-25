@@ -9,6 +9,9 @@ import { Register } from '../pages/Register';
 import { RegisterBusiness } from '../pages/RegisterBusiness';
 import { DashboardBusiness } from '../pages/DashboardBusiness';
 import { AdminDashboard } from '../pages/AdminDashboard';
+import { Terms } from '../pages/Terms';
+import { Privacy } from '../pages/Privacy';
+import { NotFound } from '../pages/NotFound';
 
 export function AppRouter() {
     return (
@@ -19,6 +22,8 @@ export function AppRouter() {
                 <Route path="/businesses/:id" element={<BusinessDetails />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/privacy" element={<Privacy />} />
                 <Route
                     path="/register-business"
                     element={
@@ -43,6 +48,7 @@ export function AppRouter() {
                         </ProtectedRoute>
                     }
                 />
+                <Route path="*" element={<NotFound />} />
             </Route>
         </Routes>
     );
