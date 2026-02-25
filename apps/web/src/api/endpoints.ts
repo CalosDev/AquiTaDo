@@ -6,6 +6,10 @@ export const authApi = {
         api.post('/auth/register', data),
     login: (data: { email: string; password: string }) =>
         api.post('/auth/login', data),
+    refresh: (data: { refreshToken: string }) =>
+        api.post('/auth/refresh', data),
+    logout: (data: { refreshToken: string }) =>
+        api.post('/auth/logout', data),
     getProfile: () => api.get('/users/me'),
 };
 
@@ -96,4 +100,84 @@ export const organizationApi = {
     ) => api.patch(`/organizations/${organizationId}/members/${userId}/role`, data),
     removeMember: (organizationId: string, userId: string) =>
         api.delete(`/organizations/${organizationId}/members/${userId}`),
+};
+
+// ---- Plans ----
+export const plansApi = {
+    getAll: () => api.get('/plans'),
+};
+
+// ---- Subscriptions ----
+export const subscriptionsApi = {
+    getCurrent: () => api.get('/subscriptions/current'),
+    createCheckoutSession: (data: { planCode: 'FREE' | 'GROWTH' | 'SCALE'; successUrl: string; cancelUrl: string }) =>
+        api.post('/subscriptions/checkout-session', data),
+    cancelAtPeriodEnd: () => api.post('/subscriptions/cancel-at-period-end'),
+};
+
+// ---- Payments ----
+export const paymentsApi = {
+    getMyPayments: (params?: { limit?: number }) => api.get('/payments/my', { params }),
+    getMyInvoices: (params?: { limit?: number }) => api.get('/payments/invoices/my', { params }),
+};
+
+// ---- Promotions ----
+export const promotionsApi = {
+    getPublic: (params?: Record<string, string | number | boolean>) => api.get('/promotions', { params }),
+    getMine: (params?: Record<string, string | number | boolean>) => api.get('/promotions/my', { params }),
+    create: (data: {
+        businessId: string;
+        title: string;
+        description?: string;
+        discountType: 'PERCENTAGE' | 'FIXED';
+        discountValue: number;
+        couponCode?: string;
+        startsAt: string;
+        endsAt: string;
+        maxRedemptions?: number;
+        isFlashOffer?: boolean;
+        isActive?: boolean;
+    }) => api.post('/promotions', data),
+    update: (id: string, data: Record<string, unknown>) => api.put(`/promotions/${id}`, data),
+    delete: (id: string) => api.delete(`/promotions/${id}`),
+};
+
+// ---- Bookings ----
+export const bookingsApi = {
+    create: (data: {
+        businessId: string;
+        scheduledFor: string;
+        partySize?: number;
+        notes?: string;
+        promotionId?: string;
+        couponCode?: string;
+        quotedAmount?: number;
+        depositAmount?: number;
+        currency?: string;
+    }) => api.post('/bookings', data),
+    getMineAsUser: (params?: Record<string, string | number | boolean>) => api.get('/bookings/me', { params }),
+    getMineAsOrganization: (params?: Record<string, string | number | boolean>) =>
+        api.get('/bookings/my', { params }),
+    updateStatus: (id: string, data: {
+        status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW';
+        quotedAmount?: number;
+        depositAmount?: number;
+        notes?: string;
+    }) => api.patch(`/bookings/${id}/status`, data),
+    getTransactionsMyOrganization: (params?: Record<string, string | number | boolean>) =>
+        api.get('/bookings/transactions/my', { params }),
+};
+
+// ---- Analytics ----
+export const analyticsApi = {
+    trackEvent: (data: {
+        businessId: string;
+        eventType: 'VIEW' | 'CLICK' | 'CONVERSION' | 'RESERVATION_REQUEST';
+        occurredAt?: string;
+        visitorId?: string;
+        amount?: number;
+    }) => api.post('/analytics/events', data),
+    getMyDashboard: (params?: { days?: number }) => api.get('/analytics/dashboard/my', { params }),
+    getBusinessAnalytics: (businessId: string, params?: { days?: number }) =>
+        api.get(`/analytics/business/${businessId}`, { params }),
 };

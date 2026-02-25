@@ -10,8 +10,9 @@ export function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false);
 
     const handleLogout = () => {
-        logout();
-        navigate('/');
+        void logout().finally(() => {
+            navigate('/');
+        });
     };
 
     return (

@@ -1,454 +1,358 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { analyticsApi, bookingsApi, businessApi, promotionsApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
-import { businessApi, uploadApi } from '../api/endpoints';
 import { useOrganization } from '../context/useOrganization';
-
-interface BusinessImage {
-    id: string;
-    url: string;
-}
 
 interface Business {
     id: string;
     name: string;
-    description: string;
-    address: string;
-    phone?: string;
-    whatsapp?: string;
     verified: boolean;
-    createdAt: string;
     _count?: { reviews: number };
-    images: BusinessImage[];
 }
 
-type EditBusinessForm = {
-    name: string;
-    description: string;
-    address: string;
-    phone: string;
-    whatsapp: string;
+interface Promotion {
+    id: string;
+    title: string;
+    couponCode?: string;
+    discountType: 'PERCENTAGE' | 'FIXED';
+    discountValue: string | number;
+    startsAt: string;
+    endsAt: string;
+    business: { id: string; name: string };
+}
+
+interface Booking {
+    id: string;
+    status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW';
+    scheduledFor: string;
+    quotedAmount?: string | number | null;
+    business: { id: string; name: string };
+    user?: { name: string } | null;
+}
+
+interface DashboardPayload {
+    totals: {
+        views: number;
+        clicks: number;
+        conversions: number;
+        grossRevenue: number;
+        conversionRate: number;
+    };
+    marketplace: {
+        activePromotions: number;
+        pendingBookings: number;
+        confirmedBookings: number;
+    };
+    subscription: {
+        status: string;
+        currentPeriodEnd: string | null;
+        plan: {
+            name: string;
+            priceMonthly: string;
+            currency: string;
+            transactionFeeBps: number;
+        };
+    } | null;
+}
+
+type PromotionForm = {
+    businessId: string;
+    title: string;
+    discountType: 'PERCENTAGE' | 'FIXED';
+    discountValue: string;
+    couponCode: string;
+    startsAt: string;
+    endsAt: string;
 };
 
-const EMPTY_EDIT_FORM: EditBusinessForm = {
-    name: '',
-    description: '',
-    address: '',
-    phone: '',
-    whatsapp: '',
+const EMPTY_PROMOTION_FORM: PromotionForm = {
+    businessId: '',
+    title: '',
+    discountType: 'PERCENTAGE',
+    discountValue: '10',
+    couponCode: '',
+    startsAt: '',
+    endsAt: '',
 };
+
+function asNumber(value: string | number | null | undefined): number {
+    if (value === null || value === undefined) return 0;
+    const parsedValue = Number(value);
+    return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
+function formatCurrency(value: string | number | null | undefined): string {
+    return new Intl.NumberFormat('es-DO', {
+        style: 'currency',
+        currency: 'DOP',
+        maximumFractionDigits: 2,
+    }).format(asNumber(value));
+}
 
 export function DashboardBusiness() {
     const { activeOrganizationId } = useOrganization();
-    const [businesses, setBusinesses] = useState<Business[]>([]);
     const [loading, setLoading] = useState(true);
-    const [uploadingBusinessId, setUploadingBusinessId] = useState<string | null>(null);
-    const [savingBusinessId, setSavingBusinessId] = useState<string | null>(null);
-    const [deletingBusinessId, setDeletingBusinessId] = useState<string | null>(null);
-    const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
-    const [editingBusinessId, setEditingBusinessId] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState<EditBusinessForm>(EMPTY_EDIT_FORM);
+    const [businesses, setBusinesses] = useState<Business[]>([]);
+    const [promotions, setPromotions] = useState<Promotion[]>([]);
+    const [bookings, setBookings] = useState<Booking[]>([]);
+    const [metrics, setMetrics] = useState<DashboardPayload | null>(null);
+    const [promotionForm, setPromotionForm] = useState<PromotionForm>(EMPTY_PROMOTION_FORM);
+    const [creatingPromotion, setCreatingPromotion] = useState(false);
+    const [updatingBookingId, setUpdatingBookingId] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
-    const loadBusinesses = useCallback(async () => {
+    const loadDashboard = useCallback(async () => {
         if (!activeOrganizationId) {
-            setBusinesses([]);
             setLoading(false);
-            setErrorMessage('Selecciona o crea una organización para ver tu dashboard');
+            setBusinesses([]);
+            setPromotions([]);
+            setBookings([]);
+            setMetrics(null);
+            setErrorMessage('Selecciona una organización para usar el dashboard');
             return;
         }
 
+        setLoading(true);
         setErrorMessage('');
+
         try {
-            const res = await businessApi.getMine();
-            setBusinesses(res.data || []);
+            const [businessesRes, promotionsRes, bookingsRes, metricsRes] = await Promise.all([
+                businessApi.getMine(),
+                promotionsApi.getMine({ limit: 10 }),
+                bookingsApi.getMineAsOrganization({ limit: 10 }),
+                analyticsApi.getMyDashboard({ days: 30 }),
+            ]);
+
+            const loadedBusinesses = businessesRes.data || [];
+            setBusinesses(loadedBusinesses);
+            setPromotions(promotionsRes.data?.data || []);
+            setBookings(bookingsRes.data?.data || []);
+            setMetrics(metricsRes.data || null);
+            setPromotionForm((previous) => ({
+                ...previous,
+                businessId: previous.businessId || loadedBusinesses[0]?.id || '',
+            }));
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar tus negocios'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el dashboard'));
         } finally {
             setLoading(false);
         }
     }, [activeOrganizationId]);
 
     useEffect(() => {
-        void loadBusinesses();
-    }, [loadBusinesses]);
+        void loadDashboard();
+    }, [loadDashboard]);
 
-    const handleImageUpload = async (businessId: string, file: File) => {
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-            setErrorMessage('Formato no válido. Usa JPG, PNG o WEBP');
+    const verifiedBusinesses = useMemo(
+        () => businesses.filter((business) => business.verified).length,
+        [businesses],
+    );
+
+    const handleCreatePromotion = async (event: React.FormEvent) => {
+        event.preventDefault();
+        const discount = Number(promotionForm.discountValue);
+        if (!promotionForm.businessId || !promotionForm.title.trim() || !Number.isFinite(discount) || discount <= 0) {
+            setErrorMessage('Completa negocio, título y descuento válido');
             return;
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-            setErrorMessage('La imagen supera el límite de 5MB');
+        if (!promotionForm.startsAt || !promotionForm.endsAt) {
+            setErrorMessage('Debes indicar fecha de inicio y fin');
             return;
         }
 
-        setUploadingBusinessId(businessId);
+        setCreatingPromotion(true);
         setErrorMessage('');
         setSuccessMessage('');
+
         try {
-            await uploadApi.uploadBusinessImage(businessId, file);
-            await loadBusinesses();
-            setSuccessMessage('Imagen subida correctamente');
-        } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo subir la imagen'));
-        } finally {
-            setUploadingBusinessId(null);
-        }
-    };
-
-    const handleDeleteImage = async (imageId: string) => {
-        setDeletingImageId(imageId);
-        setErrorMessage('');
-        setSuccessMessage('');
-        try {
-            await uploadApi.deleteBusinessImage(imageId);
-            await loadBusinesses();
-            setSuccessMessage('Imagen eliminada correctamente');
-        } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar la imagen'));
-        } finally {
-            setDeletingImageId(null);
-        }
-    };
-
-    const startEditBusiness = (business: Business) => {
-        setEditingBusinessId(business.id);
-        setEditForm({
-            name: business.name,
-            description: business.description,
-            address: business.address,
-            phone: business.phone || '',
-            whatsapp: business.whatsapp || '',
-        });
-        setErrorMessage('');
-        setSuccessMessage('');
-    };
-
-    const cancelEditBusiness = () => {
-        setEditingBusinessId(null);
-        setEditForm(EMPTY_EDIT_FORM);
-    };
-
-    const saveBusinessChanges = async (businessId: string) => {
-        if (!editForm.name.trim() || !editForm.description.trim() || !editForm.address.trim()) {
-            setErrorMessage('Nombre, descripción y dirección son obligatorios');
-            return;
-        }
-
-        setSavingBusinessId(businessId);
-        setErrorMessage('');
-        setSuccessMessage('');
-        try {
-            await businessApi.update(businessId, {
-                name: editForm.name.trim(),
-                description: editForm.description.trim(),
-                address: editForm.address.trim(),
-                phone: editForm.phone.trim() || undefined,
-                whatsapp: editForm.whatsapp.trim() || undefined,
+            await promotionsApi.create({
+                businessId: promotionForm.businessId,
+                title: promotionForm.title.trim(),
+                discountType: promotionForm.discountType,
+                discountValue: discount,
+                couponCode: promotionForm.couponCode.trim() || undefined,
+                startsAt: new Date(promotionForm.startsAt).toISOString(),
+                endsAt: new Date(promotionForm.endsAt).toISOString(),
+                isFlashOffer: true,
             });
-            await loadBusinesses();
-            setSuccessMessage('Negocio actualizado correctamente');
-            cancelEditBusiness();
+            await loadDashboard();
+            setSuccessMessage('Promoción creada');
+            setPromotionForm((previous) => ({
+                ...EMPTY_PROMOTION_FORM,
+                businessId: previous.businessId,
+            }));
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar el negocio'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la promoción'));
         } finally {
-            setSavingBusinessId(null);
+            setCreatingPromotion(false);
         }
     };
 
-    const deleteBusiness = async (businessId: string) => {
-        if (!window.confirm('Seguro que deseas eliminar este negocio?')) {
-            return;
-        }
-
-        setDeletingBusinessId(businessId);
+    const handleBookingStatus = async (
+        booking: Booking,
+        status: 'CONFIRMED' | 'COMPLETED' | 'CANCELED',
+    ) => {
+        setUpdatingBookingId(booking.id);
         setErrorMessage('');
         setSuccessMessage('');
         try {
-            await businessApi.delete(businessId);
-            await loadBusinesses();
-            setSuccessMessage('Negocio eliminado correctamente');
-            if (editingBusinessId === businessId) {
-                cancelEditBusiness();
+            let quotedAmount = asNumber(booking.quotedAmount);
+            if ((status === 'CONFIRMED' || status === 'COMPLETED') && quotedAmount <= 0) {
+                const rawValue = window.prompt('Monto cotizado en DOP', '1000');
+                if (!rawValue) {
+                    setUpdatingBookingId(null);
+                    return;
+                }
+                quotedAmount = Number(rawValue);
             }
+
+            await bookingsApi.updateStatus(booking.id, {
+                status,
+                quotedAmount: quotedAmount > 0 ? quotedAmount : undefined,
+            });
+            await loadDashboard();
+            setSuccessMessage('Reserva actualizada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar el negocio'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la reserva'));
         } finally {
-            setDeletingBusinessId(null);
+            setUpdatingBookingId(null);
         }
     };
 
     return (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
-            <div className="flex justify-between items-center mb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in space-y-6">
+            <div className="flex flex-wrap justify-between items-center gap-3">
                 <div>
-                    <h1 className="font-display text-3xl font-bold text-gray-900">Mi Dashboard</h1>
-                    <p className="text-gray-500 mt-1">Administra tus negocios</p>
+                    <h1 className="font-display text-3xl font-bold text-gray-900">Dashboard SaaS</h1>
+                    <p className="text-gray-500">Métricas, suscripción, promociones y reservas</p>
                 </div>
-                <Link to="/register-business" className="btn-accent">
-                    + Nuevo Negocio
-                </Link>
+                <Link to="/register-business" className="btn-accent">+ Nuevo Negocio</Link>
             </div>
 
-            {errorMessage && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errorMessage}
-                </div>
-            )}
-
-            {successMessage && (
-                <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                    {successMessage}
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                <div className="card p-5 text-center">
-                    <div className="text-3xl font-bold text-primary-600">{businesses.length}</div>
-                    <div className="text-sm text-gray-500">Negocios</div>
-                </div>
-                <div className="card p-5 text-center">
-                    <div className="text-3xl font-bold text-green-600">
-                        {businesses.filter((b) => b.verified).length}
-                    </div>
-                    <div className="text-sm text-gray-500">Verificados</div>
-                </div>
-                <div className="card p-5 text-center">
-                    <div className="text-3xl font-bold text-accent-600">
-                        {businesses.reduce((acc, b) => acc + (b._count?.reviews || 0), 0)}
-                    </div>
-                    <div className="text-sm text-gray-500">Reseñas totales</div>
-                </div>
-            </div>
+            {errorMessage && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>}
+            {successMessage && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{successMessage}</div>}
 
             {loading ? (
-                <div className="flex justify-center py-20">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
-                </div>
-            ) : !activeOrganizationId ? (
-                <div className="card p-8 text-center">
-                    <p className="text-gray-500 mb-4">
-                        Necesitas una organización activa para administrar negocios.
-                    </p>
-                    <Link to="/organization" className="btn-primary inline-block">
-                        Ir a Organización
-                    </Link>
-                </div>
-            ) : businesses.length > 0 ? (
-                <div className="space-y-4">
-                    {businesses.map((business) => (
-                        <div key={business.id} className="card p-5">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex gap-4 flex-1">
-                                    <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center flex-shrink-0">
-                                        {business.images?.[0] ? (
-                                            <img
-                                                src={business.images[0].url}
-                                                alt=""
-                                                className="w-full h-full object-cover rounded-xl"
-                                            />
-                                        ) : (
-                                            <span className="text-3xl">🏪</span>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <Link
-                                            to={`/businesses/${business.id}`}
-                                            className="font-display font-semibold text-lg text-gray-900 hover:text-primary-600 transition-colors"
-                                        >
-                                            {business.name}
-                                        </Link>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span
-                                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                                    business.verified
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-yellow-100 text-yellow-700'
-                                                }`}
-                                            >
-                                                {business.verified ? '✓ Verificado' : '⏳ Pendiente'}
-                                            </span>
-                                            <span className="text-xs text-gray-400">
-                                                {business._count?.reviews || 0} reseñas
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            Creado: {new Date(business.createdAt).toLocaleDateString('es-DO')}
+                <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div></div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                        <div className="card p-4 text-center"><p className="text-xs text-gray-500">Negocios</p><p className="text-2xl font-bold text-primary-600">{businesses.length}</p></div>
+                        <div className="card p-4 text-center"><p className="text-xs text-gray-500">Verificados</p><p className="text-2xl font-bold text-emerald-600">{verifiedBusinesses}</p></div>
+                        <div className="card p-4 text-center"><p className="text-xs text-gray-500">Vistas</p><p className="text-2xl font-bold text-sky-600">{metrics?.totals.views || 0}</p></div>
+                        <div className="card p-4 text-center"><p className="text-xs text-gray-500">Clics</p><p className="text-2xl font-bold text-indigo-600">{metrics?.totals.clicks || 0}</p></div>
+                        <div className="card p-4 text-center"><p className="text-xs text-gray-500">Conversiones</p><p className="text-2xl font-bold text-amber-600">{metrics?.totals.conversions || 0}</p></div>
+                        <div className="card p-4 text-center"><p className="text-xs text-gray-500">Ingresos</p><p className="text-xl font-bold text-emerald-700">{formatCurrency(metrics?.totals.grossRevenue || 0)}</p></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        <div className="card p-5">
+                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Suscripción</h2>
+                            {metrics?.subscription ? (
+                                <div className="text-sm text-gray-600 space-y-1">
+                                    <p>Plan: <span className="font-semibold text-gray-900">{metrics.subscription.plan.name}</span></p>
+                                    <p>Estado: <span className="font-semibold text-gray-900">{metrics.subscription.status}</span></p>
+                                    <p>Mensualidad: <span className="font-semibold text-gray-900">{new Intl.NumberFormat('es-DO', { style: 'currency', currency: metrics.subscription.plan.currency }).format(Number(metrics.subscription.plan.priceMonthly))}</span></p>
+                                    <p>Fee marketplace: <span className="font-semibold text-gray-900">{(metrics.subscription.plan.transactionFeeBps / 100).toFixed(2)}%</span></p>
+                                    <p>Próximo pago: <span className="font-semibold text-gray-900">{metrics.subscription.currentPeriodEnd ? new Date(metrics.subscription.currentPeriodEnd).toLocaleDateString('es-DO') : 'No definido'}</span></p>
+                                </div>
+                            ) : <p className="text-sm text-gray-500">Sin datos de suscripción.</p>}
+                        </div>
+
+                        <div className="card p-5 xl:col-span-2">
+                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Marketplace</h2>
+                            <p className="text-sm text-gray-600">
+                                Promociones activas: <strong>{metrics?.marketplace.activePromotions || 0}</strong> ·
+                                Reservas pendientes: <strong>{metrics?.marketplace.pendingBookings || 0}</strong> ·
+                                Reservas confirmadas: <strong>{metrics?.marketplace.confirmedBookings || 0}</strong>
+                            </p>
+                            <p className="text-sm text-gray-600 mt-2">
+                                Tasa de conversión: <strong>{metrics?.totals.conversionRate || 0}%</strong>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div className="card p-5">
+                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Nueva promoción</h2>
+                            <form className="space-y-3" onSubmit={handleCreatePromotion}>
+                                <select className="input-field text-sm" value={promotionForm.businessId} onChange={(event) => setPromotionForm((previous) => ({ ...previous, businessId: event.target.value }))}>
+                                    <option value="">Selecciona negocio</option>
+                                    {businesses.map((business) => <option key={business.id} value={business.id}>{business.name}</option>)}
+                                </select>
+                                <input className="input-field text-sm" placeholder="Título" value={promotionForm.title} onChange={(event) => setPromotionForm((previous) => ({ ...previous, title: event.target.value }))} />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <select className="input-field text-sm" value={promotionForm.discountType} onChange={(event) => setPromotionForm((previous) => ({ ...previous, discountType: event.target.value as 'PERCENTAGE' | 'FIXED' }))}>
+                                        <option value="PERCENTAGE">Porcentaje %</option>
+                                        <option value="FIXED">Monto fijo</option>
+                                    </select>
+                                    <input className="input-field text-sm" type="number" min="1" step="0.01" placeholder="Descuento" value={promotionForm.discountValue} onChange={(event) => setPromotionForm((previous) => ({ ...previous, discountValue: event.target.value }))} />
+                                </div>
+                                <input className="input-field text-sm" placeholder="Código (opcional)" value={promotionForm.couponCode} onChange={(event) => setPromotionForm((previous) => ({ ...previous, couponCode: event.target.value.toUpperCase() }))} />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input className="input-field text-sm" type="datetime-local" value={promotionForm.startsAt} onChange={(event) => setPromotionForm((previous) => ({ ...previous, startsAt: event.target.value }))} />
+                                    <input className="input-field text-sm" type="datetime-local" value={promotionForm.endsAt} onChange={(event) => setPromotionForm((previous) => ({ ...previous, endsAt: event.target.value }))} />
+                                </div>
+                                <button type="submit" className="btn-primary text-sm" disabled={creatingPromotion}>{creatingPromotion ? 'Creando...' : 'Publicar'}</button>
+                            </form>
+                        </div>
+
+                        <div className="card p-5">
+                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Promociones activas</h2>
+                            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {promotions.length > 0 ? promotions.map((promotion) => (
+                                    <div key={promotion.id} className="rounded-xl border border-gray-100 p-3">
+                                        <p className="font-medium text-gray-900">{promotion.title}</p>
+                                        <p className="text-xs text-gray-500">{promotion.business.name}</p>
+                                        <p className="text-xs text-gray-500">
+                                            {promotion.discountType === 'PERCENTAGE' ? `${asNumber(promotion.discountValue)}%` : formatCurrency(promotion.discountValue)}
+                                            {promotion.couponCode ? ` · ${promotion.couponCode}` : ''}
                                         </p>
                                     </div>
-                                </div>
-
-                                <div className="flex gap-2 flex-wrap justify-end">
-                                    <button
-                                        type="button"
-                                        className="btn-secondary text-xs"
-                                        onClick={() =>
-                                            editingBusinessId === business.id
-                                                ? cancelEditBusiness()
-                                                : startEditBusiness(business)
-                                        }
-                                    >
-                                        {editingBusinessId === business.id ? 'Cancelar' : 'Editar'}
-                                    </button>
-                                    <label className="btn-secondary text-xs cursor-pointer">
-                                        {uploadingBusinessId === business.id ? '📤 Subiendo...' : '📷 Subir Foto'}
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={(e) => {
-                                                if (e.target.files?.[0]) {
-                                                    void handleImageUpload(business.id, e.target.files[0]);
-                                                }
-                                            }}
-                                            disabled={uploadingBusinessId === business.id}
-                                        />
-                                    </label>
-                                    <button
-                                        type="button"
-                                        className="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50"
-                                        onClick={() => void deleteBusiness(business.id)}
-                                        disabled={deletingBusinessId === business.id}
-                                    >
-                                        {deletingBusinessId === business.id ? 'Eliminando...' : 'Eliminar'}
-                                    </button>
-                                </div>
+                                )) : <p className="text-sm text-gray-500">No hay promociones registradas.</p>}
                             </div>
-
-                            {editingBusinessId === business.id && (
-                                <div className="mt-4 p-4 rounded-xl bg-gray-50 border border-gray-100 space-y-3">
-                                    <div>
-                                        <label className="text-xs font-medium text-gray-600 mb-1 block">
-                                            Nombre
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="input-field text-sm"
-                                            value={editForm.name}
-                                            onChange={(event) =>
-                                                setEditForm((prev) => ({ ...prev, name: event.target.value }))
-                                            }
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-gray-600 mb-1 block">
-                                            Descripción
-                                        </label>
-                                        <textarea
-                                            className="input-field text-sm"
-                                            rows={3}
-                                            value={editForm.description}
-                                            onChange={(event) =>
-                                                setEditForm((prev) => ({
-                                                    ...prev,
-                                                    description: event.target.value,
-                                                }))
-                                            }
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-gray-600 mb-1 block">
-                                            Dirección
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="input-field text-sm"
-                                            value={editForm.address}
-                                            onChange={(event) =>
-                                                setEditForm((prev) => ({ ...prev, address: event.target.value }))
-                                            }
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-600 mb-1 block">
-                                                Teléfono
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className="input-field text-sm"
-                                                value={editForm.phone}
-                                                onChange={(event) =>
-                                                    setEditForm((prev) => ({
-                                                        ...prev,
-                                                        phone: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-600 mb-1 block">
-                                                WhatsApp
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className="input-field text-sm"
-                                                value={editForm.whatsapp}
-                                                onChange={(event) =>
-                                                    setEditForm((prev) => ({
-                                                        ...prev,
-                                                        whatsapp: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end gap-2">
-                                        <button
-                                            type="button"
-                                            className="btn-secondary text-xs"
-                                            onClick={cancelEditBusiness}
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn-primary text-xs"
-                                            onClick={() => void saveBusinessChanges(business.id)}
-                                            disabled={savingBusinessId === business.id}
-                                        >
-                                            {savingBusinessId === business.id ? 'Guardando...' : 'Guardar cambios'}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {business.images.length > 0 && (
-                                <div className="flex gap-2 mt-4 overflow-x-auto">
-                                    {business.images.map((image) => (
-                                        <div key={image.id} className="relative w-16 h-16 flex-shrink-0">
-                                            <img
-                                                src={image.url}
-                                                alt=""
-                                                className="w-full h-full rounded-lg object-cover"
-                                            />
-                                            <button
-                                                type="button"
-                                                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-600 text-white text-[10px] flex items-center justify-center disabled:opacity-50"
-                                                onClick={() => void handleDeleteImage(image.id)}
-                                                disabled={deletingImageId === image.id}
-                                                title="Eliminar imagen"
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="text-center py-20 text-gray-400">
-                    <p className="text-5xl mb-4">📋</p>
-                    <p className="text-lg">No tienes negocios registrados</p>
-                    <Link to="/register-business" className="btn-primary mt-4 inline-block">
-                        Registrar mi Primer Negocio
-                    </Link>
-                </div>
+                    </div>
+
+                    <div className="card p-5">
+                        <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Reservas recientes</h2>
+                        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                            {bookings.length > 0 ? bookings.map((booking) => (
+                                <div key={booking.id} className="rounded-xl border border-gray-100 p-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <p className="font-medium text-gray-900">{booking.business.name}</p>
+                                            <p className="text-xs text-gray-500">{new Date(booking.scheduledFor).toLocaleString('es-DO')} · {booking.user?.name || 'Cliente plataforma'}</p>
+                                        </div>
+                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">{booking.status}</span>
+                                    </div>
+                                    {booking.status !== 'COMPLETED' && booking.status !== 'CANCELED' && (
+                                        <div className="flex gap-2 mt-2">
+                                            {booking.status === 'PENDING' && <button type="button" className="btn-secondary text-xs" disabled={updatingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'CONFIRMED')}>Confirmar</button>}
+                                            {booking.status === 'CONFIRMED' && <button type="button" className="btn-primary text-xs" disabled={updatingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'COMPLETED')}>Completar</button>}
+                                            <button type="button" className="btn-secondary text-xs" disabled={updatingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'CANCELED')}>Cancelar</button>
+                                        </div>
+                                    )}
+                                </div>
+                            )) : <p className="text-sm text-gray-500">No hay reservas registradas.</p>}
+                        </div>
+                    </div>
+
+                    <div className="card p-5">
+                        <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Negocios</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                            {businesses.map((business) => (
+                                <Link key={business.id} to={`/businesses/${business.id}`} className="rounded-xl border border-gray-100 p-3 hover:border-primary-200 transition-colors">
+                                    <p className="font-medium text-gray-900">{business.name}</p>
+                                    <p className="text-xs text-gray-500">{business.verified ? 'Verificado' : 'Pendiente verificación'} · {business._count?.reviews || 0} reseñas</p>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                </>
             )}
         </div>
     );

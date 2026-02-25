@@ -13,11 +13,12 @@ interface User {
 interface AuthContextType {
     user: User | null;
     token: string | null;
+    refreshToken: string | null;
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
     refreshProfile: () => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
     isAuthenticated: boolean;
     isAdmin: boolean;
     isBusinessOwner: boolean;
@@ -28,14 +29,30 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
+    const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     const clearSession = useCallback(() => {
         setToken(null);
+        setRefreshToken(null);
         setUser(null);
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         localStorage.removeItem('activeOrganizationId');
+    }, []);
+
+    const applySession = useCallback((payload: {
+        accessToken: string;
+        refreshToken: string;
+        user: User;
+    }) => {
+        setToken(payload.accessToken);
+        setRefreshToken(payload.refreshToken);
+        setUser(payload.user);
+        localStorage.setItem('accessToken', payload.accessToken);
+        localStorage.setItem('refreshToken', payload.refreshToken);
+        localStorage.setItem('user', JSON.stringify(payload.user));
     }, []);
 
     const refreshProfile = useCallback(async () => {
@@ -48,25 +65,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const bootstrapAuth = async () => {
             const savedToken = localStorage.getItem('accessToken');
+            const savedRefreshToken = localStorage.getItem('refreshToken');
 
-            if (!savedToken) {
+            if (!savedToken && !savedRefreshToken) {
                 setLoading(false);
                 return;
             }
 
-            setToken(savedToken);
-
             try {
+                if (savedToken) {
+                    setToken(savedToken);
+                }
+                if (savedRefreshToken) {
+                    setRefreshToken(savedRefreshToken);
+                }
+
                 await refreshProfile();
             } catch {
-                clearSession();
+                if (!savedRefreshToken) {
+                    clearSession();
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    const refreshResponse = await authApi.refresh({ refreshToken: savedRefreshToken });
+                    const { accessToken, refreshToken: rotatedRefreshToken, user: refreshedUser } = refreshResponse.data;
+                    applySession({
+                        accessToken,
+                        refreshToken: rotatedRefreshToken,
+                        user: refreshedUser,
+                    });
+                } catch {
+                    clearSession();
+                }
             } finally {
                 setLoading(false);
             }
         };
 
         void bootstrapAuth();
-    }, [clearSession, refreshProfile]);
+    }, [applySession, clearSession, refreshProfile]);
 
     useEffect(() => {
         const handleUnauthorized = () => {
@@ -79,23 +118,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (email: string, password: string) => {
         const response = await authApi.login({ email, password });
-        const { accessToken, user: userData } = response.data;
-        setToken(accessToken);
-        setUser(userData);
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('user', JSON.stringify(userData));
+        const { accessToken, refreshToken: newRefreshToken, user: userData } = response.data;
+        applySession({
+            accessToken,
+            refreshToken: newRefreshToken,
+            user: userData,
+        });
     };
 
     const register = async (name: string, email: string, password: string, phone?: string) => {
         const response = await authApi.register({ name, email, password, phone });
-        const { accessToken, user: userData } = response.data;
-        setToken(accessToken);
-        setUser(userData);
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('user', JSON.stringify(userData));
+        const { accessToken, refreshToken: newRefreshToken, user: userData } = response.data;
+        applySession({
+            accessToken,
+            refreshToken: newRefreshToken,
+            user: userData,
+        });
     };
 
-    const logout = () => {
+    const logout = async () => {
+        const currentRefreshToken = refreshToken ?? localStorage.getItem('refreshToken');
+        if (currentRefreshToken) {
+            try {
+                await authApi.logout({ refreshToken: currentRefreshToken });
+            } catch {
+                // Ignore network/logout errors and clear client state anyway.
+            }
+        }
         clearSession();
     };
 
@@ -104,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             value={{
                 user,
                 token,
+                refreshToken,
                 loading,
                 login,
                 register,

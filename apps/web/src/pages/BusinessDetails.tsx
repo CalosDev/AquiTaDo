@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { businessApi, reviewApi } from '../api/endpoints';
+import { analyticsApi, businessApi, reviewApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 
 interface Business {
@@ -23,6 +23,17 @@ interface Business {
     reviews?: { id: string; rating: number; comment?: string; user: { name: string }; createdAt: string }[];
     _count?: { reviews: number };
     owner?: { name: string };
+}
+
+function resolveVisitorId(): string {
+    const existingVisitorId = localStorage.getItem('analyticsVisitorId');
+    if (existingVisitorId) {
+        return existingVisitorId;
+    }
+
+    const generatedVisitorId = window.crypto?.randomUUID?.() ?? `visitor-${Date.now()}`;
+    localStorage.setItem('analyticsVisitorId', generatedVisitorId);
+    return generatedVisitorId;
 }
 
 export function BusinessDetails() {
@@ -58,6 +69,19 @@ export function BusinessDetails() {
     useEffect(() => {
         void loadBusiness();
     }, [loadBusiness]);
+
+    useEffect(() => {
+        if (!business?.id) {
+            return;
+        }
+
+        const visitorId = resolveVisitorId();
+        void analyticsApi.trackEvent({
+            businessId: business.id,
+            eventType: 'VIEW',
+            visitorId,
+        }).catch(() => undefined);
+    }, [business?.id]);
 
     const handleReviewSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -309,6 +333,13 @@ export function BusinessDetails() {
                             {business.phone && (
                                 <a
                                     href={`tel:${business.phone}`}
+                                    onClick={() => {
+                                        void analyticsApi.trackEvent({
+                                            businessId: business.id,
+                                            eventType: 'CLICK',
+                                            visitorId: resolveVisitorId(),
+                                        }).catch(() => undefined);
+                                    }}
                                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-primary-50 transition-colors group"
                                 >
                                     <span className="text-lg">📞</span>
@@ -323,6 +354,13 @@ export function BusinessDetails() {
                                     href={`https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={() => {
+                                        void analyticsApi.trackEvent({
+                                            businessId: business.id,
+                                            eventType: 'CLICK',
+                                            visitorId: resolveVisitorId(),
+                                        }).catch(() => undefined);
+                                    }}
                                     className="flex items-center gap-3 p-3 rounded-xl bg-green-50 hover:bg-green-100 transition-colors group"
                                 >
                                     <span className="text-lg">💬</span>
