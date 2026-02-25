@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,14 +19,18 @@ import { validateEnv } from './config/env.validation';
             isGlobal: true,
             validate: validateEnv,
         }),
-        ThrottlerModule.forRoot({
-            throttlers: [
-                {
-                    name: 'default',
-                    ttl: Number(process.env.THROTTLE_TTL_MS ?? 60_000),
-                    limit: Number(process.env.THROTTLE_LIMIT ?? 120),
-                },
-            ],
+        ThrottlerModule.forRootAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (configService: ConfigService) => ({
+                throttlers: [
+                    {
+                        name: 'default',
+                        ttl: Number(configService.get('THROTTLE_TTL_MS') ?? 60_000),
+                        limit: Number(configService.get('THROTTLE_LIMIT') ?? 120),
+                    },
+                ],
+            }),
         }),
         PrismaModule,
         AuthModule,

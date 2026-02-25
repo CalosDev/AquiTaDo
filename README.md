@@ -9,7 +9,7 @@ Plataforma de directorio de negocios locales en República Dominicana. Permite a
 
 | Capa | Tecnología |
 |------|-----------|
-| Frontend | React 18 + Vite + TypeScript + TailwindCSS |
+| Frontend | React 19 + Vite 7 + TypeScript + TailwindCSS 4 |
 | Backend | NestJS + TypeScript |
 | Base de Datos | PostgreSQL + Prisma ORM |
 | Auth | JWT (Passport) |
@@ -59,10 +59,22 @@ Esto inicia PostgreSQL en `localhost:5432` con:
 
 ### 3. Configurar variables de entorno
 
-Los archivos `.env` ya están creados con valores por defecto:
+Copia los ejemplos de entorno antes de ejecutar la app:
 
-- `apps/api/.env` — `DATABASE_URL`, `JWT_SECRET`, `PORT`
-- `apps/web/.env` — `VITE_API_URL`
+```bash
+# Unix/macOS
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+
+# Windows PowerShell
+Copy-Item apps/api/.env.example apps/api/.env
+Copy-Item apps/web/.env.example apps/web/.env
+```
+
+Variables principales:
+
+- `apps/api/.env` � `DATABASE_URL`, `JWT_SECRET`, `PORT`, `CORS_ORIGIN`, `THROTTLE_TTL_MS`, `THROTTLE_LIMIT`
+- `apps/web/.env` � `VITE_API_URL`
 
 ### 4. Generar cliente Prisma y ejecutar migraciones
 
@@ -153,3 +165,5 @@ GET /api/businesses/nearby?lat=18.48&lng=-69.90&radius=5
 ---
 
 Hecho con ❤️ en República Dominicana
+
+

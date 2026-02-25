@@ -50,16 +50,32 @@ async function requestJson(url) {
     }
 }
 
-async function waitForHealthyEndpoint(baseUrl, path, timeoutMs, intervalMs) {
-    const url = `${baseUrl}${path}`;
+function validateLiveness(body) {
+    return (
+        body?.status === 'ok' &&
+        body?.service === 'aquita-api' &&
+        Number.isInteger(body?.uptimeSeconds)
+    );
+}
+
+function validateReadiness(body) {
+    return (
+        body?.status === 'ok' &&
+        body?.service === 'aquita-api' &&
+        body?.checks?.database === 'up'
+    );
+}
+
+async function waitForHealthyEndpoint(baseUrl, endpoint, timeoutMs, intervalMs) {
+    const url = `${baseUrl}${endpoint.path}`;
     const deadline = Date.now() + timeoutMs;
     let lastReason = 'unknown error';
 
     while (Date.now() < deadline) {
         try {
             const { response, body } = await requestJson(url);
-            if (response.ok && body && body.status === 'ok') {
-                console.log(`OK ${path} (${response.status})`);
+            if (response.ok && body && endpoint.validate(body)) {
+                console.log(`OK ${endpoint.path} (${response.status})`);
                 return;
             }
 
@@ -72,7 +88,7 @@ async function waitForHealthyEndpoint(baseUrl, path, timeoutMs, intervalMs) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
 
-    throw new Error(`Smoke check failed for ${path}: ${lastReason}`);
+    throw new Error(`Smoke check failed for ${endpoint.path}: ${lastReason}`);
 }
 
 async function main() {
@@ -81,9 +97,17 @@ async function main() {
     const intervalMs = parsePositiveInt(process.env.SMOKE_INTERVAL_MS, DEFAULT_INTERVAL_MS);
     const includeReadiness = process.env.SMOKE_CHECK_READINESS !== '0';
 
-    const endpoints = ['/api/health'];
+    const endpoints = [
+        {
+            path: '/api/health',
+            validate: validateLiveness,
+        },
+    ];
     if (includeReadiness) {
-        endpoints.push('/api/health/ready');
+        endpoints.push({
+            path: '/api/health/ready',
+            validate: validateReadiness,
+        });
     }
 
     console.log(`Running API smoke test against ${baseUrl}`);
@@ -99,4 +123,3 @@ main().catch((error) => {
     console.error(`Smoke test failed: ${message}`);
     process.exitCode = 1;
 });
-
