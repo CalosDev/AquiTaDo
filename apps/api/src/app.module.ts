@@ -12,6 +12,12 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { PlansModule } from './plans/plans.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { PaymentsModule } from './payments/payments.module';
+import { PromotionsModule } from './promotions/promotions.module';
+import { BookingsModule } from './bookings/bookings.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -43,6 +49,12 @@ import { validateEnv } from './config/env.validation';
         UploadsModule,
         HealthModule,
         OrganizationsModule,
+        PlansModule,
+        SubscriptionsModule,
+        PaymentsModule,
+        PromotionsModule,
+        BookingsModule,
+        AnalyticsModule,
     ],
     providers: [
         {

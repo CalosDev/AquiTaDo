@@ -28,6 +28,85 @@ async function main() {
     });
     console.log('✅ Admin user created:', admin.email);
 
+    const plans = [
+        {
+            code: 'FREE',
+            name: 'Free',
+            description: 'Plan inicial para presencia digital básica',
+            priceMonthly: '0',
+            currency: 'DOP',
+            transactionFeeBps: 1200,
+            maxBusinesses: 1,
+            maxMembers: 3,
+            maxImagesPerBusiness: 10,
+            maxPromotions: 1,
+            analyticsRetentionDays: 30,
+            active: true,
+        },
+        {
+            code: 'GROWTH',
+            name: 'Pro',
+            description: 'Plan para negocios en crecimiento con mayor visibilidad',
+            priceMonthly: '1990',
+            currency: 'DOP',
+            transactionFeeBps: 800,
+            maxBusinesses: 5,
+            maxMembers: 15,
+            maxImagesPerBusiness: 50,
+            maxPromotions: 10,
+            analyticsRetentionDays: 365,
+            active: true,
+        },
+        {
+            code: 'SCALE',
+            name: 'Premium',
+            description: 'Plan avanzado con capacidad y soporte preferencial',
+            priceMonthly: '4990',
+            currency: 'DOP',
+            transactionFeeBps: 500,
+            maxBusinesses: null,
+            maxMembers: null,
+            maxImagesPerBusiness: null,
+            maxPromotions: null,
+            analyticsRetentionDays: null,
+            active: true,
+        },
+    ] as const;
+
+    for (const plan of plans) {
+        await prisma.plan.upsert({
+            where: { code: plan.code },
+            update: {
+                name: plan.name,
+                description: plan.description,
+                priceMonthly: plan.priceMonthly,
+                currency: plan.currency,
+                transactionFeeBps: plan.transactionFeeBps,
+                maxBusinesses: plan.maxBusinesses,
+                maxMembers: plan.maxMembers,
+                maxImagesPerBusiness: plan.maxImagesPerBusiness,
+                maxPromotions: plan.maxPromotions,
+                analyticsRetentionDays: plan.analyticsRetentionDays,
+                active: plan.active,
+            },
+            create: {
+                code: plan.code,
+                name: plan.name,
+                description: plan.description,
+                priceMonthly: plan.priceMonthly,
+                currency: plan.currency,
+                transactionFeeBps: plan.transactionFeeBps,
+                maxBusinesses: plan.maxBusinesses,
+                maxMembers: plan.maxMembers,
+                maxImagesPerBusiness: plan.maxImagesPerBusiness,
+                maxPromotions: plan.maxPromotions,
+                analyticsRetentionDays: plan.analyticsRetentionDays,
+                active: plan.active,
+            },
+        });
+    }
+    console.log(`✅ ${plans.length} plans created`);
+
     // Create categories
     const categories = [
         { name: 'Restaurantes', slug: 'restaurantes', icon: '🍽️' },

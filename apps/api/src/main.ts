@@ -1,6 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
@@ -48,7 +49,9 @@ function resolveCorsSettings(): CorsSettings {
 
 async function bootstrap() {
     const logger = new Logger('Bootstrap');
-    const app = await NestFactory.create<NestExpressApplication>(AppModule);
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+        bodyParser: false,
+    });
     const corsSettings = resolveCorsSettings();
 
     const httpAdapter = app.getHttpAdapter().getInstance();
@@ -61,6 +64,15 @@ async function bootstrap() {
             crossOriginResourcePolicy: false,
         }),
     );
+
+    app.use(
+        json({
+            verify: (request: any, _response, buffer) => {
+                request.rawBody = Buffer.from(buffer);
+            },
+        }),
+    );
+    app.use(urlencoded({ extended: true }));
 
     app.enableCors({
         origin: corsSettings.origin,

@@ -464,6 +464,7 @@ export class BusinessesService {
         });
 
         if (ownerMembership) {
+            await this.ensureOrganizationSubscription(tx, ownerMembership.organizationId);
             return ownerMembership.organizationId;
         }
 
@@ -490,6 +491,8 @@ export class BusinessesService {
                     role: 'OWNER',
                 },
             });
+
+            await this.ensureOrganizationSubscription(tx, ownerOrganization.id);
 
             return ownerOrganization.id;
         }
@@ -544,7 +547,51 @@ export class BusinessesService {
             },
         });
 
+        await this.ensureOrganizationSubscription(tx, organization.id);
+
         return organization.id;
+    }
+
+    private async ensureOrganizationSubscription(
+        tx: Prisma.TransactionClient,
+        organizationId: string,
+    ): Promise<void> {
+        const existing = await tx.subscription.findUnique({
+            where: { organizationId },
+            select: { id: true },
+        });
+
+        if (existing) {
+            return;
+        }
+
+        const freePlan = await tx.plan.upsert({
+            where: { code: 'FREE' },
+            update: { active: true },
+            create: {
+                code: 'FREE',
+                name: 'Free',
+                description: 'Plan inicial para presencia digital básica',
+                priceMonthly: '0',
+                currency: 'DOP',
+                transactionFeeBps: 1200,
+                maxBusinesses: 1,
+                maxMembers: 3,
+                maxImagesPerBusiness: 10,
+                maxPromotions: 1,
+                analyticsRetentionDays: 30,
+                active: true,
+            },
+        });
+
+        await tx.subscription.create({
+            data: {
+                organizationId,
+                planId: freePlan.id,
+                status: 'ACTIVE',
+                currentPeriodStart: new Date(),
+            },
+        });
     }
 
     private async assertOrganizationCanCreateBusiness(

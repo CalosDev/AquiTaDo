@@ -35,6 +35,67 @@ enum OrganizationSubscriptionStatus {
   CANCELED
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  UNPAID
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELED
+  NO_SHOW
+}
+
+enum BookingSource {
+  PLATFORM
+  DASHBOARD
+  IMPORTED
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum WebhookProvider {
+  STRIPE
+}
+
+enum WebhookProcessingStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)
@@ -51,6 +112,10 @@ model User {
   organizationMemberships OrganizationMember[]
   organizationInvitesSent OrganizationInvite[] @relation("OrganizationInvitedBy")
   auditLogs               AuditLog[]          @relation("AuditActor")
+  refreshTokens           RefreshToken[]
+  bookings                Booking[]
+  promotionsCreated       Promotion[]         @relation("PromotionCreator")
+  transactionsAsBuyer     Transaction[]       @relation("TransactionBuyer")
 
   @@index([email])
   @@map("users")
@@ -83,6 +148,10 @@ model Business {
   images     BusinessImage[]
   reviews    Review[]
   features   BusinessFeature[]
+  analytics  BusinessAnalytics[]
+  promotions Promotion[]
+  bookings   Booking[]
+  transactions Transaction[]
 
   @@index([slug])
   @@index([ownerId])
@@ -109,6 +178,14 @@ model Organization {
   members    OrganizationMember[]
   invites    OrganizationInvite[]
   auditLogs  AuditLog[]
+  subscription Subscription?
+  payments     Payment[]
+  invoices     Invoice[]
+  usageMetrics UsageMetric[]
+  promotions   Promotion[]
+  bookings     Booking[]
+  transactions Transaction[]
+  webhookEvents WebhookEvent[]
 
   @@index([ownerUserId])
   @@index([plan, subscriptionStatus])
@@ -147,6 +224,126 @@ model OrganizationInvite {
   @@index([email])
   @@index([expiresAt])
   @@map("organization_invites")
+}
+
+model Plan {
+  id                     String           @id @default(uuid())
+  code                   OrganizationPlan @unique
+  name                   String           @db.VarChar(80)
+  description            String?          @db.Text
+  priceMonthly           Decimal          @db.Decimal(12, 2)
+  currency               String           @default("DOP") @db.VarChar(3)
+  transactionFeeBps      Int              @default(0)
+  maxBusinesses          Int?
+  maxMembers             Int?
+  maxImagesPerBusiness   Int?
+  maxPromotions          Int?
+  analyticsRetentionDays Int?
+  active                 Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  subscriptions Subscription[]
+
+  @@index([active, code])
+  @@map("plans")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid())
+  organizationId         String             @unique
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId                 String
+  plan                   Plan               @relation(fields: [planId], references: [id])
+  status                 SubscriptionStatus @default(ACTIVE)
+  providerCustomerId     String?            @db.VarChar(191)
+  providerSubscriptionId String?            @unique @db.VarChar(191)
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  canceledAt             DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  payments     Payment[]
+  invoices     Invoice[]
+  usageMetrics UsageMetric[]
+
+  @@index([status, currentPeriodEnd])
+  @@index([planId])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                      String        @id @default(uuid())
+  organizationId          String
+  organization            Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionId          String?
+  subscription            Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  provider                String        @default("stripe") @db.VarChar(40)
+  providerPaymentIntentId String?       @unique @db.VarChar(191)
+  amount                  Decimal       @db.Decimal(12, 2)
+  currency                String        @default("DOP") @db.VarChar(3)
+  status                  PaymentStatus @default(PENDING)
+  paidAt                  DateTime?
+  failureReason           String?       @db.VarChar(255)
+  metadata                Json?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  transactions Transaction[]
+
+  @@index([organizationId, createdAt])
+  @@index([subscriptionId, createdAt])
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+model Invoice {
+  id                String        @id @default(uuid())
+  organizationId    String
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionId    String?
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  providerInvoiceId String?       @unique @db.VarChar(191)
+  number            String?       @unique @db.VarChar(120)
+  amountSubtotal    Decimal       @db.Decimal(12, 2)
+  amountTax         Decimal       @db.Decimal(12, 2)
+  amountTotal       Decimal       @db.Decimal(12, 2)
+  currency          String        @default("DOP") @db.VarChar(3)
+  status            InvoiceStatus @default(OPEN)
+  issuedAt          DateTime      @default(now())
+  dueAt             DateTime?
+  paidAt            DateTime?
+  pdfUrl            String?       @db.VarChar(500)
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  transactions Transaction[]
+
+  @@index([organizationId, issuedAt])
+  @@index([subscriptionId, issuedAt])
+  @@index([status, dueAt])
+  @@map("invoices")
+}
+
+model UsageMetric {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  metricKey      String        @db.VarChar(80)
+  metricValue    Int
+  periodStart    DateTime
+  periodEnd      DateTime
+  createdAt      DateTime      @default(now())
+
+  @@unique([organizationId, metricKey, periodStart, periodEnd])
+  @@index([organizationId, metricKey, periodStart])
+  @@index([subscriptionId, metricKey])
+  @@map("usage_metrics")
 }
 
 model AuditLog {
@@ -260,4 +457,156 @@ model BusinessFeature {
 
   @@id([businessId, featureId])
   @@map("business_features")
+}
+
+model BusinessAnalytics {
+  id                  String   @id @default(uuid())
+  businessId          String
+  business            Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  date                DateTime @db.Date
+  views               Int      @default(0)
+  uniqueVisitors      Int      @default(0)
+  clicks              Int      @default(0)
+  conversions         Int      @default(0)
+  reservationRequests Int      @default(0)
+  grossRevenue        Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([businessId, date])
+  @@index([date])
+  @@map("business_analytics")
+}
+
+model Promotion {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId      String
+  business        Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdByUserId String?
+  createdByUser   User?        @relation("PromotionCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  title           String       @db.VarChar(160)
+  slug            String       @unique @db.VarChar(180)
+  description     String?      @db.Text
+  discountType    DiscountType
+  discountValue   Decimal      @db.Decimal(10, 2)
+  couponCode      String?      @unique @db.VarChar(80)
+  startsAt        DateTime
+  endsAt          DateTime
+  maxRedemptions  Int?
+  redemptionsCount Int         @default(0)
+  isFlashOffer    Boolean      @default(false)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  bookings     Booking[]
+  transactions Transaction[]
+
+  @@index([businessId, isActive, endsAt])
+  @@index([organizationId, isActive])
+  @@index([couponCode])
+  @@map("promotions")
+}
+
+model Booking {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId     String
+  business       Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  promotionId    String?
+  promotion      Promotion?    @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  status         BookingStatus @default(PENDING)
+  source         BookingSource @default(PLATFORM)
+  scheduledFor   DateTime
+  partySize      Int?
+  notes          String?       @db.Text
+  quotedAmount   Decimal?      @db.Decimal(12, 2)
+  depositAmount  Decimal?      @db.Decimal(12, 2)
+  currency       String        @default("DOP") @db.VarChar(3)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  transactions Transaction[]
+
+  @@index([businessId, scheduledFor])
+  @@index([organizationId, status])
+  @@index([userId, createdAt])
+  @@map("bookings")
+}
+
+model Transaction {
+  id                String            @id @default(uuid())
+  organizationId    String
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId        String
+  business          Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bookingId         String?
+  booking           Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  promotionId       String?
+  promotion         Promotion?        @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  buyerUserId       String?
+  buyerUser         User?             @relation("TransactionBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  paymentId         String?
+  payment           Payment?          @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  invoiceId         String?
+  invoice           Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  grossAmount       Decimal           @db.Decimal(12, 2)
+  platformFeeAmount Decimal           @db.Decimal(12, 2)
+  netAmount         Decimal           @db.Decimal(12, 2)
+  currency          String            @default("DOP") @db.VarChar(3)
+  status            TransactionStatus @default(PENDING)
+  providerReference String?           @db.VarChar(191)
+  paidAt            DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([organizationId, createdAt])
+  @@index([businessId, createdAt])
+  @@index([status, createdAt])
+  @@index([paymentId])
+  @@map("transactions")
+}
+
+model WebhookEvent {
+  id               String                  @id @default(uuid())
+  organizationId   String?
+  organization     Organization?           @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  provider         WebhookProvider         @default(STRIPE)
+  externalEventId  String                  @db.VarChar(191)
+  eventType        String                  @db.VarChar(120)
+  processingStatus WebhookProcessingStatus @default(RECEIVED)
+  signature        String?                 @db.VarChar(500)
+  payload          Json
+  errorMessage     String?                 @db.VarChar(500)
+  receivedAt       DateTime                @default(now())
+  processedAt      DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@unique([provider, externalEventId])
+  @@index([processingStatus, receivedAt])
+  @@index([organizationId, receivedAt])
+  @@map("webhook_events")
+}
+
+model RefreshToken {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash         String   @unique @db.VarChar(255)
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  replacedByHash    String?  @db.VarChar(255)
+  userAgent         String?  @db.VarChar(255)
+  ipAddress         String?  @db.VarChar(120)
+  createdAt         DateTime @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([revokedAt])
+  @@map("refresh_tokens")
 }

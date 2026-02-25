@@ -84,6 +84,34 @@ export class OrganizationsService {
                 data: { role: 'BUSINESS_OWNER' },
             });
 
+            const freePlan = await tx.plan.upsert({
+                where: { code: 'FREE' },
+                update: { active: true },
+                create: {
+                    code: 'FREE',
+                    name: 'Free',
+                    description: 'Plan inicial para presencia digital básica',
+                    priceMonthly: '0',
+                    currency: 'DOP',
+                    transactionFeeBps: 1200,
+                    maxBusinesses: 1,
+                    maxMembers: 3,
+                    maxImagesPerBusiness: 10,
+                    maxPromotions: 1,
+                    analyticsRetentionDays: 30,
+                    active: true,
+                },
+            });
+
+            await tx.subscription.create({
+                data: {
+                    organizationId: organization.id,
+                    planId: freePlan.id,
+                    status: 'ACTIVE',
+                    currentPeriodStart: new Date(),
+                },
+            });
+
             await this.writeAuditLog(tx, {
                 organizationId: organization.id,
                 actorUserId: userId,
@@ -325,6 +353,39 @@ export class OrganizationsService {
                     subscriptionRenewsAt: true,
                 },
             });
+
+            const linkedPlan = await tx.plan.findUnique({
+                where: { code: dto.plan },
+                select: { id: true },
+            });
+
+            if (linkedPlan) {
+                await tx.subscription.upsert({
+                    where: { organizationId },
+                    update: {
+                        planId: linkedPlan.id,
+                        status:
+                            dto.subscriptionStatus === 'PAST_DUE'
+                                ? 'PAST_DUE'
+                                : dto.subscriptionStatus === 'CANCELED'
+                                    ? 'CANCELED'
+                                    : 'ACTIVE',
+                        currentPeriodEnd: organization.subscriptionRenewsAt ?? null,
+                    },
+                    create: {
+                        organizationId,
+                        planId: linkedPlan.id,
+                        status:
+                            dto.subscriptionStatus === 'PAST_DUE'
+                                ? 'PAST_DUE'
+                                : dto.subscriptionStatus === 'CANCELED'
+                                    ? 'CANCELED'
+                                    : 'ACTIVE',
+                        currentPeriodStart: new Date(),
+                        currentPeriodEnd: organization.subscriptionRenewsAt ?? null,
+                    },
+                });
+            }
 
             await this.writeAuditLog(tx, {
                 organizationId,
