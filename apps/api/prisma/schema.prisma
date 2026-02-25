@@ -119,6 +119,53 @@ enum ReviewModerationStatus {
   FLAGGED
 }
 
+enum BusinessVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum VerificationDocumentType {
+  ID_CARD
+  TAX_CERTIFICATE
+  BUSINESS_LICENSE
+  ADDRESS_PROOF
+  SELFIE
+  OTHER
+}
+
+enum VerificationDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AdCampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+  REJECTED
+}
+
+enum AdBillingModel {
+  CPC
+}
+
+enum AdEventType {
+  IMPRESSION
+  CLICK
+  CONVERSION
+}
+
+enum MarketReportType {
+  PROVINCE_CATEGORY_DEMAND
+  TRENDING_BUSINESSES
+  CONVERSION_BENCHMARK
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)
@@ -129,58 +176,68 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  businesses              Business[]
-  reviews                 Review[]
-  organizationsOwned      Organization[]      @relation("OrganizationOwner")
-  organizationMemberships OrganizationMember[]
-  organizationInvitesSent OrganizationInvite[] @relation("OrganizationInvitedBy")
-  auditLogs               AuditLog[]          @relation("AuditActor")
-  refreshTokens           RefreshToken[]
-  bookings                Booking[]
-  promotionsCreated       Promotion[]         @relation("PromotionCreator")
-  transactionsAsBuyer     Transaction[]       @relation("TransactionBuyer")
-  conversationsAsCustomer Conversation[]      @relation("ConversationCustomer")
-  conversationMessagesSent ConversationMessage[] @relation("ConversationMessageSender")
+  businesses               Business[]
+  reviews                  Review[]
+  organizationsOwned       Organization[]                 @relation("OrganizationOwner")
+  organizationMemberships  OrganizationMember[]
+  organizationInvitesSent  OrganizationInvite[]           @relation("OrganizationInvitedBy")
+  auditLogs                AuditLog[]                     @relation("AuditActor")
+  refreshTokens            RefreshToken[]
+  bookings                 Booking[]
+  promotionsCreated        Promotion[]                    @relation("PromotionCreator")
+  transactionsAsBuyer      Transaction[]                  @relation("TransactionBuyer")
+  conversationsAsCustomer  Conversation[]                 @relation("ConversationCustomer")
+  conversationMessagesSent ConversationMessage[]          @relation("ConversationMessageSender")
+  adCampaignsCreated       AdCampaign[]                   @relation("AdCampaignCreator")
+  verificationReviews      BusinessVerificationDocument[] @relation("VerificationDocumentReviewer")
+  marketReportsGenerated   MarketReportSnapshot[]         @relation("MarketReportGeneratedBy")
 
   @@index([email])
   @@map("users")
 }
 
 model Business {
-  id          String   @id @default(uuid())
-  name        String   @db.VarChar(200)
-  slug        String   @unique @db.VarChar(250)
-  description String   @db.Text
-  phone       String?  @db.VarChar(20)
-  whatsapp    String?  @db.VarChar(20)
-  address     String   @db.VarChar(500)
-  latitude    Float?
-  longitude   Float?
-  verified    Boolean  @default(false)
-  verifiedAt  DateTime?
-  reputationScore Decimal @default(0) @db.Decimal(6, 2)
-  reputationTier  BusinessTier @default(BRONZE)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                      String                     @id @default(uuid())
+  name                    String                     @db.VarChar(200)
+  slug                    String                     @unique @db.VarChar(250)
+  description             String                     @db.Text
+  phone                   String?                    @db.VarChar(20)
+  whatsapp                String?                    @db.VarChar(20)
+  address                 String                     @db.VarChar(500)
+  latitude                Float?
+  longitude               Float?
+  verified                Boolean                    @default(false)
+  verifiedAt              DateTime?
+  verificationStatus      BusinessVerificationStatus @default(UNVERIFIED)
+  verificationSubmittedAt DateTime?
+  verificationReviewedAt  DateTime?
+  verificationNotes       String?                    @db.VarChar(500)
+  riskScore               Int                        @default(0)
+  reputationScore         Decimal                    @default(0) @db.Decimal(6, 2)
+  reputationTier          BusinessTier               @default(BRONZE)
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
 
-  ownerId    String
-  owner      User     @relation(fields: [ownerId], references: [id])
+  ownerId        String
+  owner          User         @relation(fields: [ownerId], references: [id])
   organizationId String
-  organization Organization @relation(fields: [organizationId], references: [id])
-  provinceId String
-  province   Province @relation(fields: [provinceId], references: [id])
-  cityId     String?
-  city       City?    @relation(fields: [cityId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  provinceId     String
+  province       Province     @relation(fields: [provinceId], references: [id])
+  cityId         String?
+  city           City?        @relation(fields: [cityId], references: [id])
 
-  categories BusinessCategory[]
-  images     BusinessImage[]
-  reviews    Review[]
-  features   BusinessFeature[]
-  analytics  BusinessAnalytics[]
-  promotions Promotion[]
-  bookings   Booking[]
-  transactions Transaction[]
-  conversations Conversation[]
+  categories            BusinessCategory[]
+  images                BusinessImage[]
+  reviews               Review[]
+  features              BusinessFeature[]
+  analytics             BusinessAnalytics[]
+  promotions            Promotion[]
+  bookings              Booking[]
+  transactions          Transaction[]
+  conversations         Conversation[]
+  verificationDocuments BusinessVerificationDocument[]
+  adCampaigns           AdCampaign[]
 
   @@index([slug])
   @@index([ownerId])
@@ -188,36 +245,39 @@ model Business {
   @@index([provinceId])
   @@index([latitude, longitude])
   @@index([verified])
+  @@index([verificationStatus, createdAt])
   @@index([provinceId, reputationScore])
   @@index([reputationTier, reputationScore])
   @@map("businesses")
 }
 
 model Organization {
-  id          String   @id @default(uuid())
-  name        String   @db.VarChar(150)
-  slug        String   @unique @db.VarChar(180)
-  ownerUserId String
-  ownerUser   User     @relation("OrganizationOwner", fields: [ownerUserId], references: [id])
-  plan        OrganizationPlan               @default(FREE)
-  subscriptionStatus OrganizationSubscriptionStatus @default(ACTIVE)
+  id                   String                         @id @default(uuid())
+  name                 String                         @db.VarChar(150)
+  slug                 String                         @unique @db.VarChar(180)
+  ownerUserId          String
+  ownerUser            User                           @relation("OrganizationOwner", fields: [ownerUserId], references: [id])
+  plan                 OrganizationPlan               @default(FREE)
+  subscriptionStatus   OrganizationSubscriptionStatus @default(ACTIVE)
   subscriptionRenewsAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
 
-  businesses Business[]
-  members    OrganizationMember[]
-  invites    OrganizationInvite[]
-  auditLogs  AuditLog[]
-  subscription Subscription?
-  payments     Payment[]
-  invoices     Invoice[]
-  usageMetrics UsageMetric[]
-  promotions   Promotion[]
-  bookings     Booking[]
-  transactions Transaction[]
-  webhookEvents WebhookEvent[]
-  conversations Conversation[]
+  businesses            Business[]
+  members               OrganizationMember[]
+  invites               OrganizationInvite[]
+  auditLogs             AuditLog[]
+  subscription          Subscription?
+  payments              Payment[]
+  invoices              Invoice[]
+  usageMetrics          UsageMetric[]
+  promotions            Promotion[]
+  bookings              Booking[]
+  transactions          Transaction[]
+  webhookEvents         WebhookEvent[]
+  conversations         Conversation[]
+  adCampaigns           AdCampaign[]
+  verificationDocuments BusinessVerificationDocument[]
 
   @@index([ownerUserId])
   @@index([plan, subscriptionStatus])
@@ -239,18 +299,18 @@ model OrganizationMember {
 }
 
 model OrganizationInvite {
-  id             String           @id @default(uuid())
-  organizationId String
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  email          String           @db.VarChar(255)
-  role           OrganizationRole @default(STAFF)
-  tokenHash      String           @unique @db.VarChar(255)
-  expiresAt      DateTime
-  acceptedAt     DateTime?
+  id              String           @id @default(uuid())
+  organizationId  String
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email           String           @db.VarChar(255)
+  role            OrganizationRole @default(STAFF)
+  tokenHash       String           @unique @db.VarChar(255)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
   invitedByUserId String
-  invitedByUser   User            @relation("OrganizationInvitedBy", fields: [invitedByUserId], references: [id])
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  invitedByUser   User             @relation("OrganizationInvitedBy", fields: [invitedByUserId], references: [id])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@index([organizationId])
   @@index([email])
@@ -402,7 +462,8 @@ model Category {
   slug String  @unique @db.VarChar(120)
   icon String? @db.VarChar(10)
 
-  businesses BusinessCategory[]
+  businesses          BusinessCategory[]
+  adCampaignsTargeted AdCampaign[]       @relation("AdCampaignTargetCategory")
 
   @@index([slug])
   @@map("categories")
@@ -419,24 +480,24 @@ model BusinessCategory {
 }
 
 model Review {
-  id        String   @id @default(uuid())
-  rating    Int      @db.SmallInt
-  comment   String?  @db.Text
+  id               String                 @id @default(uuid())
+  rating           Int                    @db.SmallInt
+  comment          String?                @db.Text
   moderationStatus ReviewModerationStatus @default(APPROVED)
-  moderationReason String? @db.VarChar(255)
-  flaggedAt DateTime?
-  isSpam    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  moderationReason String?                @db.VarChar(255)
+  flaggedAt        DateTime?
+  isSpam           Boolean                @default(false)
+  createdAt        DateTime               @default(now())
 
   userId     String
   user       User     @relation(fields: [userId], references: [id])
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, businessId])
   @@index([businessId])
   @@index([userId])
   @@index([moderationStatus, createdAt])
-  @@unique([userId, businessId])
   @@map("reviews")
 }
 
@@ -456,8 +517,9 @@ model Province {
   name String @unique @db.VarChar(100)
   slug String @unique @db.VarChar(120)
 
-  cities     City[]
-  businesses Business[]
+  cities              City[]
+  businesses          Business[]
+  adCampaignsTargeted AdCampaign[] @relation("AdCampaignTargetProvince")
 
   @@index([slug])
   @@map("provinces")
@@ -472,8 +534,8 @@ model City {
 
   businesses Business[]
 
-  @@index([provinceId])
   @@unique([provinceId, name])
+  @@index([provinceId])
   @@map("cities")
 }
 
@@ -516,27 +578,27 @@ model BusinessAnalytics {
 }
 
 model Promotion {
-  id              String       @id @default(uuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  businessId      String
-  business        Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  createdByUserId String?
-  createdByUser   User?        @relation("PromotionCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  title           String       @db.VarChar(160)
-  slug            String       @unique @db.VarChar(180)
-  description     String?      @db.Text
-  discountType    DiscountType
-  discountValue   Decimal      @db.Decimal(10, 2)
-  couponCode      String?      @unique @db.VarChar(80)
-  startsAt        DateTime
-  endsAt          DateTime
-  maxRedemptions  Int?
-  redemptionsCount Int         @default(0)
-  isFlashOffer    Boolean      @default(false)
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id               String       @id @default(uuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId       String
+  business         Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdByUserId  String?
+  createdByUser    User?        @relation("PromotionCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  title            String       @db.VarChar(160)
+  slug             String       @unique @db.VarChar(180)
+  description      String?      @db.Text
+  discountType     DiscountType
+  discountValue    Decimal      @db.Decimal(10, 2)
+  couponCode       String?      @unique @db.VarChar(80)
+  startsAt         DateTime
+  endsAt           DateTime
+  maxRedemptions   Int?
+  redemptionsCount Int          @default(0)
+  isFlashOffer     Boolean      @default(false)
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   bookings     Booking[]
   transactions Transaction[]
@@ -568,7 +630,7 @@ model Booking {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  transactions Transaction[]
+  transactions        Transaction[]
   sourceConversations Conversation[]
 
   @@index([businessId, scheduledFor])
@@ -633,16 +695,16 @@ model WebhookEvent {
 }
 
 model RefreshToken {
-  id                String   @id @default(uuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash         String   @unique @db.VarChar(255)
-  expiresAt         DateTime
-  revokedAt         DateTime?
-  replacedByHash    String?  @db.VarChar(255)
-  userAgent         String?  @db.VarChar(255)
-  ipAddress         String?  @db.VarChar(120)
-  createdAt         DateTime @default(now())
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash      String    @unique @db.VarChar(255)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  replacedByHash String?   @db.VarChar(255)
+  userAgent      String?   @db.VarChar(255)
+  ipAddress      String?   @db.VarChar(120)
+  createdAt      DateTime  @default(now())
 
   @@index([userId, expiresAt])
   @@index([revokedAt])
@@ -650,20 +712,20 @@ model RefreshToken {
 }
 
 model Conversation {
-  id               String             @id @default(uuid())
-  organizationId   String
-  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  businessId       String
-  business         Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customerUserId   String
-  customerUser     User               @relation("ConversationCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
-  subject          String?            @db.VarChar(160)
-  status           ConversationStatus @default(OPEN)
-  lastMessageAt    DateTime           @default(now())
-  convertedBookingId String?          @unique
-  convertedBooking Booking?           @relation(fields: [convertedBookingId], references: [id], onDelete: SetNull)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                 String             @id @default(uuid())
+  organizationId     String
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId         String
+  business           Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerUserId     String
+  customerUser       User               @relation("ConversationCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  subject            String?            @db.VarChar(160)
+  status             ConversationStatus @default(OPEN)
+  lastMessageAt      DateTime           @default(now())
+  convertedBookingId String?            @unique
+  convertedBooking   Booking?           @relation(fields: [convertedBookingId], references: [id], onDelete: SetNull)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   messages ConversationMessage[]
 
@@ -687,4 +749,93 @@ model ConversationMessage {
   @@index([conversationId, createdAt])
   @@index([senderUserId, createdAt])
   @@map("conversation_messages")
+}
+
+model BusinessVerificationDocument {
+  id               String                     @id @default(uuid())
+  organizationId   String
+  organization     Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId       String
+  business         Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  documentType     VerificationDocumentType
+  fileUrl          String                     @db.VarChar(500)
+  status           VerificationDocumentStatus @default(PENDING)
+  reviewedByUserId String?
+  reviewedByUser   User?                      @relation("VerificationDocumentReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  rejectionReason  String?                    @db.VarChar(500)
+  submittedAt      DateTime                   @default(now())
+  reviewedAt       DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  @@index([organizationId, status, submittedAt])
+  @@index([businessId, status])
+  @@index([reviewedByUserId, reviewedAt])
+  @@map("business_verification_documents")
+}
+
+model AdCampaign {
+  id               String           @id @default(uuid())
+  organizationId   String
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId       String
+  business         Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdByUserId  String?
+  createdByUser    User?            @relation("AdCampaignCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  name             String           @db.VarChar(160)
+  status           AdCampaignStatus @default(DRAFT)
+  billingModel     AdBillingModel   @default(CPC)
+  targetProvinceId String?
+  targetProvince   Province?        @relation("AdCampaignTargetProvince", fields: [targetProvinceId], references: [id], onDelete: SetNull)
+  targetCategoryId String?
+  targetCategory   Category?        @relation("AdCampaignTargetCategory", fields: [targetCategoryId], references: [id], onDelete: SetNull)
+  dailyBudget      Decimal          @db.Decimal(12, 2)
+  totalBudget      Decimal          @db.Decimal(12, 2)
+  bidAmount        Decimal          @db.Decimal(10, 2)
+  spentAmount      Decimal          @default(0) @db.Decimal(12, 2)
+  impressions      Int              @default(0)
+  clicks           Int              @default(0)
+  conversions      Int              @default(0)
+  startsAt         DateTime
+  endsAt           DateTime
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  events AdEvent[]
+
+  @@index([organizationId, status, startsAt, endsAt])
+  @@index([businessId, status])
+  @@index([targetProvinceId, targetCategoryId, status])
+  @@map("ad_campaigns")
+}
+
+model AdEvent {
+  id          String      @id @default(uuid())
+  campaignId  String
+  campaign    AdCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  eventType   AdEventType
+  visitorHash String?     @db.VarChar(64)
+  costAmount  Decimal     @default(0) @db.Decimal(12, 2)
+  metadata    Json?
+  occurredAt  DateTime    @default(now())
+
+  @@index([campaignId, eventType, occurredAt])
+  @@index([occurredAt])
+  @@map("ad_events")
+}
+
+model MarketReportSnapshot {
+  id                String           @id @default(uuid())
+  reportType        MarketReportType
+  periodStart       DateTime
+  periodEnd         DateTime
+  filters           Json?
+  summary           Json
+  generatedByUserId String?
+  generatedByUser   User?            @relation("MarketReportGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: SetNull)
+  generatedAt       DateTime         @default(now())
+
+  @@index([reportType, generatedAt])
+  @@index([generatedByUserId, generatedAt])
+  @@map("market_report_snapshots")
 }

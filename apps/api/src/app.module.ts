@@ -21,6 +21,8 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { CrmModule } from './crm/crm.module';
 import { ReputationModule } from './reputation/reputation.module';
+import { AdsModule } from './ads/ads.module';
+import { VerificationModule } from './verification/verification.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -61,6 +63,8 @@ import { validateEnv } from './config/env.validation';
         MessagingModule,
         CrmModule,
         ReputationModule,
+        AdsModule,
+        VerificationModule,
     ],
     providers: [
         {

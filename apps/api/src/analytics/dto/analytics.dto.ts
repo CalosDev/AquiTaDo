@@ -11,6 +11,7 @@ import {
     MaxLength,
     Min,
 } from 'class-validator';
+import { MarketReportType } from '../../generated/prisma/client';
 
 export enum AnalyticsEventType {
     VIEW = 'VIEW',
@@ -72,5 +73,38 @@ export class MarketInsightsQueryDto {
     @IsInt()
     @Min(1)
     @Max(50)
+    limit?: number;
+}
+
+export class GenerateMarketReportDto {
+    @IsEnum(MarketReportType)
+    reportType!: MarketReportType;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(365)
+    days?: number;
+
+    @IsOptional()
+    @IsUUID()
+    provinceId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    categoryId?: string;
+}
+
+export class ListMarketReportsQueryDto {
+    @IsOptional()
+    @IsEnum(MarketReportType)
+    reportType?: MarketReportType;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
     limit?: number;
 }

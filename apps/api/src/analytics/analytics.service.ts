@@ -4,10 +4,12 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { Prisma } from '../generated/prisma/client';
+import { MarketReportType, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
     AnalyticsEventType,
+    GenerateMarketReportDto,
+    ListMarketReportsQueryDto,
     MarketInsightsQueryDto,
     TrackBusinessEventDto,
 } from './dto/analytics.dto';
@@ -766,6 +768,129 @@ export class AnalyticsService {
             provinces: provinceInsights,
             categories: categoryInsights,
         };
+    }
+
+    async generateMarketReport(
+        generatedByUserId: string,
+        dto: GenerateMarketReportDto,
+    ) {
+        const normalizedDays = this.normalizeDays(dto.days ?? 30);
+        const periodEnd = this.toDateOnly(new Date());
+        const periodStart = this.toDateOnly(
+            new Date(periodEnd.getTime() - (normalizedDays - 1) * 86_400_000),
+        );
+
+        const insights = await this.getMarketInsights({
+            days: normalizedDays,
+            provinceId: dto.provinceId,
+            categoryId: dto.categoryId,
+            limit: 50,
+        });
+
+        const summary = this.buildReportSummary(dto.reportType, insights);
+
+        return this.prisma.marketReportSnapshot.create({
+            data: {
+                reportType: dto.reportType,
+                periodStart,
+                periodEnd,
+                filters: ({
+                    days: normalizedDays,
+                    provinceId: dto.provinceId ?? null,
+                    categoryId: dto.categoryId ?? null,
+                } as Prisma.InputJsonValue),
+                summary: summary as Prisma.InputJsonValue,
+                generatedByUserId,
+            },
+            include: {
+                generatedByUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+            },
+        });
+    }
+
+    async listMarketReports(query: ListMarketReportsQueryDto) {
+        const take = Math.min(Math.max(query.limit ?? 20, 1), 100);
+        const where: Prisma.MarketReportSnapshotWhereInput = {};
+        if (query.reportType) {
+            where.reportType = query.reportType;
+        }
+
+        return this.prisma.marketReportSnapshot.findMany({
+            where,
+            include: {
+                generatedByUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+            },
+            orderBy: { generatedAt: 'desc' },
+            take,
+        });
+    }
+
+    async getMarketReportById(reportId: string) {
+        const report = await this.prisma.marketReportSnapshot.findUnique({
+            where: { id: reportId },
+            include: {
+                generatedByUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+            },
+        });
+
+        if (!report) {
+            throw new NotFoundException('Reporte de mercado no encontrado');
+        }
+
+        return report;
+    }
+
+    private buildReportSummary(
+        reportType: MarketReportType,
+        insights: Awaited<ReturnType<AnalyticsService['getMarketInsights']>>,
+    ) {
+        switch (reportType) {
+            case 'PROVINCE_CATEGORY_DEMAND':
+                return {
+                    headline: 'Demanda por provincia y categoría',
+                    totals: insights.totals,
+                    topProvinces: insights.provinces.slice(0, 10),
+                    topCategories: insights.categories.slice(0, 10),
+                };
+            case 'TRENDING_BUSINESSES':
+                return {
+                    headline: 'Negocios en tendencia',
+                    totals: insights.totals,
+                    topBusinesses: insights.topBusinesses.slice(0, 20),
+                };
+            case 'CONVERSION_BENCHMARK':
+                return {
+                    headline: 'Benchmark de conversión del marketplace',
+                    totals: insights.totals,
+                    conversionRate: insights.totals.conversionRate,
+                    reservationRequestRate: insights.totals.reservationRequestRate,
+                    topBusinesses: insights.topBusinesses.slice(0, 10),
+                    topCategories: insights.categories.slice(0, 10),
+                };
+            default:
+                return {
+                    headline: 'Reporte de mercado',
+                    totals: insights.totals,
+                };
+        }
     }
 
     private async registerUniqueVisitor(

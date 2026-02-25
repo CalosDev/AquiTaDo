@@ -439,6 +439,8 @@ export class BusinessesService {
                 data: {
                     verified: true,
                     verifiedAt: new Date(),
+                    verificationStatus: 'VERIFIED',
+                    verificationReviewedAt: new Date(),
                 },
                 include: this.includeRelations,
             });
