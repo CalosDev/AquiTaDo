@@ -17,6 +17,12 @@ enum Role {
   ADMIN
 }
 
+enum OrganizationRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)
@@ -27,8 +33,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  businesses Business[]
-  reviews    Review[]
+  businesses              Business[]
+  reviews                 Review[]
+  organizationsOwned      Organization[]      @relation("OrganizationOwner")
+  organizationMemberships OrganizationMember[]
+  organizationInvitesSent OrganizationInvite[] @relation("OrganizationInvitedBy")
 
   @@index([email])
   @@map("users")
@@ -50,6 +59,8 @@ model Business {
 
   ownerId    String
   owner      User     @relation(fields: [ownerId], references: [id])
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id])
   provinceId String
   province   Province @relation(fields: [provinceId], references: [id])
   cityId     String?
@@ -62,10 +73,62 @@ model Business {
 
   @@index([slug])
   @@index([ownerId])
+  @@index([organizationId])
   @@index([provinceId])
   @@index([latitude, longitude])
   @@index([verified])
   @@map("businesses")
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(150)
+  slug        String   @unique @db.VarChar(180)
+  ownerUserId String
+  ownerUser   User     @relation("OrganizationOwner", fields: [ownerUserId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  businesses Business[]
+  members    OrganizationMember[]
+  invites    OrganizationInvite[]
+
+  @@index([ownerUserId])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrganizationRole @default(STAFF)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@id([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+model OrganizationInvite {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String           @db.VarChar(255)
+  role           OrganizationRole @default(STAFF)
+  tokenHash      String           @unique @db.VarChar(255)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  invitedByUserId String
+  invitedByUser   User            @relation("OrganizationInvitedBy", fields: [invitedByUserId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([expiresAt])
+  @@map("organization_invites")
 }
 
 model Category {

@@ -16,6 +16,7 @@
     "db:migrate": "pnpm --filter @aquita/api prisma:migrate",
     "db:migrate:deploy": "pnpm --filter @aquita/api prisma:migrate:deploy",
     "db:generate": "pnpm --filter @aquita/api prisma:generate",
+    "db:backfill:organizations": "pnpm --filter @aquita/api prisma:backfill:organizations",
     "db:seed": "pnpm --filter @aquita/api prisma:seed"
   },
   "engines": {

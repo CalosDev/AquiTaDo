@@ -163,6 +163,7 @@ export class BusinessesService {
         try {
             return await this.prisma.$transaction(async (tx) => {
                 await this.assertCityBelongsToProvince(tx, dto.provinceId, dto.cityId);
+                const organizationId = await this.ensureOwnerOrganization(tx, userId);
 
                 const business = await tx.business.create({
                     data: {
@@ -177,6 +178,7 @@ export class BusinessesService {
                         latitude: dto.latitude,
                         longitude: dto.longitude,
                         ownerId: userId,
+                        organizationId,
                         categories: categoryIds
                             ? {
                                 create: categoryIds.map((categoryId) => ({
@@ -358,6 +360,80 @@ export class BusinessesService {
         }
 
         return slug;
+    }
+
+    private async ensureOwnerOrganization(
+        tx: Prisma.TransactionClient,
+        userId: string,
+    ): Promise<string> {
+        const ownerMembership = await tx.organizationMember.findFirst({
+            where: {
+                userId,
+                role: 'OWNER',
+            },
+            select: {
+                organizationId: true,
+            },
+            orderBy: {
+                createdAt: 'asc',
+            },
+        });
+
+        if (ownerMembership) {
+            return ownerMembership.organizationId;
+        }
+
+        const user = await tx.user.findUnique({
+            where: { id: userId },
+            select: { id: true, name: true },
+        });
+
+        if (!user) {
+            throw new NotFoundException('Usuario no encontrado');
+        }
+
+        const organizationName = user.name?.trim()
+            ? `Organización de ${user.name.trim()}`
+            : `Organización ${user.id.slice(0, 8)}`;
+        const slugBase = slugify(user.name || 'organizacion', { lower: true, strict: true }) || 'organizacion';
+        const slugPrefix = `${slugBase}-${user.id.slice(0, 8)}`;
+
+        let slug = slugPrefix;
+        let suffix = 1;
+        while (await tx.organization.findUnique({ where: { slug }, select: { id: true } })) {
+            slug = `${slugPrefix}-${suffix}`;
+            suffix += 1;
+        }
+
+        const organization = await tx.organization.create({
+            data: {
+                name: organizationName,
+                slug,
+                ownerUserId: userId,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        await tx.organizationMember.upsert({
+            where: {
+                organizationId_userId: {
+                    organizationId: organization.id,
+                    userId,
+                },
+            },
+            update: {
+                role: 'OWNER',
+            },
+            create: {
+                organizationId: organization.id,
+                userId,
+                role: 'OWNER',
+            },
+        });
+
+        return organization.id;
     }
 
     private buildWhere(query: BusinessQueryDto, includeUnverified: boolean): Record<string, unknown> {

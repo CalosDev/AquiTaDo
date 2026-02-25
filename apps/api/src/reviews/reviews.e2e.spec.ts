@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 const REVIEWS_EMAIL_DOMAIN = '@e2e-reviews.aquita.local';
 const REVIEW_BUSINESS_SLUG_PREFIX = 'e2e-review-business-';
 const REVIEW_PROVINCE_SLUG_PREFIX = 'e2e-review-province-';
+const REVIEW_ORG_SLUG_PREFIX = 'e2e-org-';
 
 function makeSeed(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -60,6 +61,24 @@ describe('ReviewsController (e2e)', () => {
             },
         });
 
+        await prisma.organizationMember.deleteMany({
+            where: {
+                organization: {
+                    slug: {
+                        startsWith: REVIEW_ORG_SLUG_PREFIX,
+                    },
+                },
+            },
+        });
+
+        await prisma.organization.deleteMany({
+            where: {
+                slug: {
+                    startsWith: REVIEW_ORG_SLUG_PREFIX,
+                },
+            },
+        });
+
         await prisma.user.deleteMany({
             where: {
                 email: {
@@ -92,6 +111,24 @@ describe('ReviewsController (e2e)', () => {
             where: {
                 slug: {
                     startsWith: REVIEW_BUSINESS_SLUG_PREFIX,
+                },
+            },
+        });
+
+        await prisma.organizationMember.deleteMany({
+            where: {
+                organization: {
+                    slug: {
+                        startsWith: REVIEW_ORG_SLUG_PREFIX,
+                    },
+                },
+            },
+        });
+
+        await prisma.organization.deleteMany({
+            where: {
+                slug: {
+                    startsWith: REVIEW_ORG_SLUG_PREFIX,
                 },
             },
         });
@@ -139,6 +176,22 @@ describe('ReviewsController (e2e)', () => {
     async function createBusiness(ownerId: string) {
         const seed = makeSeed();
         const province = await createProvince();
+        const organization = await prisma.organization.create({
+            data: {
+                name: `E2E Organization ${seed}`,
+                slug: `e2e-org-${seed}`,
+                ownerUserId: ownerId,
+            },
+        });
+
+        await prisma.organizationMember.create({
+            data: {
+                organizationId: organization.id,
+                userId: ownerId,
+                role: 'OWNER',
+            },
+        });
+
         return prisma.business.create({
             data: {
                 name: `E2E Review Business ${seed}`,
@@ -146,6 +199,7 @@ describe('ReviewsController (e2e)', () => {
                 description: 'Negocio para pruebas e2e de reseñas',
                 address: 'Avenida de prueba 45',
                 ownerId,
+                organizationId: organization.id,
                 provinceId: province.id,
                 verified: true,
             },

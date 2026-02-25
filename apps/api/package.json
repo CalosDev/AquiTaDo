@@ -12,6 +12,7 @@
         "prisma:migrate": "npx prisma migrate dev",
         "prisma:migrate:deploy": "npx prisma migrate deploy",
         "prisma:generate": "npx prisma generate",
+        "prisma:backfill:organizations": "npx ts-node prisma/backfill-organizations.ts",
         "prisma:seed": "npx ts-node prisma/seed.ts",
         "prisma:studio": "npx prisma studio"
     },
