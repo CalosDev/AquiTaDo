@@ -143,6 +143,7 @@ docker-compose down
 | POST | /api/auth/login | No | Login |
 | GET | /api/users/me | Si | Perfil del usuario |
 | GET | /api/businesses | No | Listar negocios (filtros/paginacion) |
+| GET | /api/businesses/my | Si | Listar negocios de la organizacion activa |
 | GET | /api/businesses/:id | No | Detalle negocio |
 | POST | /api/businesses | Si | Crear negocio |
 | PUT | /api/businesses/:id | Si | Actualizar negocio |
@@ -159,8 +160,38 @@ docker-compose down
 | POST | /api/reviews | Si | Crear resena |
 | POST | /api/upload/business-image | Si | Subir imagen negocio |
 | DELETE | /api/upload/business-image/:imageId | Si | Eliminar imagen negocio |
+| POST | /api/organizations | Si | Crear organizacion |
+| GET | /api/organizations/mine | Si | Organizaciones del usuario |
+| GET | /api/organizations/:id | Si | Detalle de organizacion |
+| PATCH | /api/organizations/:id | Si | Actualizar organizacion |
+| GET | /api/organizations/:id/members | Si | Listar miembros |
+| PATCH | /api/organizations/:id/members/:userId/role | Si | Actualizar rol de miembro |
+| DELETE | /api/organizations/:id/members/:userId | Si | Remover miembro |
+| GET | /api/organizations/:id/invites | Si | Listar invitaciones pendientes |
+| POST | /api/organizations/:id/invites | Si | Crear invitacion de miembro |
+| POST | /api/organizations/invites/:token/accept | Si | Aceptar invitacion |
+| GET | /api/organizations/:id/subscription | Si | Ver plan y estado de suscripcion |
+| PATCH | /api/organizations/:id/subscription | Si (OWNER/ADMIN) | Cambiar plan/estado de suscripcion |
+| GET | /api/organizations/:id/usage | Si | Ver uso y limites del plan |
+| GET | /api/organizations/:id/audit-logs | Si | Ver actividad auditada de la organizacion |
 | GET | /api/health | No | Liveness check |
 | GET | /api/health/ready | No | Readiness check (DB) |
+
+Notas multi-tenant:
+- Para endpoints de operacion por tenant (`/api/businesses/my`, `POST/PUT/DELETE /api/businesses/*`, uploads) enviar `x-organization-id`.
+- El frontend lo envia automaticamente usando la organizacion activa.
+
+## SaaS Multi-tenant (estado actual)
+
+Planes disponibles por organizacion:
+- `FREE`: hasta `1` negocio y `3` asientos (miembros + invitaciones pendientes).
+- `GROWTH`: hasta `5` negocios y `15` asientos.
+- `SCALE`: sin limite de negocios ni asientos.
+
+Reglas aplicadas:
+- Si una organizacion supera limite de plan, no puede crear mas negocios/invitaciones.
+- Si la suscripcion esta `CANCELED`, se bloquean nuevas operaciones de crecimiento.
+- Todas las operaciones clave de organizacion quedan en `audit_logs`.
 
 ## Roles
 

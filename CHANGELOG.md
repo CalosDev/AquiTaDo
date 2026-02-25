@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+- Organization management API: members, invites, subscription, usage, and audit logs.
+- SaaS plan model (`FREE`, `GROWTH`, `SCALE`) with enforced limits by organization.
+- Frontend organization center with plan controls, usage visibility, and audit activity feed.
+
+### Changed
+- Business and upload flows now enforce active organization context and tenant scope.
+- Dashboard and navbar now reflect active organization context in multi-tenant mode.
+
 ## [1.0.0] - 2026-02-25
 
 ### Added
@@ -21,4 +32,3 @@ All notable changes to this project are documented in this file.
 - Added CI post-build DB migration + smoke validation against PostgreSQL service.
 
 [1.0.0]: https://github.com/CalosDev/AquiTaDo/releases/tag/v1.0.0
-
