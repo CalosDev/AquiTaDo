@@ -1,4 +1,14 @@
-import { Inject, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+    Inject,
+    Injectable,
+    BadRequestException,
+    ConflictException,
+    NotFoundException,
+    ForbiddenException,
+} from '@nestjs/common';
+import { promises as fs } from 'fs';
+import * as path from 'path';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
 import slugify from 'slugify';
@@ -142,104 +152,136 @@ export class BusinessesService {
 
     async create(dto: CreateBusinessDto, userId: string) {
         const baseSlug = slugify(dto.name, { lower: true, strict: true });
+        if (!baseSlug) {
+            throw new BadRequestException('El nombre del negocio no es válido para generar un slug');
+        }
+
         const slug = await this.generateUniqueSlug(baseSlug);
+        const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
+        const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
 
-        return this.prisma.$transaction(async (tx) => {
-            const business = await tx.business.create({
-                data: {
-                    name: dto.name,
-                    slug,
-                    description: dto.description,
-                    phone: dto.phone,
-                    whatsapp: dto.whatsapp,
-                    address: dto.address,
-                    provinceId: dto.provinceId,
-                    cityId: dto.cityId,
-                    latitude: dto.latitude,
-                    longitude: dto.longitude,
-                    ownerId: userId,
-                    categories: dto.categoryIds
-                        ? {
-                            create: dto.categoryIds.map((categoryId) => ({
-                                categoryId,
-                            })),
-                        }
-                        : undefined,
-                    features: dto.featureIds
-                        ? {
-                            create: dto.featureIds.map((featureId) => ({
-                                featureId,
-                            })),
-                        }
-                        : undefined,
-                },
-                include: this.includeRelations,
+        try {
+            return await this.prisma.$transaction(async (tx) => {
+                await this.assertCityBelongsToProvince(tx, dto.provinceId, dto.cityId);
+
+                const business = await tx.business.create({
+                    data: {
+                        name: dto.name,
+                        slug,
+                        description: dto.description,
+                        phone: dto.phone,
+                        whatsapp: dto.whatsapp,
+                        address: dto.address,
+                        provinceId: dto.provinceId,
+                        cityId: dto.cityId,
+                        latitude: dto.latitude,
+                        longitude: dto.longitude,
+                        ownerId: userId,
+                        categories: categoryIds
+                            ? {
+                                create: categoryIds.map((categoryId) => ({
+                                    categoryId,
+                                })),
+                            }
+                            : undefined,
+                        features: featureIds
+                            ? {
+                                create: featureIds.map((featureId) => ({
+                                    featureId,
+                                })),
+                            }
+                            : undefined,
+                    },
+                    include: this.includeRelations,
+                });
+
+                // Only promote regular users; never downgrade admin users.
+                await tx.user.updateMany({
+                    where: { id: userId, role: 'USER' },
+                    data: { role: 'BUSINESS_OWNER' },
+                });
+
+                return business;
             });
-
-            // Only promote regular users; never downgrade admin users.
-            await tx.user.updateMany({
-                where: { id: userId, role: 'USER' },
-                data: { role: 'BUSINESS_OWNER' },
-            });
-
-            return business;
-        });
+        } catch (error) {
+            this.handlePrismaError(error);
+            throw error;
+        }
     }
 
     async update(id: string, dto: UpdateBusinessDto, userId: string, userRole: string) {
-        return this.prisma.$transaction(async (tx) => {
-            const business = await tx.business.findUnique({ where: { id } });
+        const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
+        const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
 
-            if (!business) {
-                throw new NotFoundException('Negocio no encontrado');
-            }
+        try {
+            return await this.prisma.$transaction(async (tx) => {
+                const business = await tx.business.findUnique({ where: { id } });
 
-            if (business.ownerId !== userId && userRole !== 'ADMIN') {
-                throw new ForbiddenException('No tienes permisos para editar este negocio');
-            }
+                if (!business) {
+                    throw new NotFoundException('Negocio no encontrado');
+                }
 
-            if (dto.categoryIds) {
-                await tx.businessCategory.deleteMany({ where: { businessId: id } });
-            }
+                if (business.ownerId !== userId && userRole !== 'ADMIN') {
+                    throw new ForbiddenException('No tienes permisos para editar este negocio');
+                }
 
-            if (dto.featureIds) {
-                await tx.businessFeature.deleteMany({ where: { businessId: id } });
-            }
+                const targetProvinceId = dto.provinceId ?? business.provinceId;
+                const targetCityId = dto.cityId ?? business.cityId ?? undefined;
+                await this.assertCityBelongsToProvince(tx, targetProvinceId, targetCityId);
 
-            return tx.business.update({
-                where: { id },
-                data: {
-                    name: dto.name,
-                    description: dto.description,
-                    phone: dto.phone,
-                    whatsapp: dto.whatsapp,
-                    address: dto.address,
-                    provinceId: dto.provinceId,
-                    cityId: dto.cityId,
-                    latitude: dto.latitude,
-                    longitude: dto.longitude,
-                    categories: dto.categoryIds
-                        ? {
-                            create: dto.categoryIds.map((categoryId) => ({
-                                categoryId,
-                            })),
-                        }
-                        : undefined,
-                    features: dto.featureIds
-                        ? {
-                            create: dto.featureIds.map((featureId) => ({
-                                featureId,
-                            })),
-                        }
-                        : undefined,
-                },
-                include: this.includeRelations,
+                if (categoryIds) {
+                    await tx.businessCategory.deleteMany({ where: { businessId: id } });
+                }
+
+                if (featureIds) {
+                    await tx.businessFeature.deleteMany({ where: { businessId: id } });
+                }
+
+                return tx.business.update({
+                    where: { id },
+                    data: {
+                        name: dto.name,
+                        description: dto.description,
+                        phone: dto.phone,
+                        whatsapp: dto.whatsapp,
+                        address: dto.address,
+                        provinceId: dto.provinceId,
+                        cityId: dto.cityId,
+                        latitude: dto.latitude,
+                        longitude: dto.longitude,
+                        categories: categoryIds
+                            ? {
+                                create: categoryIds.map((categoryId) => ({
+                                    categoryId,
+                                })),
+                            }
+                            : undefined,
+                        features: featureIds
+                            ? {
+                                create: featureIds.map((featureId) => ({
+                                    featureId,
+                                })),
+                            }
+                            : undefined,
+                    },
+                    include: this.includeRelations,
+                });
             });
-        });
+        } catch (error) {
+            this.handlePrismaError(error);
+            throw error;
+        }
     }
 
     async delete(id: string, userId: string, userRole: string) {
-        const business = await this.prisma.business.findUnique({ where: { id } });
+        const business = await this.prisma.business.findUnique({
+            where: { id },
+            include: {
+                images: {
+                    select: { url: true },
+                },
+            },
+        });
 
         if (!business) {
             throw new NotFoundException('Negocio no encontrado');
@@ -249,7 +291,14 @@ export class BusinessesService {
             throw new ForbiddenException('No tienes permisos para eliminar este negocio');
         }
 
-        await this.prisma.business.delete({ where: { id } });
+        await this.deleteBusinessImageFiles(business.images.map((image) => image.url));
+
+        try {
+            await this.prisma.business.delete({ where: { id } });
+        } catch (error) {
+            this.handlePrismaError(error);
+            throw error;
+        }
         return { message: 'Negocio eliminado exitosamente' };
     }
 
@@ -287,11 +336,16 @@ export class BusinessesService {
     }
 
     async verify(id: string) {
-        return this.prisma.business.update({
-            where: { id },
-            data: { verified: true },
-            include: this.includeRelations,
-        });
+        try {
+            return await this.prisma.business.update({
+                where: { id },
+                data: { verified: true },
+                include: this.includeRelations,
+            });
+        } catch (error) {
+            this.handlePrismaError(error);
+            throw error;
+        }
     }
 
     private async generateUniqueSlug(baseSlug: string): Promise<string> {
@@ -337,6 +391,64 @@ export class BusinessesService {
         }
 
         return where;
+    }
+
+    private async assertCityBelongsToProvince(
+        tx: Prisma.TransactionClient,
+        provinceId: string,
+        cityId?: string,
+    ): Promise<void> {
+        if (!cityId) {
+            return;
+        }
+
+        const city = await tx.city.findUnique({
+            where: { id: cityId },
+            select: { provinceId: true },
+        });
+
+        if (!city || city.provinceId !== provinceId) {
+            throw new BadRequestException('La ciudad seleccionada no pertenece a la provincia indicada');
+        }
+    }
+
+    private async deleteBusinessImageFiles(imageUrls: string[]): Promise<void> {
+        await Promise.all(
+            imageUrls.map(async (imageUrl) => {
+                const absolutePath = this.resolveUploadPath(imageUrl);
+                try {
+                    await fs.unlink(absolutePath);
+                } catch (error) {
+                    const code = (error as NodeJS.ErrnoException).code;
+                    if (code !== 'ENOENT') {
+                        throw error;
+                    }
+                }
+            }),
+        );
+    }
+
+    private resolveUploadPath(assetUrl: string): string {
+        const relativePath = assetUrl.replace(/^\/+/, '');
+        return path.join(process.cwd(), relativePath);
+    }
+
+    private handlePrismaError(error: unknown): void {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+            return;
+        }
+
+        if (error.code === 'P2002') {
+            throw new ConflictException('Ya existe un recurso con esos datos');
+        }
+
+        if (error.code === 'P2003') {
+            throw new BadRequestException('No se pudo procesar la solicitud por referencias inválidas');
+        }
+
+        if (error.code === 'P2025') {
+            throw new NotFoundException('Negocio no encontrado');
+        }
     }
 
     private canAccessUnverified(ownerId: string, userId?: string, userRole?: string): boolean {

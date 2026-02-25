@@ -1,4 +1,15 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsArray, IsBoolean, MaxLength, Min, Max } from 'class-validator';
+import {
+    IsString,
+    IsNotEmpty,
+    IsOptional,
+    IsNumber,
+    IsArray,
+    IsBoolean,
+    IsUUID,
+    MaxLength,
+    Min,
+    Max,
+} from 'class-validator';
 
 export class CreateBusinessDto {
     @IsString()
@@ -26,10 +37,11 @@ export class CreateBusinessDto {
 
     @IsString()
     @IsNotEmpty()
+    @IsUUID()
     provinceId!: string;
 
     @IsOptional()
-    @IsString()
+    @IsUUID()
     cityId?: string;
 
     @IsOptional()
@@ -46,12 +58,12 @@ export class CreateBusinessDto {
 
     @IsOptional()
     @IsArray()
-    @IsString({ each: true })
+    @IsUUID('all', { each: true })
     categoryIds?: string[];
 
     @IsOptional()
     @IsArray()
-    @IsString({ each: true })
+    @IsUUID('all', { each: true })
     featureIds?: string[];
 }
 
@@ -80,11 +92,11 @@ export class UpdateBusinessDto {
     address?: string;
 
     @IsOptional()
-    @IsString()
+    @IsUUID()
     provinceId?: string;
 
     @IsOptional()
-    @IsString()
+    @IsUUID()
     cityId?: string;
 
     @IsOptional()
@@ -101,12 +113,12 @@ export class UpdateBusinessDto {
 
     @IsOptional()
     @IsArray()
-    @IsString({ each: true })
+    @IsUUID('all', { each: true })
     categoryIds?: string[];
 
     @IsOptional()
     @IsArray()
-    @IsString({ each: true })
+    @IsUUID('all', { each: true })
     featureIds?: string[];
 }
 
@@ -116,15 +128,15 @@ export class BusinessQueryDto {
     search?: string;
 
     @IsOptional()
-    @IsString()
+    @IsUUID()
     categoryId?: string;
 
     @IsOptional()
-    @IsString()
+    @IsUUID()
     provinceId?: string;
 
     @IsOptional()
-    @IsString()
+    @IsUUID()
     cityId?: string;
 
     @IsOptional()

@@ -11,6 +11,19 @@ export class ReviewsService {
     ) { }
 
     async create(dto: CreateReviewDto, userId: string) {
+        const business = await this.prisma.business.findUnique({
+            where: { id: dto.businessId },
+            select: { id: true, verified: true },
+        });
+
+        if (!business) {
+            throw new BadRequestException('Negocio no encontrado');
+        }
+
+        if (!business.verified) {
+            throw new BadRequestException('No puedes reseñar un negocio no verificado');
+        }
+
         // Check if user already reviewed this business
         const existingReview = await this.prisma.review.findFirst({
             where: {
@@ -43,6 +56,13 @@ export class ReviewsService {
                 error.code === 'P2002'
             ) {
                 throw new BadRequestException('Ya has dejado una reseña para este negocio');
+            }
+
+            if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2003'
+            ) {
+                throw new BadRequestException('Negocio no encontrado');
             }
 
             throw error;

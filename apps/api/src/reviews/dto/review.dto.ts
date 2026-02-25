@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 
 export class CreateReviewDto {
     @IsInt()
@@ -12,5 +12,6 @@ export class CreateReviewDto {
 
     @IsString()
     @IsNotEmpty()
+    @IsUUID()
     businessId!: string;
 }
