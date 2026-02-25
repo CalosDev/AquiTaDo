@@ -18,6 +18,9 @@ import { PaymentsModule } from './payments/payments.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { MessagingModule } from './messaging/messaging.module';
+import { CrmModule } from './crm/crm.module';
+import { ReputationModule } from './reputation/reputation.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -55,6 +58,9 @@ import { validateEnv } from './config/env.validation';
         PromotionsModule,
         BookingsModule,
         AnalyticsModule,
+        MessagingModule,
+        CrmModule,
+        ReputationModule,
     ],
     providers: [
         {

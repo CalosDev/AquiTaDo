@@ -8,15 +8,17 @@ import {
     Inject,
     Post,
     Query,
+    Res,
     Req,
     UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { Response } from 'express';
 import { CurrentOrganization } from '../organizations/decorators/current-organization.decorator';
 import { OrgContextGuard } from '../organizations/guards/org-context.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ListPaymentsQueryDto } from './dto/payment.dto';
+import { BillingReportQueryDto, ListPaymentsQueryDto } from './dto/payment.dto';
 import { PaymentsService } from './payments.service';
 
 @Controller('payments')
@@ -55,5 +57,54 @@ export class PaymentsController {
         @Query() query: ListPaymentsQueryDto,
     ) {
         return this.paymentsService.listMyInvoices(organizationId, query.limit);
+    }
+
+    @Get('reports/summary/my')
+    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    async getBillingSummary(
+        @CurrentOrganization('organizationId') organizationId: string,
+        @Query() query: BillingReportQueryDto,
+    ) {
+        return this.paymentsService.getBillingSummary(
+            organizationId,
+            query.from,
+            query.to,
+        );
+    }
+
+    @Get('invoices/export.csv')
+    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    async exportInvoicesCsv(
+        @CurrentOrganization('organizationId') organizationId: string,
+        @Query() query: BillingReportQueryDto,
+        @Res() response: Response,
+    ) {
+        const payload = await this.paymentsService.exportInvoicesCsv(
+            organizationId,
+            query.from,
+            query.to,
+        );
+
+        response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        response.setHeader('Content-Disposition', `attachment; filename="${payload.fileName}"`);
+        response.send(payload.csv);
+    }
+
+    @Get('payments/export.csv')
+    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    async exportPaymentsCsv(
+        @CurrentOrganization('organizationId') organizationId: string,
+        @Query() query: BillingReportQueryDto,
+        @Res() response: Response,
+    ) {
+        const payload = await this.paymentsService.exportPaymentsCsv(
+            organizationId,
+            query.from,
+            query.to,
+        );
+
+        response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        response.setHeader('Content-Disposition', `attachment; filename="${payload.fileName}"`);
+        response.send(payload.csv);
     }
 }

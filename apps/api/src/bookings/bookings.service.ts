@@ -13,6 +13,7 @@ import {
     TransactionStatus,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ReputationService } from '../reputation/reputation.service';
 import {
     CreateBookingDto,
     ListBookingsQueryDto,
@@ -25,6 +26,8 @@ export class BookingsService {
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
+        @Inject(ReputationService)
+        private readonly reputationService: ReputationService,
     ) { }
 
     private readonly bookingInclude = {
@@ -241,6 +244,13 @@ export class BookingsService {
                         status: 'CANCELED',
                     },
                 });
+            }
+
+            if (dto.status === 'COMPLETED') {
+                await this.reputationService.recalculateBusinessReputation(
+                    updatedBooking.businessId,
+                    tx,
+                );
             }
 
             return updatedBooking;

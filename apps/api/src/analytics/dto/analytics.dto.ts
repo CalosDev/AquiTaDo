@@ -50,3 +50,27 @@ export class AnalyticsRangeQueryDto {
     @Max(365)
     days?: number;
 }
+
+export class MarketInsightsQueryDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(365)
+    days?: number;
+
+    @IsOptional()
+    @IsUUID()
+    provinceId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    categoryId?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(50)
+    limit?: number;
+}

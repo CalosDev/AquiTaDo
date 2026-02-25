@@ -66,6 +66,197 @@ export class PaymentsService {
         });
     }
 
+    async getBillingSummary(
+        organizationId: string,
+        from?: string,
+        to?: string,
+    ) {
+        const issuedAtRange = this.resolveDateRange(from, to);
+        const createdAtRange = this.resolveDateRange(from, to);
+
+        const invoiceWhere: Prisma.InvoiceWhereInput = {
+            organizationId,
+            ...(issuedAtRange ? { issuedAt: issuedAtRange } : {}),
+        };
+        const paymentWhere: Prisma.PaymentWhereInput = {
+            organizationId,
+            ...(createdAtRange ? { createdAt: createdAtRange } : {}),
+        };
+        const transactionWhere: Prisma.TransactionWhereInput = {
+            organizationId,
+            status: 'SUCCEEDED',
+            ...(createdAtRange ? { createdAt: createdAtRange } : {}),
+        };
+
+        const [invoiceStatusStats, paymentStatusStats, transactionSummary] = await Promise.all([
+            this.prisma.invoice.groupBy({
+                by: ['status'],
+                where: invoiceWhere,
+                _count: { _all: true },
+                _sum: {
+                    amountSubtotal: true,
+                    amountTax: true,
+                    amountTotal: true,
+                },
+            }),
+            this.prisma.payment.groupBy({
+                by: ['status'],
+                where: paymentWhere,
+                _count: { _all: true },
+                _sum: {
+                    amount: true,
+                },
+            }),
+            this.prisma.transaction.aggregate({
+                where: transactionWhere,
+                _count: { _all: true },
+                _sum: {
+                    grossAmount: true,
+                    platformFeeAmount: true,
+                    netAmount: true,
+                },
+            }),
+        ]);
+
+        const invoiceByStatus: Record<string, { count: number; total: number }> = {};
+        for (const row of invoiceStatusStats) {
+            invoiceByStatus[row.status] = {
+                count: row._count._all,
+                total: Number(row._sum.amountTotal?.toString() ?? '0'),
+            };
+        }
+
+        const paymentByStatus: Record<string, { count: number; total: number }> = {};
+        for (const row of paymentStatusStats) {
+            paymentByStatus[row.status] = {
+                count: row._count._all,
+                total: Number(row._sum.amount?.toString() ?? '0'),
+            };
+        }
+
+        return {
+            range: { from: from ?? null, to: to ?? null },
+            invoices: {
+                byStatus: invoiceByStatus,
+                subtotal: invoiceStatusStats.reduce(
+                    (sum, row) => sum + Number(row._sum.amountSubtotal?.toString() ?? '0'),
+                    0,
+                ),
+                tax: invoiceStatusStats.reduce(
+                    (sum, row) => sum + Number(row._sum.amountTax?.toString() ?? '0'),
+                    0,
+                ),
+                total: invoiceStatusStats.reduce(
+                    (sum, row) => sum + Number(row._sum.amountTotal?.toString() ?? '0'),
+                    0,
+                ),
+            },
+            payments: {
+                byStatus: paymentByStatus,
+                totalCollected: paymentByStatus.SUCCEEDED?.total ?? 0,
+                totalFailed: paymentByStatus.FAILED?.total ?? 0,
+            },
+            marketplace: {
+                successfulTransactions: transactionSummary._count._all,
+                grossAmount: Number(transactionSummary._sum.grossAmount?.toString() ?? '0'),
+                platformFeeAmount: Number(transactionSummary._sum.platformFeeAmount?.toString() ?? '0'),
+                netAmount: Number(transactionSummary._sum.netAmount?.toString() ?? '0'),
+            },
+        };
+    }
+
+    async exportInvoicesCsv(
+        organizationId: string,
+        from?: string,
+        to?: string,
+    ) {
+        const issuedAtRange = this.resolveDateRange(from, to);
+        const invoices = await this.prisma.invoice.findMany({
+            where: {
+                organizationId,
+                ...(issuedAtRange ? { issuedAt: issuedAtRange } : {}),
+            },
+            orderBy: { issuedAt: 'desc' },
+        });
+
+        const headers = [
+            'invoice_id',
+            'number',
+            'status',
+            'issued_at',
+            'due_at',
+            'paid_at',
+            'currency',
+            'subtotal',
+            'tax',
+            'total',
+            'pdf_url',
+        ];
+
+        const rows = invoices.map((invoice) => [
+            invoice.id,
+            invoice.number ?? '',
+            invoice.status,
+            invoice.issuedAt.toISOString(),
+            invoice.dueAt?.toISOString() ?? '',
+            invoice.paidAt?.toISOString() ?? '',
+            invoice.currency,
+            invoice.amountSubtotal.toString(),
+            invoice.amountTax.toString(),
+            invoice.amountTotal.toString(),
+            invoice.pdfUrl ?? '',
+        ]);
+
+        const csv = this.toCsv(headers, rows);
+        const fileName = `invoices_${organizationId}_${new Date().toISOString().slice(0, 10)}.csv`;
+
+        return { fileName, csv };
+    }
+
+    async exportPaymentsCsv(
+        organizationId: string,
+        from?: string,
+        to?: string,
+    ) {
+        const createdAtRange = this.resolveDateRange(from, to);
+        const payments = await this.prisma.payment.findMany({
+            where: {
+                organizationId,
+                ...(createdAtRange ? { createdAt: createdAtRange } : {}),
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const headers = [
+            'payment_id',
+            'provider',
+            'provider_payment_intent_id',
+            'status',
+            'amount',
+            'currency',
+            'created_at',
+            'paid_at',
+            'failure_reason',
+        ];
+
+        const rows = payments.map((payment) => [
+            payment.id,
+            payment.provider,
+            payment.providerPaymentIntentId ?? '',
+            payment.status,
+            payment.amount.toString(),
+            payment.currency,
+            payment.createdAt.toISOString(),
+            payment.paidAt?.toISOString() ?? '',
+            payment.failureReason ?? '',
+        ]);
+
+        const csv = this.toCsv(headers, rows);
+        const fileName = `payments_${organizationId}_${new Date().toISOString().slice(0, 10)}.csv`;
+
+        return { fileName, csv };
+    }
+
     async handleStripeWebhook(signature: string | undefined, body: unknown) {
         const event = this.resolveStripeEvent(signature, body);
 
@@ -526,5 +717,47 @@ export class PaymentsService {
 
     private asJson(payload: unknown): Prisma.InputJsonValue {
         return payload as Prisma.InputJsonValue;
+    }
+
+    private resolveDateRange(
+        from?: string,
+        to?: string,
+    ): Prisma.DateTimeFilter | null {
+        if (!from && !to) {
+            return null;
+        }
+
+        const range: Prisma.DateTimeFilter = {};
+        if (from) {
+            const parsedFrom = new Date(from);
+            if (Number.isNaN(parsedFrom.getTime())) {
+                throw new BadRequestException('Fecha inicial inválida');
+            }
+            range.gte = parsedFrom;
+        }
+
+        if (to) {
+            const parsedTo = new Date(to);
+            if (Number.isNaN(parsedTo.getTime())) {
+                throw new BadRequestException('Fecha final inválida');
+            }
+            range.lte = parsedTo;
+        }
+
+        return range;
+    }
+
+    private toCsv(headers: string[], rows: Array<Array<string>>): string {
+        const serializedHeaders = headers.map((header) => this.escapeCsv(header)).join(',');
+        const serializedRows = rows.map((row) => row.map((cell) => this.escapeCsv(cell)).join(','));
+        return [serializedHeaders, ...serializedRows].join('\n');
+    }
+
+    private escapeCsv(value: string): string {
+        if (!value.includes(',') && !value.includes('"') && !value.includes('\n')) {
+            return value;
+        }
+
+        return `"${value.replace(/"/g, '""')}"`;
     }
 }

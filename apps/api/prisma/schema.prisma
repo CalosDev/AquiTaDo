@@ -96,6 +96,29 @@ enum WebhookProcessingStatus {
   FAILED
 }
 
+enum ConversationStatus {
+  OPEN
+  CLOSED
+  CONVERTED
+}
+
+enum MessageSenderRole {
+  CUSTOMER
+  BUSINESS_STAFF
+  SYSTEM
+}
+
+enum BusinessTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum ReviewModerationStatus {
+  APPROVED
+  FLAGGED
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)
@@ -116,6 +139,8 @@ model User {
   bookings                Booking[]
   promotionsCreated       Promotion[]         @relation("PromotionCreator")
   transactionsAsBuyer     Transaction[]       @relation("TransactionBuyer")
+  conversationsAsCustomer Conversation[]      @relation("ConversationCustomer")
+  conversationMessagesSent ConversationMessage[] @relation("ConversationMessageSender")
 
   @@index([email])
   @@map("users")
@@ -132,6 +157,9 @@ model Business {
   latitude    Float?
   longitude   Float?
   verified    Boolean  @default(false)
+  verifiedAt  DateTime?
+  reputationScore Decimal @default(0) @db.Decimal(6, 2)
+  reputationTier  BusinessTier @default(BRONZE)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -152,6 +180,7 @@ model Business {
   promotions Promotion[]
   bookings   Booking[]
   transactions Transaction[]
+  conversations Conversation[]
 
   @@index([slug])
   @@index([ownerId])
@@ -159,6 +188,8 @@ model Business {
   @@index([provinceId])
   @@index([latitude, longitude])
   @@index([verified])
+  @@index([provinceId, reputationScore])
+  @@index([reputationTier, reputationScore])
   @@map("businesses")
 }
 
@@ -186,6 +217,7 @@ model Organization {
   bookings     Booking[]
   transactions Transaction[]
   webhookEvents WebhookEvent[]
+  conversations Conversation[]
 
   @@index([ownerUserId])
   @@index([plan, subscriptionStatus])
@@ -390,6 +422,10 @@ model Review {
   id        String   @id @default(uuid())
   rating    Int      @db.SmallInt
   comment   String?  @db.Text
+  moderationStatus ReviewModerationStatus @default(APPROVED)
+  moderationReason String? @db.VarChar(255)
+  flaggedAt DateTime?
+  isSpam    Boolean  @default(false)
   createdAt DateTime @default(now())
 
   userId     String
@@ -399,6 +435,7 @@ model Review {
 
   @@index([businessId])
   @@index([userId])
+  @@index([moderationStatus, createdAt])
   @@unique([userId, businessId])
   @@map("reviews")
 }
@@ -532,6 +569,7 @@ model Booking {
   updatedAt      DateTime      @updatedAt
 
   transactions Transaction[]
+  sourceConversations Conversation[]
 
   @@index([businessId, scheduledFor])
   @@index([organizationId, status])
@@ -609,4 +647,44 @@ model RefreshToken {
   @@index([userId, expiresAt])
   @@index([revokedAt])
   @@map("refresh_tokens")
+}
+
+model Conversation {
+  id               String             @id @default(uuid())
+  organizationId   String
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId       String
+  business         Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerUserId   String
+  customerUser     User               @relation("ConversationCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  subject          String?            @db.VarChar(160)
+  status           ConversationStatus @default(OPEN)
+  lastMessageAt    DateTime           @default(now())
+  convertedBookingId String?          @unique
+  convertedBooking Booking?           @relation(fields: [convertedBookingId], references: [id], onDelete: SetNull)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  messages ConversationMessage[]
+
+  @@index([organizationId, status, lastMessageAt])
+  @@index([businessId, status, lastMessageAt])
+  @@index([customerUserId, status, lastMessageAt])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String            @id @default(uuid())
+  conversationId String
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUserId   String?
+  senderUser     User?             @relation("ConversationMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  senderRole     MessageSenderRole
+  content        String            @db.Text
+  createdAt      DateTime          @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId, createdAt])
+  @@index([senderUserId, createdAt])
+  @@map("conversation_messages")
 }

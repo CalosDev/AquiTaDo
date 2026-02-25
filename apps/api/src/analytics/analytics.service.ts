@@ -8,6 +8,7 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
     AnalyticsEventType,
+    MarketInsightsQueryDto,
     TrackBusinessEventDto,
 } from './dto/analytics.dto';
 
@@ -378,6 +379,392 @@ export class AnalyticsService {
                     : 0,
             },
             daily: this.buildDailySeries(rangeStart, normalizedDays, dailyMap),
+        };
+    }
+
+    async getMarketInsights(query: MarketInsightsQueryDto) {
+        const normalizedDays = this.normalizeDays(query.days ?? 30);
+        const take = Math.min(Math.max(query.limit ?? 10, 1), 50);
+        const now = new Date();
+        const rangeStart = this.toDateOnly(new Date(now.getTime() - (normalizedDays - 1) * 86_400_000));
+
+        const businessWhere: Prisma.BusinessWhereInput = {
+            verified: true,
+        };
+
+        if (query.provinceId) {
+            businessWhere.provinceId = query.provinceId;
+        }
+
+        if (query.categoryId) {
+            businessWhere.categories = {
+                some: {
+                    categoryId: query.categoryId,
+                },
+            };
+        }
+
+        const businesses = await this.prisma.business.findMany({
+            where: businessWhere,
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                reputationScore: true,
+                reputationTier: true,
+                province: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
+                city: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                categories: {
+                    select: {
+                        category: {
+                            select: {
+                                id: true,
+                                name: true,
+                                slug: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (businesses.length === 0) {
+            return {
+                range: {
+                    days: normalizedDays,
+                    from: rangeStart.toISOString(),
+                    to: this.toDateOnly(now).toISOString(),
+                },
+                filters: {
+                    provinceId: query.provinceId ?? null,
+                    categoryId: query.categoryId ?? null,
+                },
+                totals: {
+                    trackedBusinesses: 0,
+                    views: 0,
+                    clicks: 0,
+                    conversions: 0,
+                    reservationRequests: 0,
+                    grossRevenue: 0,
+                    conversionRate: 0,
+                    reservationRequestRate: 0,
+                },
+                topBusinesses: [],
+                provinces: [],
+                categories: [],
+            };
+        }
+
+        const businessIds = businesses.map((business) => business.id);
+
+        const [analyticsRows, reviewRows, bookingRows] = await Promise.all([
+            this.prisma.businessAnalytics.groupBy({
+                by: ['businessId'],
+                where: {
+                    businessId: { in: businessIds },
+                    date: { gte: rangeStart },
+                },
+                _sum: {
+                    views: true,
+                    clicks: true,
+                    conversions: true,
+                    reservationRequests: true,
+                    grossRevenue: true,
+                },
+            }),
+            this.prisma.review.groupBy({
+                by: ['businessId'],
+                where: {
+                    businessId: { in: businessIds },
+                    moderationStatus: 'APPROVED',
+                    isSpam: false,
+                },
+                _avg: {
+                    rating: true,
+                },
+                _count: {
+                    _all: true,
+                },
+            }),
+            this.prisma.booking.groupBy({
+                by: ['businessId'],
+                where: {
+                    businessId: { in: businessIds },
+                    scheduledFor: { gte: rangeStart },
+                },
+                _count: {
+                    _all: true,
+                },
+            }),
+        ]);
+
+        const analyticsByBusiness = new Map<
+        string,
+        {
+            views: number;
+            clicks: number;
+            conversions: number;
+            reservationRequests: number;
+            grossRevenue: number;
+        }
+        >();
+        for (const row of analyticsRows) {
+            analyticsByBusiness.set(row.businessId, {
+                views: row._sum.views ?? 0,
+                clicks: row._sum.clicks ?? 0,
+                conversions: row._sum.conversions ?? 0,
+                reservationRequests: row._sum.reservationRequests ?? 0,
+                grossRevenue: Number(row._sum.grossRevenue?.toString() ?? '0'),
+            });
+        }
+
+        const reviewsByBusiness = new Map<
+        string,
+        {
+            averageRating: number;
+            reviewCount: number;
+        }
+        >();
+        for (const row of reviewRows) {
+            reviewsByBusiness.set(row.businessId, {
+                averageRating: Number(row._avg.rating ?? 0),
+                reviewCount: row._count._all,
+            });
+        }
+
+        const bookingsByBusiness = new Map<string, number>();
+        for (const row of bookingRows) {
+            bookingsByBusiness.set(row.businessId, row._count._all);
+        }
+
+        const totals = {
+            views: 0,
+            clicks: 0,
+            conversions: 0,
+            reservationRequests: 0,
+            grossRevenue: 0,
+        };
+
+        const provinceRollup = new Map<
+        string,
+        {
+            provinceId: string;
+            provinceName: string;
+            provinceSlug: string;
+            businessCount: number;
+            views: number;
+            clicks: number;
+            conversions: number;
+            reservationRequests: number;
+            grossRevenue: number;
+            reviewCount: number;
+            weightedRatingSum: number;
+        }
+        >();
+
+        const categoryRollup = new Map<
+        string,
+        {
+            categoryId: string;
+            categoryName: string;
+            categorySlug: string;
+            businessCount: number;
+            views: number;
+            clicks: number;
+            conversions: number;
+            reservationRequests: number;
+            grossRevenue: number;
+        }
+        >();
+
+        const topBusinesses = businesses.map((business) => {
+            const analytics = analyticsByBusiness.get(business.id) ?? {
+                views: 0,
+                clicks: 0,
+                conversions: 0,
+                reservationRequests: 0,
+                grossRevenue: 0,
+            };
+            const review = reviewsByBusiness.get(business.id) ?? {
+                averageRating: 0,
+                reviewCount: 0,
+            };
+            const bookingsCount = bookingsByBusiness.get(business.id) ?? 0;
+
+            totals.views += analytics.views;
+            totals.clicks += analytics.clicks;
+            totals.conversions += analytics.conversions;
+            totals.reservationRequests += analytics.reservationRequests;
+            totals.grossRevenue += analytics.grossRevenue;
+
+            const provinceBucket = provinceRollup.get(business.province.id) ?? {
+                provinceId: business.province.id,
+                provinceName: business.province.name,
+                provinceSlug: business.province.slug,
+                businessCount: 0,
+                views: 0,
+                clicks: 0,
+                conversions: 0,
+                reservationRequests: 0,
+                grossRevenue: 0,
+                reviewCount: 0,
+                weightedRatingSum: 0,
+            };
+
+            provinceBucket.businessCount += 1;
+            provinceBucket.views += analytics.views;
+            provinceBucket.clicks += analytics.clicks;
+            provinceBucket.conversions += analytics.conversions;
+            provinceBucket.reservationRequests += analytics.reservationRequests;
+            provinceBucket.grossRevenue += analytics.grossRevenue;
+            provinceBucket.reviewCount += review.reviewCount;
+            provinceBucket.weightedRatingSum += review.averageRating * review.reviewCount;
+            provinceRollup.set(business.province.id, provinceBucket);
+
+            for (const categoryRef of business.categories) {
+                const category = categoryRef.category;
+                const categoryBucket = categoryRollup.get(category.id) ?? {
+                    categoryId: category.id,
+                    categoryName: category.name,
+                    categorySlug: category.slug,
+                    businessCount: 0,
+                    views: 0,
+                    clicks: 0,
+                    conversions: 0,
+                    reservationRequests: 0,
+                    grossRevenue: 0,
+                };
+
+                categoryBucket.businessCount += 1;
+                categoryBucket.views += analytics.views;
+                categoryBucket.clicks += analytics.clicks;
+                categoryBucket.conversions += analytics.conversions;
+                categoryBucket.reservationRequests += analytics.reservationRequests;
+                categoryBucket.grossRevenue += analytics.grossRevenue;
+                categoryRollup.set(category.id, categoryBucket);
+            }
+
+            return {
+                id: business.id,
+                name: business.name,
+                slug: business.slug,
+                province: business.province,
+                city: business.city,
+                categories: business.categories.map((entry) => entry.category),
+                reputationScore: Number(business.reputationScore.toString()),
+                reputationTier: business.reputationTier,
+                stats: {
+                    views: analytics.views,
+                    clicks: analytics.clicks,
+                    conversions: analytics.conversions,
+                    reservationRequests: analytics.reservationRequests,
+                    bookings: bookingsCount,
+                    grossRevenue: this.roundMoney(analytics.grossRevenue),
+                    conversionRate: analytics.views > 0
+                        ? Number(((analytics.conversions / analytics.views) * 100).toFixed(2))
+                        : 0,
+                    averageRating: Number(review.averageRating.toFixed(2)),
+                    reviewCount: review.reviewCount,
+                },
+            };
+        });
+
+        const provinceInsights = [...provinceRollup.values()]
+            .map((row) => ({
+                provinceId: row.provinceId,
+                provinceName: row.provinceName,
+                provinceSlug: row.provinceSlug,
+                businessCount: row.businessCount,
+                views: row.views,
+                clicks: row.clicks,
+                conversions: row.conversions,
+                reservationRequests: row.reservationRequests,
+                grossRevenue: this.roundMoney(row.grossRevenue),
+                conversionRate: row.views > 0
+                    ? Number(((row.conversions / row.views) * 100).toFixed(2))
+                    : 0,
+                averageRating: row.reviewCount > 0
+                    ? Number((row.weightedRatingSum / row.reviewCount).toFixed(2))
+                    : 0,
+            }))
+            .sort((left, right) => {
+                if (right.reservationRequests !== left.reservationRequests) {
+                    return right.reservationRequests - left.reservationRequests;
+                }
+                return right.views - left.views;
+            })
+            .slice(0, take);
+
+        const categoryInsights = [...categoryRollup.values()]
+            .map((row) => ({
+                categoryId: row.categoryId,
+                categoryName: row.categoryName,
+                categorySlug: row.categorySlug,
+                businessCount: row.businessCount,
+                views: row.views,
+                clicks: row.clicks,
+                conversions: row.conversions,
+                reservationRequests: row.reservationRequests,
+                grossRevenue: this.roundMoney(row.grossRevenue),
+                conversionRate: row.views > 0
+                    ? Number(((row.conversions / row.views) * 100).toFixed(2))
+                    : 0,
+            }))
+            .sort((left, right) => {
+                if (right.reservationRequests !== left.reservationRequests) {
+                    return right.reservationRequests - left.reservationRequests;
+                }
+                return right.views - left.views;
+            })
+            .slice(0, take);
+
+        const rankedBusinesses = topBusinesses
+            .sort((left, right) => {
+                if (right.stats.reservationRequests !== left.stats.reservationRequests) {
+                    return right.stats.reservationRequests - left.stats.reservationRequests;
+                }
+                return right.stats.views - left.stats.views;
+            })
+            .slice(0, take);
+
+        return {
+            range: {
+                days: normalizedDays,
+                from: rangeStart.toISOString(),
+                to: this.toDateOnly(now).toISOString(),
+            },
+            filters: {
+                provinceId: query.provinceId ?? null,
+                categoryId: query.categoryId ?? null,
+            },
+            totals: {
+                trackedBusinesses: businesses.length,
+                views: totals.views,
+                clicks: totals.clicks,
+                conversions: totals.conversions,
+                reservationRequests: totals.reservationRequests,
+                grossRevenue: this.roundMoney(totals.grossRevenue),
+                conversionRate: totals.views > 0
+                    ? Number(((totals.conversions / totals.views) * 100).toFixed(2))
+                    : 0,
+                reservationRequestRate: totals.views > 0
+                    ? Number(((totals.reservationRequests / totals.views) * 100).toFixed(2))
+                    : 0,
+            },
+            topBusinesses: rankedBusinesses,
+            provinces: provinceInsights,
+            categories: categoryInsights,
         };
     }
 

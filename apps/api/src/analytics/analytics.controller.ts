@@ -9,11 +9,17 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentOrganization } from '../organizations/decorators/current-organization.decorator';
 import { OrgContextGuard } from '../organizations/guards/org-context.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { AnalyticsService } from './analytics.service';
-import { AnalyticsRangeQueryDto, TrackBusinessEventDto } from './dto/analytics.dto';
+import {
+    AnalyticsRangeQueryDto,
+    MarketInsightsQueryDto,
+    TrackBusinessEventDto,
+} from './dto/analytics.dto';
 
 @Controller('analytics')
 export class AnalyticsController {
@@ -51,5 +57,12 @@ export class AnalyticsController {
             businessId,
             query.days ?? 30,
         );
+    }
+
+    @Get('market-insights')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async getMarketInsights(@Query() query: MarketInsightsQueryDto) {
+        return this.analyticsService.getMarketInsights(query);
     }
 }

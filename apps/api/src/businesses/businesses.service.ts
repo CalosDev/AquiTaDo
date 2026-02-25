@@ -13,12 +13,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
 import slugify from 'slugify';
 import { getOrganizationPlanLimits } from '../organizations/organization-plan-limits';
+import { ReputationService } from '../reputation/reputation.service';
 
 @Injectable()
 export class BusinessesService {
     constructor(
         @Inject(PrismaService)
         private prisma: PrismaService,
+        @Inject(ReputationService)
+        private readonly reputationService: ReputationService,
     ) { }
 
     private readonly includeRelations = {
@@ -113,6 +116,10 @@ export class BusinessesService {
             include: {
                 ...this.includeRelations,
                 reviews: {
+                    where: {
+                        moderationStatus: 'APPROVED',
+                        isSpam: false,
+                    },
                     include: {
                         user: { select: { id: true, name: true } },
                     },
@@ -153,6 +160,10 @@ export class BusinessesService {
             include: {
                 ...this.includeRelations,
                 reviews: {
+                    where: {
+                        moderationStatus: 'APPROVED',
+                        isSpam: false,
+                    },
                     include: {
                         user: { select: { id: true, name: true } },
                     },
@@ -423,11 +434,18 @@ export class BusinessesService {
 
     async verify(id: string) {
         try {
-            return await this.prisma.business.update({
+            const business = await this.prisma.business.update({
                 where: { id },
-                data: { verified: true },
+                data: {
+                    verified: true,
+                    verifiedAt: new Date(),
+                },
                 include: this.includeRelations,
             });
+
+            await this.reputationService.recalculateBusinessReputation(id);
+
+            return business;
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
