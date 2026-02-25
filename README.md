@@ -144,6 +144,7 @@ GET /api/businesses/nearby?lat=18.48&lng=-69.90&radius=5
 | `pnpm build` | Build de producción |
 | `pnpm smoke:api` | Smoke test de health/readiness |
 | `pnpm db:migrate` | Ejecutar migraciones |
+| `pnpm db:migrate:deploy` | Ejecutar migraciones para producción/CI |
 | `pnpm db:seed` | Seed de datos |
 
 ---

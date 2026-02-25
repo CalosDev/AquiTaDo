@@ -10,7 +10,29 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aquita_test
+      JWT_SECRET: ci-super-secret-key-at-least-16
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:5173
+      THROTTLE_TTL_MS: 60000
+      THROTTLE_LIMIT: 120
+      SMOKE_BASE_URL: http://localhost:3000
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aquita_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d aquita_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - name: Checkout
@@ -41,3 +63,13 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Apply Prisma migrations
+        run: pnpm db:migrate:deploy
+
+      - name: Smoke test API
+        run: |
+          pnpm --filter @aquita/api start:prod &
+          API_PID=$!
+          trap "kill $API_PID" EXIT
+          pnpm smoke:api
