@@ -1,0 +1,313 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { businessApi, reviewApi } from '../api/endpoints';
+import { useAuth } from '../context/useAuth';
+
+interface Business {
+    id: string;
+    name: string;
+    slug: string;
+    description: string;
+    phone?: string;
+    whatsapp?: string;
+    address: string;
+    latitude?: number;
+    longitude?: number;
+    verified: boolean;
+    province?: { name: string };
+    city?: { name: string };
+    images: { id: string; url: string }[];
+    categories?: { category: { name: string; icon?: string } }[];
+    features?: { feature: { name: string } }[];
+    reviews?: { id: string; rating: number; comment?: string; user: { name: string }; createdAt: string }[];
+    _count?: { reviews: number };
+    owner?: { name: string };
+}
+
+export function BusinessDetails() {
+    const { id } = useParams<{ id: string }>();
+    const { isAuthenticated } = useAuth();
+    const [business, setBusiness] = useState<Business | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [activeImage, setActiveImage] = useState(0);
+    const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
+    const [submittingReview, setSubmittingReview] = useState(false);
+
+    const loadBusiness = useCallback(async () => {
+        if (!id) {
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const res = await businessApi.getById(id);
+            setBusiness(res.data);
+        } catch (error) {
+            console.error('Error loading business:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [id]);
+
+    useEffect(() => {
+        void loadBusiness();
+    }, [loadBusiness]);
+
+    const handleReviewSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!id) return;
+        setSubmittingReview(true);
+        try {
+            await reviewApi.create({
+                rating: reviewForm.rating,
+                comment: reviewForm.comment || undefined,
+                businessId: id,
+            });
+            setReviewForm({ rating: 5, comment: '' });
+            await loadBusiness();
+        } catch (error) {
+            console.error('Error submitting review:', error);
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
+
+    const averageRating =
+        business?.reviews && business.reviews.length > 0
+            ? (business.reviews.reduce((acc, r) => acc + r.rating, 0) / business.reviews.length).toFixed(1)
+            : null;
+
+    if (loading) {
+        return (
+            <div className="flex justify-center py-32">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+        );
+    }
+
+    if (!business) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+                <p className="text-5xl mb-4">😕</p>
+                <h2 className="text-2xl font-bold text-gray-900">Negocio no encontrado</h2>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Image Gallery */}
+                    <div className="card overflow-hidden">
+                        <div className="h-72 md:h-96 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
+                            {business.images.length > 0 ? (
+                                <img
+                                    src={business.images[activeImage]?.url}
+                                    alt={business.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <span className="text-7xl">🏪</span>
+                            )}
+                        </div>
+                        {business.images.length > 1 && (
+                            <div className="flex gap-2 p-3 overflow-x-auto">
+                                {business.images.map((img, i) => (
+                                    <button
+                                        key={img.id}
+                                        onClick={() => setActiveImage(i)}
+                                        className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === activeImage ? 'border-primary-500' : 'border-transparent'
+                                            }`}
+                                    >
+                                        <img src={img.url} alt="" className="w-full h-full object-cover" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="card p-6">
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    {business.verified && (
+                                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                                            ✓ Verificado
+                                        </span>
+                                    )}
+                                    <div className="flex gap-1">
+                                        {business.categories?.map((bc, i) => (
+                                            <span key={i} className="bg-primary-50 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                                                {bc.category.icon} {bc.category.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <h1 className="font-display text-3xl font-bold text-gray-900">{business.name}</h1>
+                                <p className="text-gray-500 mt-1 flex items-center gap-1">
+                                    📍 {business.address}
+                                    {business.province && ` — ${business.province.name}`}
+                                    {business.city && `, ${business.city.name}`}
+                                </p>
+                            </div>
+                            {averageRating && (
+                                <div className="text-center bg-accent-50 px-4 py-2 rounded-xl">
+                                    <div className="text-2xl font-bold text-accent-600">⭐ {averageRating}</div>
+                                    <div className="text-xs text-gray-500">{business._count?.reviews} reseñas</div>
+                                </div>
+                            )}
+                        </div>
+
+                        <p className="text-gray-700 leading-relaxed whitespace-pre-line">{business.description}</p>
+
+                        {/* Features */}
+                        {business.features && business.features.length > 0 && (
+                            <div className="mt-6">
+                                <h3 className="font-display font-semibold text-gray-900 mb-3">Características</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {business.features.map((bf, i) => (
+                                        <span key={i} className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-700">
+                                            ✔️ {bf.feature.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Map */}
+                    {business.latitude && business.longitude && (
+                        <div className="card p-6">
+                            <h3 className="font-display font-semibold text-gray-900 mb-3">Ubicación</h3>
+                            <div className="h-64 bg-gray-100 rounded-xl flex items-center justify-center">
+                                <iframe
+                                    width="100%"
+                                    height="100%"
+                                    style={{ border: 0, borderRadius: '0.75rem' }}
+                                    loading="lazy"
+                                    src={`https://maps.google.com/maps?q=${business.latitude},${business.longitude}&z=15&output=embed`}
+                                    allowFullScreen
+                                ></iframe>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Reviews */}
+                    <div className="card p-6">
+                        <h3 className="font-display font-semibold text-gray-900 mb-4">
+                            Reseñas ({business.reviews?.length || 0})
+                        </h3>
+
+                        {/* Review Form */}
+                        {isAuthenticated && (
+                            <form onSubmit={handleReviewSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <span className="text-sm font-medium text-gray-600">Tu calificación:</span>
+                                    <div className="flex gap-1">
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <button
+                                                key={star}
+                                                type="button"
+                                                onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                                                className={`text-2xl transition-transform hover:scale-110 ${star <= reviewForm.rating ? 'text-yellow-400' : 'text-gray-300'
+                                                    }`}
+                                            >
+                                                ★
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <textarea
+                                    value={reviewForm.comment}
+                                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                                    placeholder="Escribe tu experiencia..."
+                                    className="input-field text-sm mb-3"
+                                    rows={3}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={submittingReview}
+                                    className="btn-primary text-sm"
+                                >
+                                    {submittingReview ? 'Enviando...' : 'Enviar Reseña'}
+                                </button>
+                            </form>
+                        )}
+
+                        {/* Reviews List */}
+                        <div className="space-y-4">
+                            {business.reviews?.map((review) => (
+                                <div key={review.id} className="p-4 border border-gray-100 rounded-xl">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <span className="font-semibold text-gray-900">{review.user.name}</span>
+                                            <div className="flex gap-0.5 mt-0.5">
+                                                {Array.from({ length: 5 }, (_, i) => (
+                                                    <span key={i} className={`text-sm ${i < review.rating ? 'text-yellow-400' : 'text-gray-200'}`}>★</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <span className="text-xs text-gray-400">
+                                            {new Date(review.createdAt).toLocaleDateString('es-DO')}
+                                        </span>
+                                    </div>
+                                    {review.comment && <p className="text-sm text-gray-600">{review.comment}</p>}
+                                </div>
+                            ))}
+                            {(!business.reviews || business.reviews.length === 0) && (
+                                <p className="text-gray-400 text-sm text-center py-4">
+                                    Aún no hay reseñas. ¡Sé el primero en opinar!
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sidebar - Contact */}
+                <div className="space-y-6">
+                    <div className="card p-6 sticky top-20">
+                        <h3 className="font-display font-semibold text-gray-900 mb-4">Contacto</h3>
+                        <div className="space-y-3">
+                            {business.phone && (
+                                <a
+                                    href={`tel:${business.phone}`}
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-primary-50 transition-colors group"
+                                >
+                                    <span className="text-lg">📞</span>
+                                    <div>
+                                        <div className="text-xs text-gray-400">Teléfono</div>
+                                        <div className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{business.phone}</div>
+                                    </div>
+                                </a>
+                            )}
+                            {business.whatsapp && (
+                                <a
+                                    href={`https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-green-50 hover:bg-green-100 transition-colors group"
+                                >
+                                    <span className="text-lg">💬</span>
+                                    <div>
+                                        <div className="text-xs text-gray-400">WhatsApp</div>
+                                        <div className="text-sm font-medium text-green-700">{business.whatsapp}</div>
+                                    </div>
+                                </a>
+                            )}
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                                <span className="text-lg">📍</span>
+                                <div>
+                                    <div className="text-xs text-gray-400">Dirección</div>
+                                    <div className="text-sm text-gray-700">{business.address}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
