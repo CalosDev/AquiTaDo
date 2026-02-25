@@ -18,7 +18,12 @@ import { CurrentOrganization } from '../organizations/decorators/current-organiz
 import { OrgContextGuard } from '../organizations/guards/org-context.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { BillingReportQueryDto, ListPaymentsQueryDto } from './dto/payment.dto';
+import {
+    BillingReportQueryDto,
+    CreateAdsWalletCheckoutSessionDto,
+    ListAdsWalletTopupsQueryDto,
+    ListPaymentsQueryDto,
+} from './dto/payment.dto';
 import { PaymentsService } from './payments.service';
 
 @Controller('payments')
@@ -106,5 +111,30 @@ export class PaymentsController {
         response.setHeader('Content-Type', 'text/csv; charset=utf-8');
         response.setHeader('Content-Disposition', `attachment; filename="${payload.fileName}"`);
         response.send(payload.csv);
+    }
+
+    @Get('ads-wallet/my')
+    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    async getAdsWalletOverview(
+        @CurrentOrganization('organizationId') organizationId: string,
+        @Query() query: ListAdsWalletTopupsQueryDto,
+    ) {
+        return this.paymentsService.getAdsWalletOverview(organizationId, query.limit);
+    }
+
+    @Post('ads-wallet/checkout-session')
+    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    async createAdsWalletCheckoutSession(
+        @CurrentOrganization('organizationId') organizationId: string,
+        @CurrentUser('id') actorUserId: string,
+        @CurrentUser('role') actorGlobalRole: string,
+        @Body() dto: CreateAdsWalletCheckoutSessionDto,
+    ) {
+        return this.paymentsService.createAdsWalletCheckoutSession(
+            organizationId,
+            actorUserId,
+            actorGlobalRole,
+            dto,
+        );
     }
 }

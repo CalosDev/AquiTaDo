@@ -151,6 +151,16 @@ interface AdCampaign {
     business: { id: string; name: string };
 }
 
+interface AdWalletTopup {
+    id: string;
+    amount: number;
+    currency: string;
+    status: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELED';
+    paidAt?: string | null;
+    createdAt: string;
+    failureReason?: string | null;
+}
+
 interface VerificationDocument {
     id: string;
     documentType: 'ID_CARD' | 'TAX_CERTIFICATE' | 'BUSINESS_LICENSE' | 'ADDRESS_PROOF' | 'SELFIE' | 'OTHER';
@@ -229,6 +239,31 @@ function formatDateTime(value?: string | null): string {
     return new Date(value).toLocaleString('es-DO');
 }
 
+function resolveAdsWalletTopupStatus(status: AdWalletTopup['status']) {
+    switch (status) {
+        case 'SUCCEEDED':
+            return {
+                label: 'Aprobada',
+                className: 'bg-emerald-100 text-emerald-700',
+            };
+        case 'FAILED':
+            return {
+                label: 'Fallida',
+                className: 'bg-red-100 text-red-700',
+            };
+        case 'CANCELED':
+            return {
+                label: 'Cancelada',
+                className: 'bg-amber-100 text-amber-700',
+            };
+        default:
+            return {
+                label: 'Pendiente',
+                className: 'bg-gray-100 text-gray-700',
+            };
+    }
+}
+
 function resolveCsvFileName(contentDisposition: string | undefined, fallback: string): string {
     if (!contentDisposition) {
         return fallback;
@@ -284,6 +319,10 @@ export function DashboardBusiness() {
 
     const [adsLoading, setAdsLoading] = useState(false);
     const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
+    const [adsWalletBalance, setAdsWalletBalance] = useState(0);
+    const [adsWalletTopups, setAdsWalletTopups] = useState<AdWalletTopup[]>([]);
+    const [adsWalletTopupAmount, setAdsWalletTopupAmount] = useState('1000');
+    const [creatingAdsWalletTopup, setCreatingAdsWalletTopup] = useState(false);
     const [creatingCampaign, setCreatingCampaign] = useState(false);
     const [campaignForm, setCampaignForm] = useState({
         businessId: '',
@@ -464,13 +503,21 @@ export function DashboardBusiness() {
     const loadAdCampaigns = useCallback(async () => {
         if (!activeOrganizationId) {
             setCampaigns([]);
+            setAdsWalletBalance(0);
+            setAdsWalletTopups([]);
             return;
         }
 
         setAdsLoading(true);
         try {
-            const response = await adsApi.getMyCampaigns({ limit: 30 });
-            setCampaigns((response.data?.data || []) as AdCampaign[]);
+            const [campaignsRes, walletRes] = await Promise.all([
+                adsApi.getMyCampaigns({ limit: 30 }),
+                paymentsApi.getAdsWalletOverview({ limit: 20 }),
+            ]);
+
+            setCampaigns((campaignsRes.data?.data || []) as AdCampaign[]);
+            setAdsWalletBalance(Number(walletRes.data?.balance ?? 0));
+            setAdsWalletTopups((walletRes.data?.topups || []) as AdWalletTopup[]);
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar las campañas ads'));
         } finally {
@@ -775,6 +822,39 @@ export function DashboardBusiness() {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la campaña ads'));
         } finally {
             setCreatingCampaign(false);
+        }
+    };
+
+    const handleCreateAdsWalletTopup = async (event: React.FormEvent) => {
+        event.preventDefault();
+        const amount = Number(adsWalletTopupAmount);
+        if (!Number.isFinite(amount) || amount < 1) {
+            setErrorMessage('Monto de recarga inválido');
+            return;
+        }
+
+        setCreatingAdsWalletTopup(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            const origin = window.location.origin;
+            const response = await paymentsApi.createAdsWalletCheckoutSession({
+                amount,
+                successUrl: `${origin}/dashboard`,
+                cancelUrl: `${origin}/dashboard`,
+            });
+
+            const checkoutUrl = response.data?.checkoutUrl as string | undefined;
+            if (!checkoutUrl) {
+                throw new Error('No se recibió URL de checkout');
+            }
+
+            window.location.assign(checkoutUrl);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar la recarga del Ads Wallet'));
+        } finally {
+            setCreatingAdsWalletTopup(false);
         }
     };
 
@@ -1150,6 +1230,66 @@ export function DashboardBusiness() {
     const renderAds = () => (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="card p-5 xl:col-span-1">
+                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Ads Wallet</h3>
+                <div className="rounded-xl border border-gray-100 p-3 mb-5 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-gray-500">Saldo disponible</p>
+                        <button
+                            type="button"
+                            className="btn-secondary text-xs"
+                            onClick={() => void loadAdCampaigns()}
+                            disabled={adsLoading}
+                        >
+                            Refrescar
+                        </button>
+                    </div>
+                    <p className={`text-2xl font-bold ${adsWalletBalance > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {formatCurrency(adsWalletBalance)}
+                    </p>
+                    <form onSubmit={handleCreateAdsWalletTopup} className="flex items-end gap-2">
+                        <div className="flex-1">
+                            <label className="text-xs text-gray-500 block mb-1">Recargar saldo (DOP)</label>
+                            <input
+                                type="number"
+                                min="1"
+                                step="0.01"
+                                className="input-field text-sm"
+                                value={adsWalletTopupAmount}
+                                onChange={(event) => setAdsWalletTopupAmount(event.target.value)}
+                            />
+                        </div>
+                        <button type="submit" className="btn-primary text-sm" disabled={creatingAdsWalletTopup}>
+                            {creatingAdsWalletTopup ? 'Conectando...' : 'Recargar'}
+                        </button>
+                    </form>
+                    <p className="text-xs text-gray-500">Cada clic válido descuenta el CPC de la campaña desde este saldo.</p>
+                </div>
+
+                <div className="mb-5">
+                    <p className="text-xs text-gray-500 mb-2">Últimas recargas</p>
+                    <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                        {adsWalletTopups.length > 0 ? adsWalletTopups.slice(0, 8).map((topup) => {
+                            const status = resolveAdsWalletTopupStatus(topup.status);
+                            return (
+                                <div key={topup.id} className="rounded-lg border border-gray-100 px-3 py-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-medium text-gray-900">{formatCurrency(topup.amount)}</p>
+                                        <span className={`text-[11px] px-2 py-0.5 rounded-full ${status.className}`}>
+                                            {status.label}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-gray-500 mt-1">
+                                        {formatDateTime(topup.paidAt || topup.createdAt)}
+                                    </p>
+                                    {topup.failureReason ? (
+                                        <p className="text-[11px] text-red-600 mt-1">{topup.failureReason}</p>
+                                    ) : null}
+                                </div>
+                            );
+                        }) : <p className="text-sm text-gray-500">Sin recargas registradas.</p>}
+                    </div>
+                </div>
+
                 <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Nueva campaña</h3>
                 <form onSubmit={handleCreateCampaign} className="space-y-3">
                     <select

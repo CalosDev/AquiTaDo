@@ -1,13 +1,16 @@
 import {
     BadRequestException,
+    ForbiddenException,
     Inject,
     Injectable,
     Logger,
+    NotFoundException,
     ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import {
+    OrganizationRole,
     OrganizationPlan,
     OrganizationSubscriptionStatus,
     Prisma,
@@ -16,6 +19,7 @@ import {
 import { PlansService } from '../plans/plans.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { CreateAdsWalletCheckoutSessionDto } from './dto/payment.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -64,6 +68,156 @@ export class PaymentsService {
             orderBy: { issuedAt: 'desc' },
             take: boundedLimit,
         });
+    }
+
+    async getAdsWalletOverview(organizationId: string, limit = 20) {
+        const boundedLimit = Math.min(Math.max(limit, 1), 100);
+        const [organization, topups] = await Promise.all([
+            this.prisma.organization.findUnique({
+                where: { id: organizationId },
+                select: {
+                    id: true,
+                    adWalletBalance: true,
+                },
+            }),
+            this.prisma.adWalletTopup.findMany({
+                where: { organizationId },
+                orderBy: { createdAt: 'desc' },
+                take: boundedLimit,
+            }),
+        ]);
+
+        if (!organization) {
+            throw new NotFoundException('Organización no encontrada');
+        }
+
+        return {
+            organizationId,
+            balance: Number(organization.adWalletBalance.toString()),
+            topups: topups.map((topup) => ({
+                ...topup,
+                amount: Number(topup.amount.toString()),
+            })),
+        };
+    }
+
+    async createAdsWalletCheckoutSession(
+        organizationId: string,
+        actorUserId: string,
+        actorGlobalRole: string,
+        dto: CreateAdsWalletCheckoutSessionDto,
+    ) {
+        await this.assertCanManageBilling(organizationId, actorUserId, actorGlobalRole);
+
+        const stripe = this.resolveStripeClient();
+        const amount = Number(dto.amount);
+        if (!Number.isFinite(amount) || amount < 1) {
+            throw new BadRequestException('Monto de recarga inválido');
+        }
+
+        const organization = await this.prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                id: true,
+                name: true,
+                ownerUser: {
+                    select: {
+                        email: true,
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        if (!organization) {
+            throw new NotFoundException('Organización no encontrada');
+        }
+
+        const subscription = await this.subscriptionsService.ensureSubscriptionForOrganization(organizationId);
+
+        let customerId = subscription?.providerCustomerId ?? null;
+        if (!customerId) {
+            const customer = await stripe.customers.create({
+                email: organization.ownerUser.email,
+                name: organization.ownerUser.name,
+                metadata: {
+                    organizationId,
+                },
+            });
+            customerId = customer.id;
+
+            await this.prisma.subscription.update({
+                where: { id: subscription.id },
+                data: {
+                    providerCustomerId: customerId,
+                },
+            });
+        }
+
+        const topup = await this.prisma.adWalletTopup.create({
+            data: {
+                organizationId,
+                requestedByUserId: actorUserId,
+                provider: 'stripe',
+                amount: amount.toFixed(2),
+                currency: 'DOP',
+                status: 'PENDING',
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        try {
+            const checkoutSession = await stripe.checkout.sessions.create({
+                mode: 'payment',
+                customer: customerId,
+                success_url: dto.successUrl,
+                cancel_url: dto.cancelUrl,
+                line_items: [
+                    {
+                        price_data: {
+                            currency: 'dop',
+                            unit_amount: Math.round(amount * 100),
+                            product_data: {
+                                name: 'AquiTa.do Ads Wallet Top-up',
+                                description: 'Recarga de saldo publicitario para campañas CPC',
+                            },
+                        },
+                        quantity: 1,
+                    },
+                ],
+                metadata: {
+                    paymentType: 'AD_WALLET_TOPUP',
+                    organizationId,
+                    topupId: topup.id,
+                },
+            });
+
+            await this.prisma.adWalletTopup.update({
+                where: { id: topup.id },
+                data: {
+                    providerCheckoutSessionId: checkoutSession.id,
+                },
+            });
+
+            return {
+                topupId: topup.id,
+                sessionId: checkoutSession.id,
+                checkoutUrl: checkoutSession.url,
+            };
+        } catch (error) {
+            await this.prisma.adWalletTopup.update({
+                where: { id: topup.id },
+                data: {
+                    status: 'FAILED',
+                    failureReason: error instanceof Error
+                        ? error.message.slice(0, 255)
+                        : 'No se pudo crear sesión de pago',
+                },
+            });
+            throw error;
+        }
     }
 
     async getBillingSummary(
@@ -321,6 +475,11 @@ export class PaymentsService {
                     event.data.object as Stripe.Checkout.Session,
                 );
                 return;
+            case 'checkout.session.expired':
+                await this.processCheckoutSessionExpired(
+                    event.data.object as Stripe.Checkout.Session,
+                );
+                return;
             case 'customer.subscription.created':
             case 'customer.subscription.updated':
             case 'customer.subscription.deleted':
@@ -344,6 +503,11 @@ export class PaymentsService {
     }
 
     private async processCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+        if (session.metadata?.paymentType === 'AD_WALLET_TOPUP') {
+            await this.processAdWalletTopupCompleted(session);
+            return;
+        }
+
         const organizationId = session.metadata?.organizationId;
         if (!organizationId) {
             return;
@@ -379,6 +543,107 @@ export class PaymentsService {
                 plan: selectedPlan?.code ?? subscription.plan.code,
                 subscriptionStatus: 'ACTIVE',
             },
+        });
+    }
+
+    private async processCheckoutSessionExpired(session: Stripe.Checkout.Session) {
+        if (session.metadata?.paymentType !== 'AD_WALLET_TOPUP') {
+            return;
+        }
+
+        const topupId = session.metadata?.topupId;
+        if (!topupId) {
+            return;
+        }
+
+        await this.prisma.adWalletTopup.updateMany({
+            where: {
+                id: topupId,
+                status: 'PENDING',
+            },
+            data: {
+                status: 'CANCELED',
+                failureReason: 'Sesion de pago expirada',
+                metadata: this.asJson(session),
+            },
+        });
+    }
+
+    private async processAdWalletTopupCompleted(session: Stripe.Checkout.Session) {
+        const topupId = session.metadata?.topupId;
+        const organizationId = session.metadata?.organizationId;
+        if (!topupId || !organizationId) {
+            return;
+        }
+
+        const topup = await this.prisma.adWalletTopup.findUnique({
+            where: { id: topupId },
+            select: {
+                id: true,
+                organizationId: true,
+                status: true,
+                amount: true,
+            },
+        });
+
+        if (!topup || topup.organizationId !== organizationId) {
+            return;
+        }
+
+        if (topup.status !== 'PENDING') {
+            return;
+        }
+
+        const paymentIntentId = this.resolveStringId(session.payment_intent);
+        const paidAmount = Number.isFinite(session.amount_total ?? NaN)
+            ? (session.amount_total ?? 0) / 100
+            : Number(topup.amount.toString());
+        const currency = (session.currency ?? 'dop').toUpperCase();
+        const paidAt = new Date();
+
+        await this.prisma.$transaction(async (tx) => {
+            const updatedTopup = await tx.adWalletTopup.updateMany({
+                where: {
+                    id: topupId,
+                    status: 'PENDING',
+                },
+                data: {
+                    status: 'SUCCEEDED',
+                    providerPaymentIntentId: paymentIntentId,
+                    paidAt,
+                    metadata: this.asJson(session),
+                },
+            });
+
+            if (updatedTopup.count !== 1) {
+                return;
+            }
+
+            await tx.organization.update({
+                where: { id: organizationId },
+                data: {
+                    adWalletBalance: {
+                        increment: paidAmount.toFixed(2),
+                    },
+                },
+            });
+
+            await tx.payment.create({
+                data: {
+                    organizationId,
+                    provider: 'stripe',
+                    providerPaymentIntentId: paymentIntentId,
+                    amount: paidAmount.toFixed(2),
+                    currency,
+                    status: 'SUCCEEDED',
+                    paidAt,
+                    metadata: ({
+                        paymentType: 'AD_WALLET_TOPUP',
+                        topupId,
+                        checkoutSessionId: session.id,
+                    } as Prisma.InputJsonValue),
+                },
+            });
         });
     }
 
@@ -643,6 +908,36 @@ export class PaymentsService {
                 return 'CANCELED';
             default:
                 return 'ACTIVE';
+        }
+    }
+
+    private async assertCanManageBilling(
+        organizationId: string,
+        actorUserId: string,
+        actorGlobalRole: string,
+    ) {
+        if (actorGlobalRole === 'ADMIN') {
+            return;
+        }
+
+        const membership = await this.prisma.organizationMember.findUnique({
+            where: {
+                organizationId_userId: {
+                    organizationId,
+                    userId: actorUserId,
+                },
+            },
+            select: {
+                role: true,
+            },
+        });
+
+        if (!membership) {
+            throw new ForbiddenException('No tienes acceso a esta organización');
+        }
+
+        if (membership.role !== OrganizationRole.OWNER) {
+            throw new ForbiddenException('Solo el owner puede gestionar la facturación');
         }
     }
 

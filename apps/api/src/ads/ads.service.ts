@@ -271,6 +271,9 @@ export class AdsService {
             business: {
                 verified: true,
             },
+            organization: {
+                adWalletBalance: { gt: 0 },
+            },
         };
         const andFilters: Prisma.AdCampaignWhereInput[] = [];
 
@@ -378,6 +381,11 @@ export class AdsService {
                     bidAmount: true,
                     spentAmount: true,
                     totalBudget: true,
+                    organization: {
+                        select: {
+                            adWalletBalance: true,
+                        },
+                    },
                     business: {
                         select: {
                             verified: true,
@@ -419,6 +427,19 @@ export class AdsService {
             }
 
             if (eventType === 'CLICK') {
+                const walletBalance = Number(campaign.organization.adWalletBalance.toString());
+                const bidAmount = Number(campaign.bidAmount.toString());
+                if (walletBalance < bidAmount) {
+                    await tx.adCampaign.update({
+                        where: { id: campaign.id },
+                        data: { status: 'PAUSED' },
+                    });
+                    return {
+                        tracked: false,
+                        reason: 'WALLET_INSUFFICIENT_FUNDS',
+                    };
+                }
+
                 const nextSpent = Number(campaign.spentAmount.toString()) + Number(campaign.bidAmount.toString());
                 const budgetLimit = Number(campaign.totalBudget.toString());
                 if (nextSpent > budgetLimit) {
@@ -429,6 +450,29 @@ export class AdsService {
                     return {
                         tracked: false,
                         reason: 'BUDGET_EXHAUSTED',
+                    };
+                }
+
+                const debitedWallet = await tx.organization.updateMany({
+                    where: {
+                        id: campaign.organizationId,
+                        adWalletBalance: { gte: campaign.bidAmount },
+                    },
+                    data: {
+                        adWalletBalance: {
+                            decrement: campaign.bidAmount,
+                        },
+                    },
+                });
+
+                if (debitedWallet.count !== 1) {
+                    await tx.adCampaign.update({
+                        where: { id: campaign.id },
+                        data: { status: 'PAUSED' },
+                    });
+                    return {
+                        tracked: false,
+                        reason: 'WALLET_INSUFFICIENT_FUNDS',
                     };
                 }
 

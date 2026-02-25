@@ -125,6 +125,10 @@ export const paymentsApi = {
         api.get('/payments/invoices/export.csv', { params, responseType: 'blob' }),
     exportPaymentsCsv: (params?: { from?: string; to?: string }) =>
         api.get('/payments/payments/export.csv', { params, responseType: 'blob' }),
+    getAdsWalletOverview: (params?: { limit?: number }) =>
+        api.get('/payments/ads-wallet/my', { params }),
+    createAdsWalletCheckoutSession: (data: { amount: number; successUrl: string; cancelUrl: string }) =>
+        api.post('/payments/ads-wallet/checkout-session', data),
 };
 
 // ---- Promotions ----

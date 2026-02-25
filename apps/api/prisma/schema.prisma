@@ -166,6 +166,13 @@ enum MarketReportType {
   CONVERSION_BENCHMARK
 }
 
+enum AdWalletTopupStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)
@@ -191,6 +198,7 @@ model User {
   adCampaignsCreated       AdCampaign[]                   @relation("AdCampaignCreator")
   verificationReviews      BusinessVerificationDocument[] @relation("VerificationDocumentReviewer")
   marketReportsGenerated   MarketReportSnapshot[]         @relation("MarketReportGeneratedBy")
+  adWalletTopupsRequested  AdWalletTopup[]                @relation("AdWalletTopupRequester")
 
   @@index([email])
   @@map("users")
@@ -260,6 +268,7 @@ model Organization {
   plan                 OrganizationPlan               @default(FREE)
   subscriptionStatus   OrganizationSubscriptionStatus @default(ACTIVE)
   subscriptionRenewsAt DateTime?
+  adWalletBalance      Decimal                        @default(0) @db.Decimal(12, 2)
   createdAt            DateTime                       @default(now())
   updatedAt            DateTime                       @updatedAt
 
@@ -278,6 +287,7 @@ model Organization {
   conversations         Conversation[]
   adCampaigns           AdCampaign[]
   verificationDocuments BusinessVerificationDocument[]
+  adWalletTopups        AdWalletTopup[]
 
   @@index([ownerUserId])
   @@index([plan, subscriptionStatus])
@@ -838,4 +848,28 @@ model MarketReportSnapshot {
   @@index([reportType, generatedAt])
   @@index([generatedByUserId, generatedAt])
   @@map("market_report_snapshots")
+}
+
+model AdWalletTopup {
+  id                        String              @id @default(uuid())
+  organizationId            String
+  organization              Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedByUserId         String?
+  requestedByUser           User?               @relation("AdWalletTopupRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  provider                  String              @default("stripe") @db.VarChar(40)
+  amount                    Decimal             @db.Decimal(12, 2)
+  currency                  String              @default("DOP") @db.VarChar(3)
+  status                    AdWalletTopupStatus @default(PENDING)
+  providerCheckoutSessionId String?             @unique @db.VarChar(191)
+  providerPaymentIntentId   String?             @unique @db.VarChar(191)
+  paidAt                    DateTime?
+  failureReason             String?             @db.VarChar(255)
+  metadata                  Json?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  @@index([organizationId, createdAt])
+  @@index([status, createdAt])
+  @@index([requestedByUserId, createdAt])
+  @@map("ad_wallet_topups")
 }
