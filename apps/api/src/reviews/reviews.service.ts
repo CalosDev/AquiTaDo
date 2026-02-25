@@ -22,6 +22,9 @@ export class ReviewsService {
     ) { }
 
     async create(dto: CreateReviewDto, userId: string) {
+        const normalizedInputComment = dto.comment?.trim() ?? '';
+        const storedComment = normalizedInputComment.length > 0 ? normalizedInputComment : null;
+
         const business = await this.prisma.business.findUnique({
             where: { id: dto.businessId },
             select: { id: true, verified: true },
@@ -63,14 +66,14 @@ export class ReviewsService {
             userId,
             dto.businessId,
             dto.rating,
-            dto.comment,
+            storedComment,
         );
 
         try {
             const createdReview = await this.prisma.review.create({
                 data: {
                     rating: dto.rating,
-                    comment: dto.comment,
+                    comment: storedComment,
                     userId,
                     businessId: dto.businessId,
                     moderationStatus: moderation.status,
@@ -237,7 +240,7 @@ export class ReviewsService {
         userId: string,
         businessId: string,
         rating: number,
-        rawComment?: string,
+        rawComment?: string | null,
     ): Promise<{ status: 'APPROVED' | 'FLAGGED'; reason: string | null }> {
         const comment = rawComment?.trim() ?? '';
         const reasons: string[] = [];
@@ -255,7 +258,10 @@ export class ReviewsService {
                 this.prisma.review.count({
                     where: {
                         userId,
-                        comment: null,
+                        OR: [
+                            { comment: null },
+                            { comment: '' },
+                        ],
                         createdAt: {
                             gte: new Date(Date.now() - 60 * 60 * 1000),
                         },
@@ -339,22 +345,24 @@ export class ReviewsService {
             }
         }
 
-        const sameCommentCount = await this.prisma.review.count({
-            where: {
-                userId,
-                businessId: { not: businessId },
-                comment: {
-                    equals: comment,
-                    mode: 'insensitive',
+        if (comment) {
+            const sameCommentCount = await this.prisma.review.count({
+                where: {
+                    userId,
+                    businessId: { not: businessId },
+                    comment: {
+                        equals: comment,
+                        mode: 'insensitive',
+                    },
+                    createdAt: {
+                        gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                    },
                 },
-                createdAt: {
-                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-                },
-            },
-        });
+            });
 
-        if (sameCommentCount > 0) {
-            reasons.push('Comentario duplicado en multiples negocios');
+            if (sameCommentCount > 0) {
+                reasons.push('Comentario duplicado en multiples negocios');
+            }
         }
 
         const [flaggedByUserRecent, userReviewBurst] = await Promise.all([

@@ -476,13 +476,41 @@ export class AdsService {
                     };
                 }
 
-                const updated = await tx.adCampaign.update({
-                    where: { id: campaign.id },
+                const maxSpentBeforeCharge = Number(campaign.totalBudget.toString()) - Number(campaign.bidAmount.toString());
+                const budgetConstrainedUpdate = await tx.adCampaign.updateMany({
+                    where: {
+                        id: campaign.id,
+                        spentAmount: {
+                            lte: new Prisma.Decimal(maxSpentBeforeCharge.toFixed(2)),
+                        },
+                    },
                     data: {
                         clicks: { increment: 1 },
                         spentAmount: { increment: campaign.bidAmount },
-                        status: nextSpent >= budgetLimit ? 'ENDED' : campaign.status,
                     },
+                });
+
+                if (budgetConstrainedUpdate.count !== 1) {
+                    await tx.organization.update({
+                        where: { id: campaign.organizationId },
+                        data: {
+                            adWalletBalance: {
+                                increment: campaign.bidAmount,
+                            },
+                        },
+                    });
+                    await tx.adCampaign.update({
+                        where: { id: campaign.id },
+                        data: { status: 'ENDED' },
+                    });
+                    return {
+                        tracked: false,
+                        reason: 'BUDGET_EXHAUSTED',
+                    };
+                }
+
+                const updated = await tx.adCampaign.findUnique({
+                    where: { id: campaign.id },
                     select: {
                         id: true,
                         status: true,
@@ -491,6 +519,19 @@ export class AdsService {
                         clicks: true,
                     },
                 });
+
+                if (!updated) {
+                    throw new NotFoundException('Campaña no encontrada');
+                }
+
+                const reachedBudget = Number(updated.spentAmount.toString()) >= Number(updated.totalBudget.toString());
+                const nextStatus = reachedBudget ? 'ENDED' : updated.status;
+                if (nextStatus !== updated.status) {
+                    await tx.adCampaign.update({
+                        where: { id: campaign.id },
+                        data: { status: nextStatus },
+                    });
+                }
 
                 await tx.adEvent.create({
                     data: {
@@ -510,7 +551,7 @@ export class AdsService {
                     tracked: true,
                     eventType,
                     campaignId: campaign.id,
-                    status: updated.status,
+                    status: nextStatus,
                     chargedAmount: Number(campaign.bidAmount.toString()),
                     spentAmount: Number(updated.spentAmount.toString()),
                     remainingBudget: Number((
