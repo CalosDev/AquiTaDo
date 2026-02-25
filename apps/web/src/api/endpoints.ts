@@ -50,6 +50,12 @@ export const reviewApi = {
     create: (data: { rating: number; comment?: string; businessId: string }) =>
         api.post('/reviews', data),
     getByBusiness: (businessId: string) => api.get(`/reviews/business/${businessId}`),
+    getFlagged: (params?: { limit?: number; businessId?: string }) =>
+        api.get('/reviews/moderation/flagged', { params }),
+    moderate: (
+        reviewId: string,
+        data: { status: 'APPROVED' | 'FLAGGED'; reason?: string },
+    ) => api.patch(`/reviews/${reviewId}/moderation`, data),
 };
 
 // ---- Uploads ----

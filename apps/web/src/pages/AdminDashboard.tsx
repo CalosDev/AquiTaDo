@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, categoryApi, verificationApi } from '../api/endpoints';
+import { analyticsApi, businessApi, categoryApi, reviewApi, verificationApi } from '../api/endpoints';
 
 interface Business {
     id: string;
@@ -50,6 +50,23 @@ interface MarketReport {
     } | null;
 }
 
+interface FlaggedReview {
+    id: string;
+    rating: number;
+    comment?: string | null;
+    moderationReason?: string | null;
+    flaggedAt?: string | null;
+    createdAt: string;
+    user: {
+        id: string;
+        name: string;
+    };
+    business: {
+        id: string;
+        name: string;
+    };
+}
+
 type CategoryForm = {
     name: string;
     slug: string;
@@ -84,6 +101,7 @@ export function AdminDashboard() {
     const [verificationLoading, setVerificationLoading] = useState(false);
     const [pendingVerifications, setPendingVerifications] = useState<PendingVerificationBusiness[]>([]);
     const [marketReports, setMarketReports] = useState<MarketReport[]>([]);
+    const [flaggedReviews, setFlaggedReviews] = useState<FlaggedReview[]>([]);
     const [generatingReport, setGeneratingReport] = useState(false);
 
     const [newCategoryForm, setNewCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
@@ -114,12 +132,14 @@ export function AdminDashboard() {
     const loadVerificationData = useCallback(async () => {
         setVerificationLoading(true);
         try {
-            const [pendingRes, reportsRes] = await Promise.all([
+            const [pendingRes, reportsRes, flaggedReviewsRes] = await Promise.all([
                 verificationApi.getPendingBusinessesAdmin({ limit: 50 }),
                 analyticsApi.listMarketReports({ limit: 20 }),
+                reviewApi.getFlagged({ limit: 50 }),
             ]);
             setPendingVerifications((pendingRes.data || []) as PendingVerificationBusiness[]);
             setMarketReports((reportsRes.data || []) as MarketReport[]);
+            setFlaggedReviews((flaggedReviewsRes.data || []) as FlaggedReview[]);
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificación y data layer'));
         } finally {
@@ -303,6 +323,33 @@ export function AdminDashboard() {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo generar el reporte'));
         } finally {
             setGeneratingReport(false);
+        }
+    };
+
+    const handleModerateFlaggedReview = async (
+        reviewId: string,
+        status: 'APPROVED' | 'FLAGGED',
+    ) => {
+        setProcessingId(reviewId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await reviewApi.moderate(reviewId, {
+                status,
+                reason: status === 'APPROVED'
+                    ? 'Aprobada por equipo de moderacion'
+                    : 'Mantenida en cola por riesgo',
+            });
+            await Promise.all([loadData(), loadVerificationData()]);
+            setSuccessMessage(
+                status === 'APPROVED'
+                    ? 'Resena aprobada y publicada'
+                    : 'Resena mantenida como sospechosa',
+            );
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la resena'));
+        } finally {
+            setProcessingId(null);
         }
     };
 
@@ -682,6 +729,61 @@ export function AdminDashboard() {
                                         </div>
                                     )) : (
                                         <p className="text-sm text-gray-500">No hay verificaciones pendientes.</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <h3 className="font-display font-semibold">Moderacion automatica: resenas sospechosas</h3>
+                                    <span className="text-xs rounded-full px-2 py-0.5 bg-red-100 text-red-700">
+                                        {flaggedReviews.length} en cola
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                    {flaggedReviews.length > 0 ? flaggedReviews.map((review) => (
+                                        <div key={review.id} className="rounded-xl border border-gray-100 p-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div>
+                                                    <p className="font-medium text-gray-900">
+                                                        {review.business.name} · {review.user.name}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        Rating {review.rating}/5 · {new Date(review.flaggedAt || review.createdAt).toLocaleString('es-DO')}
+                                                    </p>
+                                                </div>
+                                                <span className="text-xs rounded-full px-2 py-0.5 bg-yellow-100 text-yellow-700">
+                                                    FLAGGED
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">
+                                                {review.comment?.trim() || '(Sin comentario)'}
+                                            </p>
+                                            {review.moderationReason ? (
+                                                <p className="text-xs text-red-700 mt-1">{review.moderationReason}</p>
+                                            ) : null}
+                                            <div className="flex gap-2 mt-2">
+                                                <button
+                                                    type="button"
+                                                    className="btn-primary text-xs"
+                                                    disabled={processingId === review.id}
+                                                    onClick={() => void handleModerateFlaggedReview(review.id, 'APPROVED')}
+                                                >
+                                                    Aprobar y publicar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn-secondary text-xs"
+                                                    disabled={processingId === review.id}
+                                                    onClick={() => void handleModerateFlaggedReview(review.id, 'FLAGGED')}
+                                                >
+                                                    Mantener en cola
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <p className="text-sm text-gray-500">No hay resenas sospechosas en este momento.</p>
                                     )}
                                 </div>
                             </div>
