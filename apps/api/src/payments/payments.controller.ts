@@ -113,6 +113,37 @@ export class PaymentsController {
         response.send(payload.csv);
     }
 
+    @Get('reports/fiscal/my')
+    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    async getFiscalSummary(
+        @CurrentOrganization('organizationId') organizationId: string,
+        @Query() query: BillingReportQueryDto,
+    ) {
+        return this.paymentsService.getFiscalSummary(
+            organizationId,
+            query.from,
+            query.to,
+        );
+    }
+
+    @Get('reports/fiscal/export.csv')
+    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    async exportFiscalCsv(
+        @CurrentOrganization('organizationId') organizationId: string,
+        @Query() query: BillingReportQueryDto,
+        @Res() response: Response,
+    ) {
+        const payload = await this.paymentsService.exportFiscalCsv(
+            organizationId,
+            query.from,
+            query.to,
+        );
+
+        response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        response.setHeader('Content-Disposition', `attachment; filename="${payload.fileName}"`);
+        response.send(payload.csv);
+    }
+
     @Get('ads-wallet/my')
     @UseGuards(JwtAuthGuard, OrgContextGuard)
     async getAdsWalletOverview(

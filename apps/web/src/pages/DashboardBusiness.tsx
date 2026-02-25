@@ -135,6 +135,27 @@ interface BillingSummary {
     };
 }
 
+interface FiscalSummary {
+    totals: {
+        invoicesIssued: number;
+        invoicesPaid: number;
+        subtotal: number;
+        tax: number;
+        total: number;
+        paidTotal: number;
+        pendingTotal: number;
+    };
+    monthly: Array<{
+        period: string;
+        invoicesIssued: number;
+        invoicesPaid: number;
+        subtotal: number;
+        tax: number;
+        total: number;
+        paidTotal: number;
+    }>;
+}
+
 interface AdCampaign {
     id: string;
     name: string;
@@ -313,9 +334,10 @@ export function DashboardBusiness() {
     const [customerHistory, setCustomerHistory] = useState<CrmCustomerHistory | null>(null);
 
     const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
+    const [fiscalSummary, setFiscalSummary] = useState<FiscalSummary | null>(null);
     const [billingLoading, setBillingLoading] = useState(false);
     const [billingRange, setBillingRange] = useState({ from: '', to: '' });
-    const [exportingCsv, setExportingCsv] = useState<'invoices' | 'payments' | null>(null);
+    const [exportingCsv, setExportingCsv] = useState<'invoices' | 'payments' | 'fiscal' | null>(null);
 
     const [adsLoading, setAdsLoading] = useState(false);
     const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
@@ -483,16 +505,22 @@ export function DashboardBusiness() {
     const loadBillingSummary = useCallback(async () => {
         if (!activeOrganizationId) {
             setBillingSummary(null);
+            setFiscalSummary(null);
             return;
         }
 
         setBillingLoading(true);
         try {
-            const response = await paymentsApi.getBillingSummary({
+            const params = {
                 from: billingRange.from ? new Date(billingRange.from).toISOString() : undefined,
                 to: billingRange.to ? new Date(billingRange.to).toISOString() : undefined,
-            });
-            setBillingSummary(response.data as BillingSummary);
+            };
+            const [billingRes, fiscalRes] = await Promise.all([
+                paymentsApi.getBillingSummary(params),
+                paymentsApi.getFiscalSummary(params),
+            ]);
+            setBillingSummary(billingRes.data as BillingSummary);
+            setFiscalSummary(fiscalRes.data as FiscalSummary);
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar facturación'));
         } finally {
@@ -741,7 +769,7 @@ export function DashboardBusiness() {
         }
     };
 
-    const handleDownloadCsv = async (target: 'invoices' | 'payments') => {
+    const handleDownloadCsv = async (target: 'invoices' | 'payments' | 'fiscal') => {
         setExportingCsv(target);
         setErrorMessage('');
         setSuccessMessage('');
@@ -754,7 +782,9 @@ export function DashboardBusiness() {
 
             const response = target === 'invoices'
                 ? await paymentsApi.exportInvoicesCsv(params)
-                : await paymentsApi.exportPaymentsCsv(params);
+                : target === 'payments'
+                    ? await paymentsApi.exportPaymentsCsv(params)
+                    : await paymentsApi.exportFiscalCsv(params);
 
             const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
@@ -762,7 +792,11 @@ export function DashboardBusiness() {
             link.href = url;
             link.download = resolveCsvFileName(
                 response.headers['content-disposition'] as string | undefined,
-                target === 'invoices' ? 'invoices.csv' : 'payments.csv',
+                target === 'invoices'
+                    ? 'invoices.csv'
+                    : target === 'payments'
+                        ? 'payments.csv'
+                        : 'fiscal.csv',
             );
             document.body.appendChild(link);
             link.click();
@@ -1173,6 +1207,7 @@ export function DashboardBusiness() {
     const renderBilling = () => {
         const invoiceStatuses = Object.entries(billingSummary?.invoices.byStatus || {});
         const paymentStatuses = Object.entries(billingSummary?.payments.byStatus || {});
+        const monthlyFiscalRows = fiscalSummary?.monthly ?? [];
 
         return (
             <div className="space-y-6">
@@ -1189,14 +1224,17 @@ export function DashboardBusiness() {
                         <button type="button" className="btn-primary text-sm" onClick={() => void loadBillingSummary()} disabled={billingLoading}>{billingLoading ? 'Cargando...' : 'Actualizar'}</button>
                         <button type="button" className="btn-secondary text-sm" onClick={() => void handleDownloadCsv('invoices')} disabled={exportingCsv === 'invoices'}>{exportingCsv === 'invoices' ? 'Exportando...' : 'Facturas CSV'}</button>
                         <button type="button" className="btn-secondary text-sm" onClick={() => void handleDownloadCsv('payments')} disabled={exportingCsv === 'payments'}>{exportingCsv === 'payments' ? 'Exportando...' : 'Pagos CSV'}</button>
+                        <button type="button" className="btn-secondary text-sm" onClick={() => void handleDownloadCsv('fiscal')} disabled={exportingCsv === 'fiscal'}>{exportingCsv === 'fiscal' ? 'Exportando...' : 'Reporte fiscal CSV'}</button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
                     <div className="card p-4 text-center"><p className="text-xs text-gray-500">Total facturado</p><p className="text-xl font-bold text-primary-700">{formatCurrency(billingSummary?.invoices.total || 0)}</p></div>
                     <div className="card p-4 text-center"><p className="text-xs text-gray-500">Cobrado</p><p className="text-xl font-bold text-emerald-700">{formatCurrency(billingSummary?.payments.totalCollected || 0)}</p></div>
                     <div className="card p-4 text-center"><p className="text-xs text-gray-500">Fallido</p><p className="text-xl font-bold text-red-700">{formatCurrency(billingSummary?.payments.totalFailed || 0)}</p></div>
                     <div className="card p-4 text-center"><p className="text-xs text-gray-500">Comisión plataforma</p><p className="text-xl font-bold text-amber-700">{formatCurrency(billingSummary?.marketplace.platformFeeAmount || 0)}</p></div>
+                    <div className="card p-4 text-center"><p className="text-xs text-gray-500">ITBIS acumulado</p><p className="text-xl font-bold text-indigo-700">{formatCurrency(fiscalSummary?.totals.tax || 0)}</p></div>
+                    <div className="card p-4 text-center"><p className="text-xs text-gray-500">Facturas pagadas</p><p className="text-xl font-bold text-teal-700">{fiscalSummary?.totals.invoicesPaid || 0}</p></div>
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -1221,6 +1259,42 @@ export function DashboardBusiness() {
                                 </div>
                             )) : <p className="text-sm text-gray-500">Sin datos de pagos.</p>}
                         </div>
+                    </div>
+                </div>
+
+                <div className="card p-5">
+                    <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Resumen fiscal mensual</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="border-b border-gray-100 text-gray-500">
+                                <tr>
+                                    <th className="text-left py-2">Periodo</th>
+                                    <th className="text-left py-2">Emitidas</th>
+                                    <th className="text-left py-2">Pagadas</th>
+                                    <th className="text-left py-2">Subtotal</th>
+                                    <th className="text-left py-2">ITBIS</th>
+                                    <th className="text-left py-2">Total</th>
+                                    <th className="text-left py-2">Cobrado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {monthlyFiscalRows.length > 0 ? monthlyFiscalRows.map((row) => (
+                                    <tr key={row.period} className="border-b border-gray-50">
+                                        <td className="py-2">{row.period}</td>
+                                        <td className="py-2">{row.invoicesIssued}</td>
+                                        <td className="py-2">{row.invoicesPaid}</td>
+                                        <td className="py-2">{formatCurrency(row.subtotal)}</td>
+                                        <td className="py-2">{formatCurrency(row.tax)}</td>
+                                        <td className="py-2">{formatCurrency(row.total)}</td>
+                                        <td className="py-2">{formatCurrency(row.paidTotal)}</td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td className="py-3 text-gray-500" colSpan={7}>Sin datos fiscales en el rango seleccionado.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

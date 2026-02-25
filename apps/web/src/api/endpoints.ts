@@ -127,10 +127,14 @@ export const paymentsApi = {
     getMyInvoices: (params?: { limit?: number }) => api.get('/payments/invoices/my', { params }),
     getBillingSummary: (params?: { from?: string; to?: string }) =>
         api.get('/payments/reports/summary/my', { params }),
+    getFiscalSummary: (params?: { from?: string; to?: string }) =>
+        api.get('/payments/reports/fiscal/my', { params }),
     exportInvoicesCsv: (params?: { from?: string; to?: string }) =>
         api.get('/payments/invoices/export.csv', { params, responseType: 'blob' }),
     exportPaymentsCsv: (params?: { from?: string; to?: string }) =>
         api.get('/payments/payments/export.csv', { params, responseType: 'blob' }),
+    exportFiscalCsv: (params?: { from?: string; to?: string }) =>
+        api.get('/payments/reports/fiscal/export.csv', { params, responseType: 'blob' }),
     getAdsWalletOverview: (params?: { limit?: number }) =>
         api.get('/payments/ads-wallet/my', { params }),
     createAdsWalletCheckoutSession: (data: { amount: number; successUrl: string; cancelUrl: string }) =>
