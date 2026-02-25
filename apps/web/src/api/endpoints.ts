@@ -139,6 +139,10 @@ export const paymentsApi = {
         api.get('/payments/ads-wallet/my', { params }),
     createAdsWalletCheckoutSession: (data: { amount: number; successUrl: string; cancelUrl: string }) =>
         api.post('/payments/ads-wallet/checkout-session', data),
+    createBookingCheckoutSession: (
+        bookingId: string,
+        data: { successUrl: string; cancelUrl: string },
+    ) => api.post(`/payments/marketplace/bookings/${bookingId}/checkout-session`, data),
 };
 
 // ---- Promotions ----

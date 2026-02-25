@@ -6,6 +6,8 @@ import {
     HttpCode,
     HttpStatus,
     Inject,
+    Param,
+    ParseUUIDPipe,
     Post,
     Query,
     Res,
@@ -21,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
     BillingReportQueryDto,
     CreateAdsWalletCheckoutSessionDto,
+    CreateBookingCheckoutSessionDto,
     ListAdsWalletTopupsQueryDto,
     ListPaymentsQueryDto,
 } from './dto/payment.dto';
@@ -163,6 +166,22 @@ export class PaymentsController {
     ) {
         return this.paymentsService.createAdsWalletCheckoutSession(
             organizationId,
+            actorUserId,
+            actorGlobalRole,
+            dto,
+        );
+    }
+
+    @Post('marketplace/bookings/:bookingId/checkout-session')
+    @UseGuards(JwtAuthGuard)
+    async createBookingCheckoutSession(
+        @Param('bookingId', new ParseUUIDPipe()) bookingId: string,
+        @CurrentUser('id') actorUserId: string,
+        @CurrentUser('role') actorGlobalRole: string,
+        @Body() dto: CreateBookingCheckoutSessionDto,
+    ) {
+        return this.paymentsService.createBookingCheckoutSession(
+            bookingId,
             actorUserId,
             actorGlobalRole,
             dto,

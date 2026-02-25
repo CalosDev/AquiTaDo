@@ -36,6 +36,20 @@ export class CreateAdsWalletCheckoutSessionDto {
     cancelUrl!: string;
 }
 
+export class CreateBookingCheckoutSessionDto {
+    @IsString()
+    @IsUrl({
+        require_protocol: true,
+    })
+    successUrl!: string;
+
+    @IsString()
+    @IsUrl({
+        require_protocol: true,
+    })
+    cancelUrl!: string;
+}
+
 export class ListAdsWalletTopupsQueryDto {
     @IsOptional()
     @Type(() => Number)

@@ -35,8 +35,15 @@ interface Booking {
     status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW';
     scheduledFor: string;
     quotedAmount?: string | number | null;
+    currency?: string;
     business: { id: string; name: string };
     user?: { name: string } | null;
+    transactions?: Array<{
+        id: string;
+        status: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REFUNDED' | 'CANCELED';
+        paymentId?: string | null;
+        paidAt?: string | null;
+    }>;
 }
 
 interface DashboardPayload {
@@ -308,6 +315,7 @@ export function DashboardBusiness() {
     const [promotionForm, setPromotionForm] = useState<PromotionForm>(EMPTY_PROMOTION_FORM);
     const [creatingPromotion, setCreatingPromotion] = useState(false);
     const [updatingBookingId, setUpdatingBookingId] = useState<string | null>(null);
+    const [chargingBookingId, setChargingBookingId] = useState<string | null>(null);
 
     const [conversations, setConversations] = useState<ConversationSummary[]>([]);
     const [conversationFilter, setConversationFilter] = useState<ConversationStatus | 'ALL'>('OPEN');
@@ -700,6 +708,55 @@ export function DashboardBusiness() {
         }
     };
 
+    const handleBookingCheckout = async (booking: Booking) => {
+        if (booking.status === 'CANCELED' || booking.status === 'NO_SHOW') {
+            setErrorMessage('La reserva no permite cobro');
+            return;
+        }
+
+        setChargingBookingId(booking.id);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            let quotedAmount = asNumber(booking.quotedAmount);
+            if (quotedAmount <= 0) {
+                const rawValue = window.prompt('Monto a cobrar en DOP', '1000');
+                if (!rawValue) {
+                    return;
+                }
+
+                quotedAmount = Number(rawValue);
+                if (!Number.isFinite(quotedAmount) || quotedAmount <= 0) {
+                    setErrorMessage('El monto debe ser mayor que 0');
+                    return;
+                }
+
+                await bookingsApi.updateStatus(booking.id, {
+                    status: booking.status,
+                    quotedAmount,
+                });
+            }
+
+            const origin = window.location.origin;
+            const response = await paymentsApi.createBookingCheckoutSession(booking.id, {
+                successUrl: `${origin}/dashboard`,
+                cancelUrl: `${origin}/dashboard`,
+            });
+
+            const checkoutUrl = response.data?.checkoutUrl as string | undefined;
+            if (!checkoutUrl) {
+                throw new Error('No se recibio URL de checkout');
+            }
+
+            window.location.assign(checkoutUrl);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar el cobro de la reserva'));
+        } finally {
+            setChargingBookingId(null);
+        }
+    };
+
     const handleSendReply = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!selectedConversationId || !replyContent.trim()) {
@@ -1033,24 +1090,50 @@ export function DashboardBusiness() {
             <div className="card p-5">
                 <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Reservas recientes</h2>
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                    {bookings.length > 0 ? bookings.map((booking) => (
-                        <div key={booking.id} className="rounded-xl border border-gray-100 p-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                    <p className="font-medium text-gray-900">{booking.business.name}</p>
-                                    <p className="text-xs text-gray-500">{new Date(booking.scheduledFor).toLocaleString('es-DO')} · {booking.user?.name || 'Cliente plataforma'}</p>
+                    {bookings.length > 0 ? bookings.map((booking) => {
+                        const latestTransaction = booking.transactions?.[0];
+                        const paymentCaptured = latestTransaction?.status === 'SUCCEEDED';
+                        const canCharge =
+                            (booking.status === 'PENDING' || booking.status === 'CONFIRMED') &&
+                            !paymentCaptured;
+
+                        return (
+                            <div key={booking.id} className="rounded-xl border border-gray-100 p-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <p className="font-medium text-gray-900">{booking.business.name}</p>
+                                        <p className="text-xs text-gray-500">{new Date(booking.scheduledFor).toLocaleString('es-DO')} · {booking.user?.name || 'Cliente plataforma'}</p>
+                                        <p className="text-xs text-gray-500">{asNumber(booking.quotedAmount) > 0 ? formatCurrency(booking.quotedAmount) : 'Monto pendiente de cotizar'}</p>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">{booking.status}</span>
+                                        {paymentCaptured && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                                Pago confirmado
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
-                                <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">{booking.status}</span>
+                                {booking.status !== 'COMPLETED' && booking.status !== 'CANCELED' && (
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {booking.status === 'PENDING' && <button type="button" className="btn-secondary text-xs" disabled={updatingBookingId === booking.id || chargingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'CONFIRMED')}>Confirmar</button>}
+                                        {booking.status === 'CONFIRMED' && <button type="button" className="btn-primary text-xs" disabled={updatingBookingId === booking.id || chargingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'COMPLETED')}>Completar</button>}
+                                        <button type="button" className="btn-secondary text-xs" disabled={updatingBookingId === booking.id || chargingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'CANCELED')}>Cancelar</button>
+                                        {canCharge && (
+                                            <button
+                                                type="button"
+                                                className="btn-primary text-xs"
+                                                disabled={chargingBookingId === booking.id || updatingBookingId === booking.id}
+                                                onClick={() => void handleBookingCheckout(booking)}
+                                            >
+                                                {chargingBookingId === booking.id ? 'Abriendo checkout...' : 'Cobrar'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                            {booking.status !== 'COMPLETED' && booking.status !== 'CANCELED' && (
-                                <div className="flex gap-2 mt-2">
-                                    {booking.status === 'PENDING' && <button type="button" className="btn-secondary text-xs" disabled={updatingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'CONFIRMED')}>Confirmar</button>}
-                                    {booking.status === 'CONFIRMED' && <button type="button" className="btn-primary text-xs" disabled={updatingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'COMPLETED')}>Completar</button>}
-                                    <button type="button" className="btn-secondary text-xs" disabled={updatingBookingId === booking.id} onClick={() => void handleBookingStatus(booking, 'CANCELED')}>Cancelar</button>
-                                </div>
-                            )}
-                        </div>
-                    )) : <p className="text-sm text-gray-500">No hay reservas registradas.</p>}
+                        );
+                    }) : <p className="text-sm text-gray-500">No hay reservas registradas.</p>}
                 </div>
             </div>
         </>

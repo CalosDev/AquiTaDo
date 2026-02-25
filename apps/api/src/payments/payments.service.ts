@@ -19,7 +19,10 @@ import {
 import { PlansService } from '../plans/plans.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
-import { CreateAdsWalletCheckoutSessionDto } from './dto/payment.dto';
+import {
+    CreateAdsWalletCheckoutSessionDto,
+    CreateBookingCheckoutSessionDto,
+} from './dto/payment.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -216,6 +219,262 @@ export class PaymentsService {
                         : 'No se pudo crear sesión de pago',
                 },
             });
+            throw error;
+        }
+    }
+
+    async createBookingCheckoutSession(
+        bookingId: string,
+        actorUserId: string,
+        actorGlobalRole: string,
+        dto: CreateBookingCheckoutSessionDto,
+    ) {
+        const stripe = this.resolveStripeClient();
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: {
+                id: true,
+                organizationId: true,
+                businessId: true,
+                userId: true,
+                promotionId: true,
+                status: true,
+                scheduledFor: true,
+                quotedAmount: true,
+                depositAmount: true,
+                currency: true,
+                business: {
+                    select: {
+                        name: true,
+                    },
+                },
+                user: {
+                    select: {
+                        email: true,
+                    },
+                },
+                organization: {
+                    select: {
+                        ownerUserId: true,
+                        ownerUser: {
+                            select: {
+                                email: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!booking) {
+            throw new NotFoundException('Reserva no encontrada');
+        }
+
+        if (booking.status === 'CANCELED' || booking.status === 'NO_SHOW') {
+            throw new BadRequestException('La reserva no permite cobro');
+        }
+
+        const chargeAmount = this.resolveBookingChargeAmount(
+            booking.quotedAmount,
+            booking.depositAmount,
+        );
+        if (chargeAmount <= 0) {
+            throw new BadRequestException('La reserva no tiene monto para cobrar');
+        }
+
+        await this.assertCanCreateBookingPayment(booking, actorUserId, actorGlobalRole);
+
+        const currency = (booking.currency || 'DOP').trim().toUpperCase();
+        const paymentContext = await this.prisma.$transaction(async (tx) => {
+            const latestTransaction = await tx.transaction.findFirst({
+                where: { bookingId: booking.id },
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    status: true,
+                    paymentId: true,
+                },
+            });
+
+            if (latestTransaction?.status === 'SUCCEEDED') {
+                throw new BadRequestException('La reserva ya tiene un pago confirmado');
+            }
+
+            if (latestTransaction?.paymentId) {
+                await tx.payment.updateMany({
+                    where: {
+                        id: latestTransaction.paymentId,
+                        status: 'PENDING',
+                    },
+                    data: {
+                        status: 'CANCELED',
+                        failureReason: 'Checkout reemplazado por nueva sesion',
+                    },
+                });
+            }
+
+            const feeBps = await this.resolveTransactionFeeBps(tx, booking.organizationId);
+            const platformFeeAmount = this.roundMoney((chargeAmount * feeBps) / 10_000);
+            const netAmount = this.roundMoney(chargeAmount - platformFeeAmount);
+
+            const payment = await tx.payment.create({
+                data: {
+                    organizationId: booking.organizationId,
+                    provider: 'stripe',
+                    amount: String(chargeAmount),
+                    currency,
+                    status: 'PENDING',
+                    metadata: this.asJson({
+                        paymentType: 'BOOKING_PAYMENT',
+                        bookingId: booking.id,
+                    }),
+                },
+                select: {
+                    id: true,
+                },
+            });
+
+            let transactionId: string;
+            if (latestTransaction) {
+                await tx.transaction.update({
+                    where: { id: latestTransaction.id },
+                    data: {
+                        paymentId: payment.id,
+                        grossAmount: String(chargeAmount),
+                        platformFeeAmount: String(platformFeeAmount),
+                        netAmount: String(netAmount),
+                        currency,
+                        status: 'PENDING',
+                        paidAt: null,
+                        providerReference: null,
+                    },
+                });
+                transactionId = latestTransaction.id;
+            } else {
+                const createdTransaction = await tx.transaction.create({
+                    data: {
+                        organizationId: booking.organizationId,
+                        businessId: booking.businessId,
+                        bookingId: booking.id,
+                        promotionId: booking.promotionId,
+                        buyerUserId: booking.userId,
+                        paymentId: payment.id,
+                        grossAmount: String(chargeAmount),
+                        platformFeeAmount: String(platformFeeAmount),
+                        netAmount: String(netAmount),
+                        currency,
+                        status: 'PENDING',
+                    },
+                    select: {
+                        id: true,
+                    },
+                });
+                transactionId = createdTransaction.id;
+            }
+
+            return {
+                paymentId: payment.id,
+                transactionId,
+            };
+        });
+
+        const metadata = {
+            paymentType: 'BOOKING_PAYMENT',
+            organizationId: booking.organizationId,
+            bookingId: booking.id,
+            paymentId: paymentContext.paymentId,
+            transactionId: paymentContext.transactionId,
+        };
+
+        try {
+            const checkoutSession = await stripe.checkout.sessions.create({
+                mode: 'payment',
+                success_url: dto.successUrl,
+                cancel_url: dto.cancelUrl,
+                customer_email: booking.user?.email ?? booking.organization.ownerUser.email ?? undefined,
+                line_items: [
+                    {
+                        price_data: {
+                            currency: currency.toLowerCase(),
+                            unit_amount: Math.round(chargeAmount * 100),
+                            product_data: {
+                                name: 'AquiTa.do Marketplace Booking',
+                                description: `Cobro de reserva para ${booking.business.name}`,
+                            },
+                        },
+                        quantity: 1,
+                    },
+                ],
+                metadata,
+                payment_intent_data: {
+                    metadata,
+                },
+            });
+
+            const paymentIntentId = this.resolveStringId(checkoutSession.payment_intent);
+
+            await this.prisma.$transaction(async (tx) => {
+                const payment = await tx.payment.findUnique({
+                    where: { id: paymentContext.paymentId },
+                    select: {
+                        metadata: true,
+                    },
+                });
+
+                await tx.payment.update({
+                    where: { id: paymentContext.paymentId },
+                    data: {
+                        providerPaymentIntentId: paymentIntentId ?? undefined,
+                        metadata: this.mergeJsonObject(payment?.metadata, {
+                            ...metadata,
+                            checkoutSessionId: checkoutSession.id,
+                        }),
+                    },
+                });
+
+                await tx.transaction.update({
+                    where: { id: paymentContext.transactionId },
+                    data: {
+                        providerReference: checkoutSession.id,
+                    },
+                });
+            });
+
+            return {
+                bookingId: booking.id,
+                paymentId: paymentContext.paymentId,
+                transactionId: paymentContext.transactionId,
+                sessionId: checkoutSession.id,
+                checkoutUrl: checkoutSession.url,
+            };
+        } catch (error) {
+            const failureReason = error instanceof Error
+                ? error.message.slice(0, 255)
+                : 'No se pudo crear sesion de pago';
+
+            await this.prisma.$transaction(async (tx) => {
+                await tx.payment.updateMany({
+                    where: {
+                        id: paymentContext.paymentId,
+                        status: 'PENDING',
+                    },
+                    data: {
+                        status: 'FAILED',
+                        failureReason,
+                    },
+                });
+
+                await tx.transaction.updateMany({
+                    where: {
+                        id: paymentContext.transactionId,
+                        status: 'PENDING',
+                    },
+                    data: {
+                        status: 'FAILED',
+                    },
+                });
+            });
+
             throw error;
         }
     }
@@ -654,6 +913,11 @@ export class PaymentsService {
                     event.data.object as Stripe.Invoice,
                 );
                 return;
+            case 'payment_intent.payment_failed':
+                await this.processPaymentIntentFailed(
+                    event.data.object as Stripe.PaymentIntent,
+                );
+                return;
             default:
                 this.logger.debug(`stripe.webhook.ignored type=${event.type}`);
         }
@@ -662,6 +926,11 @@ export class PaymentsService {
     private async processCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
         if (session.metadata?.paymentType === 'AD_WALLET_TOPUP') {
             await this.processAdWalletTopupCompleted(session);
+            return;
+        }
+
+        if (session.metadata?.paymentType === 'BOOKING_PAYMENT') {
+            await this.processBookingPaymentCompleted(session);
             return;
         }
 
@@ -704,6 +973,11 @@ export class PaymentsService {
     }
 
     private async processCheckoutSessionExpired(session: Stripe.Checkout.Session) {
+        if (session.metadata?.paymentType === 'BOOKING_PAYMENT') {
+            await this.processBookingPaymentExpired(session);
+            return;
+        }
+
         if (session.metadata?.paymentType !== 'AD_WALLET_TOPUP') {
             return;
         }
@@ -801,6 +1075,261 @@ export class PaymentsService {
                     } as Prisma.InputJsonValue),
                 },
             });
+        });
+    }
+
+    private async processBookingPaymentCompleted(session: Stripe.Checkout.Session) {
+        const paymentId = session.metadata?.paymentId;
+        const bookingId = session.metadata?.bookingId;
+        const organizationId = session.metadata?.organizationId;
+        const transactionId = session.metadata?.transactionId ?? null;
+        if (!paymentId || !bookingId || !organizationId) {
+            return;
+        }
+
+        const paymentIntentId = this.resolveStringId(session.payment_intent);
+        const amountFromStripe = Number.isFinite(session.amount_total ?? NaN)
+            ? Math.max((session.amount_total ?? 0) / 100, 0)
+            : null;
+        const paidAt = new Date();
+        const currency = (session.currency ?? 'dop').toUpperCase();
+
+        await this.prisma.$transaction(async (tx) => {
+            const [payment, booking] = await Promise.all([
+                tx.payment.findUnique({
+                    where: { id: paymentId },
+                    select: {
+                        id: true,
+                        organizationId: true,
+                        status: true,
+                        amount: true,
+                        metadata: true,
+                    },
+                }),
+                tx.booking.findUnique({
+                    where: { id: bookingId },
+                    select: {
+                        id: true,
+                        organizationId: true,
+                        businessId: true,
+                        promotionId: true,
+                        userId: true,
+                        status: true,
+                        currency: true,
+                    },
+                }),
+            ]);
+
+            if (!payment || !booking) {
+                return;
+            }
+
+            if (payment.organizationId !== organizationId || booking.organizationId !== organizationId) {
+                return;
+            }
+
+            if (payment.status === 'SUCCEEDED' || payment.status === 'REFUNDED') {
+                return;
+            }
+
+            const grossAmount = this.roundMoney(
+                amountFromStripe !== null && amountFromStripe > 0
+                    ? amountFromStripe
+                    : Number(payment.amount.toString()),
+            );
+
+            const feeBps = await this.resolveTransactionFeeBps(tx, organizationId);
+            const platformFeeAmount = this.roundMoney((grossAmount * feeBps) / 10_000);
+            const netAmount = this.roundMoney(grossAmount - platformFeeAmount);
+
+            await tx.payment.update({
+                where: { id: payment.id },
+                data: {
+                    providerPaymentIntentId: paymentIntentId ?? undefined,
+                    amount: String(grossAmount),
+                    currency,
+                    status: 'SUCCEEDED',
+                    paidAt,
+                    failureReason: null,
+                    metadata: this.mergeJsonObject(payment.metadata, {
+                        paymentType: 'BOOKING_PAYMENT',
+                        bookingId,
+                        transactionId,
+                        checkoutSessionId: session.id,
+                    }),
+                },
+            });
+
+            let targetTransactionId = transactionId;
+            if (!targetTransactionId) {
+                const latestTransaction = await tx.transaction.findFirst({
+                    where: { bookingId: booking.id },
+                    orderBy: { createdAt: 'desc' },
+                    select: { id: true },
+                });
+                targetTransactionId = latestTransaction?.id ?? null;
+            }
+
+            let updatedTransactions = 0;
+            if (targetTransactionId) {
+                const updateResult = await tx.transaction.updateMany({
+                    where: {
+                        id: targetTransactionId,
+                        bookingId: booking.id,
+                    },
+                    data: {
+                        paymentId: payment.id,
+                        grossAmount: String(grossAmount),
+                        platformFeeAmount: String(platformFeeAmount),
+                        netAmount: String(netAmount),
+                        currency: booking.currency.toUpperCase(),
+                        status: 'SUCCEEDED',
+                        providerReference: paymentIntentId ?? session.id,
+                        paidAt,
+                    },
+                });
+                updatedTransactions = updateResult.count;
+            }
+
+            if (updatedTransactions === 0) {
+                await tx.transaction.create({
+                    data: {
+                        organizationId: booking.organizationId,
+                        businessId: booking.businessId,
+                        bookingId: booking.id,
+                        promotionId: booking.promotionId,
+                        buyerUserId: booking.userId,
+                        paymentId: payment.id,
+                        grossAmount: String(grossAmount),
+                        platformFeeAmount: String(platformFeeAmount),
+                        netAmount: String(netAmount),
+                        currency: booking.currency.toUpperCase(),
+                        status: 'SUCCEEDED',
+                        providerReference: paymentIntentId ?? session.id,
+                        paidAt,
+                    },
+                });
+            }
+
+            if (booking.status === 'PENDING') {
+                await tx.booking.update({
+                    where: { id: booking.id },
+                    data: { status: 'CONFIRMED' },
+                });
+            }
+        });
+    }
+
+    private async processBookingPaymentExpired(session: Stripe.Checkout.Session) {
+        const paymentId = session.metadata?.paymentId;
+        const transactionId = session.metadata?.transactionId ?? null;
+        if (!paymentId) {
+            return;
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+            const payment = await tx.payment.findUnique({
+                where: { id: paymentId },
+                select: {
+                    metadata: true,
+                },
+            });
+
+            await tx.payment.updateMany({
+                where: {
+                    id: paymentId,
+                    status: 'PENDING',
+                },
+                data: {
+                    status: 'CANCELED',
+                    failureReason: 'Sesion de pago expirada',
+                    metadata: this.mergeJsonObject(payment?.metadata, {
+                        paymentType: 'BOOKING_PAYMENT',
+                        checkoutSessionId: session.id,
+                    }),
+                },
+            });
+
+            if (transactionId) {
+                await tx.transaction.updateMany({
+                    where: {
+                        id: transactionId,
+                        paymentId,
+                        status: 'PENDING',
+                    },
+                    data: {
+                        status: 'CANCELED',
+                    },
+                });
+            }
+        });
+    }
+
+    private async processPaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
+        if (paymentIntent.metadata?.paymentType !== 'BOOKING_PAYMENT') {
+            return;
+        }
+
+        const paymentIdFromMetadata = paymentIntent.metadata?.paymentId;
+        let paymentId: string | null = paymentIdFromMetadata ?? null;
+        if (!paymentId) {
+            const existing = await this.prisma.payment.findUnique({
+                where: {
+                    providerPaymentIntentId: paymentIntent.id,
+                },
+                select: {
+                    id: true,
+                },
+            });
+            paymentId = existing?.id ?? null;
+        }
+
+        if (!paymentId) {
+            return;
+        }
+
+        const failureReason = paymentIntent.last_payment_error?.message?.slice(0, 255) ?? 'Pago fallido';
+        const transactionId = paymentIntent.metadata?.transactionId ?? null;
+
+        await this.prisma.$transaction(async (tx) => {
+            const payment = await tx.payment.findUnique({
+                where: { id: paymentId },
+                select: {
+                    id: true,
+                    status: true,
+                    metadata: true,
+                },
+            });
+
+            if (!payment || payment.status !== 'PENDING') {
+                return;
+            }
+
+            await tx.payment.update({
+                where: { id: payment.id },
+                data: {
+                    providerPaymentIntentId: paymentIntent.id,
+                    status: 'FAILED',
+                    failureReason,
+                    metadata: this.mergeJsonObject(payment.metadata, {
+                        paymentType: 'BOOKING_PAYMENT',
+                        paymentIntentId: paymentIntent.id,
+                    }),
+                },
+            });
+
+            if (transactionId) {
+                await tx.transaction.updateMany({
+                    where: {
+                        id: transactionId,
+                        paymentId: payment.id,
+                        status: 'PENDING',
+                    },
+                    data: {
+                        status: 'FAILED',
+                    },
+                });
+            }
         });
     }
 
@@ -1098,6 +1627,100 @@ export class PaymentsService {
         }
     }
 
+    private async assertCanCreateBookingPayment(
+        booking: {
+            organizationId: string;
+            userId: string | null;
+            organization: {
+                ownerUserId: string;
+            };
+        },
+        actorUserId: string,
+        actorGlobalRole: string,
+    ) {
+        if (actorGlobalRole === 'ADMIN') {
+            return;
+        }
+
+        if (booking.userId === actorUserId) {
+            return;
+        }
+
+        if (booking.organization.ownerUserId === actorUserId) {
+            return;
+        }
+
+        const membership = await this.prisma.organizationMember.findUnique({
+            where: {
+                organizationId_userId: {
+                    organizationId: booking.organizationId,
+                    userId: actorUserId,
+                },
+            },
+            select: {
+                role: true,
+            },
+        });
+
+        if (!membership) {
+            throw new ForbiddenException('No tienes acceso a esta reserva');
+        }
+
+        if (membership.role === OrganizationRole.STAFF) {
+            throw new ForbiddenException('El rol STAFF no puede gestionar cobros');
+        }
+    }
+
+    private resolveBookingChargeAmount(
+        quotedAmount: Prisma.Decimal | null,
+        depositAmount: Prisma.Decimal | null,
+    ): number {
+        const deposit = depositAmount ? Number(depositAmount.toString()) : 0;
+        const quoted = quotedAmount ? Number(quotedAmount.toString()) : 0;
+        const amount = deposit > 0 ? deposit : quoted;
+        return this.roundMoney(Math.max(amount, 0));
+    }
+
+    private async resolveTransactionFeeBps(
+        tx: Prisma.TransactionClient,
+        organizationId: string,
+    ): Promise<number> {
+        const subscription = await tx.subscription.findUnique({
+            where: { organizationId },
+            include: {
+                plan: {
+                    select: {
+                        transactionFeeBps: true,
+                    },
+                },
+            },
+        });
+
+        if (subscription?.plan) {
+            return subscription.plan.transactionFeeBps;
+        }
+
+        const organization = await tx.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                plan: true,
+            },
+        });
+
+        if (!organization) {
+            return 1200;
+        }
+
+        const plan = await tx.plan.findUnique({
+            where: { code: organization.plan },
+            select: {
+                transactionFeeBps: true,
+            },
+        });
+
+        return plan?.transactionFeeBps ?? 1200;
+    }
+
     private resolveStripeEvent(signature: string | undefined, body: unknown): Stripe.Event {
         const stripe = this.resolveStripeClient();
         const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET')?.trim();
@@ -1165,6 +1788,24 @@ export class PaymentsService {
         }
 
         return new Stripe(stripeSecretKey);
+    }
+
+    private roundMoney(value: number): number {
+        return Math.round(value * 100) / 100;
+    }
+
+    private mergeJsonObject(
+        base: Prisma.JsonValue | null | undefined,
+        extra: Record<string, unknown>,
+    ): Prisma.InputJsonValue {
+        const normalizedBase =
+            base && typeof base === 'object' && !Array.isArray(base)
+                ? (base as Record<string, unknown>)
+                : {};
+        return {
+            ...normalizedBase,
+            ...extra,
+        } as Prisma.InputJsonValue;
     }
 
     private asJson(payload: unknown): Prisma.InputJsonValue {
