@@ -1,0 +1,42 @@
+{
+  "name": "aquita",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AquiTa.do — Directorio inteligente de negocios locales en República Dominicana",
+  "scripts": {
+    "dev": "pnpm --parallel -r run dev",
+    "dev:web": "pnpm --filter @aquita/web dev",
+    "dev:api": "pnpm --filter @aquita/api dev",
+    "build": "pnpm --parallel -r run build",
+    "build:web": "pnpm --filter @aquita/web build",
+    "build:api": "pnpm --filter @aquita/api build",
+    "lint": "pnpm --parallel -r run lint",
+    "test": "pnpm --parallel -r --if-present run test",
+    "db:migrate": "pnpm --filter @aquita/api prisma:migrate",
+    "db:generate": "pnpm --filter @aquita/api prisma:generate",
+    "db:seed": "pnpm --filter @aquita/api prisma:seed"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^10.0.2",
+    "eslint-plugin-react-hooks": "7.1.0-canary-c0060cf2-20260224",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.3.0",
+    "jsdom": "^28.1.0",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "overrides": {
+      "hono": "4.11.10",
+      "lodash": "4.17.23"
+    }
+  }
+}
