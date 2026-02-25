@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../api/error';
-import { businessApi, categoryApi } from '../api/endpoints';
+import { analyticsApi, businessApi, categoryApi, verificationApi } from '../api/endpoints';
 
 interface Business {
     id: string;
@@ -16,6 +16,38 @@ interface Category {
     slug: string;
     icon?: string;
     _count?: { businesses: number };
+}
+
+interface PendingVerificationBusiness {
+    id: string;
+    name: string;
+    slug: string;
+    riskScore: number;
+    verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED' | 'UNVERIFIED';
+    verificationSubmittedAt?: string | null;
+    verificationNotes?: string | null;
+    organization: {
+        id: string;
+        name: string;
+        slug: string;
+    };
+    documents: {
+        total: number;
+        pending: number;
+        approved: number;
+        rejected: number;
+    };
+}
+
+interface MarketReport {
+    id: string;
+    reportType: 'PROVINCE_CATEGORY_DEMAND' | 'TRENDING_BUSINESSES' | 'CONVERSION_BENCHMARK';
+    generatedAt: string;
+    generatedByUser?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
 }
 
 type CategoryForm = {
@@ -44,11 +76,15 @@ function toSlug(value: string): string {
 export function AdminDashboard() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [activeTab, setActiveTab] = useState<'businesses' | 'categories'>('businesses');
+    const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'verification'>('businesses');
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [verificationLoading, setVerificationLoading] = useState(false);
+    const [pendingVerifications, setPendingVerifications] = useState<PendingVerificationBusiness[]>([]);
+    const [marketReports, setMarketReports] = useState<MarketReport[]>([]);
+    const [generatingReport, setGeneratingReport] = useState(false);
 
     const [newCategoryForm, setNewCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -74,6 +110,28 @@ export function AdminDashboard() {
     useEffect(() => {
         void loadData();
     }, [loadData]);
+
+    const loadVerificationData = useCallback(async () => {
+        setVerificationLoading(true);
+        try {
+            const [pendingRes, reportsRes] = await Promise.all([
+                verificationApi.getPendingBusinessesAdmin({ limit: 50 }),
+                analyticsApi.listMarketReports({ limit: 20 }),
+            ]);
+            setPendingVerifications((pendingRes.data || []) as PendingVerificationBusiness[]);
+            setMarketReports((reportsRes.data || []) as MarketReport[]);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificación y data layer'));
+        } finally {
+            setVerificationLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'verification') {
+            void loadVerificationData();
+        }
+    }, [activeTab, loadVerificationData]);
 
     const handleVerifyBusiness = async (businessId: string) => {
         setProcessingId(businessId);
@@ -205,9 +263,53 @@ export function AdminDashboard() {
         }
     };
 
+    const handleReviewVerification = async (
+        businessId: string,
+        status: 'VERIFIED' | 'REJECTED' | 'SUSPENDED',
+    ) => {
+        setProcessingId(businessId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await verificationApi.reviewBusinessAdmin(businessId, {
+                status,
+                notes: status === 'VERIFIED'
+                    ? 'Verificación aprobada por equipo admin'
+                    : 'Revisión administrativa',
+            });
+            await Promise.all([loadData(), loadVerificationData()]);
+            setSuccessMessage('Revisión de verificación actualizada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la verificación'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleGenerateMarketReport = async (
+        reportType: 'PROVINCE_CATEGORY_DEMAND' | 'TRENDING_BUSINESSES' | 'CONVERSION_BENCHMARK',
+    ) => {
+        setGeneratingReport(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await analyticsApi.generateMarketReport({
+                reportType,
+                days: 30,
+            });
+            await loadVerificationData();
+            setSuccessMessage('Reporte de mercado generado');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo generar el reporte'));
+        } finally {
+            setGeneratingReport(false);
+        }
+    };
+
     const tabs = [
         { key: 'businesses', label: 'Negocios', icon: '🏪' },
         { key: 'categories', label: 'Categorías', icon: '📁' },
+        { key: 'verification', label: 'KYC + Data Layer', icon: '🛡️' },
     ] as const;
 
     return (
@@ -508,6 +610,130 @@ export function AdminDashboard() {
                                             )}
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'verification' && (
+                        <div className="space-y-4">
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <h3 className="font-display font-semibold">Verificación KYC pendiente</h3>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary text-xs"
+                                        onClick={() => void loadVerificationData()}
+                                        disabled={verificationLoading}
+                                    >
+                                        {verificationLoading ? 'Actualizando...' : 'Actualizar'}
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                    {pendingVerifications.length > 0 ? pendingVerifications.map((business) => (
+                                        <div key={business.id} className="rounded-xl border border-gray-100 p-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div>
+                                                    <p className="font-medium text-gray-900">{business.name}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {business.organization.name} · riesgo {business.riskScore}/100 · docs {business.documents.total}
+                                                    </p>
+                                                </div>
+                                                <span className="text-xs rounded-full px-2 py-0.5 bg-yellow-100 text-yellow-700">
+                                                    {business.verificationStatus}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Pendientes {business.documents.pending} · Aprobados {business.documents.approved} · Rechazados {business.documents.rejected}
+                                            </p>
+                                            <div className="flex gap-2 mt-2">
+                                                <button
+                                                    type="button"
+                                                    className="btn-primary text-xs"
+                                                    disabled={processingId === business.id}
+                                                    onClick={() =>
+                                                        void handleReviewVerification(business.id, 'VERIFIED')
+                                                    }
+                                                >
+                                                    Aprobar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn-secondary text-xs"
+                                                    disabled={processingId === business.id}
+                                                    onClick={() =>
+                                                        void handleReviewVerification(business.id, 'REJECTED')
+                                                    }
+                                                >
+                                                    Rechazar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50"
+                                                    disabled={processingId === business.id}
+                                                    onClick={() =>
+                                                        void handleReviewVerification(business.id, 'SUSPENDED')
+                                                    }
+                                                >
+                                                    Suspender
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <p className="text-sm text-gray-500">No hay verificaciones pendientes.</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <h3 className="font-display font-semibold">Data Layer: snapshots</h3>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            disabled={generatingReport}
+                                            onClick={() =>
+                                                void handleGenerateMarketReport('PROVINCE_CATEGORY_DEMAND')
+                                            }
+                                        >
+                                            Demanda
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            disabled={generatingReport}
+                                            onClick={() =>
+                                                void handleGenerateMarketReport('TRENDING_BUSINESSES')
+                                            }
+                                        >
+                                            Tendencias
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            disabled={generatingReport}
+                                            onClick={() =>
+                                                void handleGenerateMarketReport('CONVERSION_BENCHMARK')
+                                            }
+                                        >
+                                            Benchmark
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                    {marketReports.length > 0 ? marketReports.map((report) => (
+                                        <div key={report.id} className="rounded-xl border border-gray-100 p-3">
+                                            <p className="text-sm font-medium text-gray-900">{report.reportType}</p>
+                                            <p className="text-xs text-gray-500">
+                                                {new Date(report.generatedAt).toLocaleString('es-DO')} · {report.generatedByUser?.name || 'Sistema'}
+                                            </p>
+                                        </div>
+                                    )) : (
+                                        <p className="text-sm text-gray-500">Sin snapshots generados.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>

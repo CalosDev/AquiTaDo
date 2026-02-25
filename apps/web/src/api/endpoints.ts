@@ -192,6 +192,17 @@ export const analyticsApi = {
         categoryId?: string;
         limit?: number;
     }) => api.get('/analytics/market-insights', { params }),
+    generateMarketReport: (data: {
+        reportType: 'PROVINCE_CATEGORY_DEMAND' | 'TRENDING_BUSINESSES' | 'CONVERSION_BENCHMARK';
+        days?: number;
+        provinceId?: string;
+        categoryId?: string;
+    }) => api.post('/analytics/market-reports/generate', data),
+    listMarketReports: (params?: {
+        reportType?: 'PROVINCE_CATEGORY_DEMAND' | 'TRENDING_BUSINESSES' | 'CONVERSION_BENCHMARK';
+        limit?: number;
+    }) => api.get('/analytics/market-reports', { params }),
+    getMarketReportById: (reportId: string) => api.get(`/analytics/market-reports/${reportId}`),
 };
 
 // ---- Messaging ----
@@ -245,4 +256,57 @@ export const reputationApi = {
     getRankings: (params?: { provinceId?: string; limit?: number }) =>
         api.get('/reputation/rankings', { params }),
     getBusinessProfile: (businessId: string) => api.get(`/reputation/business/${businessId}`),
+};
+
+// ---- Ads ----
+export const adsApi = {
+    getPlacements: (params?: { provinceId?: string; categoryId?: string; limit?: number }) =>
+        api.get('/ads/placements', { params }),
+    trackImpression: (campaignId: string, data?: { visitorId?: string; placementKey?: string }) =>
+        api.post(`/ads/campaigns/${campaignId}/impression`, data ?? {}),
+    trackClick: (campaignId: string, data?: { visitorId?: string; placementKey?: string }) =>
+        api.post(`/ads/campaigns/${campaignId}/click`, data ?? {}),
+    createCampaign: (data: {
+        businessId: string;
+        name: string;
+        targetProvinceId?: string;
+        targetCategoryId?: string;
+        dailyBudget: number;
+        totalBudget: number;
+        bidAmount: number;
+        startsAt: string;
+        endsAt: string;
+        status?: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ENDED' | 'REJECTED';
+    }) => api.post('/ads/campaigns', data),
+    getMyCampaigns: (params?: Record<string, string | number | boolean>) =>
+        api.get('/ads/campaigns/my', { params }),
+    updateCampaignStatus: (
+        campaignId: string,
+        data: { status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ENDED' | 'REJECTED' },
+    ) => api.patch(`/ads/campaigns/${campaignId}/status`, data),
+};
+
+// ---- Verification ----
+export const verificationApi = {
+    submitDocument: (data: {
+        businessId: string;
+        documentType: 'ID_CARD' | 'TAX_CERTIFICATE' | 'BUSINESS_LICENSE' | 'ADDRESS_PROOF' | 'SELFIE' | 'OTHER';
+        fileUrl: string;
+    }) => api.post('/verification/documents', data),
+    getMyDocuments: (params?: Record<string, string | number | boolean>) =>
+        api.get('/verification/documents/my', { params }),
+    submitBusiness: (businessId: string, data?: { notes?: string }) =>
+        api.post(`/verification/businesses/${businessId}/submit`, data ?? {}),
+    getBusinessStatus: (businessId: string) =>
+        api.get(`/verification/businesses/${businessId}/status`),
+    getPendingBusinessesAdmin: (params?: { limit?: number }) =>
+        api.get('/verification/admin/pending-businesses', { params }),
+    reviewBusinessAdmin: (
+        businessId: string,
+        data: { status: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED'; notes?: string },
+    ) => api.patch(`/verification/admin/businesses/${businessId}/review`, data),
+    reviewDocumentAdmin: (
+        documentId: string,
+        data: { status: 'PENDING' | 'APPROVED' | 'REJECTED'; rejectionReason?: string },
+    ) => api.patch(`/verification/admin/documents/${documentId}/review`, data),
 };

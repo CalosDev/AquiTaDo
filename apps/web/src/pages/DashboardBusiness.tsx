@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+    adsApi,
     analyticsApi,
     bookingsApi,
     businessApi,
@@ -8,6 +9,7 @@ import {
     messagingApi,
     paymentsApi,
     promotionsApi,
+    verificationApi,
 } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { useOrganization } from '../context/useOrganization';
@@ -64,7 +66,7 @@ interface DashboardPayload {
 
 type ConversationStatus = 'OPEN' | 'CLOSED' | 'CONVERTED';
 
-type DashboardTab = 'overview' | 'inbox' | 'crm' | 'billing';
+type DashboardTab = 'overview' | 'inbox' | 'crm' | 'billing' | 'ads' | 'verification';
 
 interface ConversationSummary {
     id: string;
@@ -133,6 +135,50 @@ interface BillingSummary {
     };
 }
 
+interface AdCampaign {
+    id: string;
+    name: string;
+    status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ENDED' | 'REJECTED';
+    dailyBudget: number;
+    totalBudget: number;
+    bidAmount: number;
+    spentAmount: number;
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    startsAt: string;
+    endsAt: string;
+    business: { id: string; name: string };
+}
+
+interface VerificationDocument {
+    id: string;
+    documentType: 'ID_CARD' | 'TAX_CERTIFICATE' | 'BUSINESS_LICENSE' | 'ADDRESS_PROOF' | 'SELFIE' | 'OTHER';
+    fileUrl: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    rejectionReason?: string | null;
+    submittedAt: string;
+    business: {
+        id: string;
+        name: string;
+        verificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
+        verified: boolean;
+    };
+}
+
+interface BusinessVerificationStatusPayload {
+    id: string;
+    name: string;
+    verificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
+    verified: boolean;
+    verifiedAt?: string | null;
+    verificationSubmittedAt?: string | null;
+    verificationReviewedAt?: string | null;
+    verificationNotes?: string | null;
+    riskScore: number;
+    verificationDocuments: VerificationDocument[];
+}
+
 type PromotionForm = {
     businessId: string;
     title: string;
@@ -158,6 +204,8 @@ const TABS: Array<{ key: DashboardTab; label: string }> = [
     { key: 'inbox', label: 'Inbox' },
     { key: 'crm', label: 'CRM' },
     { key: 'billing', label: 'Facturación' },
+    { key: 'ads', label: 'Ads' },
+    { key: 'verification', label: 'Verificación' },
 ];
 
 function asNumber(value: string | number | null | undefined): number {
@@ -234,6 +282,33 @@ export function DashboardBusiness() {
     const [billingRange, setBillingRange] = useState({ from: '', to: '' });
     const [exportingCsv, setExportingCsv] = useState<'invoices' | 'payments' | null>(null);
 
+    const [adsLoading, setAdsLoading] = useState(false);
+    const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
+    const [creatingCampaign, setCreatingCampaign] = useState(false);
+    const [campaignForm, setCampaignForm] = useState({
+        businessId: '',
+        name: '',
+        dailyBudget: '300',
+        totalBudget: '3000',
+        bidAmount: '15',
+        startsAt: '',
+        endsAt: '',
+        status: 'DRAFT' as 'DRAFT' | 'ACTIVE',
+    });
+    const [updatingCampaignId, setUpdatingCampaignId] = useState<string | null>(null);
+
+    const [verificationLoading, setVerificationLoading] = useState(false);
+    const [verificationDocuments, setVerificationDocuments] = useState<VerificationDocument[]>([]);
+    const [selectedVerificationBusinessId, setSelectedVerificationBusinessId] = useState<string>('');
+    const [verificationStatus, setVerificationStatus] = useState<BusinessVerificationStatusPayload | null>(null);
+    const [uploadingVerificationDocument, setUploadingVerificationDocument] = useState(false);
+    const [submittingBusinessVerification, setSubmittingBusinessVerification] = useState(false);
+    const [verificationForm, setVerificationForm] = useState({
+        documentType: 'ID_CARD' as VerificationDocument['documentType'],
+        fileUrl: '',
+        notes: '',
+    });
+
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
@@ -268,6 +343,11 @@ export function DashboardBusiness() {
                 ...previous,
                 businessId: previous.businessId || loadedBusinesses[0]?.id || '',
             }));
+            setCampaignForm((previous) => ({
+                ...previous,
+                businessId: previous.businessId || loadedBusinesses[0]?.id || '',
+            }));
+            setSelectedVerificationBusinessId((previous) => previous || loadedBusinesses[0]?.id || '');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el dashboard'));
         } finally {
@@ -381,6 +461,48 @@ export function DashboardBusiness() {
         }
     }, [activeOrganizationId, billingRange.from, billingRange.to]);
 
+    const loadAdCampaigns = useCallback(async () => {
+        if (!activeOrganizationId) {
+            setCampaigns([]);
+            return;
+        }
+
+        setAdsLoading(true);
+        try {
+            const response = await adsApi.getMyCampaigns({ limit: 30 });
+            setCampaigns((response.data?.data || []) as AdCampaign[]);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar las campañas ads'));
+        } finally {
+            setAdsLoading(false);
+        }
+    }, [activeOrganizationId]);
+
+    const loadVerificationData = useCallback(async () => {
+        if (!activeOrganizationId) {
+            setVerificationDocuments([]);
+            setVerificationStatus(null);
+            return;
+        }
+
+        setVerificationLoading(true);
+        try {
+            const documentsRes = await verificationApi.getMyDocuments({ limit: 20 });
+            setVerificationDocuments((documentsRes.data?.data || []) as VerificationDocument[]);
+
+            if (selectedVerificationBusinessId) {
+                const statusRes = await verificationApi.getBusinessStatus(selectedVerificationBusinessId);
+                setVerificationStatus(statusRes.data as BusinessVerificationStatusPayload);
+            } else {
+                setVerificationStatus(null);
+            }
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificación'));
+        } finally {
+            setVerificationLoading(false);
+        }
+    }, [activeOrganizationId, selectedVerificationBusinessId]);
+
     useEffect(() => {
         void loadDashboard();
     }, [loadDashboard]);
@@ -414,6 +536,18 @@ export function DashboardBusiness() {
             void loadBillingSummary();
         }
     }, [activeTab, loadBillingSummary]);
+
+    useEffect(() => {
+        if (activeTab === 'ads') {
+            void loadAdCampaigns();
+        }
+    }, [activeTab, loadAdCampaigns]);
+
+    useEffect(() => {
+        if (activeTab === 'verification') {
+            void loadVerificationData();
+        }
+    }, [activeTab, loadVerificationData]);
 
     const verifiedBusinesses = useMemo(
         () => businesses.filter((business) => business.verified).length,
@@ -592,6 +726,128 @@ export function DashboardBusiness() {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo exportar CSV'));
         } finally {
             setExportingCsv(null);
+        }
+    };
+
+    const handleCreateCampaign = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!campaignForm.businessId || !campaignForm.name.trim()) {
+            setErrorMessage('Selecciona negocio y nombre para la campaña');
+            return;
+        }
+
+        const dailyBudget = Number(campaignForm.dailyBudget);
+        const totalBudget = Number(campaignForm.totalBudget);
+        const bidAmount = Number(campaignForm.bidAmount);
+        if (!Number.isFinite(dailyBudget) || !Number.isFinite(totalBudget) || !Number.isFinite(bidAmount)) {
+            setErrorMessage('Presupuestos y puja deben ser numéricos');
+            return;
+        }
+
+        if (!campaignForm.startsAt || !campaignForm.endsAt) {
+            setErrorMessage('Debes indicar rango de fechas para la campaña');
+            return;
+        }
+
+        setCreatingCampaign(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await adsApi.createCampaign({
+                businessId: campaignForm.businessId,
+                name: campaignForm.name.trim(),
+                dailyBudget,
+                totalBudget,
+                bidAmount,
+                startsAt: new Date(campaignForm.startsAt).toISOString(),
+                endsAt: new Date(campaignForm.endsAt).toISOString(),
+                status: campaignForm.status,
+            });
+            await loadAdCampaigns();
+            setCampaignForm((previous) => ({
+                ...previous,
+                name: '',
+                startsAt: '',
+                endsAt: '',
+            }));
+            setSuccessMessage('Campaña ads creada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la campaña ads'));
+        } finally {
+            setCreatingCampaign(false);
+        }
+    };
+
+    const handleCampaignStatus = async (
+        campaignId: string,
+        status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ENDED' | 'REJECTED',
+    ) => {
+        setUpdatingCampaignId(campaignId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await adsApi.updateCampaignStatus(campaignId, { status });
+            await loadAdCampaigns();
+            setSuccessMessage('Estado de campaña actualizado');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la campaña'));
+        } finally {
+            setUpdatingCampaignId(null);
+        }
+    };
+
+    const handleSubmitVerificationDocument = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!selectedVerificationBusinessId) {
+            setErrorMessage('Selecciona un negocio para subir documentos');
+            return;
+        }
+        if (!verificationForm.fileUrl.trim()) {
+            setErrorMessage('Debes indicar URL del documento');
+            return;
+        }
+
+        setUploadingVerificationDocument(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await verificationApi.submitDocument({
+                businessId: selectedVerificationBusinessId,
+                documentType: verificationForm.documentType,
+                fileUrl: verificationForm.fileUrl.trim(),
+            });
+            setVerificationForm((previous) => ({
+                ...previous,
+                fileUrl: '',
+            }));
+            await loadVerificationData();
+            setSuccessMessage('Documento de verificación cargado');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar documento'));
+        } finally {
+            setUploadingVerificationDocument(false);
+        }
+    };
+
+    const handleSubmitBusinessVerification = async () => {
+        if (!selectedVerificationBusinessId) {
+            setErrorMessage('Selecciona un negocio');
+            return;
+        }
+
+        setSubmittingBusinessVerification(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await verificationApi.submitBusiness(selectedVerificationBusinessId, {
+                notes: verificationForm.notes.trim() || undefined,
+            });
+            await loadVerificationData();
+            setSuccessMessage('Negocio enviado a revisión');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar a revisión'));
+        } finally {
+            setSubmittingBusinessVerification(false);
         }
     };
     const renderOverview = () => (
@@ -891,6 +1147,325 @@ export function DashboardBusiness() {
         );
     };
 
+    const renderAds = () => (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="card p-5 xl:col-span-1">
+                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Nueva campaña</h3>
+                <form onSubmit={handleCreateCampaign} className="space-y-3">
+                    <select
+                        className="input-field text-sm"
+                        value={campaignForm.businessId}
+                        onChange={(event) =>
+                            setCampaignForm((previous) => ({
+                                ...previous,
+                                businessId: event.target.value,
+                            }))
+                        }
+                    >
+                        <option value="">Selecciona negocio</option>
+                        {businesses.map((business) => (
+                            <option key={business.id} value={business.id}>{business.name}</option>
+                        ))}
+                    </select>
+                    <input
+                        className="input-field text-sm"
+                        placeholder="Nombre campaña"
+                        value={campaignForm.name}
+                        onChange={(event) =>
+                            setCampaignForm((previous) => ({
+                                ...previous,
+                                name: event.target.value,
+                            }))
+                        }
+                    />
+                    <div className="grid grid-cols-3 gap-2">
+                        <input
+                            type="number"
+                            min="1"
+                            step="0.01"
+                            className="input-field text-sm"
+                            placeholder="Diario"
+                            value={campaignForm.dailyBudget}
+                            onChange={(event) =>
+                                setCampaignForm((previous) => ({
+                                    ...previous,
+                                    dailyBudget: event.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            type="number"
+                            min="1"
+                            step="0.01"
+                            className="input-field text-sm"
+                            placeholder="Total"
+                            value={campaignForm.totalBudget}
+                            onChange={(event) =>
+                                setCampaignForm((previous) => ({
+                                    ...previous,
+                                    totalBudget: event.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            className="input-field text-sm"
+                            placeholder="CPC"
+                            value={campaignForm.bidAmount}
+                            onChange={(event) =>
+                                setCampaignForm((previous) => ({
+                                    ...previous,
+                                    bidAmount: event.target.value,
+                                }))
+                            }
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <input
+                            type="datetime-local"
+                            className="input-field text-sm"
+                            value={campaignForm.startsAt}
+                            onChange={(event) =>
+                                setCampaignForm((previous) => ({
+                                    ...previous,
+                                    startsAt: event.target.value,
+                                }))
+                            }
+                        />
+                        <input
+                            type="datetime-local"
+                            className="input-field text-sm"
+                            value={campaignForm.endsAt}
+                            onChange={(event) =>
+                                setCampaignForm((previous) => ({
+                                    ...previous,
+                                    endsAt: event.target.value,
+                                }))
+                            }
+                        />
+                    </div>
+                    <select
+                        className="input-field text-sm"
+                        value={campaignForm.status}
+                        onChange={(event) =>
+                            setCampaignForm((previous) => ({
+                                ...previous,
+                                status: event.target.value as 'DRAFT' | 'ACTIVE',
+                            }))
+                        }
+                    >
+                        <option value="DRAFT">Borrador</option>
+                        <option value="ACTIVE">Activa</option>
+                    </select>
+                    <button type="submit" className="btn-primary text-sm" disabled={creatingCampaign}>
+                        {creatingCampaign ? 'Creando...' : 'Crear campaña'}
+                    </button>
+                </form>
+            </div>
+
+            <div className="card p-5 xl:col-span-2">
+                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Campañas actuales</h3>
+                <div className="space-y-2 max-h-[34rem] overflow-y-auto pr-1">
+                    {adsLoading ? (
+                        <p className="text-sm text-gray-500">Cargando campañas ads...</p>
+                    ) : campaigns.length > 0 ? (
+                        campaigns.map((campaign) => (
+                            <div key={campaign.id} className="rounded-xl border border-gray-100 p-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <p className="font-medium text-gray-900">{campaign.name}</p>
+                                        <p className="text-xs text-gray-500">{campaign.business.name}</p>
+                                    </div>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                        {campaign.status}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    CPC {formatCurrency(campaign.bidAmount)} ·
+                                    Presupuesto {formatCurrency(campaign.spentAmount)} / {formatCurrency(campaign.totalBudget)} ·
+                                    CTR {campaign.ctr}%
+                                </p>
+                                <div className="flex gap-2 mt-2">
+                                    {campaign.status !== 'ACTIVE' && campaign.status !== 'ENDED' && (
+                                        <button
+                                            type="button"
+                                            className="btn-primary text-xs"
+                                            disabled={updatingCampaignId === campaign.id}
+                                            onClick={() => void handleCampaignStatus(campaign.id, 'ACTIVE')}
+                                        >
+                                            Activar
+                                        </button>
+                                    )}
+                                    {campaign.status === 'ACTIVE' && (
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            disabled={updatingCampaignId === campaign.id}
+                                            onClick={() => void handleCampaignStatus(campaign.id, 'PAUSED')}
+                                        >
+                                            Pausar
+                                        </button>
+                                    )}
+                                    {campaign.status !== 'ENDED' && (
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            disabled={updatingCampaignId === campaign.id}
+                                            onClick={() => void handleCampaignStatus(campaign.id, 'ENDED')}
+                                        >
+                                            Finalizar
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-sm text-gray-500">No hay campañas creadas.</p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderVerification = () => (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="card p-5 xl:col-span-1">
+                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">KYC negocio</h3>
+                <div className="space-y-3">
+                    <select
+                        className="input-field text-sm"
+                        value={selectedVerificationBusinessId}
+                        onChange={(event) => setSelectedVerificationBusinessId(event.target.value)}
+                    >
+                        <option value="">Selecciona negocio</option>
+                        {businesses.map((business) => (
+                            <option key={business.id} value={business.id}>{business.name}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        className="input-field text-sm"
+                        value={verificationForm.documentType}
+                        onChange={(event) =>
+                            setVerificationForm((previous) => ({
+                                ...previous,
+                                documentType: event.target.value as VerificationDocument['documentType'],
+                            }))
+                        }
+                    >
+                        <option value="ID_CARD">Cédula/ID</option>
+                        <option value="TAX_CERTIFICATE">RNC/Certificado fiscal</option>
+                        <option value="BUSINESS_LICENSE">Licencia comercial</option>
+                        <option value="ADDRESS_PROOF">Comprobante dirección</option>
+                        <option value="SELFIE">Selfie validación</option>
+                        <option value="OTHER">Otro</option>
+                    </select>
+
+                    <form onSubmit={handleSubmitVerificationDocument} className="space-y-2">
+                        <input
+                            className="input-field text-sm"
+                            placeholder="URL del documento"
+                            value={verificationForm.fileUrl}
+                            onChange={(event) =>
+                                setVerificationForm((previous) => ({
+                                    ...previous,
+                                    fileUrl: event.target.value,
+                                }))
+                            }
+                        />
+                        <button type="submit" className="btn-secondary text-sm" disabled={uploadingVerificationDocument}>
+                            {uploadingVerificationDocument ? 'Subiendo...' : 'Subir documento'}
+                        </button>
+                    </form>
+
+                    <textarea
+                        className="input-field text-sm"
+                        rows={3}
+                        placeholder="Notas de revisión (opcional)"
+                        value={verificationForm.notes}
+                        onChange={(event) =>
+                            setVerificationForm((previous) => ({
+                                ...previous,
+                                notes: event.target.value,
+                            }))
+                        }
+                    />
+                    <button
+                        type="button"
+                        className="btn-primary text-sm"
+                        disabled={submittingBusinessVerification || !selectedVerificationBusinessId}
+                        onClick={() => void handleSubmitBusinessVerification()}
+                    >
+                        {submittingBusinessVerification ? 'Enviando...' : 'Enviar a revisión'}
+                    </button>
+                </div>
+            </div>
+
+            <div className="card p-5 xl:col-span-2">
+                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Estado y documentos</h3>
+                {verificationLoading ? (
+                    <p className="text-sm text-gray-500">Cargando información de verificación...</p>
+                ) : (
+                    <div className="space-y-4">
+                        {verificationStatus ? (
+                            <div className="rounded-xl border border-gray-100 p-3 text-sm space-y-1">
+                                <p>
+                                    Estado: <strong>{verificationStatus.verificationStatus}</strong>
+                                </p>
+                                <p>
+                                    Verificado: <strong>{verificationStatus.verified ? 'Sí' : 'No'}</strong>
+                                </p>
+                                <p>
+                                    Riesgo: <strong>{verificationStatus.riskScore}/100</strong>
+                                </p>
+                                {verificationStatus.verificationNotes && (
+                                    <p className="text-gray-600">{verificationStatus.verificationNotes}</p>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500">Selecciona un negocio para ver su estado.</p>
+                        )}
+
+                        <div className="space-y-2 max-h-[28rem] overflow-y-auto pr-1">
+                            {verificationDocuments.length > 0 ? (
+                                verificationDocuments.map((document) => (
+                                    <div key={document.id} className="rounded-xl border border-gray-100 p-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <p className="text-sm font-medium text-gray-900">
+                                                {document.documentType}
+                                            </p>
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                                {document.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-500">
+                                            {document.business.name} · {formatDateTime(document.submittedAt)}
+                                        </p>
+                                        <a
+                                            href={document.fileUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-xs text-primary-700 underline"
+                                        >
+                                            Ver documento
+                                        </a>
+                                        {document.rejectionReason && (
+                                            <p className="text-xs text-red-600 mt-1">{document.rejectionReason}</p>
+                                        )}
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-gray-500">No hay documentos cargados.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in space-y-6">
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -930,6 +1505,8 @@ export function DashboardBusiness() {
                     {activeTab === 'inbox' && renderInbox()}
                     {activeTab === 'crm' && renderCrm()}
                     {activeTab === 'billing' && renderBilling()}
+                    {activeTab === 'ads' && renderAds()}
+                    {activeTab === 'verification' && renderVerification()}
                 </>
             )}
         </div>

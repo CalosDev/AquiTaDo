@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { adsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
 
 interface Business {
     id: string;
@@ -28,6 +28,35 @@ interface Province {
     slug: string;
 }
 
+interface SponsoredPlacement {
+    placementRank: number;
+    campaign: {
+        id: string;
+        name: string;
+        bidAmount: number;
+        ctr: number;
+    };
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+        province?: { name: string };
+        city?: { name: string };
+        categories?: { name: string; icon?: string }[];
+    };
+}
+
+function resolveVisitorId(): string {
+    const existingVisitorId = localStorage.getItem('analyticsVisitorId');
+    if (existingVisitorId) {
+        return existingVisitorId;
+    }
+
+    const generatedVisitorId = window.crypto?.randomUUID?.() ?? `visitor-${Date.now()}`;
+    localStorage.setItem('analyticsVisitorId', generatedVisitorId);
+    return generatedVisitorId;
+}
+
 export function BusinessesList() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -35,6 +64,7 @@ export function BusinessesList() {
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
+    const [sponsoredPlacements, setSponsoredPlacements] = useState<SponsoredPlacement[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
 
@@ -75,10 +105,19 @@ export function BusinessesList() {
             if (currentCategory) params.categoryId = currentCategory;
             if (currentProvince) params.provinceId = currentProvince;
 
-            const res = await businessApi.getAll(params);
-            setBusinesses(res.data.data || []);
-            setTotal(res.data.total || 0);
-            setTotalPages(res.data.totalPages || 0);
+            const [businessesRes, sponsoredRes] = await Promise.all([
+                businessApi.getAll(params),
+                adsApi.getPlacements({
+                    provinceId: currentProvince || undefined,
+                    categoryId: currentCategory || undefined,
+                    limit: 3,
+                }),
+            ]);
+
+            setBusinesses(businessesRes.data.data || []);
+            setTotal(businessesRes.data.total || 0);
+            setTotalPages(businessesRes.data.totalPages || 0);
+            setSponsoredPlacements((sponsoredRes.data || []) as SponsoredPlacement[]);
         } catch (error) {
             setLoadError(getApiErrorMessage(error, 'No se pudieron cargar los negocios'));
         } finally {
@@ -89,6 +128,20 @@ export function BusinessesList() {
     useEffect(() => {
         void loadBusinesses();
     }, [loadBusinesses]);
+
+    useEffect(() => {
+        if (sponsoredPlacements.length === 0) {
+            return;
+        }
+
+        const visitorId = resolveVisitorId();
+        sponsoredPlacements.forEach((placement) => {
+            void adsApi.trackImpression(placement.campaign.id, {
+                visitorId,
+                placementKey: 'businesses-list',
+            }).catch(() => undefined);
+        });
+    }, [sponsoredPlacements]);
 
     const updateFilter = useCallback((
         key: string,
@@ -208,6 +261,37 @@ export function BusinessesList() {
                         </div>
                     ) : businesses.length > 0 ? (
                         <>
+                            {sponsoredPlacements.length > 0 && (
+                                <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                                    {sponsoredPlacements.map((placement) => (
+                                        <Link
+                                            key={placement.campaign.id}
+                                            to={`/businesses/${placement.business.id}`}
+                                            onClick={() => {
+                                                void adsApi.trackClick(placement.campaign.id, {
+                                                    visitorId: resolveVisitorId(),
+                                                    placementKey: 'businesses-list',
+                                                }).catch(() => undefined);
+                                            }}
+                                            className="rounded-xl border border-amber-200 bg-amber-50 p-3 hover:border-amber-300 transition-colors"
+                                        >
+                                            <p className="text-[10px] uppercase tracking-wide font-semibold text-amber-700 mb-1">
+                                                Patrocinado #{placement.placementRank}
+                                            </p>
+                                            <p className="text-sm font-semibold text-gray-900">
+                                                {placement.business.name}
+                                            </p>
+                                            <p className="text-xs text-gray-600">
+                                                Campaña: {placement.campaign.name}
+                                            </p>
+                                            <p className="text-xs text-gray-600">
+                                                CPC {placement.campaign.bidAmount} · CTR {placement.campaign.ctr}%
+                                            </p>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                                 {businesses.map((biz) => (
                                     <Link key={biz.id} to={`/businesses/${biz.id}`} className="card group">
