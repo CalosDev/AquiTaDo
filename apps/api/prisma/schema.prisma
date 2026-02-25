@@ -1,0 +1,164 @@
+// ============================================================
+// AquiTa.do — Prisma Schema
+// ============================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  BUSINESS_OWNER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(100)
+  email     String   @unique @db.VarChar(255)
+  password  String
+  phone     String?  @db.VarChar(20)
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businesses Business[]
+  reviews    Review[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Business {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(200)
+  slug        String   @unique @db.VarChar(250)
+  description String   @db.Text
+  phone       String?  @db.VarChar(20)
+  whatsapp    String?  @db.VarChar(20)
+  address     String   @db.VarChar(500)
+  latitude    Float?
+  longitude   Float?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId    String
+  owner      User     @relation(fields: [ownerId], references: [id])
+  provinceId String
+  province   Province @relation(fields: [provinceId], references: [id])
+  cityId     String?
+  city       City?    @relation(fields: [cityId], references: [id])
+
+  categories BusinessCategory[]
+  images     BusinessImage[]
+  reviews    Review[]
+  features   BusinessFeature[]
+
+  @@index([slug])
+  @@index([ownerId])
+  @@index([provinceId])
+  @@index([latitude, longitude])
+  @@index([verified])
+  @@map("businesses")
+}
+
+model Category {
+  id   String  @id @default(uuid())
+  name String  @unique @db.VarChar(100)
+  slug String  @unique @db.VarChar(120)
+  icon String? @db.VarChar(10)
+
+  businesses BusinessCategory[]
+
+  @@index([slug])
+  @@map("categories")
+}
+
+model BusinessCategory {
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([businessId, categoryId])
+  @@map("business_categories")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int      @db.SmallInt
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([userId])
+  @@unique([userId, businessId])
+  @@map("reviews")
+}
+
+model BusinessImage {
+  id  String @id @default(uuid())
+  url String @db.VarChar(500)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("business_images")
+}
+
+model Province {
+  id   String @id @default(uuid())
+  name String @unique @db.VarChar(100)
+  slug String @unique @db.VarChar(120)
+
+  cities     City[]
+  businesses Business[]
+
+  @@index([slug])
+  @@map("provinces")
+}
+
+model City {
+  id   String @id @default(uuid())
+  name String @db.VarChar(100)
+
+  provinceId String
+  province   Province @relation(fields: [provinceId], references: [id])
+
+  businesses Business[]
+
+  @@index([provinceId])
+  @@unique([provinceId, name])
+  @@map("cities")
+}
+
+model Feature {
+  id   String @id @default(uuid())
+  name String @unique @db.VarChar(100)
+
+  businesses BusinessFeature[]
+
+  @@map("features")
+}
+
+model BusinessFeature {
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  featureId  String
+  feature    Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@id([businessId, featureId])
+  @@map("business_features")
+}
