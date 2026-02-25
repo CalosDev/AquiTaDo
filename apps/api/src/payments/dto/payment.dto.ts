@@ -26,12 +26,14 @@ export class CreateAdsWalletCheckoutSessionDto {
     @IsString()
     @IsUrl({
         require_protocol: true,
+        require_tld: false,
     })
     successUrl!: string;
 
     @IsString()
     @IsUrl({
         require_protocol: true,
+        require_tld: false,
     })
     cancelUrl!: string;
 }
@@ -40,12 +42,14 @@ export class CreateBookingCheckoutSessionDto {
     @IsString()
     @IsUrl({
         require_protocol: true,
+        require_tld: false,
     })
     successUrl!: string;
 
     @IsString()
     @IsUrl({
         require_protocol: true,
+        require_tld: false,
     })
     cancelUrl!: string;
 }
