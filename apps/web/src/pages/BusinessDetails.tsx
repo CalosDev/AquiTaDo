@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, reviewApi } from '../api/endpoints';
+import { analyticsApi, businessApi, messagingApi, reviewApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 
 interface Business {
@@ -44,9 +44,13 @@ export function BusinessDetails() {
     const [activeImage, setActiveImage] = useState(0);
     const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
     const [submittingReview, setSubmittingReview] = useState(false);
+    const [messageForm, setMessageForm] = useState({ subject: '', content: '' });
+    const [sendingMessage, setSendingMessage] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [reviewErrorMessage, setReviewErrorMessage] = useState('');
     const [reviewSuccessMessage, setReviewSuccessMessage] = useState('');
+    const [messageErrorMessage, setMessageErrorMessage] = useState('');
+    const [messageSuccessMessage, setMessageSuccessMessage] = useState('');
 
     const loadBusiness = useCallback(async () => {
         if (!id) {
@@ -102,6 +106,37 @@ export function BusinessDetails() {
             setReviewErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la reseña'));
         } finally {
             setSubmittingReview(false);
+        }
+    };
+
+    const handleMessageSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!id || !messageForm.content.trim()) {
+            setMessageErrorMessage('Escribe un mensaje para el negocio');
+            return;
+        }
+
+        setSendingMessage(true);
+        setMessageErrorMessage('');
+        setMessageSuccessMessage('');
+
+        try {
+            await messagingApi.createConversation({
+                businessId: id,
+                subject: messageForm.subject.trim() || undefined,
+                message: messageForm.content.trim(),
+            });
+            setMessageForm({ subject: '', content: '' });
+            setMessageSuccessMessage('Mensaje enviado correctamente');
+            void analyticsApi.trackEvent({
+                businessId: id,
+                eventType: 'RESERVATION_REQUEST',
+                visitorId: resolveVisitorId(),
+            }).catch(() => undefined);
+        } catch (error) {
+            setMessageErrorMessage(getApiErrorMessage(error, 'No se pudo enviar el mensaje'));
+        } finally {
+            setSendingMessage(false);
         }
     };
 
@@ -377,6 +412,66 @@ export function BusinessDetails() {
                                     <div className="text-sm text-gray-700">{business.address}</div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="mt-6 border-t border-gray-100 pt-6">
+                            <h4 className="font-display font-semibold text-gray-900 mb-3">
+                                Mensaje directo
+                            </h4>
+
+                            {!isAuthenticated && (
+                                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                                    Inicia sesión para enviar un mensaje.{' '}
+                                    <Link to="/login" className="underline font-medium">Ir a login</Link>
+                                </div>
+                            )}
+
+                            {isAuthenticated && (
+                                <form onSubmit={handleMessageSubmit} className="space-y-3">
+                                    <input
+                                        className="input-field text-sm"
+                                        placeholder="Asunto (opcional)"
+                                        value={messageForm.subject}
+                                        onChange={(event) =>
+                                            setMessageForm((previous) => ({
+                                                ...previous,
+                                                subject: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                    <textarea
+                                        className="input-field text-sm"
+                                        rows={3}
+                                        placeholder="Escribe tu consulta..."
+                                        value={messageForm.content}
+                                        onChange={(event) =>
+                                            setMessageForm((previous) => ({
+                                                ...previous,
+                                                content: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="btn-primary text-sm"
+                                        disabled={sendingMessage}
+                                    >
+                                        {sendingMessage ? 'Enviando...' : 'Enviar mensaje'}
+                                    </button>
+                                </form>
+                            )}
+
+                            {messageErrorMessage && (
+                                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                    {messageErrorMessage}
+                                </div>
+                            )}
+
+                            {messageSuccessMessage && (
+                                <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                                    {messageSuccessMessage}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

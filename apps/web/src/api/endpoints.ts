@@ -119,6 +119,12 @@ export const subscriptionsApi = {
 export const paymentsApi = {
     getMyPayments: (params?: { limit?: number }) => api.get('/payments/my', { params }),
     getMyInvoices: (params?: { limit?: number }) => api.get('/payments/invoices/my', { params }),
+    getBillingSummary: (params?: { from?: string; to?: string }) =>
+        api.get('/payments/reports/summary/my', { params }),
+    exportInvoicesCsv: (params?: { from?: string; to?: string }) =>
+        api.get('/payments/invoices/export.csv', { params, responseType: 'blob' }),
+    exportPaymentsCsv: (params?: { from?: string; to?: string }) =>
+        api.get('/payments/payments/export.csv', { params, responseType: 'blob' }),
 };
 
 // ---- Promotions ----
@@ -180,4 +186,63 @@ export const analyticsApi = {
     getMyDashboard: (params?: { days?: number }) => api.get('/analytics/dashboard/my', { params }),
     getBusinessAnalytics: (businessId: string, params?: { days?: number }) =>
         api.get(`/analytics/business/${businessId}`, { params }),
+    getMarketInsights: (params?: {
+        days?: number;
+        provinceId?: string;
+        categoryId?: string;
+        limit?: number;
+    }) => api.get('/analytics/market-insights', { params }),
+};
+
+// ---- Messaging ----
+export const messagingApi = {
+    createConversation: (data: { businessId: string; subject?: string; message: string }) =>
+        api.post('/messaging/conversations', data),
+    getMyConversations: (params?: Record<string, string | number | boolean>) =>
+        api.get('/messaging/conversations/me', { params }),
+    getMyConversationThread: (conversationId: string) =>
+        api.get(`/messaging/conversations/me/${conversationId}`),
+    sendMessageAsCustomer: (conversationId: string, data: { content: string }) =>
+        api.post(`/messaging/conversations/me/${conversationId}/messages`, data),
+    getOrgConversations: (params?: Record<string, string | number | boolean>) =>
+        api.get('/messaging/conversations/my', { params }),
+    getOrgConversationThread: (conversationId: string) =>
+        api.get(`/messaging/conversations/my/${conversationId}`),
+    sendMessageAsOrg: (conversationId: string, data: { content: string }) =>
+        api.post(`/messaging/conversations/my/${conversationId}/messages`, data),
+    updateConversationStatus: (
+        conversationId: string,
+        data: { status: 'OPEN' | 'CLOSED' | 'CONVERTED' },
+    ) => api.patch(`/messaging/conversations/my/${conversationId}/status`, data),
+    convertConversationToBooking: (
+        conversationId: string,
+        data: {
+            scheduledFor: string;
+            partySize?: number;
+            notes?: string;
+            quotedAmount?: number;
+            depositAmount?: number;
+            currency?: string;
+            promotionId?: string;
+        },
+    ) => api.post(`/messaging/conversations/my/${conversationId}/convert-booking`, data),
+};
+
+// ---- CRM ----
+export const crmApi = {
+    getCustomers: (params?: {
+        search?: string;
+        businessId?: string;
+        page?: number;
+        limit?: number;
+    }) => api.get('/crm/customers/my', { params }),
+    getCustomerHistory: (customerUserId: string, params?: { businessId?: string }) =>
+        api.get(`/crm/customers/${customerUserId}/history`, { params }),
+};
+
+// ---- Reputation ----
+export const reputationApi = {
+    getRankings: (params?: { provinceId?: string; limit?: number }) =>
+        api.get('/reputation/rankings', { params }),
+    getBusinessProfile: (businessId: string) => api.get(`/reputation/business/${businessId}`),
 };
