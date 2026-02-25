@@ -4,7 +4,7 @@ services:
     container_name: aquita_postgres
     restart: unless-stopped
     ports:
-      - '5432:5432'
+      - '${DB_PORT:-5432}:5432'
     environment:
       POSTGRES_USER: aquita
       POSTGRES_PASSWORD: aquita123
@@ -17,5 +17,40 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    container_name: aquita_api
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://aquita:aquita123@db:5432/aquita_db
+      JWT_SECRET: change-this-secret-minimum-16-chars
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:8080
+      THROTTLE_TTL_MS: 60000
+      THROTTLE_LIMIT: 120
+    ports:
+      - '${API_PORT:-3000}:3000'
+    volumes:
+      - uploads_data:/app/uploads
+
+  web:
+    container_name: aquita_web
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '${WEB_PORT:-8080}:80'
+
 volumes:
   postgres_data:
+  uploads_data:

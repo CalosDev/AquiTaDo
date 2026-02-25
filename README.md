@@ -1,169 +1,182 @@
-# 🇩🇴 AquiTa.do — Directorio Inteligente de Negocios Locales
+# AquiTa.do - Directorio Inteligente de Negocios Locales
 
 [![CI](https://github.com/CalosDev/AquiTaDo/actions/workflows/ci.yml/badge.svg)](https://github.com/CalosDev/AquiTaDo/actions/workflows/ci.yml)
 
+Plataforma para descubrir negocios locales en Republica Dominicana.
+Incluye frontend web, backend API y base de datos PostgreSQL en un monorepo con pnpm.
 
-Plataforma de directorio de negocios locales en República Dominicana. Permite a usuarios buscar negocios, dejar reseñas, y a dueños de negocios registrar y gestionar sus establecimientos.
+## Stack
 
-## Stack Tecnológico
+- Frontend: React 19 + Vite 7 + TypeScript + TailwindCSS 4
+- Backend: NestJS + TypeScript
+- Base de datos: PostgreSQL + Prisma ORM
+- Auth: JWT (Passport)
+- Monorepo: pnpm workspaces
+- Contenedores: Docker + Docker Compose
 
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | React 19 + Vite 7 + TypeScript + TailwindCSS 4 |
-| Backend | NestJS + TypeScript |
-| Base de Datos | PostgreSQL + Prisma ORM |
-| Auth | JWT (Passport) |
-| Monorepo | pnpm workspaces |
-| Contenedores | Docker Compose |
+## Estructura
 
-## Estructura del Proyecto
-
-```
+```text
 aquita/
-├── apps/
-│   ├── web/           # Frontend React
-│   └── api/           # Backend NestJS
-├── packages/
-│   ├── types/         # Interfaces TypeScript compartidas
-│   └── config/        # Constantes y configuración compartida
-├── docker-compose.yml
-├── pnpm-workspace.yaml
-└── package.json
+|-- apps/
+|   |-- web/                # Frontend React
+|   |-- api/                # Backend NestJS
+|-- packages/
+|   |-- types/              # Tipos compartidos
+|   |-- config/             # Configuracion compartida
+|-- docker-compose.yml
+|-- pnpm-workspace.yaml
+|-- package.json
 ```
 
-## Requisitos Previos
+## Requisitos
 
-- **Node.js** 18+
-- **pnpm** 8+ (`npm install -g pnpm`)
-- **Docker** y Docker Compose (para PostgreSQL)
+- Node.js 18+
+- pnpm 8+
+- Docker y Docker Compose
 
-## Instalación Paso a Paso
+## Inicio rapido local
 
-### 1. Clonar e instalar dependencias
+1. Instalar dependencias:
 
 ```bash
-cd aquita
 pnpm install
 ```
 
-### 2. Iniciar PostgreSQL con Docker
+2. Crear archivos de entorno:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+```
+
+En PowerShell:
+
+```powershell
+Copy-Item apps/api/.env.example apps/api/.env
+Copy-Item apps/web/.env.example apps/web/.env
+```
+
+3. Levantar PostgreSQL:
 
 ```bash
 docker-compose up -d db
 ```
 
-Esto inicia PostgreSQL en `localhost:5432` con:
-- Usuario: `aquita`
-- Contraseña: `aquita123`
-- Base de datos: `aquita_db`
-
-### 3. Configurar variables de entorno
-
-Copia los ejemplos de entorno antes de ejecutar la app:
+4. Generar cliente Prisma y migrar:
 
 ```bash
-# Unix/macOS
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
-
-# Windows PowerShell
-Copy-Item apps/api/.env.example apps/api/.env
-Copy-Item apps/web/.env.example apps/web/.env
+pnpm db:generate
+pnpm db:migrate
 ```
 
-Variables principales:
-
-- `apps/api/.env` � `DATABASE_URL`, `JWT_SECRET`, `PORT`, `CORS_ORIGIN`, `THROTTLE_TTL_MS`, `THROTTLE_LIMIT`
-- `apps/web/.env` � `VITE_API_URL`
-
-### 4. Generar cliente Prisma y ejecutar migraciones
+5. (Opcional) Seed de datos iniciales:
 
 ```bash
-cd apps/api
-npx prisma generate
-npx prisma migrate dev --name init
+pnpm db:seed
 ```
 
-### 5. Ejecutar seed de datos
+6. Ejecutar frontend + backend:
 
 ```bash
-cd apps/api
-npx ts-node prisma/seed.ts
-```
-
-Esto crea: admin (admin@aquita.do / admin12345), 15 categorías, 32 provincias, ciudades principales y 12 features.
-
-### 6. Ejecutar la aplicación
-
-```bash
-# Desde la raíz del monorepo
 pnpm dev
 ```
 
-O por separado:
+Servicios:
+
+- Web: http://localhost:5173
+- API: http://localhost:3000
+- Health: http://localhost:3000/api/health
+
+## Entorno
+
+`apps/api/.env`:
+
+- `DATABASE_URL=postgresql://aquita:aquita123@localhost:5432/aquita_db`
+- `JWT_SECRET=change-this-secret-minimum-16-chars`
+- `PORT=3000`
+- `CORS_ORIGIN=http://localhost:5173`
+- `THROTTLE_TTL_MS=60000`
+- `THROTTLE_LIMIT=120`
+
+`apps/web/.env`:
+
+- `VITE_API_URL=http://localhost:3000`
+
+## Docker (stack completo)
+
+Levantar DB + API + Web:
 
 ```bash
-pnpm dev:api    # Backend en http://localhost:3000
-pnpm dev:web    # Frontend en http://localhost:5173
+docker-compose up -d --build
 ```
 
-## API REST Endpoints
+Servicios en Docker:
 
-| Método | Ruta | Auth | Descripción |
+- Web (nginx): http://localhost:8080 (default)
+- API: http://localhost:3000 (default)
+- PostgreSQL: localhost:5432 (default)
+
+Si tienes puertos ocupados, puedes sobrescribirlos:
+
+```bash
+DB_PORT=55432 API_PORT=3100 WEB_PORT=8081 docker-compose up -d --build
+```
+
+Para ver logs:
+
+```bash
+docker-compose logs -f api web db
+```
+
+Para apagar servicios:
+
+```bash
+docker-compose down
+```
+
+## Endpoints API
+
+| Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
-| POST | /api/auth/register | ❌ | Registrar usuario |
-| POST | /api/auth/login | ❌ | Login |
-| GET | /api/users/me | ✅ | Perfil del usuario |
-| GET | /api/businesses | ❌ | Listar negocios (con filtros) |
-| GET | /api/businesses/:id | ❌ | Detalle de negocio |
-| POST | /api/businesses | ✅ | Crear negocio |
-| PUT | /api/businesses/:id | ✅ | Editar negocio |
-| DELETE | /api/businesses/:id | ✅ | Eliminar negocio |
-| GET | /api/businesses/nearby | ❌ | Negocios cercanos |
-| PUT | /api/businesses/:id/verify | 🔒 ADMIN | Aprobar negocio |
-| GET | /api/categories | ❌ | Listar categorías |
-| GET | /api/provinces | ❌ | Listar provincias |
-| GET | /api/provinces/:id/cities | ❌ | Ciudades por provincia |
-| POST | /api/reviews | ✅ | Crear reseña |
-| POST | /api/upload/business-image | ✅ | Subir imagen |
-| GET | /api/health | ❌ | Liveness check |
-| GET | /api/health/ready | ❌ | Readiness check (DB) |
+| POST | /api/auth/register | No | Registrar usuario |
+| POST | /api/auth/login | No | Login |
+| GET | /api/users/me | Si | Perfil del usuario |
+| GET | /api/businesses | No | Listar negocios (filtros/paginacion) |
+| GET | /api/businesses/:id | No | Detalle negocio |
+| POST | /api/businesses | Si | Crear negocio |
+| PUT | /api/businesses/:id | Si | Actualizar negocio |
+| DELETE | /api/businesses/:id | Si | Eliminar negocio |
+| GET | /api/businesses/nearby | No | Buscar negocios cercanos |
+| PUT | /api/businesses/:id/verify | Admin | Aprobar negocio |
+| GET | /api/categories | No | Listar categorias |
+| GET | /api/categories/:id | No | Ver categoria |
+| POST | /api/categories | Admin | Crear categoria |
+| PUT | /api/categories/:id | Admin | Editar categoria |
+| DELETE | /api/categories/:id | Admin | Eliminar categoria |
+| GET | /api/provinces | No | Listar provincias |
+| GET | /api/provinces/:id/cities | No | Ciudades por provincia |
+| POST | /api/reviews | Si | Crear resena |
+| POST | /api/upload/business-image | Si | Subir imagen negocio |
+| DELETE | /api/upload/business-image/:imageId | Si | Eliminar imagen negocio |
+| GET | /api/health | No | Liveness check |
+| GET | /api/health/ready | No | Readiness check (DB) |
 
-## Roles de Usuario
+## Roles
 
-| Rol | Permisos |
-|-----|----------|
-| `USER` | Buscar negocios, escribir reseñas |
-| `BUSINESS_OWNER` | Todo de USER + gestionar sus negocios |
-| `ADMIN` | Todo + aprobar negocios, gestionar categorías |
+- `USER`: Buscar negocios y publicar resenas
+- `BUSINESS_OWNER`: Todo lo de USER + gestionar sus negocios
+- `ADMIN`: Todo lo anterior + moderacion y categorias
 
-## Credenciales de Prueba
+## Scripts raiz
 
-- **Admin**: `admin@aquita.do` / `admin12345`
-
-## Geolocalización
-
-Endpoint para buscar negocios cercanos usando la fórmula de Haversine:
-
-```
-GET /api/businesses/nearby?lat=18.48&lng=-69.90&radius=5
-```
-
-## Scripts Disponibles
-
-| Script | Descripción |
-|--------|-------------|
-| `pnpm dev` | Inicia frontend y backend |
-| `pnpm dev:web` | Solo frontend |
-| `pnpm dev:api` | Solo backend |
-| `pnpm build` | Build de producción |
-| `pnpm smoke:api` | Smoke test de health/readiness |
-| `pnpm db:migrate` | Ejecutar migraciones |
-| `pnpm db:migrate:deploy` | Ejecutar migraciones para producción/CI |
-| `pnpm db:seed` | Seed de datos |
-
----
-
-Hecho con ❤️ en República Dominicana
-
-
+- `pnpm dev`: Ejecuta frontend + backend
+- `pnpm dev:web`: Solo frontend
+- `pnpm dev:api`: Solo backend
+- `pnpm build`: Build de todo el monorepo
+- `pnpm lint`: Lint de todo el monorepo
+- `pnpm smoke:api`: Smoke de endpoints health
+- `pnpm db:generate`: Prisma generate
+- `pnpm db:migrate`: Prisma migrate dev
+- `pnpm db:migrate:deploy`: Prisma migrate deploy
+- `pnpm db:seed`: Seed inicial
