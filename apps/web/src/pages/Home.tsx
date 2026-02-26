@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { categoryApi, businessApi, locationApi } from '../api/endpoints';
@@ -35,14 +35,12 @@ export function Home() {
     const [recentBusinesses, setRecentBusinesses] = useState<Business[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [totalBusinesses, setTotalBusinesses] = useState(0);
+    const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const navigate = useNavigate();
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
+        setLoading(true);
         setLoadError('');
         try {
             const [catRes, bizRes, provRes] = await Promise.all([
@@ -56,8 +54,14 @@ export function Home() {
             setProvinces(provRes.data);
         } catch (error) {
             setLoadError(getApiErrorMessage(error, 'No se pudo cargar la informacion inicial'));
+        } finally {
+            setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        void loadData();
+    }, [loadData]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -118,16 +122,16 @@ export function Home() {
                         <div className="flex justify-center gap-8 mt-10">
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-white">
-                                    {totalBusinesses.toLocaleString('es-DO')}
+                                    {loading ? '...' : totalBusinesses.toLocaleString('es-DO')}
                                 </div>
                                 <div className="text-sm text-blue-200">Negocios</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-white">{provinces.length}</div>
+                                <div className="text-2xl font-bold text-white">{loading ? '...' : provinces.length}</div>
                                 <div className="text-sm text-blue-200">Provincias</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-white">{categories.length}</div>
+                                <div className="text-2xl font-bold text-white">{loading ? '...' : categories.length}</div>
                                 <div className="text-sm text-blue-200">Categorías</div>
                             </div>
                         </div>
@@ -203,7 +207,13 @@ export function Home() {
                         <Link key={biz.id} to={`/businesses/${biz.id}`} className="card group">
                             <div className="h-48 bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center">
                                 {biz.images?.[0] ? (
-                                    <img src={biz.images[0].url} alt={biz.name} className="w-full h-full object-cover" />
+                                    <img
+                                        src={biz.images[0].url}
+                                        alt={biz.name}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                        decoding="async"
+                                    />
                                 ) : (
                                     <span className="text-5xl">🏪</span>
                                 )}

@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
+import compression from 'compression';
 import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
@@ -64,6 +65,7 @@ async function bootstrap() {
             crossOriginResourcePolicy: false,
         }),
     );
+    app.use(compression());
 
     app.use(
         json({

@@ -8,14 +8,11 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
-COPY packages/config/package.json packages/config/package.json
-COPY packages/types/package.json packages/types/package.json
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter @aquita/web...
 
-COPY . .
+COPY apps/web apps/web
 
 ARG VITE_API_URL=http://localhost:3000
 ENV VITE_API_URL=$VITE_API_URL

@@ -24,37 +24,124 @@ export class BusinessesService {
         private readonly reputationService: ReputationService,
     ) { }
 
-    private readonly includeRelations = {
+    private readonly fullInclude = {
         owner: {
             select: { id: true, name: true },
         },
         organization: {
             select: { id: true, name: true, slug: true },
         },
-        province: true,
-        city: true,
-        categories: {
-            include: { category: true },
+        province: {
+            select: { id: true, name: true, slug: true },
         },
-        images: true,
+        city: {
+            select: { id: true, name: true },
+        },
+        categories: {
+            include: {
+                category: {
+                    select: { id: true, name: true, slug: true, icon: true },
+                },
+            },
+        },
+        images: {
+            orderBy: { id: Prisma.SortOrder.asc },
+        },
         features: {
-            include: { feature: true },
+            include: {
+                feature: {
+                    select: { id: true, name: true },
+                },
+            },
         },
         _count: {
             select: { reviews: true },
         },
     };
 
+    private readonly publicListSelect = {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        address: true,
+        verified: true,
+        verificationStatus: true,
+        province: {
+            select: { id: true, name: true, slug: true },
+        },
+        city: {
+            select: { id: true, name: true },
+        },
+        categories: {
+            select: {
+                category: {
+                    select: { id: true, name: true, slug: true, icon: true },
+                },
+            },
+        },
+        images: {
+            select: { id: true, url: true },
+            orderBy: { id: Prisma.SortOrder.asc },
+            take: 1,
+        },
+        _count: {
+            select: { reviews: true },
+        },
+    };
+
+    private readonly adminListSelect = {
+        id: true,
+        name: true,
+        slug: true,
+        verified: true,
+        verificationStatus: true,
+        createdAt: true,
+        owner: {
+            select: { id: true, name: true },
+        },
+        organization: {
+            select: { id: true, name: true, slug: true },
+        },
+        province: {
+            select: { id: true, name: true, slug: true },
+        },
+        categories: {
+            select: {
+                category: {
+                    select: { id: true, name: true, slug: true, icon: true },
+                },
+            },
+        },
+        images: {
+            select: { id: true, url: true },
+            orderBy: { id: Prisma.SortOrder.asc },
+            take: 1,
+        },
+        _count: {
+            select: { reviews: true },
+        },
+    };
+
+    private readonly mineListSelect = {
+        id: true,
+        name: true,
+        slug: true,
+        verified: true,
+        verificationStatus: true,
+        _count: {
+            select: { reviews: true },
+        },
+    };
+
     async findAll(query: BusinessQueryDto) {
-        const page = query.page || 1;
-        const limit = query.limit || 12;
-        const skip = (page - 1) * limit;
+        const { page, limit, skip } = this.resolvePagination(query.page, query.limit, 12, 24);
         const where = this.buildWhere(query, false);
 
         const [data, total] = await Promise.all([
             this.prisma.business.findMany({
                 where,
-                include: this.includeRelations,
+                select: this.publicListSelect,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
@@ -72,15 +159,13 @@ export class BusinessesService {
     }
 
     async findAllAdmin(query: BusinessQueryDto) {
-        const page = query.page || 1;
-        const limit = query.limit || 12;
-        const skip = (page - 1) * limit;
+        const { page, limit, skip } = this.resolvePagination(query.page, query.limit, 12, 100);
         const where = this.buildWhere(query, true);
 
         const [data, total] = await Promise.all([
             this.prisma.business.findMany({
                 where,
-                include: this.includeRelations,
+                select: this.adminListSelect,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
@@ -100,7 +185,7 @@ export class BusinessesService {
     async findMine(_userId: string, _userRole: string, organizationId: string) {
         return this.prisma.business.findMany({
             where: { organizationId },
-            include: this.includeRelations,
+            select: this.mineListSelect,
             orderBy: { createdAt: 'desc' },
         });
     }
@@ -114,7 +199,7 @@ export class BusinessesService {
         const business = await this.prisma.business.findUnique({
             where: { id },
             include: {
-                ...this.includeRelations,
+                ...this.fullInclude,
                 reviews: {
                     where: {
                         moderationStatus: 'APPROVED',
@@ -158,7 +243,7 @@ export class BusinessesService {
         const business = await this.prisma.business.findUnique({
             where: { slug },
             include: {
-                ...this.includeRelations,
+                ...this.fullInclude,
                 reviews: {
                     where: {
                         moderationStatus: 'APPROVED',
@@ -255,7 +340,7 @@ export class BusinessesService {
                             }
                             : undefined,
                     },
-                    include: this.includeRelations,
+                    include: this.fullInclude,
                 });
 
                 // Only promote regular users; never downgrade admin users.
@@ -349,7 +434,7 @@ export class BusinessesService {
                             }
                             : undefined,
                     },
-                    include: this.includeRelations,
+                    include: this.fullInclude,
                 });
             });
         } catch (error) {
@@ -402,6 +487,14 @@ export class BusinessesService {
     async findNearby(query: NearbyQueryDto) {
         const radius = query.radius || 5;
         const earthRadiusKm = 6371;
+        const latDelta = radius / 111;
+        const cosLat = Math.cos((query.lat * Math.PI) / 180);
+        const safeCosLat = Math.abs(cosLat) < 0.01 ? 0.01 : cosLat;
+        const lngDelta = radius / (111 * safeCosLat);
+        const minLat = query.lat - latDelta;
+        const maxLat = query.lat + latDelta;
+        const minLng = query.lng - lngDelta;
+        const maxLng = query.lng + lngDelta;
 
         // Haversine formula using raw SQL for optimal PostgreSQL performance
         const businesses = await this.prisma.$queryRaw`
@@ -418,6 +511,8 @@ export class BusinessesService {
       WHERE b.verified = true
         AND b.latitude IS NOT NULL
         AND b.longitude IS NOT NULL
+        AND b.latitude BETWEEN ${minLat} AND ${maxLat}
+        AND b.longitude BETWEEN ${minLng} AND ${maxLng}
         AND (
           ${earthRadiusKm} * acos(
             cos(radians(${query.lat})) * cos(radians(b.latitude)) *
@@ -442,7 +537,7 @@ export class BusinessesService {
                     verificationStatus: 'VERIFIED',
                     verificationReviewedAt: new Date(),
                 },
-                include: this.includeRelations,
+                include: this.fullInclude,
             });
 
             await this.reputationService.recalculateBusinessReputation(id);
@@ -682,6 +777,24 @@ export class BusinessesService {
         }
 
         return where;
+    }
+
+    private resolvePagination(
+        rawPage: number | undefined,
+        rawLimit: number | undefined,
+        defaultLimit: number,
+        maxLimit: number,
+    ): { page: number; limit: number; skip: number } {
+        const page = rawPage && Number.isFinite(rawPage) && rawPage > 0
+            ? Math.floor(rawPage)
+            : 1;
+        const requestedLimit = rawLimit && Number.isFinite(rawLimit) && rawLimit > 0
+            ? Math.floor(rawLimit)
+            : defaultLimit;
+        const limit = Math.min(requestedLimit, maxLimit);
+        const skip = (page - 1) * limit;
+
+        return { page, limit, skip };
     }
 
     private async assertCityBelongsToProvince(

@@ -9,6 +9,7 @@ import {
     ParseUUIDPipe,
     UseGuards,
     Inject,
+    Header,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -24,11 +25,13 @@ export class CategoriesController {
     ) { }
 
     @Get()
+    @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
     async findAll() {
         return this.categoriesService.findAll();
     }
 
     @Get(':id')
+    @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
     async findById(@Param('id', new ParseUUIDPipe()) id: string) {
         return this.categoriesService.findById(id);
     }

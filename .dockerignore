@@ -1,5 +1,8 @@
 .git
 .github
+.run
+.vscode
+.idea
 node_modules
 **/node_modules
 **/dist
@@ -10,5 +13,12 @@ coverage
 **/*.log
 .env
 .env.*
+**/.env
+**/.env.*
 uploads
 apps/api/uploads
+**/*.spec.ts
+**/*.e2e.spec.ts
+**/*.test.ts
+**/*.test.tsx
+apps/web/src/test

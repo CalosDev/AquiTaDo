@@ -1,4 +1,36 @@
+import type { AxiosResponse } from 'axios';
 import api from './client';
+
+const REFERENCE_TTL_MS = 5 * 60 * 1000;
+
+type CachedRequest<T = AxiosResponse> = {
+    promise: Promise<T>;
+    expiresAt: number;
+};
+
+let categoriesCache: CachedRequest | null = null;
+let provincesCache: CachedRequest | null = null;
+const citiesCacheByProvince = new Map<string, CachedRequest>();
+
+function resolveCachedRequest<T>(
+    cacheEntry: CachedRequest<T> | null,
+    fetcher: () => Promise<T>,
+): CachedRequest<T> {
+    if (cacheEntry && cacheEntry.expiresAt > Date.now()) {
+        return cacheEntry;
+    }
+
+    const nextEntry: CachedRequest<T> = {
+        expiresAt: Date.now() + REFERENCE_TTL_MS,
+        promise: fetcher(),
+    };
+    nextEntry.promise = nextEntry.promise.catch((error) => {
+        nextEntry.expiresAt = 0;
+        throw error;
+    });
+
+    return nextEntry;
+}
 
 // ---- Auth ----
 export const authApi = {
@@ -38,18 +70,46 @@ export const businessApi = {
 
 // ---- Categories ----
 export const categoryApi = {
-    getAll: () => api.get('/categories'),
+    getAll: () => {
+        categoriesCache = resolveCachedRequest(
+            categoriesCache,
+            () => api.get('/categories'),
+        );
+        return categoriesCache.promise;
+    },
     create: (data: { name: string; slug: string; icon?: string }) =>
-        api.post('/categories', data),
+        api.post('/categories', data).then((response) => {
+            categoriesCache = null;
+            return response;
+        }),
     update: (id: string, data: { name?: string; slug?: string; icon?: string }) =>
-        api.put(`/categories/${id}`, data),
-    delete: (id: string) => api.delete(`/categories/${id}`),
+        api.put(`/categories/${id}`, data).then((response) => {
+            categoriesCache = null;
+            return response;
+        }),
+    delete: (id: string) => api.delete(`/categories/${id}`).then((response) => {
+        categoriesCache = null;
+        return response;
+    }),
 };
 
 // ---- Locations ----
 export const locationApi = {
-    getProvinces: () => api.get('/provinces'),
-    getCities: (provinceId: string) => api.get(`/provinces/${provinceId}/cities`),
+    getProvinces: () => {
+        provincesCache = resolveCachedRequest(
+            provincesCache,
+            () => api.get('/provinces'),
+        );
+        return provincesCache.promise;
+    },
+    getCities: (provinceId: string) => {
+        const cached = resolveCachedRequest(
+            citiesCacheByProvince.get(provinceId) ?? null,
+            () => api.get(`/provinces/${provinceId}/cities`),
+        );
+        citiesCacheByProvince.set(provinceId, cached);
+        return cached.promise;
+    },
 };
 
 // ---- Reviews ----

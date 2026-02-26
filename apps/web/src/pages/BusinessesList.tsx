@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { adsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
@@ -57,6 +57,31 @@ function resolveVisitorId(): string {
     return generatedVisitorId;
 }
 
+function buildPagination(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+    if (totalPages <= 7) {
+        return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const pages: Array<number | 'ellipsis'> = [1];
+    const windowStart = Math.max(currentPage - 1, 2);
+    const windowEnd = Math.min(currentPage + 1, totalPages - 1);
+
+    if (windowStart > 2) {
+        pages.push('ellipsis');
+    }
+
+    for (let page = windowStart; page <= windowEnd; page += 1) {
+        pages.push(page);
+    }
+
+    if (windowEnd < totalPages - 1) {
+        pages.push('ellipsis');
+    }
+
+    pages.push(totalPages);
+    return pages;
+}
+
 export function BusinessesList() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -74,6 +99,10 @@ export function BusinessesList() {
     const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
     const currentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
     const [searchInput, setSearchInput] = useState(currentSearch);
+    const paginationItems = useMemo(
+        () => buildPagination(currentPage, totalPages),
+        [currentPage, totalPages],
+    );
 
     useEffect(() => {
         setSearchInput(currentSearch);
@@ -256,8 +285,15 @@ export function BusinessesList() {
                     </div>
 
                     {loading ? (
-                        <div className="flex justify-center py-20">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                            {Array.from({ length: 9 }).map((_, index) => (
+                                <div key={index} className="card p-4">
+                                    <div className="h-40 rounded-xl bg-gray-100 animate-pulse mb-3"></div>
+                                    <div className="h-4 w-2/3 rounded bg-gray-100 animate-pulse mb-2"></div>
+                                    <div className="h-3 w-full rounded bg-gray-100 animate-pulse mb-1.5"></div>
+                                    <div className="h-3 w-4/5 rounded bg-gray-100 animate-pulse"></div>
+                                </div>
+                            ))}
                         </div>
                     ) : businesses.length > 0 ? (
                         <>
@@ -297,7 +333,13 @@ export function BusinessesList() {
                                     <Link key={biz.id} to={`/businesses/${biz.id}`} className="card group">
                                         <div className="h-40 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
                                             {biz.images?.[0] ? (
-                                                <img src={biz.images[0].url} alt={biz.name} className="w-full h-full object-cover" />
+                                                <img
+                                                    src={biz.images[0].url}
+                                                    alt={biz.name}
+                                                    className="w-full h-full object-cover"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                />
                                             ) : (
                                                 <span className="text-4xl">🏪</span>
                                             )}
@@ -325,19 +367,28 @@ export function BusinessesList() {
                             {/* Pagination */}
                             {totalPages > 1 && (
                                 <div className="flex justify-center gap-2 mt-8">
-                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                        <button
-                                            key={page}
-                                            onClick={() =>
-                                                updateFilter('page', String(page), { resetPage: false })
-                                            }
-                                            className={`w-10 h-10 rounded-xl text-sm font-medium transition-all ${page === currentPage
+                                    {paginationItems.map((page, index) => (
+                                        page === 'ellipsis' ? (
+                                            <span
+                                                key={`ellipsis-${index}`}
+                                                className="w-10 h-10 inline-flex items-center justify-center text-gray-400"
+                                            >
+                                                ...
+                                            </span>
+                                        ) : (
+                                            <button
+                                                key={page}
+                                                onClick={() =>
+                                                    updateFilter('page', String(page), { resetPage: false })
+                                                }
+                                                className={`w-10 h-10 rounded-xl text-sm font-medium transition-all ${page === currentPage
                                                     ? 'bg-primary-600 text-white shadow-lg'
                                                     : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-500'
-                                                }`}
-                                        >
-                                            {page}
-                                        </button>
+                                                    }`}
+                                            >
+                                                {page}
+                                            </button>
+                                        )
                                     ))}
                                 </div>
                             )}

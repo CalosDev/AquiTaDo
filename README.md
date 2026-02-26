@@ -21,9 +21,6 @@ aquita/
 |-- apps/
 |   |-- web/                # Frontend React
 |   |-- api/                # Backend NestJS
-|-- packages/
-|   |-- types/              # Tipos compartidos
-|   |-- config/             # Configuracion compartida
 |-- docker-compose.yml
 |-- pnpm-workspace.yaml
 |-- package.json

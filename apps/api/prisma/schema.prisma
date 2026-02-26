@@ -254,6 +254,8 @@ model Business {
   @@index([provinceId])
   @@index([latitude, longitude])
   @@index([verified])
+  @@index([verified, createdAt])
+  @@index([provinceId, verified, createdAt])
   @@index([verificationStatus, createdAt])
   @@index([provinceId, reputationScore])
   @@index([reputationTier, reputationScore])
@@ -487,6 +489,7 @@ model BusinessCategory {
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@id([businessId, categoryId])
+  @@index([categoryId])
   @@map("business_categories")
 }
 
@@ -509,6 +512,7 @@ model Review {
   @@index([businessId])
   @@index([userId])
   @@index([moderationStatus, createdAt])
+  @@index([businessId, moderationStatus, isSpam, createdAt])
   @@map("reviews")
 }
 

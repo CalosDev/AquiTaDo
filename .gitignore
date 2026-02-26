@@ -11,3 +11,4 @@ coverage/
 uploads/
 apps/api/uploads/
 apps/api/src/generated/prisma/
+.run/

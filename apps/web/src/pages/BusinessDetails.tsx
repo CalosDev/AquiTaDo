@@ -197,7 +197,13 @@ export function BusinessDetails() {
                                         className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === activeImage ? 'border-primary-500' : 'border-transparent'
                                             }`}
                                     >
-                                        <img src={img.url} alt="" className="w-full h-full object-cover" />
+                                        <img
+                                            src={img.url}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                            decoding="async"
+                                        />
                                     </button>
                                 ))}
                             </div>
