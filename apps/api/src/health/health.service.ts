@@ -8,6 +8,7 @@ type HealthPayload = {
     uptimeSeconds: number;
     checks?: {
         database: 'up';
+        schema?: 'up';
     };
     responseTimeMs?: number;
 };
@@ -29,7 +30,29 @@ export class HealthService {
         const startedAt = Date.now();
 
         try {
-            await this.prisma.$queryRaw`SELECT 1`;
+            const [dbStatus] = await this.prisma.$queryRaw<Array<{
+                ping: number;
+                businesses: string | null;
+                categories: string | null;
+            }>>`
+                SELECT
+                    1 AS ping,
+                    to_regclass('public.businesses')::text AS businesses,
+                    to_regclass('public.categories')::text AS categories
+            `;
+
+            const schemaReady = Boolean(dbStatus?.businesses && dbStatus?.categories);
+            if (!schemaReady) {
+                throw new ServiceUnavailableException({
+                    service: 'aquita-api',
+                    status: 'error',
+                    timestamp: new Date().toISOString(),
+                    checks: {
+                        database: 'up',
+                        schema: 'down',
+                    },
+                });
+            }
 
             return {
                 service: 'aquita-api',
@@ -38,10 +61,15 @@ export class HealthService {
                 uptimeSeconds: Math.floor(process.uptime()),
                 checks: {
                     database: 'up',
+                    schema: 'up',
                 },
                 responseTimeMs: Date.now() - startedAt,
             };
-        } catch {
+        } catch (error) {
+            if (error instanceof ServiceUnavailableException) {
+                throw error;
+            }
+
             throw new ServiceUnavailableException({
                 service: 'aquita-api',
                 status: 'error',
@@ -53,4 +81,3 @@ export class HealthService {
         }
     }
 }
-

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
     IsEmail,
     IsEnum,
@@ -6,6 +7,7 @@ import {
     IsNotEmpty,
     IsOptional,
     IsString,
+    Max,
     MaxLength,
     Min,
 } from 'class-validator';
@@ -60,7 +62,9 @@ export class UpdateOrganizationSubscriptionDto {
 
 export class ListOrganizationAuditLogsQueryDto {
     @IsOptional()
+    @Type(() => Number)
     @IsInt()
     @Min(1)
+    @Max(200)
     limit?: number;
 }

@@ -16,7 +16,13 @@ describe('HealthService', () => {
     });
 
     it('returns readiness payload when database is available', async () => {
-        const queryRaw = vi.fn().mockResolvedValue([{ '?column?': 1 }]);
+        const queryRaw = vi.fn().mockResolvedValue([
+            {
+                ping: 1,
+                businesses: 'businesses',
+                categories: 'categories',
+            },
+        ]);
         const prisma = {
             $queryRaw: queryRaw,
         } as unknown as PrismaService;
@@ -26,7 +32,7 @@ describe('HealthService', () => {
 
         expect(queryRaw).toHaveBeenCalledTimes(1);
         expect(result.status).toBe('ok');
-        expect(result.checks).toEqual({ database: 'up' });
+        expect(result.checks).toEqual({ database: 'up', schema: 'up' });
     });
 
     it('throws ServiceUnavailableException when database is unavailable', async () => {
@@ -38,5 +44,20 @@ describe('HealthService', () => {
 
         await expect(service.getReadiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
-});
 
+    it('throws ServiceUnavailableException when schema is unavailable', async () => {
+        const queryRaw = vi.fn().mockResolvedValue([
+            {
+                ping: 1,
+                businesses: null,
+                categories: null,
+            },
+        ]);
+        const prisma = {
+            $queryRaw: queryRaw,
+        } as unknown as PrismaService;
+        const service = new HealthService(prisma);
+
+        await expect(service.getReadiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+});

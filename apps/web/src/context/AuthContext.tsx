@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useState, useEffect, ReactNode } from 'react';
+import { clearAccessToken, getAccessToken, setAccessToken } from '../api/client';
 import { authApi } from '../api/endpoints';
 
 interface User {
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null);
         setRefreshToken(null);
         setUser(null);
-        localStorage.removeItem('accessToken');
+        clearAccessToken();
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         localStorage.removeItem('activeOrganizationId');
@@ -51,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(payload.accessToken);
         setRefreshToken(payload.refreshToken);
         setUser(payload.user);
-        localStorage.setItem('accessToken', payload.accessToken);
+        setAccessToken(payload.accessToken);
         localStorage.setItem('refreshToken', payload.refreshToken);
         localStorage.setItem('user', JSON.stringify(payload.user));
     }, []);
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         const bootstrapAuth = async () => {
-            const savedToken = localStorage.getItem('accessToken');
+            const savedToken = getAccessToken();
             const savedRefreshToken = localStorage.getItem('refreshToken');
 
             if (!savedToken && !savedRefreshToken) {

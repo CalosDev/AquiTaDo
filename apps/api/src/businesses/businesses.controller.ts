@@ -1,5 +1,5 @@
 import {
-    Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Inject,
+    Controller, Get, Post, Put, Delete, Body, Param, ParseUUIDPipe, Query, UseGuards, Inject,
 } from '@nestjs/common';
 import { BusinessesService } from './businesses.service';
 import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
@@ -52,7 +52,7 @@ export class BusinessesController {
     @Get(':id')
     @UseGuards(OptionalJwtAuthGuard, OptionalOrgContextGuard)
     async findById(
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
         @CurrentUser('id') userId?: string,
         @CurrentUser('role') userRole?: string,
         @CurrentOrganization('organizationId') organizationId?: string,
@@ -76,7 +76,7 @@ export class BusinessesController {
     @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
     @OrgRoles('OWNER', 'MANAGER')
     async update(
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
         @Body() dto: UpdateBusinessDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
@@ -90,7 +90,7 @@ export class BusinessesController {
     @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
     @OrgRoles('OWNER', 'MANAGER')
     async delete(
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
         @CurrentOrganization('organizationId') organizationId: string,
@@ -102,7 +102,7 @@ export class BusinessesController {
     @Put(':id/verify')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')
-    async verify(@Param('id') id: string) {
+    async verify(@Param('id', new ParseUUIDPipe()) id: string) {
         return this.businessesService.verify(id);
     }
 }

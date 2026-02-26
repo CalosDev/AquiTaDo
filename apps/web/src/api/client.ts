@@ -14,6 +14,55 @@ function resolveApiBaseUrl(rawBaseUrl: string): string {
 }
 
 const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:3000');
+const ACCESS_TOKEN_STORAGE_KEY = 'accessToken';
+const hasWindow = typeof window !== 'undefined';
+
+let accessTokenMemory: string | null = null;
+
+function hydrateAccessTokenFromStorage(): void {
+    if (!hasWindow) {
+        return;
+    }
+
+    const sessionToken = sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+    const legacyLocalToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+    accessTokenMemory = sessionToken ?? legacyLocalToken;
+
+    if (!sessionToken && legacyLocalToken) {
+        sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, legacyLocalToken);
+    }
+
+    if (legacyLocalToken) {
+        localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    }
+}
+
+hydrateAccessTokenFromStorage();
+
+export function getAccessToken(): string | null {
+    return accessTokenMemory;
+}
+
+export function setAccessToken(token: string | null): void {
+    accessTokenMemory = token;
+
+    if (!hasWindow) {
+        return;
+    }
+
+    if (token) {
+        sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
+        localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+        return;
+    }
+
+    sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+}
+
+export function clearAccessToken(): void {
+    setAccessToken(null);
+}
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -28,7 +77,11 @@ type RetryableRequestConfig = AxiosRequestConfig & { _retry?: boolean };
 let refreshRequestPromise: Promise<string | null> | null = null;
 
 function clearAuthStorage() {
-    localStorage.removeItem('accessToken');
+    clearAccessToken();
+    if (!hasWindow) {
+        return;
+    }
+
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     localStorage.removeItem('activeOrganizationId');
@@ -52,6 +105,10 @@ async function requestAccessTokenRefresh(): Promise<string | null> {
         return refreshRequestPromise;
     }
 
+    if (!hasWindow) {
+        return null;
+    }
+
     const refreshToken = localStorage.getItem('refreshToken');
     if (!refreshToken) {
         return null;
@@ -73,7 +130,7 @@ async function requestAccessTokenRefresh(): Promise<string | null> {
                 return null;
             }
 
-            localStorage.setItem('accessToken', newAccessToken);
+            setAccessToken(newAccessToken);
             localStorage.setItem('refreshToken', newRefreshToken);
 
             if (response.data.user) {
@@ -93,7 +150,7 @@ async function requestAccessTokenRefresh(): Promise<string | null> {
 // Request interceptor to add JWT token
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         config.headers = config.headers ?? {};
 
         if (token) {
@@ -117,7 +174,7 @@ api.interceptors.response.use(
         const originalRequest = error.config as RetryableRequestConfig | undefined;
 
         if (status === 401 && originalRequest) {
-            const hadAccessToken = !!localStorage.getItem('accessToken');
+            const hadAccessToken = !!getAccessToken();
 
             if (!originalRequest._retry && !shouldSkipRefresh(originalRequest.url)) {
                 originalRequest._retry = true;
@@ -131,9 +188,11 @@ api.interceptors.response.use(
             }
 
             clearAuthStorage();
-            window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+            if (hasWindow) {
+                window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+            }
 
-            if (hadAccessToken && window.location.pathname !== '/login') {
+            if (hasWindow && hadAccessToken && window.location.pathname !== '/login') {
                 window.location.assign('/login');
             }
         }

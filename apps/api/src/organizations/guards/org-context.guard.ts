@@ -23,6 +23,9 @@ export class OrgContextGuard implements CanActivate {
         return true;
     }
 
+    private readonly uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest<RequestWithOrganizationContext>();
         const user = request.user;
@@ -40,6 +43,10 @@ export class OrgContextGuard implements CanActivate {
                 );
             }
             return true;
+        }
+
+        if (!this.uuidPattern.test(organizationId)) {
+            throw new BadRequestException('El organizationId debe ser un UUID valido');
         }
 
         const organizationExists = await this.prisma.organization.findUnique({

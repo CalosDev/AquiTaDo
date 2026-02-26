@@ -108,6 +108,10 @@ Levantar DB + API + Web:
 docker-compose up -d --build
 ```
 
+Nota:
+- El servicio `migrate` ejecuta `prisma migrate deploy` automáticamente antes de levantar la API.
+- La salud de la API ahora se valida con `/api/health/ready` (DB + esquema).
+
 Servicios en Docker:
 
 - Web (nginx): http://localhost:8080 (default)

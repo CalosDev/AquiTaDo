@@ -41,7 +41,7 @@ RUN addgroup -S nodejs && adduser -S nodejs -G nodejs
 
 COPY --from=prod-deps --chown=nodejs:nodejs /app/node_modules /app/node_modules
 COPY --from=prod-deps --chown=nodejs:nodejs /app/apps/api/node_modules /app/apps/api/node_modules
-COPY --from=build --chown=nodejs:nodejs /app/apps/api/dist /app/dist
+COPY --from=build --chown=nodejs:nodejs /app/apps/api/dist /app/apps/api/dist
 
 RUN mkdir -p /app/uploads && chown nodejs:nodejs /app/uploads
 
@@ -49,4 +49,4 @@ USER nodejs
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "apps/api/dist/main.js"]

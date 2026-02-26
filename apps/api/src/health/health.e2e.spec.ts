@@ -60,7 +60,7 @@ describe('HealthController (e2e)', () => {
             status: 'ok',
             timestamp: new Date().toISOString(),
             uptimeSeconds: 10,
-            checks: { database: 'up' },
+            checks: { database: 'up', schema: 'up' },
             responseTimeMs: 2,
         });
 
@@ -71,7 +71,7 @@ describe('HealthController (e2e)', () => {
         expect(response.body).toMatchObject({
             service: 'aquita-api',
             status: 'ok',
-            checks: { database: 'up' },
+            checks: { database: 'up', schema: 'up' },
         });
     });
 

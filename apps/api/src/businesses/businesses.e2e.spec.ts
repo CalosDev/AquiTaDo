@@ -41,7 +41,7 @@ describe('BusinessesController (e2e)', () => {
         jwtService = app.get(JwtService);
     });
 
-    beforeEach(async () => {
+    async function cleanBusinessFixtures() {
         await prisma.review.deleteMany({
             where: {
                 business: {
@@ -56,6 +56,40 @@ describe('BusinessesController (e2e)', () => {
             where: {
                 slug: {
                     startsWith: BUSINESS_SLUG_PREFIX,
+                },
+            },
+        });
+
+        await prisma.organizationMember.deleteMany({
+            where: {
+                organization: {
+                    ownerUser: {
+                        email: {
+                            endsWith: BUSINESSES_EMAIL_DOMAIN,
+                        },
+                    },
+                },
+            },
+        });
+
+        await prisma.organizationInvite.deleteMany({
+            where: {
+                organization: {
+                    ownerUser: {
+                        email: {
+                            endsWith: BUSINESSES_EMAIL_DOMAIN,
+                        },
+                    },
+                },
+            },
+        });
+
+        await prisma.organization.deleteMany({
+            where: {
+                ownerUser: {
+                    email: {
+                        endsWith: BUSINESSES_EMAIL_DOMAIN,
+                    },
                 },
             },
         });
@@ -75,42 +109,14 @@ describe('BusinessesController (e2e)', () => {
                 },
             },
         });
+    }
+
+    beforeEach(async () => {
+        await cleanBusinessFixtures();
     });
 
     afterAll(async () => {
-        await prisma.review.deleteMany({
-            where: {
-                business: {
-                    slug: {
-                        startsWith: BUSINESS_SLUG_PREFIX,
-                    },
-                },
-            },
-        });
-
-        await prisma.business.deleteMany({
-            where: {
-                slug: {
-                    startsWith: BUSINESS_SLUG_PREFIX,
-                },
-            },
-        });
-
-        await prisma.user.deleteMany({
-            where: {
-                email: {
-                    endsWith: BUSINESSES_EMAIL_DOMAIN,
-                },
-            },
-        });
-
-        await prisma.province.deleteMany({
-            where: {
-                slug: {
-                    startsWith: PROVINCE_SLUG_PREFIX,
-                },
-            },
-        });
+        await cleanBusinessFixtures();
         await app.close();
     });
 
@@ -165,6 +171,22 @@ describe('BusinessesController (e2e)', () => {
         expect(response.body).toMatchObject({
             statusCode: 401,
             message: 'Unauthorized',
+        });
+    });
+
+    it('rejects malformed organization context headers', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
+        const ownerToken = signToken(owner.id, owner.role);
+
+        const response = await request(app.getHttpServer())
+            .get('/api/businesses/my')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', 'invalid-uuid')
+            .expect(400);
+
+        expect(response.body).toMatchObject({
+            statusCode: 400,
+            error: 'Bad Request',
         });
     });
 
@@ -240,6 +262,7 @@ describe('BusinessesController (e2e)', () => {
         const response = await request(app.getHttpServer())
             .put(`/api/businesses/${created.body.id}`)
             .set('Authorization', `Bearer ${outsiderToken}`)
+            .set('x-organization-id', created.body.organization.id)
             .send({ name: 'Intento no autorizado' })
             .expect(403);
 

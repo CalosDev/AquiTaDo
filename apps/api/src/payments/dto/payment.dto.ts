@@ -12,8 +12,10 @@ import {
 
 export class ListPaymentsQueryDto {
     @IsOptional()
+    @Type(() => Number)
     @IsInt()
     @Min(1)
+    @Max(200)
     limit?: number;
 }
 

@@ -331,4 +331,26 @@ describe('ReviewsController (e2e)', () => {
             );
         }
     });
+
+    it('rejects invalid UUID params in review routes', async () => {
+        const admin = await createUser('ADMIN');
+        const adminToken = signToken(admin.id, admin.role);
+
+        await request(app.getHttpServer())
+            .get('/api/reviews/business/not-a-uuid')
+            .expect(400);
+
+        const moderationResponse = await request(app.getHttpServer())
+            .patch('/api/reviews/not-a-uuid/moderation')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                status: 'APPROVED',
+            })
+            .expect(400);
+
+        expect(moderationResponse.body).toMatchObject({
+            statusCode: 400,
+            error: 'Bad Request',
+        });
+    });
 });

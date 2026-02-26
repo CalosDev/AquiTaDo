@@ -18,6 +18,19 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://aquita:aquita123@db:5432/aquita_db
+    command: ['pnpm', '--filter', '@aquita/api', 'prisma:migrate:deploy']
+
   api:
     container_name: aquita_api
     build:
@@ -28,6 +41,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://aquita:aquita123@db:5432/aquita_db
       JWT_SECRET: change-this-secret-minimum-16-chars
@@ -44,7 +59,7 @@ services:
       test:
         [
           'CMD-SHELL',
-          'node -e "fetch(''http://localhost:3000/api/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+          'node -e "fetch(''http://localhost:3000/api/health/ready'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
         ]
       interval: 15s
       timeout: 5s
@@ -69,7 +84,7 @@ services:
     ports:
       - '${WEB_PORT:-8080}:80'
     healthcheck:
-      test: ['CMD-SHELL', 'wget -q -O - http://localhost/health >/dev/null 2>&1 || exit 1']
+      test: ['CMD-SHELL', 'wget -q -O - http://127.0.0.1/health >/dev/null 2>&1 || exit 1']
       interval: 20s
       timeout: 5s
       retries: 5

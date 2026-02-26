@@ -1724,11 +1724,18 @@ export class PaymentsService {
     private resolveStripeEvent(signature: string | undefined, body: unknown): Stripe.Event {
         const stripe = this.resolveStripeClient();
         const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET')?.trim();
+        const normalizedSignature = signature?.trim();
+        const isProduction =
+            (this.configService.get<string>('NODE_ENV') ?? '').trim().toLowerCase() === 'production';
         const rawBody = this.normalizeRawBody(body);
 
-        if (webhookSecret && signature && rawBody) {
+        if (isProduction && (!webhookSecret || !normalizedSignature)) {
+            throw new BadRequestException('Webhook signature is required in production');
+        }
+
+        if (webhookSecret && normalizedSignature && rawBody) {
             try {
-                return stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+                return stripe.webhooks.constructEvent(rawBody, normalizedSignature, webhookSecret);
             } catch {
                 throw new BadRequestException('Firma de webhook inválida');
             }
@@ -1847,11 +1854,17 @@ export class PaymentsService {
     }
 
     private escapeCsv(value: string): string {
-        if (!value.includes(',') && !value.includes('"') && !value.includes('\n')) {
-            return value;
+        const normalizedValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
+
+        if (
+            !normalizedValue.includes(',') &&
+            !normalizedValue.includes('"') &&
+            !normalizedValue.includes('\n')
+        ) {
+            return normalizedValue;
         }
 
-        return `"${value.replace(/"/g, '""')}"`;
+        return `"${normalizedValue.replace(/"/g, '""')}"`;
     }
 
     private resolveFiscalPeriod(date: Date): string {
@@ -1860,3 +1873,4 @@ export class PaymentsService {
         return `${year}-${month}`;
     }
 }
+

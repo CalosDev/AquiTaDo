@@ -49,7 +49,7 @@ export class OrganizationsController {
     @Get(':id')
     @UseGuards(JwtAuthGuard)
     async findById(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
     ) {
@@ -59,7 +59,7 @@ export class OrganizationsController {
     @Patch(':id')
     @UseGuards(JwtAuthGuard)
     async update(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Body() dto: UpdateOrganizationDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
@@ -70,7 +70,7 @@ export class OrganizationsController {
     @Get(':id/members')
     @UseGuards(JwtAuthGuard)
     async listMembers(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
     ) {
@@ -80,7 +80,7 @@ export class OrganizationsController {
     @Get(':id/invites')
     @UseGuards(JwtAuthGuard)
     async listInvites(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
     ) {
@@ -90,7 +90,7 @@ export class OrganizationsController {
     @Get(':id/subscription')
     @UseGuards(JwtAuthGuard)
     async getSubscription(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
     ) {
@@ -100,7 +100,7 @@ export class OrganizationsController {
     @Patch(':id/subscription')
     @UseGuards(JwtAuthGuard)
     async updateSubscription(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Body() dto: UpdateOrganizationSubscriptionDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
@@ -111,7 +111,7 @@ export class OrganizationsController {
     @Get(':id/usage')
     @UseGuards(JwtAuthGuard)
     async getUsage(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
     ) {
@@ -121,7 +121,7 @@ export class OrganizationsController {
     @Get(':id/audit-logs')
     @UseGuards(JwtAuthGuard)
     async listAuditLogs(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Query() query: ListOrganizationAuditLogsQueryDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
@@ -138,7 +138,7 @@ export class OrganizationsController {
     @UseGuards(JwtAuthGuard)
     @Throttle({ default: { limit: 10, ttl: 60_000 } })
     async inviteMember(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Body() dto: InviteOrganizationMemberDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
@@ -159,7 +159,7 @@ export class OrganizationsController {
     @Patch(':id/members/:userId/role')
     @UseGuards(JwtAuthGuard)
     async updateMemberRole(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Param('userId', new ParseUUIDPipe()) memberUserId: string,
         @Body() dto: UpdateOrganizationMemberRoleDto,
         @CurrentUser('id') actorUserId: string,
@@ -177,7 +177,7 @@ export class OrganizationsController {
     @Delete(':id/members/:userId')
     @UseGuards(JwtAuthGuard)
     async removeMember(
-        @Param('id') organizationId: string,
+        @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Param('userId', new ParseUUIDPipe()) memberUserId: string,
         @CurrentUser('id') actorUserId: string,
         @CurrentUser('role') actorGlobalRole: string,

@@ -23,6 +23,7 @@ export class BusinessesService {
         @Inject(ReputationService)
         private readonly reputationService: ReputationService,
     ) { }
+    private readonly uploadsRoot = path.resolve(process.cwd(), 'uploads');
 
     private readonly fullInclude = {
         owner: {
@@ -820,6 +821,9 @@ export class BusinessesService {
         await Promise.all(
             imageUrls.map(async (imageUrl) => {
                 const absolutePath = this.resolveUploadPath(imageUrl);
+                if (!absolutePath) {
+                    return;
+                }
                 try {
                     await fs.unlink(absolutePath);
                 } catch (error) {
@@ -832,9 +836,21 @@ export class BusinessesService {
         );
     }
 
-    private resolveUploadPath(assetUrl: string): string {
-        const relativePath = assetUrl.replace(/^\/+/, '');
-        return path.join(process.cwd(), relativePath);
+    private resolveUploadPath(assetUrl: string): string | null {
+        const normalizedAssetUrl = assetUrl.trim();
+        if (!normalizedAssetUrl.startsWith('/uploads/')) {
+            return null;
+        }
+
+        const relativePath = normalizedAssetUrl.replace(/^\/+/, '');
+        const absolutePath = path.resolve(process.cwd(), relativePath);
+        const relativeToUploadsRoot = path.relative(this.uploadsRoot, absolutePath);
+
+        if (relativeToUploadsRoot.startsWith('..') || path.isAbsolute(relativeToUploadsRoot)) {
+            return null;
+        }
+
+        return absolutePath;
     }
 
     private handlePrismaError(error: unknown): void {

@@ -4,6 +4,7 @@ import {
     Get,
     Inject,
     Param,
+    ParseUUIDPipe,
     Patch,
     Post,
     Query,
@@ -37,7 +38,7 @@ export class ReviewsController {
     }
 
     @Get('business/:businessId')
-    async findByBusiness(@Param('businessId') businessId: string) {
+    async findByBusiness(@Param('businessId', new ParseUUIDPipe()) businessId: string) {
         return this.reviewsService.findByBusiness(businessId);
     }
 
@@ -52,7 +53,7 @@ export class ReviewsController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')
     async moderateReview(
-        @Param('reviewId') reviewId: string,
+        @Param('reviewId', new ParseUUIDPipe()) reviewId: string,
         @Body() dto: ModerateReviewDto,
         @CurrentUser('id') adminUserId: string,
     ) {

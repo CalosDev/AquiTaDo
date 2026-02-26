@@ -62,7 +62,8 @@ function validateReadiness(body) {
     return (
         body?.status === 'ok' &&
         body?.service === 'aquita-api' &&
-        body?.checks?.database === 'up'
+        body?.checks?.database === 'up' &&
+        body?.checks?.schema === 'up'
     );
 }
 

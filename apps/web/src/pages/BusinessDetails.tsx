@@ -61,6 +61,7 @@ export function BusinessDetails() {
         try {
             const res = await businessApi.getById(id);
             setBusiness(res.data);
+            setActiveImage(0);
             setErrorMessage('');
         } catch (error) {
             setBusiness(null);
@@ -144,6 +145,7 @@ export function BusinessDetails() {
         business?.reviews && business.reviews.length > 0
             ? (business.reviews.reduce((acc, r) => acc + r.rating, 0) / business.reviews.length).toFixed(1)
             : null;
+    const currentImage = business?.images?.[activeImage] ?? business?.images?.[0];
 
     if (loading) {
         return (
@@ -180,7 +182,7 @@ export function BusinessDetails() {
                         <div className="h-72 md:h-96 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
                             {business.images.length > 0 ? (
                                 <img
-                                    src={business.images[activeImage]?.url}
+                                    src={currentImage?.url}
                                     alt={business.name}
                                     className="w-full h-full object-cover"
                                 />
@@ -261,7 +263,7 @@ export function BusinessDetails() {
                     </div>
 
                     {/* Map */}
-                    {business.latitude && business.longitude && (
+                    {typeof business.latitude === 'number' && typeof business.longitude === 'number' && (
                         <div className="card p-6">
                             <h3 className="font-display font-semibold text-gray-900 mb-3">Ubicación</h3>
                             <div className="h-64 bg-gray-100 rounded-xl flex items-center justify-center">
