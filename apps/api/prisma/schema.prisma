@@ -173,6 +173,56 @@ enum AdWalletTopupStatus {
   CANCELED
 }
 
+enum EmbeddingStatus {
+  PENDING
+  INDEXED
+  FAILED
+}
+
+enum ReviewSentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+enum WhatsAppConversationStatus {
+  OPEN
+  CLOSED
+  ESCALATED
+}
+
+enum WhatsAppMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppMessageStatus {
+  RECEIVED
+  PROCESSED
+  SENT
+  FAILED
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  PUSH
+}
+
+enum NotificationJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum GrowthEventType {
+  SEARCH_QUERY
+  SEARCH_RESULT_CLICK
+  CONTACT_CLICK
+  WHATSAPP_CLICK
+  BOOKING_INTENT
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)
@@ -200,6 +250,9 @@ model User {
   verificationReviews      BusinessVerificationDocument[] @relation("VerificationDocumentReviewer")
   marketReportsGenerated   MarketReportSnapshot[]         @relation("MarketReportGeneratedBy")
   adWalletTopupsRequested  AdWalletTopup[]                @relation("AdWalletTopupRequester")
+  whatsappClickConversions WhatsAppClickConversion[]
+  whatsappConversations    WhatsAppConversation[]          @relation("WhatsAppConversationCustomer")
+  growthEvents             GrowthEvent[]
 
   @@index([email])
   @@map("users")
@@ -226,6 +279,9 @@ model Business {
   riskScore               Int                        @default(0)
   reputationScore         Decimal                    @default(0) @db.Decimal(6, 2)
   reputationTier          BusinessTier               @default(BRONZE)
+  aiAutoResponderEnabled  Boolean                    @default(false)
+  aiAutoResponderPrompt   String?                    @db.Text
+  aiLastEmbeddedAt        DateTime?
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
@@ -247,8 +303,14 @@ model Business {
   bookings              Booking[]
   transactions          Transaction[]
   conversations         Conversation[]
+  whatsappConversations WhatsAppConversation[]
+  whatsappClickEvents   WhatsAppClickConversion[]
+  embeddings            BusinessEmbedding[]
   verificationDocuments BusinessVerificationDocument[]
   adCampaigns           AdCampaign[]
+  sentimentInsights     ReviewSentimentInsight[]
+  notificationJobs      NotificationJob[]
+  growthEvents          GrowthEvent[]
 
   @@index([slug])
   @@index([ownerId])
@@ -292,9 +354,16 @@ model Organization {
   transactions          Transaction[]
   webhookEvents         WebhookEvent[]
   conversations         Conversation[]
+  whatsappConversations WhatsAppConversation[]
+  whatsappWebhookEvents WhatsAppWebhookEvent[]
+  whatsappClickEvents   WhatsAppClickConversion[]
+  embeddings            BusinessEmbedding[]
+  sentimentInsights     ReviewSentimentInsight[]
+  notificationJobs      NotificationJob[]
   adCampaigns           AdCampaign[]
   verificationDocuments BusinessVerificationDocument[]
   adWalletTopups        AdWalletTopup[]
+  growthEvents          GrowthEvent[]
 
   @@index([ownerUserId])
   @@index([plan, subscriptionStatus])
@@ -482,6 +551,7 @@ model Category {
 
   businesses          BusinessCategory[]
   adCampaignsTargeted AdCampaign[]       @relation("AdCampaignTargetCategory")
+  growthEvents        GrowthEvent[]
 
   @@index([slug])
   @@map("categories")
@@ -512,6 +582,7 @@ model Review {
   user       User     @relation(fields: [userId], references: [id])
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  sentiment  ReviewSentimentInsight?
 
   @@unique([userId, businessId])
   @@index([businessId])
@@ -540,6 +611,7 @@ model Province {
   cities              City[]
   businesses          Business[]
   adCampaignsTargeted AdCampaign[] @relation("AdCampaignTargetProvince")
+  growthEvents        GrowthEvent[]
 
   @@index([slug])
   @@map("provinces")
@@ -553,6 +625,7 @@ model City {
   province   Province @relation(fields: [provinceId], references: [id])
 
   businesses Business[]
+  growthEvents GrowthEvent[]
 
   @@unique([provinceId, name])
   @@index([provinceId])
@@ -595,6 +668,39 @@ model BusinessAnalytics {
   @@unique([businessId, date])
   @@index([date])
   @@map("business_analytics")
+}
+
+model GrowthEvent {
+  id             String          @id @default(uuid())
+  eventType      GrowthEventType
+  businessId     String?
+  business       Business?       @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  organizationId String?
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  userId         String?
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  categoryId     String?
+  category       Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  provinceId     String?
+  province       Province?       @relation(fields: [provinceId], references: [id], onDelete: SetNull)
+  cityId         String?
+  city           City?           @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  visitorIdHash  String?         @db.VarChar(64)
+  sessionId      String?         @db.VarChar(120)
+  variantKey     String?         @db.VarChar(80)
+  searchQuery    String?         @db.VarChar(255)
+  metadata       Json?
+  occurredAt     DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+
+  @@index([eventType, occurredAt])
+  @@index([provinceId, categoryId, occurredAt])
+  @@index([businessId, eventType, occurredAt])
+  @@index([organizationId, eventType, occurredAt])
+  @@index([variantKey, eventType, occurredAt])
+  @@index([visitorIdHash, occurredAt])
+  @@index([searchQuery])
+  @@map("growth_events")
 }
 
 model Promotion {
@@ -888,4 +994,158 @@ model AdWalletTopup {
   @@index([status, createdAt])
   @@index([requestedByUserId, createdAt])
   @@map("ad_wallet_topups")
+}
+
+model BusinessEmbedding {
+  id             String          @id @default(uuid())
+  businessId     String          @unique
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  content        String          @db.Text
+  embedding      Json
+  dimensions     Int             @default(1536)
+  provider       String          @default("openai") @db.VarChar(40)
+  status         EmbeddingStatus @default(PENDING)
+  errorMessage   String?         @db.VarChar(500)
+  sourceChecksum String?         @db.VarChar(128)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([organizationId, status, updatedAt])
+  @@index([businessId, updatedAt])
+  @@map("business_embeddings")
+}
+
+model WhatsAppConversation {
+  id                  String                     @id @default(uuid())
+  organizationId      String
+  organization        Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessId          String?
+  business            Business?                  @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  customerPhone       String                     @db.VarChar(30)
+  customerName        String?                    @db.VarChar(120)
+  customerUserId      String?
+  customerUser        User?                      @relation("WhatsAppConversationCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
+  status              WhatsAppConversationStatus @default(OPEN)
+  lastMessageAt       DateTime                   @default(now())
+  autoResponderActive Boolean                    @default(true)
+  metadata            Json?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  messages WhatsAppMessage[]
+
+  @@index([organizationId, status, lastMessageAt])
+  @@index([businessId, status, lastMessageAt])
+  @@index([customerPhone, createdAt])
+  @@unique([organizationId, businessId, customerPhone])
+  @@map("whatsapp_conversations")
+}
+
+model WhatsAppMessage {
+  id                String                   @id @default(uuid())
+  conversationId    String
+  conversation      WhatsAppConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction         WhatsAppMessageDirection
+  status            WhatsAppMessageStatus    @default(RECEIVED)
+  whatsappMessageId String?                  @unique @db.VarChar(191)
+  senderPhone       String?                  @db.VarChar(30)
+  recipientPhone    String?                  @db.VarChar(30)
+  messageType       String                   @default("text") @db.VarChar(40)
+  content           String?                  @db.Text
+  payload           Json?
+  processedAt       DateTime?
+  createdAt         DateTime                 @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([status, createdAt])
+  @@index([senderPhone, createdAt])
+  @@map("whatsapp_messages")
+}
+
+model WhatsAppWebhookEvent {
+  id                String                @id @default(uuid())
+  organizationId    String?
+  organization      Organization?         @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  source            String                @default("meta") @db.VarChar(40)
+  externalEventId   String?               @db.VarChar(191)
+  payload           Json
+  processingStatus  WebhookProcessingStatus @default(RECEIVED)
+  errorMessage      String?               @db.VarChar(500)
+  receivedAt        DateTime              @default(now())
+  processedAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([source, externalEventId])
+  @@index([organizationId, receivedAt])
+  @@index([processingStatus, receivedAt])
+  @@map("whatsapp_webhook_events")
+}
+
+model WhatsAppClickConversion {
+  id             String       @id @default(uuid())
+  businessId     String
+  business       Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  source         String       @default("web") @db.VarChar(50)
+  sessionId      String?      @db.VarChar(191)
+  targetPhone    String?      @db.VarChar(30)
+  metadata       Json?
+  clickedAt      DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  @@index([businessId, clickedAt])
+  @@index([organizationId, clickedAt])
+  @@index([userId, clickedAt])
+  @@map("whatsapp_click_conversions")
+}
+
+model ReviewSentimentInsight {
+  id             String          @id @default(uuid())
+  reviewId       String          @unique
+  review         Review          @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  businessId     String
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sentiment      ReviewSentiment
+  score          Decimal         @db.Decimal(5, 4)
+  summary        String?         @db.VarChar(500)
+  model          String?         @db.VarChar(80)
+  alertedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([organizationId, sentiment, createdAt])
+  @@index([businessId, createdAt])
+  @@map("review_sentiment_insights")
+}
+
+model NotificationJob {
+  id             String                @id @default(uuid())
+  queueJobId     String?               @unique @db.VarChar(191)
+  organizationId String?
+  organization   Organization?         @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  businessId     String?
+  business       Business?             @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  channel        NotificationChannel
+  topic          String                @db.VarChar(120)
+  payload        Json
+  status         NotificationJobStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  availableAt    DateTime              @default(now())
+  processedAt    DateTime?
+  errorMessage   String?               @db.VarChar(500)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([status, availableAt])
+  @@index([organizationId, topic, createdAt])
+  @@index([businessId, topic, createdAt])
+  @@map("notification_jobs")
 }

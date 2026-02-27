@@ -29,13 +29,18 @@ import { AdsModule } from './ads/ads.module';
 import { VerificationModule } from './verification/verification.module';
 import { ResilienceModule } from './resilience/resilience.module';
 import { ObservabilityModule } from './observability/observability.module';
+import { AiModule } from './ai/ai.module';
+import { WhatsAppModule } from './whatsapp/whatsapp.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { RequestContextModule } from './core/request-context/request-context.module';
 import { DomainEventsModule } from './core/events/domain-events.module';
 import { AuthorizationModule } from './core/authorization/authorization.module';
 import { RequestContextInterceptor } from './core/interceptors/request-context.interceptor';
 import { JsonApiResponseInterceptor } from './core/interceptors/json-api-response.interceptor';
+import { PublicCacheInterceptor } from './core/interceptors/public-cache.interceptor';
 import { GlobalExceptionFilter } from './core/filters/global-exception.filter';
 import { validateEnv } from './config/env.validation';
+import { SecurityModule } from './security/security.module';
 
 @Module({
     imports: [
@@ -61,6 +66,7 @@ import { validateEnv } from './config/env.validation';
         RequestContextModule,
         DomainEventsModule,
         AuthorizationModule,
+        SecurityModule,
         PrismaModule,
         ObservabilityModule,
         AuthModule,
@@ -86,6 +92,9 @@ import { validateEnv } from './config/env.validation';
         ReputationModule,
         AdsModule,
         VerificationModule,
+        AiModule,
+        WhatsAppModule,
+        NotificationsModule,
     ],
     providers: [
         {
@@ -99,6 +108,10 @@ import { validateEnv } from './config/env.validation';
         {
             provide: APP_INTERCEPTOR,
             useClass: JsonApiResponseInterceptor,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: PublicCacheInterceptor,
         },
         {
             provide: APP_FILTER,

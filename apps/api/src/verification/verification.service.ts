@@ -3,6 +3,7 @@ import {
     ForbiddenException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import {
@@ -13,6 +14,7 @@ import {
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReputationService } from '../reputation/reputation.service';
+import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 import {
     ListVerificationDocumentsQueryDto,
     ReviewBusinessVerificationDto,
@@ -25,11 +27,15 @@ type PrismaClientLike = PrismaService | Prisma.TransactionClient;
 
 @Injectable()
 export class VerificationService {
+    private readonly logger = new Logger(VerificationService.name);
+
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
         @Inject(ReputationService)
         private readonly reputationService: ReputationService,
+        @Inject(NotificationsQueueService)
+        private readonly notificationsQueueService: NotificationsQueueService,
     ) { }
 
     async submitDocument(
@@ -259,12 +265,20 @@ export class VerificationService {
             throw new BadRequestException('Estado de revisión inválido');
         }
 
-        return this.prisma.$transaction(async (tx) => {
+        const result = await this.prisma.$transaction(async (tx) => {
             const business = await tx.business.findUnique({
                 where: { id: businessId },
                 select: {
                     id: true,
+                    name: true,
+                    organizationId: true,
+                    whatsapp: true,
                     verificationStatus: true,
+                    owner: {
+                        select: {
+                            phone: true,
+                        },
+                    },
                 },
             });
 
@@ -331,8 +345,28 @@ export class VerificationService {
 
             await this.recalculateRiskScore(businessId, tx);
 
-            return updatedBusiness;
+            return {
+                updatedBusiness,
+                notificationPayload: {
+                    organizationId: business.organizationId,
+                    businessId: business.id,
+                    ownerPhone: business.owner?.phone ?? business.whatsapp ?? null,
+                    businessName: business.name,
+                    status: reviewStatus,
+                    notes: dto.notes?.trim() || null,
+                },
+            };
         });
+
+        try {
+            await this.notificationsQueueService.enqueueVerificationAlert(result.notificationPayload);
+        } catch (error) {
+            this.logger.warn(
+                `No se pudo encolar alerta de verificacion para negocio "${businessId}" (${error instanceof Error ? error.message : String(error)})`,
+            );
+        }
+
+        return result.updatedBusiness;
     }
 
     async reviewDocument(

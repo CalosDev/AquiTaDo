@@ -35,14 +35,28 @@ export class RequestContextInterceptor implements NestInterceptor {
         }>();
 
         const requestIdHeader = response.getHeader('x-request-id');
+        const traceIdHeader = response.getHeader('x-trace-id');
+        const traceparentHeader = response.getHeader('traceparent');
         const requestId = typeof requestIdHeader === 'string'
             ? requestIdHeader
             : Array.isArray(requestIdHeader) && requestIdHeader.length > 0
                 ? requestIdHeader[0] ?? null
                 : null;
+        const traceId = typeof traceIdHeader === 'string'
+            ? traceIdHeader
+            : Array.isArray(traceIdHeader) && traceIdHeader.length > 0
+                ? traceIdHeader[0] ?? null
+                : null;
+        const traceparent = typeof traceparentHeader === 'string'
+            ? traceparentHeader
+            : Array.isArray(traceparentHeader) && traceparentHeader.length > 0
+                ? traceparentHeader[0] ?? null
+                : null;
 
         const state: RequestContextState = {
             requestId,
+            traceId,
+            traceparent,
             method: request.method ?? null,
             path: request.originalUrl ?? request.path ?? null,
             userId: request.user?.id ?? null,
@@ -54,4 +68,3 @@ export class RequestContextInterceptor implements NestInterceptor {
         return this.requestContextService.run(state, () => next.handle());
     }
 }
-

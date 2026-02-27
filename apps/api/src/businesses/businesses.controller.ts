@@ -16,6 +16,7 @@ import { OrgRolesGuard } from '../organizations/guards/org-roles.guard';
 import { OrganizationRole } from '../generated/prisma/client';
 import { Policy } from '../core/authorization/policy.decorator';
 import { PolicyGuard } from '../core/authorization/policy.guard';
+import { PublicCache } from '../core/interceptors/public-cache.decorator';
 
 @Controller('businesses')
 export class BusinessesController {
@@ -25,11 +26,13 @@ export class BusinessesController {
     ) { }
 
     @Get()
+    @PublicCache({ maxAgeSeconds: 45, staleWhileRevalidateSeconds: 300 })
     async findAll(@Query() query: BusinessQueryDto) {
         return this.businessesService.findAll(query);
     }
 
     @Get('nearby')
+    @PublicCache({ maxAgeSeconds: 30, staleWhileRevalidateSeconds: 120 })
     async findNearby(@Query() query: NearbyQueryDto) {
         return this.businessesService.findNearby(query);
     }
@@ -52,6 +55,7 @@ export class BusinessesController {
     }
 
     @Get(':id')
+    @PublicCache({ maxAgeSeconds: 120, staleWhileRevalidateSeconds: 900 })
     @UseGuards(OptionalJwtAuthGuard, OptionalOrgContextGuard)
     async findById(
         @Param('id', new ParseUUIDPipe()) id: string,

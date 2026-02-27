@@ -22,6 +22,7 @@ La propuesta de escalado B2B2C (Discovery + SaaS + Marketplace) esta documentada
 
 - `docs/SUPERAPP_ARCHITECTURE.md`
 - `docs/MONOLITH_MODULAR_STRUCTURE.md`
+- `docs/PRODUCTION_BLINDAJE_PROMPT4.md`
 
 ## Estructura
 
@@ -102,19 +103,41 @@ Servicios:
 - `JWT_SECRET=change-this-secret-minimum-16-chars`
 - `PORT=3000`
 - `CORS_ORIGIN=http://localhost:5173`
+- `SECURITY_TRUST_PROXY=true`
+- `CORS_ALLOWED_METHODS=GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS`
+- `APP_PUBLIC_WEB_URL=http://localhost:5173`
 - `THROTTLE_TTL_MS=60000`
 - `THROTTLE_LIMIT=120`
+- `RATE_LIMIT_SEARCH_IP_LIMIT=120`
+- `RATE_LIMIT_AI_IP_LIMIT=30`
 - `REDIS_URL=redis://localhost:6379`
 - `REDIS_CACHE_TTL_SECONDS=120`
+- `BULLMQ_PREFIX=aquita`
+- `BULLMQ_DEFAULT_ATTEMPTS=3`
 - `MEILISEARCH_HOST=http://localhost:7700`
 - `MEILISEARCH_API_KEY=masterKeyChangeMe`
 - `MEILISEARCH_INDEX_BUSINESSES=businesses`
+- `OPENAI_API_KEY=...` (opcional, habilita embeddings y respuestas IA enriquecidas)
+- `OPENAI_MODEL_EMBEDDING=text-embedding-3-small`
+- `OPENAI_MODEL_CHAT=gpt-4o-mini`
+- `OPENAI_EMBEDDING_DIMENSIONS=1536`
+- `WHATSAPP_ENABLED=false`
+- `WHATSAPP_VERIFY_TOKEN=...` (requerido si `WHATSAPP_ENABLED=true`)
+- `WHATSAPP_GRAPH_BASE_URL=https://graph.facebook.com`
+- `WHATSAPP_API_VERSION=v20.0`
+- `WHATSAPP_PHONE_NUMBER_ID=...` (requerido si `WHATSAPP_ENABLED=true`)
+- `WHATSAPP_ACCESS_TOKEN=...` (requerido si `WHATSAPP_ENABLED=true`)
 - `CIRCUIT_BREAKER_FAILURE_THRESHOLD=5`
 - `CIRCUIT_BREAKER_COOLDOWN_MS=60000`
 - `JSON_API_RESPONSE_ENABLED=false`
-- `SENTRY_DSN=`
+- `SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0`
 - `SENTRY_ENVIRONMENT=development`
 - `SENTRY_TRACES_SAMPLE_RATE=0`
+- `OTEL_ENABLED=false`
+- `OTEL_SERVICE_NAME=aquita-api`
+- `OTEL_EXPORTER_OTLP_ENDPOINT=...` (opcional)
+- `HEALTH_AI_P95_MAX_MS=2500`
+- `HEALTH_DB_POOL_WARN_RATIO=0.75`
 
 `apps/web/.env`:
 
@@ -187,6 +210,16 @@ docker-compose down
 | GET | /api/provinces | No | Listar provincias |
 | GET | /api/provinces/:id/cities | No | Ciudades por provincia |
 | POST | /api/reviews | Si | Crear resena |
+| POST | /api/ai/concierge/query | No | Busqueda conversacional RAG |
+| PATCH | /api/ai/businesses/:businessId/assistant-config | Si (OWNER/MANAGER) | Configurar auto-respondedor IA |
+| POST | /api/ai/businesses/:businessId/reindex | Si (OWNER/MANAGER) | Reindexar embedding semantico |
+| POST | /api/ai/businesses/:businessId/auto-reply | Si (OWNER/MANAGER/STAFF) | Probar respuesta IA del negocio |
+| POST | /api/ai/reviews/:reviewId/analyze | Si | Analizar sentimiento de resena |
+| GET | /api/whatsapp/webhook | No | Verificacion webhook Meta |
+| POST | /api/whatsapp/webhook | No | Recepcion de mensajes WhatsApp |
+| POST | /api/whatsapp/click-to-chat | Opcional | Generar link WhatsApp y registrar conversion |
+| GET | /api/whatsapp/conversations/my | Si | Listar conversaciones del tenant |
+| PATCH | /api/whatsapp/conversations/my/:id/status | Si (OWNER/MANAGER) | Cambiar estado de conversacion |
 | POST | /api/upload/business-image | Si | Subir imagen negocio |
 | DELETE | /api/upload/business-image/:imageId | Si | Eliminar imagen negocio |
 | POST | /api/organizations | Si | Crear organizacion |
@@ -203,8 +236,11 @@ docker-compose down
 | PATCH | /api/organizations/:id/subscription | Si (OWNER/ADMIN) | Cambiar plan/estado de suscripcion |
 | GET | /api/organizations/:id/usage | Si | Ver uso y limites del plan |
 | GET | /api/organizations/:id/audit-logs | Si | Ver actividad auditada de la organizacion |
+| POST | /api/analytics/events/growth | Opcional | Registrar evento de growth (search/click/whatsapp) |
+| GET | /api/analytics/growth/insights | Admin | Insights de demanda/oferta y conversion |
 | GET | /api/health | No | Liveness check |
 | GET | /api/health/ready | No | Readiness check (DB) |
+| GET | /api/health/dashboard | No | Salud operativa avanzada (latencia + saturacion) |
 | GET | /api/observability/metrics | No | Metricas Prometheus |
 
 Notas multi-tenant:

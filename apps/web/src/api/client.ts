@@ -1,4 +1,9 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import {
+    generateTraceparent,
+    getOrCreateSessionId,
+    getOrCreateVisitorId,
+} from '../lib/clientContext';
 
 function resolveApiBaseUrl(rawBaseUrl: string): string {
     const normalizedBaseUrl = rawBaseUrl.trim().replace(/\/+$/, '');
@@ -160,6 +165,15 @@ api.interceptors.request.use(
         const activeOrganizationId = localStorage.getItem('activeOrganizationId');
         if (activeOrganizationId) {
             config.headers['x-organization-id'] = activeOrganizationId;
+        }
+
+        if (hasWindow) {
+            config.headers['x-visitor-id'] = getOrCreateVisitorId();
+            config.headers['x-session-id'] = getOrCreateSessionId();
+            config.headers['x-request-id'] = typeof window.crypto.randomUUID === 'function'
+                ? window.crypto.randomUUID()
+                : `req-${Date.now()}`;
+            config.headers.traceparent = generateTraceparent();
         }
         return config;
     },

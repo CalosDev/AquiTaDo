@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
@@ -7,6 +7,9 @@ import { OrganizationRole } from '../generated/prisma/client';
 
 @Injectable()
 export class UploadsService {
+    private readonly logger = new Logger(UploadsService.name);
+    private sharpLoadFailed = false;
+
     constructor(
         @Inject(PrismaService)
         private prisma: PrismaService,
@@ -78,6 +81,7 @@ export class UploadsService {
         const fileName = `${businessId}-${randomUUID()}.${extension}`;
         const filePath = path.join(uploadsDir, fileName);
         await fs.writeFile(filePath, file.buffer);
+        void this.generateOptimizedVariants(file.buffer, filePath);
 
         try {
             return await this.prisma.businessImage.create({
@@ -130,6 +134,7 @@ export class UploadsService {
         if (filePath) {
             try {
                 await fs.unlink(filePath);
+                await this.deleteOptimizedSiblings(filePath);
             } catch (error) {
                 const code = (error as NodeJS.ErrnoException).code;
                 if (code !== 'ENOENT') {
@@ -191,5 +196,75 @@ export class UploadsService {
         });
 
         return fallbackPlan?.maxImagesPerBusiness ?? 10;
+    }
+
+    private async generateOptimizedVariants(
+        sourceBuffer: Buffer,
+        originalFilePath: string,
+    ): Promise<void> {
+        const sharpFactory = await this.resolveSharpFactory();
+        if (!sharpFactory) {
+            return;
+        }
+
+        const basePath = originalFilePath.replace(/\.[^.]+$/, '');
+        try {
+            await Promise.all([
+                sharpFactory(sourceBuffer)
+                    .rotate()
+                    .resize({
+                        width: 1_920,
+                        withoutEnlargement: true,
+                    })
+                    .webp({ quality: 82 })
+                    .toFile(`${basePath}.webp`),
+                sharpFactory(sourceBuffer)
+                    .rotate()
+                    .resize({
+                        width: 1_920,
+                        withoutEnlargement: true,
+                    })
+                    .avif({ quality: 56 })
+                    .toFile(`${basePath}.avif`),
+            ]);
+        } catch (error) {
+            this.logger.warn(
+                `No se pudieron generar variantes optimizadas para "${originalFilePath}" (${error instanceof Error ? error.message : String(error)})`,
+            );
+        }
+    }
+
+    private async deleteOptimizedSiblings(originalFilePath: string): Promise<void> {
+        const basePath = originalFilePath.replace(/\.[^.]+$/, '');
+        const variants = [`${basePath}.webp`, `${basePath}.avif`];
+        for (const variantPath of variants) {
+            try {
+                await fs.unlink(variantPath);
+            } catch (error) {
+                const code = (error as NodeJS.ErrnoException).code;
+                if (code !== 'ENOENT') {
+                    throw error;
+                }
+            }
+        }
+    }
+
+    private async resolveSharpFactory(): Promise<((input?: Buffer) => import('sharp').Sharp) | null> {
+        if (this.sharpLoadFailed) {
+            return null;
+        }
+
+        try {
+            const sharpModule = await import('sharp');
+            return sharpModule.default;
+        } catch (error) {
+            if (!this.sharpLoadFailed) {
+                this.sharpLoadFailed = true;
+                this.logger.warn(
+                    `Sharp no disponible, se omite optimizacion AVIF/WebP (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }
+            return null;
+        }
     }
 }

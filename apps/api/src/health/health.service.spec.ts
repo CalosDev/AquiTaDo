@@ -1,12 +1,25 @@
 import { ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { describe, expect, it, vi } from 'vitest';
+import { ObservabilityService } from '../observability/observability.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HealthService } from './health.service';
 
 describe('HealthService', () => {
+    function createService(prisma: PrismaService): HealthService {
+        const observability = {
+            getDependencyHealthSnapshot: vi.fn().mockReturnValue([]),
+        } as unknown as ObservabilityService;
+        const configService = {
+            get: vi.fn(),
+        } as unknown as ConfigService;
+
+        return new HealthService(prisma, observability, configService);
+    }
+
     it('returns liveness payload', () => {
         const prisma = {} as PrismaService;
-        const service = new HealthService(prisma);
+        const service = createService(prisma);
 
         const result = service.getLiveness();
         expect(result.status).toBe('ok');
@@ -26,7 +39,7 @@ describe('HealthService', () => {
         const prisma = {
             $queryRaw: queryRaw,
         } as unknown as PrismaService;
-        const service = new HealthService(prisma);
+        const service = createService(prisma);
 
         const result = await service.getReadiness();
 
@@ -40,7 +53,7 @@ describe('HealthService', () => {
         const prisma = {
             $queryRaw: queryRaw,
         } as unknown as PrismaService;
-        const service = new HealthService(prisma);
+        const service = createService(prisma);
 
         await expect(service.getReadiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
@@ -56,7 +69,7 @@ describe('HealthService', () => {
         const prisma = {
             $queryRaw: queryRaw,
         } as unknown as PrismaService;
-        const service = new HealthService(prisma);
+        const service = createService(prisma);
 
         await expect(service.getReadiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
     });

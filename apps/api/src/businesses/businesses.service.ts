@@ -151,7 +151,7 @@ export class BusinessesService {
 
     async findAll(query: BusinessQueryDto) {
         const cacheKey = hashedCacheKey(BusinessesService.PUBLIC_LIST_CACHE_PREFIX, query);
-        return this.redisService.rememberJson(cacheKey, 120, async () => {
+        return this.redisService.rememberJsonStaleWhileRevalidate(cacheKey, 45, 300, async () => {
             const { page, limit, skip } = this.resolvePagination(query.page, query.limit, 12, 24);
             const where = this.buildWhere(query, false);
 
@@ -216,7 +216,7 @@ export class BusinessesService {
     ) {
         if (!userId) {
             const cacheKey = `${BusinessesService.DETAIL_ID_CACHE_PREFIX}:${id}`;
-            return this.redisService.rememberJson(cacheKey, 300, async () => {
+            return this.redisService.rememberJsonStaleWhileRevalidate(cacheKey, 120, 900, async () => {
                 const publicBusiness = await this.findPublicBusinessById(id);
                 if (!publicBusiness) {
                     throw new NotFoundException('Negocio no encontrado');
@@ -255,7 +255,7 @@ export class BusinessesService {
     ) {
         if (!userId) {
             const cacheKey = `${BusinessesService.DETAIL_SLUG_CACHE_PREFIX}:${slug}`;
-            return this.redisService.rememberJson(cacheKey, 300, async () => {
+            return this.redisService.rememberJsonStaleWhileRevalidate(cacheKey, 120, 900, async () => {
                 const publicBusiness = await this.findPublicBusinessBySlug(slug);
                 if (!publicBusiness) {
                     throw new NotFoundException('Negocio no encontrado');
@@ -985,6 +985,7 @@ export class BusinessesService {
                 }
                 try {
                     await fs.unlink(absolutePath);
+                    await this.deleteOptimizedImageVariants(absolutePath);
                 } catch (error) {
                     const code = (error as NodeJS.ErrnoException).code;
                     if (code !== 'ENOENT') {
@@ -993,6 +994,22 @@ export class BusinessesService {
                 }
             }),
         );
+    }
+
+    private async deleteOptimizedImageVariants(originalPath: string): Promise<void> {
+        const basePath = originalPath.replace(/\.[^.]+$/, '');
+        const optimizedPaths = [`${basePath}.webp`, `${basePath}.avif`];
+
+        for (const optimizedPath of optimizedPaths) {
+            try {
+                await fs.unlink(optimizedPath);
+            } catch (error) {
+                const code = (error as NodeJS.ErrnoException).code;
+                if (code !== 'ENOENT') {
+                    throw error;
+                }
+            }
+        }
     }
 
     private resolveUploadPath(assetUrl: string): string | null {

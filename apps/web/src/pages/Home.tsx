@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { categoryApi, businessApi, locationApi } from '../api/endpoints';
+import { analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { OptimizedImage } from '../components/OptimizedImage';
+import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 
 interface Category {
     id: string;
@@ -66,8 +68,27 @@ export function Home() {
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         if (searchQuery.trim()) {
+            void analyticsApi.trackGrowthEvent({
+                eventType: 'SEARCH_QUERY',
+                visitorId: getOrCreateVisitorId(),
+                sessionId: getOrCreateSessionId(),
+                searchQuery: searchQuery.trim(),
+                metadata: {
+                    source: 'home-hero',
+                },
+            }).catch(() => undefined);
             navigate(`/businesses?search=${encodeURIComponent(searchQuery)}`);
         }
+    };
+
+    const trackBusinessClick = (businessId: string, source: string) => {
+        void analyticsApi.trackGrowthEvent({
+            eventType: 'SEARCH_RESULT_CLICK',
+            businessId,
+            visitorId: getOrCreateVisitorId(),
+            sessionId: getOrCreateSessionId(),
+            metadata: { source },
+        }).catch(() => undefined);
     };
 
     return (
@@ -152,6 +173,15 @@ export function Home() {
                         <Link
                             key={cat.id}
                             to={`/businesses?categoryId=${cat.id}`}
+                            onClick={() => {
+                                void analyticsApi.trackGrowthEvent({
+                                    eventType: 'SEARCH_QUERY',
+                                    categoryId: cat.id,
+                                    visitorId: getOrCreateVisitorId(),
+                                    sessionId: getOrCreateSessionId(),
+                                    metadata: { source: 'home-category' },
+                                }).catch(() => undefined);
+                            }}
                             className="card p-5 text-center group cursor-pointer"
                         >
                             <div className="text-3xl mb-2">{cat.icon || '📁'}</div>
@@ -180,6 +210,15 @@ export function Home() {
                             <Link
                                 key={prov.id}
                                 to={`/businesses?provinceId=${prov.id}`}
+                                onClick={() => {
+                                    void analyticsApi.trackGrowthEvent({
+                                        eventType: 'SEARCH_QUERY',
+                                        provinceId: prov.id,
+                                        visitorId: getOrCreateVisitorId(),
+                                        sessionId: getOrCreateSessionId(),
+                                        metadata: { source: 'home-province' },
+                                    }).catch(() => undefined);
+                                }}
                                 className="px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-600 border border-gray-200 hover:border-primary-500 hover:text-primary-600 hover:shadow-md transition-all"
                             >
                                 📍 {prov.name}
@@ -204,10 +243,15 @@ export function Home() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {recentBusinesses.map((biz) => (
-                        <Link key={biz.id} to={`/businesses/${biz.id}`} className="card group">
+                        <Link
+                            key={biz.id}
+                            to={`/businesses/${biz.id}`}
+                            onClick={() => trackBusinessClick(biz.id, 'home-recent')}
+                            className="card group"
+                        >
                             <div className="h-48 bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center">
                                 {biz.images?.[0] ? (
-                                    <img
+                                    <OptimizedImage
                                         src={biz.images[0].url}
                                         alt={biz.name}
                                         className="w-full h-full object-cover"

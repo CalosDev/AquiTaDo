@@ -1,5 +1,7 @@
 export interface RequestContextState {
     requestId: string | null;
+    traceId: string | null;
+    traceparent: string | null;
     method: string | null;
     path: string | null;
     userId: string | null;
@@ -7,4 +9,3 @@ export interface RequestContextState {
     organizationId: string | null;
     organizationRole: string | null;
 }
-

@@ -288,6 +288,45 @@ export const analyticsApi = {
         limit?: number;
     }) => api.get('/analytics/market-reports', { params }),
     getMarketReportById: (reportId: string) => api.get(`/analytics/market-reports/${reportId}`),
+    trackGrowthEvent: (data: {
+        eventType: 'SEARCH_QUERY' | 'SEARCH_RESULT_CLICK' | 'CONTACT_CLICK' | 'WHATSAPP_CLICK' | 'BOOKING_INTENT';
+        businessId?: string;
+        categoryId?: string;
+        provinceId?: string;
+        cityId?: string;
+        visitorId?: string;
+        sessionId?: string;
+        variantKey?: string;
+        searchQuery?: string;
+        metadata?: Record<string, unknown>;
+        occurredAt?: string;
+    }) => api.post('/analytics/events/growth', data),
+    getGrowthInsights: (params?: {
+        days?: number;
+        provinceId?: string;
+        categoryId?: string;
+        limit?: number;
+    }) => api.get('/analytics/growth/insights', { params }),
+};
+
+// ---- WhatsApp ----
+export const whatsappApi = {
+    createClickToChatLink: (data: {
+        businessId: string;
+        source?: string;
+        sessionId?: string;
+        visitorId?: string;
+        variantKey?: string;
+    }) => api.post('/whatsapp/click-to-chat', data),
+    getMyConversations: (params?: Record<string, string | number | boolean>) =>
+        api.get('/whatsapp/conversations/my', { params }),
+    updateConversationStatus: (
+        conversationId: string,
+        data: {
+            status?: 'OPEN' | 'CLOSED' | 'ESCALATED';
+            autoResponderActive?: boolean;
+        },
+    ) => api.patch(`/whatsapp/conversations/my/${conversationId}/status`, data),
 };
 
 // ---- Messaging ----

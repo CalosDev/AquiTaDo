@@ -19,4 +19,9 @@ export class HealthController {
     async getReadiness() {
         return this.healthService.getReadiness();
     }
+
+    @Get('dashboard')
+    async getOperationalDashboard() {
+        return this.healthService.getOperationalDashboard();
+    }
 }

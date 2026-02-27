@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { adsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { adsApi, analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { OptimizedImage } from '../components/OptimizedImage';
+import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 
 interface Business {
     id: string;
@@ -44,17 +46,6 @@ interface SponsoredPlacement {
         city?: { name: string };
         categories?: { name: string; icon?: string }[];
     };
-}
-
-function resolveVisitorId(): string {
-    const existingVisitorId = localStorage.getItem('analyticsVisitorId');
-    if (existingVisitorId) {
-        return existingVisitorId;
-    }
-
-    const generatedVisitorId = window.crypto?.randomUUID?.() ?? `visitor-${Date.now()}`;
-    localStorage.setItem('analyticsVisitorId', generatedVisitorId);
-    return generatedVisitorId;
 }
 
 function buildPagination(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
@@ -163,7 +154,7 @@ export function BusinessesList() {
             return;
         }
 
-        const visitorId = resolveVisitorId();
+        const visitorId = getOrCreateVisitorId();
         sponsoredPlacements.forEach((placement) => {
             void adsApi.trackImpression(placement.campaign.id, {
                 visitorId,
@@ -171,6 +162,22 @@ export function BusinessesList() {
             }).catch(() => undefined);
         });
     }, [sponsoredPlacements]);
+
+    const trackBusinessClick = useCallback((businessId: string, source: string) => {
+        void analyticsApi.trackGrowthEvent({
+            eventType: 'SEARCH_RESULT_CLICK',
+            businessId,
+            categoryId: currentCategory || undefined,
+            provinceId: currentProvince || undefined,
+            visitorId: getOrCreateVisitorId(),
+            sessionId: getOrCreateSessionId(),
+            searchQuery: currentSearch || undefined,
+            metadata: {
+                source,
+                page: currentPage,
+            },
+        }).catch(() => undefined);
+    }, [currentCategory, currentPage, currentProvince, currentSearch]);
 
     const updateFilter = useCallback((
         key: string,
@@ -305,9 +312,10 @@ export function BusinessesList() {
                                             to={`/businesses/${placement.business.id}`}
                                             onClick={() => {
                                                 void adsApi.trackClick(placement.campaign.id, {
-                                                    visitorId: resolveVisitorId(),
+                                                    visitorId: getOrCreateVisitorId(),
                                                     placementKey: 'businesses-list',
                                                 }).catch(() => undefined);
+                                                trackBusinessClick(placement.business.id, 'sponsored-placement');
                                             }}
                                             className="rounded-xl border border-amber-200 bg-amber-50 p-3 hover:border-amber-300 transition-colors"
                                         >
@@ -330,10 +338,17 @@ export function BusinessesList() {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                                 {businesses.map((biz) => (
-                                    <Link key={biz.id} to={`/businesses/${biz.id}`} className="card group">
+                                    <Link
+                                        key={biz.id}
+                                        to={`/businesses/${biz.id}`}
+                                        onClick={() => {
+                                            trackBusinessClick(biz.id, 'businesses-list');
+                                        }}
+                                        className="card group"
+                                    >
                                         <div className="h-40 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
                                             {biz.images?.[0] ? (
-                                                <img
+                                                <OptimizedImage
                                                     src={biz.images[0].url}
                                                     alt={biz.name}
                                                     className="w-full h-full object-cover"

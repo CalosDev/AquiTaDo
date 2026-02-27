@@ -4,13 +4,15 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { MarketReportType, Prisma } from '../generated/prisma/client';
+import { GrowthEventType, MarketReportType, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
     AnalyticsEventType,
     GenerateMarketReportDto,
+    GrowthInsightsQueryDto,
     ListMarketReportsQueryDto,
     MarketInsightsQueryDto,
+    TrackGrowthEventDto,
     TrackBusinessEventDto,
 } from './dto/analytics.dto';
 
@@ -91,6 +93,374 @@ export class AnalyticsService {
                 trackedAt: eventTime.toISOString(),
             };
         });
+    }
+
+    async trackGrowthEvent(dto: TrackGrowthEventDto) {
+        const occurredAt = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
+        const visitorIdHash = dto.visitorId?.trim()
+            ? createHash('sha256').update(dto.visitorId.trim()).digest('hex').slice(0, 64)
+            : null;
+        const searchQuery = dto.searchQuery?.trim().slice(0, 255) || null;
+
+        let organizationId: string | null = null;
+        if (dto.businessId) {
+            const business = await this.prisma.business.findUnique({
+                where: { id: dto.businessId },
+                select: {
+                    id: true,
+                    organizationId: true,
+                },
+            });
+
+            if (!business) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            organizationId = business.organizationId;
+        }
+
+        const growthEvent = await this.prisma.growthEvent.create({
+            data: {
+                eventType: dto.eventType,
+                businessId: dto.businessId ?? null,
+                organizationId,
+                userId: dto.userId ?? null,
+                categoryId: dto.categoryId ?? null,
+                provinceId: dto.provinceId ?? null,
+                cityId: dto.cityId ?? null,
+                visitorIdHash,
+                sessionId: dto.sessionId?.trim() || null,
+                variantKey: dto.variantKey?.trim() || null,
+                searchQuery,
+                metadata: (dto.metadata ?? null) as Prisma.InputJsonValue,
+                occurredAt,
+            },
+            select: {
+                id: true,
+                eventType: true,
+                occurredAt: true,
+            },
+        });
+
+        return {
+            received: true,
+            id: growthEvent.id,
+            eventType: growthEvent.eventType,
+            occurredAt: growthEvent.occurredAt.toISOString(),
+        };
+    }
+
+    async getGrowthInsights(query: GrowthInsightsQueryDto) {
+        const normalizedDays = this.normalizeDays(query.days ?? 30);
+        const limit = Math.min(Math.max(query.limit ?? 15, 1), 50);
+        const now = new Date();
+        const rangeStart = this.toDateOnly(new Date(now.getTime() - (normalizedDays - 1) * 86_400_000));
+
+        const where: Prisma.GrowthEventWhereInput = {
+            occurredAt: {
+                gte: rangeStart,
+            },
+        };
+        if (query.provinceId) {
+            where.provinceId = query.provinceId;
+        }
+        if (query.categoryId) {
+            where.categoryId = query.categoryId;
+        }
+
+        const [
+            categoryDemand,
+            cityDemand,
+            provinceDemand,
+            searchVisitors,
+            whatsappVisitors,
+            contactClicksByVariant,
+            whatsappClicksByVariant,
+        ] = await Promise.all([
+            this.prisma.growthEvent.groupBy({
+                by: ['categoryId'],
+                where: {
+                    ...where,
+                    eventType: GrowthEventType.SEARCH_QUERY,
+                    categoryId: { not: null },
+                },
+                _count: { _all: true },
+                orderBy: {
+                    _count: {
+                        categoryId: 'desc',
+                    },
+                },
+                take: limit,
+            }),
+            this.prisma.growthEvent.groupBy({
+                by: ['cityId', 'provinceId'],
+                where: {
+                    ...where,
+                    eventType: GrowthEventType.SEARCH_QUERY,
+                    cityId: { not: null },
+                },
+                _count: { _all: true },
+                orderBy: {
+                    _count: {
+                        cityId: 'desc',
+                    },
+                },
+                take: limit,
+            }),
+            this.prisma.growthEvent.groupBy({
+                by: ['provinceId', 'categoryId'],
+                where: {
+                    ...where,
+                    eventType: GrowthEventType.SEARCH_QUERY,
+                },
+                _count: { _all: true },
+                orderBy: {
+                    _count: {
+                        provinceId: 'desc',
+                    },
+                },
+                take: limit,
+            }),
+            this.prisma.growthEvent.findMany({
+                where: {
+                    ...where,
+                    eventType: GrowthEventType.SEARCH_QUERY,
+                    visitorIdHash: { not: null },
+                },
+                select: { visitorIdHash: true },
+                distinct: ['visitorIdHash'],
+            }),
+            this.prisma.growthEvent.findMany({
+                where: {
+                    ...where,
+                    eventType: GrowthEventType.WHATSAPP_CLICK,
+                    visitorIdHash: { not: null },
+                },
+                select: { visitorIdHash: true },
+                distinct: ['visitorIdHash'],
+            }),
+            this.prisma.growthEvent.groupBy({
+                by: ['variantKey'],
+                where: {
+                    ...where,
+                    eventType: GrowthEventType.CONTACT_CLICK,
+                    variantKey: { not: null },
+                },
+                _count: { _all: true },
+            }),
+            this.prisma.growthEvent.groupBy({
+                by: ['variantKey'],
+                where: {
+                    ...where,
+                    eventType: GrowthEventType.WHATSAPP_CLICK,
+                    variantKey: { not: null },
+                },
+                _count: { _all: true },
+            }),
+        ]);
+
+        const categoryIds = categoryDemand
+            .map((entry) => entry.categoryId)
+            .filter((entry): entry is string => Boolean(entry));
+        const cityIds = cityDemand
+            .map((entry) => entry.cityId)
+            .filter((entry): entry is string => Boolean(entry));
+        const provinceIds = new Set<string>();
+        for (const row of provinceDemand) {
+            if (row.provinceId) {
+                provinceIds.add(row.provinceId);
+            }
+        }
+        for (const row of cityDemand) {
+            if (row.provinceId) {
+                provinceIds.add(row.provinceId);
+            }
+        }
+        if (query.provinceId) {
+            provinceIds.add(query.provinceId);
+        }
+
+        const [categories, cities, provinces] = await Promise.all([
+            categoryIds.length > 0
+                ? this.prisma.category.findMany({
+                    where: { id: { in: categoryIds } },
+                    select: { id: true, name: true, slug: true },
+                })
+                : Promise.resolve([]),
+            cityIds.length > 0
+                ? this.prisma.city.findMany({
+                    where: { id: { in: cityIds } },
+                    select: {
+                        id: true,
+                        name: true,
+                        province: {
+                            select: {
+                                id: true,
+                                name: true,
+                                slug: true,
+                            },
+                        },
+                    },
+                })
+                : Promise.resolve([]),
+            provinceIds.size > 0
+                ? this.prisma.province.findMany({
+                    where: { id: { in: [...provinceIds] } },
+                    select: { id: true, name: true, slug: true },
+                })
+                : Promise.resolve([]),
+        ]);
+
+        const categoryById = new Map(categories.map((category) => [category.id, category]));
+        const cityById = new Map(cities.map((city) => [city.id, city]));
+        const provinceById = new Map(provinces.map((province) => [province.id, province]));
+
+        const topCategories = await Promise.all(categoryDemand.map(async (entry) => {
+            if (!entry.categoryId) {
+                return null;
+            }
+
+            const category = categoryById.get(entry.categoryId);
+            const supply = await this.prisma.business.count({
+                where: {
+                    verified: true,
+                    ...(query.provinceId ? { provinceId: query.provinceId } : {}),
+                    categories: {
+                        some: {
+                            categoryId: entry.categoryId,
+                        },
+                    },
+                },
+            });
+
+            return {
+                categoryId: entry.categoryId,
+                categoryName: category?.name ?? 'Sin categoria',
+                categorySlug: category?.slug ?? null,
+                searches: entry._count._all,
+                supplyBusinesses: supply,
+                demandSupplyRatio: Number((entry._count._all / Math.max(supply, 1)).toFixed(2)),
+            };
+        }));
+
+        const demandSupplyGaps = await Promise.all(provinceDemand.map(async (entry) => {
+            const supply = await this.prisma.business.count({
+                where: {
+                    verified: true,
+                    ...(entry.provinceId ? { provinceId: entry.provinceId } : {}),
+                    ...(entry.categoryId
+                        ? {
+                            categories: {
+                                some: {
+                                    categoryId: entry.categoryId,
+                                },
+                            },
+                        }
+                        : {}),
+                },
+            });
+
+            const province = entry.provinceId ? provinceById.get(entry.provinceId) : null;
+            const category = entry.categoryId ? categoryById.get(entry.categoryId) : null;
+            return {
+                provinceId: entry.provinceId ?? null,
+                provinceName: province?.name ?? 'Nacional',
+                categoryId: entry.categoryId ?? null,
+                categoryName: category?.name ?? 'Todas',
+                demandSearches: entry._count._all,
+                supplyBusinesses: supply,
+                demandSupplyRatio: Number((entry._count._all / Math.max(supply, 1)).toFixed(2)),
+            };
+        }));
+
+        const topCityGaps = await Promise.all(cityDemand.map(async (entry) => {
+            if (!entry.cityId) {
+                return null;
+            }
+
+            const city = cityById.get(entry.cityId);
+            const supply = await this.prisma.business.count({
+                where: {
+                    verified: true,
+                    cityId: entry.cityId,
+                },
+            });
+
+            return {
+                cityId: entry.cityId,
+                cityName: city?.name ?? 'Ciudad',
+                provinceId: city?.province.id ?? entry.provinceId ?? null,
+                provinceName: city?.province.name ?? null,
+                demandSearches: entry._count._all,
+                supplyBusinesses: supply,
+                demandSupplyRatio: Number((entry._count._all / Math.max(supply, 1)).toFixed(2)),
+            };
+        }));
+
+        const contactClicksMap = new Map(
+            contactClicksByVariant
+                .filter((entry) => Boolean(entry.variantKey))
+                .map((entry) => [entry.variantKey as string, entry._count._all]),
+        );
+        const whatsappClicksMap = new Map(
+            whatsappClicksByVariant
+                .filter((entry) => Boolean(entry.variantKey))
+                .map((entry) => [entry.variantKey as string, entry._count._all]),
+        );
+
+        const allVariants = new Set<string>([
+            ...contactClicksMap.keys(),
+            ...whatsappClicksMap.keys(),
+        ]);
+        const abTest = [...allVariants].map((variantKey) => {
+            const contactClicks = contactClicksMap.get(variantKey) ?? 0;
+            const whatsappClicks = whatsappClicksMap.get(variantKey) ?? 0;
+            return {
+                variantKey,
+                contactClicks,
+                whatsappClicks,
+                conversionRate: contactClicks > 0
+                    ? Number(((whatsappClicks / contactClicks) * 100).toFixed(2))
+                    : 0,
+            };
+        }).sort((left, right) => right.conversionRate - left.conversionRate);
+
+        const uniqueSearchVisitors = searchVisitors.length;
+        const uniqueWhatsAppVisitors = whatsappVisitors.length;
+
+        return {
+            range: {
+                days: normalizedDays,
+                from: rangeStart.toISOString(),
+                to: this.toDateOnly(now).toISOString(),
+            },
+            filters: {
+                provinceId: query.provinceId ?? null,
+                categoryId: query.categoryId ?? null,
+            },
+            topSearchedCategories: topCategories.filter(Boolean).slice(0, limit),
+            demandSupplyGaps: demandSupplyGaps
+                .sort((left, right) => right.demandSupplyRatio - left.demandSupplyRatio)
+                .slice(0, limit),
+            topCityDemandGaps: topCityGaps
+                .filter(Boolean)
+                .sort((left, right) => (right?.demandSupplyRatio ?? 0) - (left?.demandSupplyRatio ?? 0))
+                .slice(0, limit),
+            conversionFunnels: {
+                searchToWhatsApp: {
+                    uniqueSearchVisitors,
+                    uniqueWhatsAppVisitors,
+                    conversionRate: uniqueSearchVisitors > 0
+                        ? Number(((uniqueWhatsAppVisitors / uniqueSearchVisitors) * 100).toFixed(2))
+                        : 0,
+                },
+            },
+            abTesting: {
+                experiment: 'business_contact_button',
+                variants: abTest,
+                winner: abTest[0] ?? null,
+            },
+        };
     }
 
     async getOrganizationDashboard(organizationId: string, days = 30) {

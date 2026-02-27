@@ -23,6 +23,7 @@ import {
 } from './dto/promotion.dto';
 import { RedisService } from '../cache/redis.service';
 import { hashedCacheKey } from '../cache/cache-key';
+import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 
 type PrismaClientLike = PrismaService | Prisma.TransactionClient;
 
@@ -36,6 +37,8 @@ export class PromotionsService {
         private readonly prisma: PrismaService,
         @Inject(RedisService)
         private readonly redisService: RedisService,
+        @Inject(NotificationsQueueService)
+        private readonly notificationsQueueService: NotificationsQueueService,
     ) { }
 
     private readonly includeRelations = {
@@ -238,6 +241,16 @@ export class PromotionsService {
                 throw error;
             }
         });
+
+        if (createdPromotion.isFlashOffer && createdPromotion.isActive) {
+            await this.notificationsQueueService.enqueuePromotionGeoAlert({
+                organizationId: createdPromotion.organizationId,
+                businessId: createdPromotion.businessId,
+                promotionId: createdPromotion.id,
+                title: createdPromotion.title,
+                message: createdPromotion.description?.trim() || 'Nueva oferta disponible por tiempo limitado.',
+            });
+        }
 
         await this.invalidatePublicPromotionsCache();
         return createdPromotion;

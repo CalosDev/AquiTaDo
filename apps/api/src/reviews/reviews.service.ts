@@ -2,9 +2,12 @@ import {
     BadRequestException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
+import { AiService } from '../ai/ai.service';
+import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReputationService } from '../reputation/reputation.service';
 import {
@@ -14,11 +17,17 @@ import {
 
 @Injectable()
 export class ReviewsService {
+    private readonly logger = new Logger(ReviewsService.name);
+
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
         @Inject(ReputationService)
         private readonly reputationService: ReputationService,
+        @Inject(AiService)
+        private readonly aiService: AiService,
+        @Inject(NotificationsQueueService)
+        private readonly notificationsQueueService: NotificationsQueueService,
     ) { }
 
     async create(dto: CreateReviewDto, userId: string) {
@@ -89,6 +98,9 @@ export class ReviewsService {
             });
 
             await this.reputationService.recalculateBusinessReputation(dto.businessId);
+            if (createdReview.moderationStatus === 'APPROVED' && !createdReview.isSpam) {
+                void this.processReviewSentiment(createdReview.id);
+            }
 
             return createdReview;
         } catch (error) {
@@ -232,6 +244,10 @@ export class ReviewsService {
                 },
             }),
         ]);
+
+        if (updatedReview.moderationStatus === 'APPROVED' && !updatedReview.isSpam) {
+            void this.processReviewSentiment(updatedReview.id);
+        }
 
         return updatedReview;
     }
@@ -420,5 +436,36 @@ export class ReviewsService {
             status: 'FLAGGED',
             reason: reasons.join('; ').slice(0, 255),
         };
+    }
+
+    private async processReviewSentiment(reviewId: string): Promise<void> {
+        try {
+            const analysis = await this.aiService.analyzeReviewSentiment(reviewId);
+            if (!analysis.isNegative) {
+                return;
+            }
+
+            const business = await this.prisma.business.findUnique({
+                where: { id: analysis.businessId },
+                select: {
+                    whatsapp: true,
+                },
+            });
+
+            await this.notificationsQueueService.enqueueNegativeReviewAlert({
+                organizationId: analysis.organizationId,
+                businessId: analysis.businessId,
+                businessName: analysis.businessName,
+                businessWhatsapp: business?.whatsapp ?? null,
+                reviewId: analysis.reviewId,
+                summary: analysis.summary || 'Se detecto feedback negativo sin resumen textual.',
+            });
+
+            await this.aiService.markReviewSentimentAlerted(reviewId);
+        } catch (error) {
+            this.logger.warn(
+                `No se pudo procesar sentimiento para resena "${reviewId}" (${error instanceof Error ? error.message : String(error)})`,
+            );
+        }
     }
 }

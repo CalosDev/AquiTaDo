@@ -10,8 +10,10 @@ import {
     Max,
     MaxLength,
     Min,
+    ValidateIf,
+    IsObject,
 } from 'class-validator';
-import { MarketReportType } from '../../generated/prisma/client';
+import { GrowthEventType, MarketReportType } from '../../generated/prisma/client';
 
 export enum AnalyticsEventType {
     VIEW = 'VIEW',
@@ -106,5 +108,82 @@ export class ListMarketReportsQueryDto {
     @IsInt()
     @Min(1)
     @Max(100)
+    limit?: number;
+}
+
+export class TrackGrowthEventDto {
+    @IsEnum(GrowthEventType)
+    eventType!: GrowthEventType;
+
+    @IsOptional()
+    @IsUUID()
+    businessId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    categoryId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    provinceId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    cityId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    userId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(255)
+    visitorId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    sessionId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    variantKey?: string;
+
+    @ValidateIf((_, value) => value !== undefined)
+    @IsString()
+    @MaxLength(255)
+    searchQuery?: string;
+
+    @IsOptional()
+    @IsObject()
+    metadata?: Record<string, unknown>;
+
+    @IsOptional()
+    @IsISO8601()
+    occurredAt?: string;
+}
+
+export class GrowthInsightsQueryDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(365)
+    days?: number;
+
+    @IsOptional()
+    @IsUUID()
+    provinceId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    categoryId?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(50)
     limit?: number;
 }

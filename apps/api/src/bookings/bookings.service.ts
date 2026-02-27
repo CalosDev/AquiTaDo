@@ -14,6 +14,7 @@ import {
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReputationService } from '../reputation/reputation.service';
+import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 import {
     CreateBookingDto,
     ListBookingsQueryDto,
@@ -28,6 +29,8 @@ export class BookingsService {
         private readonly prisma: PrismaService,
         @Inject(ReputationService)
         private readonly reputationService: ReputationService,
+        @Inject(NotificationsQueueService)
+        private readonly notificationsQueueService: NotificationsQueueService,
     ) { }
 
     private readonly bookingInclude = {
@@ -44,6 +47,7 @@ export class BookingsService {
                 id: true,
                 name: true,
                 email: true,
+                phone: true,
             },
         },
         promotion: {
@@ -92,7 +96,7 @@ export class BookingsService {
             throw new NotFoundException('Negocio no disponible para reservas');
         }
 
-        return this.prisma.$transaction(async (tx) => {
+        const booking = await this.prisma.$transaction(async (tx) => {
             const promotion = await this.resolveApplicablePromotion(
                 tx,
                 business.organizationId,
@@ -132,6 +136,24 @@ export class BookingsService {
 
             return booking;
         });
+
+        const scheduledForDate = new Date(booking.scheduledFor);
+        if (!Number.isNaN(scheduledForDate.getTime())) {
+            const reminderAt = new Date(scheduledForDate.getTime() - 2 * 60 * 60 * 1000);
+            await this.notificationsQueueService.enqueueBookingReminder(
+                {
+                    organizationId: booking.organizationId,
+                    businessId: booking.businessId,
+                    bookingId: booking.id,
+                    businessName: booking.business.name,
+                    customerPhone: booking.user?.phone ?? null,
+                    scheduledFor: scheduledForDate.toISOString(),
+                },
+                reminderAt,
+            );
+        }
+
+        return booking;
     }
 
     async listMyBookings(userId: string, query: ListBookingsQueryDto) {

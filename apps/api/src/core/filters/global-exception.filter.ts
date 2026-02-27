@@ -28,10 +28,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             : HttpStatus.INTERNAL_SERVER_ERROR;
 
         const requestIdHeader = response.getHeader('x-request-id');
+        const traceIdHeader = response.getHeader('x-trace-id');
         const requestId = typeof requestIdHeader === 'string'
             ? requestIdHeader
             : Array.isArray(requestIdHeader) && requestIdHeader.length > 0
                 ? requestIdHeader[0] ?? null
+                : null;
+        const traceId = typeof traceIdHeader === 'string'
+            ? traceIdHeader
+            : Array.isArray(traceIdHeader) && traceIdHeader.length > 0
+                ? traceIdHeader[0] ?? null
                 : null;
 
         const baseErrorBody = exception instanceof HttpException
@@ -48,6 +54,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
                 },
                 extra: {
                     requestId,
+                    traceId,
                     method: request.method,
                     path: request.originalUrl || request.url,
                     status,
@@ -59,6 +66,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         this.logger.error(
             JSON.stringify({
                 requestId,
+                traceId,
                 status,
                 method: request.method,
                 path: request.originalUrl || request.url,
@@ -73,6 +81,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         response.status(status).json({
             ...(payload as Record<string, unknown>),
             requestId,
+            traceId,
         });
     }
 }

@@ -14,13 +14,16 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CurrentOrganization } from '../organizations/decorators/current-organization.decorator';
 import { OrgContextGuard } from '../organizations/guards/org-context.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AnalyticsService } from './analytics.service';
 import {
     AnalyticsRangeQueryDto,
     GenerateMarketReportDto,
+    GrowthInsightsQueryDto,
     ListMarketReportsQueryDto,
     MarketInsightsQueryDto,
+    TrackGrowthEventDto,
     TrackBusinessEventDto,
 } from './dto/analytics.dto';
 
@@ -34,6 +37,18 @@ export class AnalyticsController {
     @Post('events')
     async trackEvent(@Body() dto: TrackBusinessEventDto) {
         return this.analyticsService.trackBusinessEvent(dto);
+    }
+
+    @Post('events/growth')
+    @UseGuards(OptionalJwtAuthGuard)
+    async trackGrowthEvent(
+        @Body() dto: TrackGrowthEventDto,
+        @CurrentUser('id') userId?: string,
+    ) {
+        return this.analyticsService.trackGrowthEvent({
+            ...dto,
+            userId: dto.userId ?? userId,
+        });
     }
 
     @Get('dashboard/my')
@@ -67,6 +82,13 @@ export class AnalyticsController {
     @Roles('ADMIN')
     async getMarketInsights(@Query() query: MarketInsightsQueryDto) {
         return this.analyticsService.getMarketInsights(query);
+    }
+
+    @Get('growth/insights')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async getGrowthInsights(@Query() query: GrowthInsightsQueryDto) {
+        return this.analyticsService.getGrowthInsights(query);
     }
 
     @Post('market-reports/generate')

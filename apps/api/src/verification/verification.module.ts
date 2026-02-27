@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ReputationModule } from '../reputation/reputation.module';
 import { VerificationController } from './verification.controller';
 import { VerificationService } from './verification.service';
 
 @Module({
-    imports: [PrismaModule, ReputationModule],
+    imports: [PrismaModule, ReputationModule, NotificationsModule],
     controllers: [VerificationController],
     providers: [VerificationService],
     exports: [VerificationService],

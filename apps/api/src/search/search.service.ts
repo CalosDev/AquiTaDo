@@ -4,6 +4,7 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../cache/redis.service';
 import { hashedCacheKey } from '../cache/cache-key';
+import { AnalyticsService } from '../analytics/analytics.service';
 import {
     ReindexBusinessesQueryDto,
     SearchBusinessesQueryDto,
@@ -41,6 +42,8 @@ export class SearchService implements OnModuleInit {
         private readonly configService: ConfigService,
         @Inject(RedisService)
         private readonly redisService: RedisService,
+        @Inject(AnalyticsService)
+        private readonly analyticsService: AnalyticsService,
     ) { }
 
     async onModuleInit() {
@@ -69,7 +72,10 @@ export class SearchService implements OnModuleInit {
         }
     }
 
-    async searchBusinesses(query: SearchBusinessesQueryDto) {
+    async searchBusinesses(
+        query: SearchBusinessesQueryDto,
+        trackingContext?: { visitorId?: string; sessionId?: string; source?: string | null },
+    ) {
         const page = query.page ?? 1;
         const limit = query.limit ?? 12;
         const normalizedQuery = {
@@ -82,7 +88,7 @@ export class SearchService implements OnModuleInit {
         };
 
         const cacheKey = hashedCacheKey('search:businesses:list', normalizedQuery);
-        return this.redisService.rememberJson(cacheKey, 120, async () => {
+        const result = await this.redisService.rememberJsonStaleWhileRevalidate(cacheKey, 30, 180, async () => {
             if (this.meiliClient) {
                 try {
                     return await this.searchBusinessesViaMeili(normalizedQuery);
@@ -95,6 +101,27 @@ export class SearchService implements OnModuleInit {
 
             return this.searchBusinessesViaDatabase(normalizedQuery);
         });
+
+        void this.analyticsService.trackGrowthEvent({
+            eventType: 'SEARCH_QUERY',
+            categoryId: normalizedQuery.categoryId ?? undefined,
+            provinceId: normalizedQuery.provinceId ?? undefined,
+            cityId: normalizedQuery.cityId ?? undefined,
+            searchQuery: normalizedQuery.q || undefined,
+            visitorId: trackingContext?.visitorId,
+            sessionId: trackingContext?.sessionId,
+            metadata: {
+                source: trackingContext?.source ?? 'search-endpoint',
+                page: normalizedQuery.page,
+                limit: normalizedQuery.limit,
+                resultCount: Array.isArray((result as { data?: unknown }).data)
+                    ? ((result as { data: unknown[] }).data.length)
+                    : null,
+                resultSource: (result as { source?: string }).source ?? null,
+            },
+        }).catch(() => undefined);
+
+        return result;
     }
 
     async reindexBusinesses(query: ReindexBusinessesQueryDto = {}) {

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, messagingApi, reviewApi } from '../api/endpoints';
+import { analyticsApi, businessApi, messagingApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
+import { OptimizedImage } from '../components/OptimizedImage';
+import { getOrAssignExperimentVariant } from '../lib/abTesting';
+import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 
 interface Business {
     id: string;
@@ -25,17 +28,6 @@ interface Business {
     owner?: { name: string };
 }
 
-function resolveVisitorId(): string {
-    const existingVisitorId = localStorage.getItem('analyticsVisitorId');
-    if (existingVisitorId) {
-        return existingVisitorId;
-    }
-
-    const generatedVisitorId = window.crypto?.randomUUID?.() ?? `visitor-${Date.now()}`;
-    localStorage.setItem('analyticsVisitorId', generatedVisitorId);
-    return generatedVisitorId;
-}
-
 export function BusinessDetails() {
     const { id } = useParams<{ id: string }>();
     const { isAuthenticated } = useAuth();
@@ -51,6 +43,7 @@ export function BusinessDetails() {
     const [reviewSuccessMessage, setReviewSuccessMessage] = useState('');
     const [messageErrorMessage, setMessageErrorMessage] = useState('');
     const [messageSuccessMessage, setMessageSuccessMessage] = useState('');
+    const [contactVariant, setContactVariant] = useState('control');
 
     const loadBusiness = useCallback(async () => {
         if (!id) {
@@ -80,7 +73,14 @@ export function BusinessDetails() {
             return;
         }
 
-        const visitorId = resolveVisitorId();
+        const visitorId = getOrCreateVisitorId();
+        setContactVariant(
+            getOrAssignExperimentVariant(
+                'business_contact_button',
+                ['control', 'emphasis'],
+                business.id,
+            ),
+        );
         void analyticsApi.trackEvent({
             businessId: business.id,
             eventType: 'VIEW',
@@ -132,7 +132,7 @@ export function BusinessDetails() {
             void analyticsApi.trackEvent({
                 businessId: id,
                 eventType: 'RESERVATION_REQUEST',
-                visitorId: resolveVisitorId(),
+                visitorId: getOrCreateVisitorId(),
             }).catch(() => undefined);
         } catch (error) {
             setMessageErrorMessage(getApiErrorMessage(error, 'No se pudo enviar el mensaje'));
@@ -146,6 +146,94 @@ export function BusinessDetails() {
             ? (business.reviews.reduce((acc, r) => acc + r.rating, 0) / business.reviews.length).toFixed(1)
             : null;
     const currentImage = business?.images?.[activeImage] ?? business?.images?.[0];
+    const contactExperimentVariant = `business_contact_button:${contactVariant}`;
+    const whatsappDirectUrl = business?.whatsapp
+        ? `https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`
+        : null;
+
+    const trackContactGrowthEvent = (
+        eventType: 'CONTACT_CLICK' | 'WHATSAPP_CLICK',
+        metadata: Record<string, unknown>,
+    ) => {
+        if (!business?.id) {
+            return;
+        }
+
+        void analyticsApi.trackGrowthEvent({
+            eventType,
+            businessId: business.id,
+            visitorId: getOrCreateVisitorId(),
+            sessionId: getOrCreateSessionId(),
+            variantKey: contactExperimentVariant,
+            metadata,
+        }).catch(() => undefined);
+    };
+
+    const handlePhoneClick = () => {
+        if (!business?.id) {
+            return;
+        }
+
+        const visitorId = getOrCreateVisitorId();
+        void analyticsApi.trackEvent({
+            businessId: business.id,
+            eventType: 'CLICK',
+            visitorId,
+        }).catch(() => undefined);
+
+        trackContactGrowthEvent('CONTACT_CLICK', {
+            source: 'business-details',
+            channel: 'phone',
+        });
+    };
+
+    const handleWhatsAppClick = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+        event.preventDefault();
+        if (!business?.id || !business.whatsapp) {
+            return;
+        }
+
+        const visitorId = getOrCreateVisitorId();
+        const sessionId = getOrCreateSessionId();
+
+        void analyticsApi.trackEvent({
+            businessId: business.id,
+            eventType: 'CLICK',
+            visitorId,
+        }).catch(() => undefined);
+
+        trackContactGrowthEvent('CONTACT_CLICK', {
+            source: 'business-details',
+            channel: 'whatsapp',
+        });
+
+        try {
+            const response = await whatsappApi.createClickToChatLink({
+                businessId: business.id,
+                source: 'business-details',
+                sessionId,
+                visitorId,
+                variantKey: contactExperimentVariant,
+            });
+
+            trackContactGrowthEvent('WHATSAPP_CLICK', {
+                source: 'business-details',
+                channel: 'whatsapp',
+                conversionId: response.data?.conversionId ?? null,
+            });
+
+            const url = response.data?.url || whatsappDirectUrl;
+            if (url) {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
+        } catch {
+            if (whatsappDirectUrl) {
+                window.open(whatsappDirectUrl, '_blank', 'noopener,noreferrer');
+                return;
+            }
+            setErrorMessage('No se pudo abrir WhatsApp');
+        }
+    };
 
     if (loading) {
         return (
@@ -180,9 +268,9 @@ export function BusinessDetails() {
                     {/* Image Gallery */}
                     <div className="card overflow-hidden">
                         <div className="h-72 md:h-96 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
-                            {business.images.length > 0 ? (
-                                <img
-                                    src={currentImage?.url}
+                            {currentImage ? (
+                                <OptimizedImage
+                                    src={currentImage.url}
                                     alt={business.name}
                                     className="w-full h-full object-cover"
                                 />
@@ -199,7 +287,7 @@ export function BusinessDetails() {
                                         className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === activeImage ? 'border-primary-500' : 'border-transparent'
                                             }`}
                                     >
-                                        <img
+                                        <OptimizedImage
                                             src={img.url}
                                             alt=""
                                             className="w-full h-full object-cover"
@@ -376,13 +464,7 @@ export function BusinessDetails() {
                             {business.phone && (
                                 <a
                                     href={`tel:${business.phone}`}
-                                    onClick={() => {
-                                        void analyticsApi.trackEvent({
-                                            businessId: business.id,
-                                            eventType: 'CLICK',
-                                            visitorId: resolveVisitorId(),
-                                        }).catch(() => undefined);
-                                    }}
+                                    onClick={handlePhoneClick}
                                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-primary-50 transition-colors group"
                                 >
                                     <span className="text-lg">📞</span>
@@ -394,22 +476,21 @@ export function BusinessDetails() {
                             )}
                             {business.whatsapp && (
                                 <a
-                                    href={`https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`}
+                                    href={whatsappDirectUrl ?? '#'}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    onClick={() => {
-                                        void analyticsApi.trackEvent({
-                                            businessId: business.id,
-                                            eventType: 'CLICK',
-                                            visitorId: resolveVisitorId(),
-                                        }).catch(() => undefined);
-                                    }}
-                                    className="flex items-center gap-3 p-3 rounded-xl bg-green-50 hover:bg-green-100 transition-colors group"
+                                    onClick={handleWhatsAppClick}
+                                    className={`flex items-center gap-3 p-3 rounded-xl transition-colors group ${contactVariant === 'emphasis'
+                                        ? 'bg-green-100 hover:bg-green-200 border border-green-300 shadow-sm'
+                                        : 'bg-green-50 hover:bg-green-100'
+                                        }`}
                                 >
                                     <span className="text-lg">💬</span>
                                     <div>
                                         <div className="text-xs text-gray-400">WhatsApp</div>
-                                        <div className="text-sm font-medium text-green-700">{business.whatsapp}</div>
+                                        <div className="text-sm font-medium text-green-700">
+                                            {contactVariant === 'emphasis' ? 'Chatea ahora' : business.whatsapp}
+                                        </div>
                                     </div>
                                 </a>
                             )}
