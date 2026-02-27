@@ -2,12 +2,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
+import { resolveRoleHomeLabel, resolveRoleHomePath } from '../auth/roles';
 
 export function Navbar() {
     const { isAuthenticated, user, logout, isAdmin, isBusinessOwner } = useAuth();
     const { activeOrganization } = useOrganization();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
+    const roleHomePath = resolveRoleHomePath(user?.role);
+    const roleHomeLabel = resolveRoleHomeLabel(user?.role);
 
     const handleLogout = () => {
         void logout().finally(() => {
@@ -35,8 +38,13 @@ export function Navbar() {
                         {isAuthenticated ? (
                             <>
                                 {(isBusinessOwner || isAdmin) && (
-                                    <Link to="/dashboard" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
-                                        Dashboard
+                                    <Link to={roleHomePath} className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                        {roleHomeLabel}
+                                    </Link>
+                                )}
+                                {!isBusinessOwner && !isAdmin && (
+                                    <Link to={roleHomePath} className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                        {roleHomeLabel}
                                     </Link>
                                 )}
                                 <Link to="/organization" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
@@ -106,8 +114,13 @@ export function Navbar() {
                                         + Registrar Negocio
                                     </Link>
                                     {(isBusinessOwner || isAdmin) && (
-                                        <Link to="/dashboard" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
-                                            Dashboard
+                                        <Link to={roleHomePath} className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                            {roleHomeLabel}
+                                        </Link>
+                                    )}
+                                    {!isBusinessOwner && !isAdmin && (
+                                        <Link to={roleHomePath} className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                            {roleHomeLabel}
                                         </Link>
                                     )}
                                     <Link to="/organization" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>

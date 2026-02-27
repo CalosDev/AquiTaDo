@@ -4,6 +4,8 @@ import { MainLayout } from '../layouts/MainLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 
 const Home = lazy(async () => ({ default: (await import('../pages/Home')).Home }));
+const AppHome = lazy(async () => ({ default: (await import('../pages/AppHome')).AppHome }));
+const CustomerDashboard = lazy(async () => ({ default: (await import('../pages/CustomerDashboard')).CustomerDashboard }));
 const BusinessesList = lazy(async () => ({ default: (await import('../pages/BusinessesList')).BusinessesList }));
 const BusinessDetails = lazy(async () => ({ default: (await import('../pages/BusinessDetails')).BusinessDetails }));
 const Login = lazy(async () => ({ default: (await import('../pages/Login')).Login }));
@@ -48,6 +50,22 @@ export function AppRouter() {
                     <Route path="/register" element={<Register />} />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
+                    <Route
+                        path="/app"
+                        element={
+                            <ProtectedRoute>
+                                <AppHome />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/customer"
+                        element={
+                            <ProtectedRoute roles={['USER']}>
+                                <CustomerDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route
                         path="/organization"
                         element={

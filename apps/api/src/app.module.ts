@@ -1,12 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { RedisModule } from './cache/redis.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { BusinessesModule } from './businesses/businesses.module';
 import { CategoriesModule } from './categories/categories.module';
+import { FeaturesModule } from './features/features.module';
+import { SearchModule } from './search/search.module';
+import { DiscoveryModule } from './discovery/discovery.module';
 import { LocationsModule } from './locations/locations.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -23,6 +27,14 @@ import { CrmModule } from './crm/crm.module';
 import { ReputationModule } from './reputation/reputation.module';
 import { AdsModule } from './ads/ads.module';
 import { VerificationModule } from './verification/verification.module';
+import { ResilienceModule } from './resilience/resilience.module';
+import { ObservabilityModule } from './observability/observability.module';
+import { RequestContextModule } from './core/request-context/request-context.module';
+import { DomainEventsModule } from './core/events/domain-events.module';
+import { AuthorizationModule } from './core/authorization/authorization.module';
+import { RequestContextInterceptor } from './core/interceptors/request-context.interceptor';
+import { JsonApiResponseInterceptor } from './core/interceptors/json-api-response.interceptor';
+import { GlobalExceptionFilter } from './core/filters/global-exception.filter';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -44,11 +56,20 @@ import { validateEnv } from './config/env.validation';
                 ],
             }),
         }),
+        RedisModule,
+        ResilienceModule,
+        RequestContextModule,
+        DomainEventsModule,
+        AuthorizationModule,
         PrismaModule,
+        ObservabilityModule,
         AuthModule,
         UsersModule,
         BusinessesModule,
         CategoriesModule,
+        FeaturesModule,
+        SearchModule,
+        DiscoveryModule,
         LocationsModule,
         ReviewsModule,
         UploadsModule,
@@ -70,6 +91,18 @@ import { validateEnv } from './config/env.validation';
         {
             provide: APP_GUARD,
             useClass: ThrottlerGuard,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: RequestContextInterceptor,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: JsonApiResponseInterceptor,
+        },
+        {
+            provide: APP_FILTER,
+            useClass: GlobalExceptionFilter,
         },
     ],
 })

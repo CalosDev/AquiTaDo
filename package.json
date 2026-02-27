@@ -13,6 +13,8 @@
     "lint": "pnpm --parallel -r run lint",
     "test": "pnpm --parallel -r --if-present run test",
     "smoke:api": "node scripts/smoke-api.mjs",
+    "smoke:full": "node scripts/smoke-full.mjs",
+    "smoke:saas": "node scripts/smoke-saas.mjs",
     "db:migrate": "pnpm --filter @aquita/api prisma:migrate",
     "db:migrate:deploy": "pnpm --filter @aquita/api prisma:migrate:deploy",
     "db:generate": "pnpm --filter @aquita/api prisma:generate",

@@ -18,6 +18,7 @@ import {
 } from '../generated/prisma/client';
 import { PlansService } from '../plans/plans.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import {
     CreateAdsWalletCheckoutSessionDto,
@@ -37,6 +38,8 @@ export class PaymentsService {
         private readonly plansService: PlansService,
         @Inject(SubscriptionsService)
         private readonly subscriptionsService: SubscriptionsService,
+        @Inject(CircuitBreakerService)
+        private readonly circuitBreaker: CircuitBreakerService,
     ) { }
 
     async listMyPayments(organizationId: string, limit = 50) {
@@ -140,13 +143,15 @@ export class PaymentsService {
 
         let customerId = subscription?.providerCustomerId ?? null;
         if (!customerId) {
-            const customer = await stripe.customers.create({
-                email: organization.ownerUser.email,
-                name: organization.ownerUser.name,
-                metadata: {
-                    organizationId,
-                },
-            });
+            const customer = await this.circuitBreaker.execute('stripe', () =>
+                stripe.customers.create({
+                    email: organization.ownerUser.email,
+                    name: organization.ownerUser.name,
+                    metadata: {
+                        organizationId,
+                    },
+                }),
+            );
             customerId = customer.id;
 
             await this.prisma.subscription.update({
@@ -172,7 +177,8 @@ export class PaymentsService {
         });
 
         try {
-            const checkoutSession = await stripe.checkout.sessions.create({
+            const checkoutSession = await this.circuitBreaker.execute('stripe', () =>
+                stripe.checkout.sessions.create({
                 mode: 'payment',
                 customer: customerId,
                 success_url: dto.successUrl,
@@ -195,7 +201,8 @@ export class PaymentsService {
                     organizationId,
                     topupId: topup.id,
                 },
-            });
+                }),
+            );
 
             await this.prisma.adWalletTopup.update({
                 where: { id: topup.id },
@@ -387,29 +394,31 @@ export class PaymentsService {
         };
 
         try {
-            const checkoutSession = await stripe.checkout.sessions.create({
-                mode: 'payment',
-                success_url: dto.successUrl,
-                cancel_url: dto.cancelUrl,
-                customer_email: booking.user?.email ?? booking.organization.ownerUser.email ?? undefined,
-                line_items: [
-                    {
-                        price_data: {
-                            currency: currency.toLowerCase(),
-                            unit_amount: Math.round(chargeAmount * 100),
-                            product_data: {
-                                name: 'AquiTa.do Marketplace Booking',
-                                description: `Cobro de reserva para ${booking.business.name}`,
+            const checkoutSession = await this.circuitBreaker.execute('stripe', () =>
+                stripe.checkout.sessions.create({
+                    mode: 'payment',
+                    success_url: dto.successUrl,
+                    cancel_url: dto.cancelUrl,
+                    customer_email: booking.user?.email ?? booking.organization.ownerUser.email ?? undefined,
+                    line_items: [
+                        {
+                            price_data: {
+                                currency: currency.toLowerCase(),
+                                unit_amount: Math.round(chargeAmount * 100),
+                                product_data: {
+                                    name: 'AquiTa.do Marketplace Booking',
+                                    description: `Cobro de reserva para ${booking.business.name}`,
+                                },
                             },
+                            quantity: 1,
                         },
-                        quantity: 1,
-                    },
-                ],
-                metadata,
-                payment_intent_data: {
+                    ],
                     metadata,
-                },
-            });
+                    payment_intent_data: {
+                        metadata,
+                    },
+                }),
+            );
 
             const paymentIntentId = this.resolveStringId(checkoutSession.payment_intent);
 
@@ -828,7 +837,7 @@ export class PaymentsService {
     }
 
     async handleStripeWebhook(signature: string | undefined, body: unknown) {
-        const event = this.resolveStripeEvent(signature, body);
+        const event = await this.resolveStripeEvent(signature, body);
 
         const existing = await this.prisma.webhookEvent.findUnique({
             where: {
@@ -1721,7 +1730,7 @@ export class PaymentsService {
         return plan?.transactionFeeBps ?? 1200;
     }
 
-    private resolveStripeEvent(signature: string | undefined, body: unknown): Stripe.Event {
+    private async resolveStripeEvent(signature: string | undefined, body: unknown): Promise<Stripe.Event> {
         const stripe = this.resolveStripeClient();
         const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET')?.trim();
         const normalizedSignature = signature?.trim();
@@ -1735,7 +1744,11 @@ export class PaymentsService {
 
         if (webhookSecret && normalizedSignature && rawBody) {
             try {
-                return stripe.webhooks.constructEvent(rawBody, normalizedSignature, webhookSecret);
+                return await this.circuitBreaker.execute('stripe', () =>
+                    Promise.resolve(
+                        stripe.webhooks.constructEvent(rawBody, normalizedSignature, webhookSecret),
+                    ),
+                );
             } catch {
                 throw new BadRequestException('Firma de webhook inválida');
             }

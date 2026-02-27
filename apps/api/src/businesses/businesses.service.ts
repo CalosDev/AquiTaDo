@@ -1,6 +1,7 @@
 import {
     Inject,
     Injectable,
+    Logger,
     BadRequestException,
     ConflictException,
     NotFoundException,
@@ -14,14 +15,27 @@ import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto 
 import slugify from 'slugify';
 import { getOrganizationPlanLimits } from '../organizations/organization-plan-limits';
 import { ReputationService } from '../reputation/reputation.service';
+import { RedisService } from '../cache/redis.service';
+import { hashedCacheKey } from '../cache/cache-key';
+import { DomainEventsService } from '../core/events/domain-events.service';
 
 @Injectable()
 export class BusinessesService {
+    private readonly logger = new Logger(BusinessesService.name);
+    private static readonly PUBLIC_LIST_CACHE_PREFIX = 'public:businesses:list';
+    private static readonly NEARBY_CACHE_PREFIX = 'public:businesses:nearby';
+    private static readonly DETAIL_ID_CACHE_PREFIX = 'public:businesses:detail:id';
+    private static readonly DETAIL_SLUG_CACHE_PREFIX = 'public:businesses:detail:slug';
+
     constructor(
         @Inject(PrismaService)
         private prisma: PrismaService,
         @Inject(ReputationService)
         private readonly reputationService: ReputationService,
+        @Inject(RedisService)
+        private readonly redisService: RedisService,
+        @Inject(DomainEventsService)
+        private readonly domainEventsService: DomainEventsService,
     ) { }
     private readonly uploadsRoot = path.resolve(process.cwd(), 'uploads');
 
@@ -136,27 +150,30 @@ export class BusinessesService {
     };
 
     async findAll(query: BusinessQueryDto) {
-        const { page, limit, skip } = this.resolvePagination(query.page, query.limit, 12, 24);
-        const where = this.buildWhere(query, false);
+        const cacheKey = hashedCacheKey(BusinessesService.PUBLIC_LIST_CACHE_PREFIX, query);
+        return this.redisService.rememberJson(cacheKey, 120, async () => {
+            const { page, limit, skip } = this.resolvePagination(query.page, query.limit, 12, 24);
+            const where = this.buildWhere(query, false);
 
-        const [data, total] = await Promise.all([
-            this.prisma.business.findMany({
-                where,
-                select: this.publicListSelect,
-                skip,
-                take: limit,
-                orderBy: { createdAt: 'desc' },
-            }),
-            this.prisma.business.count({ where }),
-        ]);
+            const [data, total] = await Promise.all([
+                this.prisma.business.findMany({
+                    where,
+                    select: this.publicListSelect,
+                    skip,
+                    take: limit,
+                    orderBy: { createdAt: 'desc' },
+                }),
+                this.prisma.business.count({ where }),
+            ]);
 
-        return {
-            data,
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-        };
+            return {
+                data,
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            };
+        });
     }
 
     async findAllAdmin(query: BusinessQueryDto) {
@@ -197,23 +214,18 @@ export class BusinessesService {
         userRole?: string,
         currentOrganizationId?: string,
     ) {
-        const business = await this.prisma.business.findUnique({
-            where: { id },
-            include: {
-                ...this.fullInclude,
-                reviews: {
-                    where: {
-                        moderationStatus: 'APPROVED',
-                        isSpam: false,
-                    },
-                    include: {
-                        user: { select: { id: true, name: true } },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 20,
-                },
-            },
-        });
+        if (!userId) {
+            const cacheKey = `${BusinessesService.DETAIL_ID_CACHE_PREFIX}:${id}`;
+            return this.redisService.rememberJson(cacheKey, 300, async () => {
+                const publicBusiness = await this.findPublicBusinessById(id);
+                if (!publicBusiness) {
+                    throw new NotFoundException('Negocio no encontrado');
+                }
+                return publicBusiness;
+            });
+        }
+
+        const business = await this.findBusinessByIdWithReviews(id);
 
         if (!business) {
             throw new NotFoundException('Negocio no encontrado');
@@ -241,23 +253,18 @@ export class BusinessesService {
         userRole?: string,
         currentOrganizationId?: string,
     ) {
-        const business = await this.prisma.business.findUnique({
-            where: { slug },
-            include: {
-                ...this.fullInclude,
-                reviews: {
-                    where: {
-                        moderationStatus: 'APPROVED',
-                        isSpam: false,
-                    },
-                    include: {
-                        user: { select: { id: true, name: true } },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 20,
-                },
-            },
-        });
+        if (!userId) {
+            const cacheKey = `${BusinessesService.DETAIL_SLUG_CACHE_PREFIX}:${slug}`;
+            return this.redisService.rememberJson(cacheKey, 300, async () => {
+                const publicBusiness = await this.findPublicBusinessBySlug(slug);
+                if (!publicBusiness) {
+                    throw new NotFoundException('Negocio no encontrado');
+                }
+                return publicBusiness;
+            });
+        }
+
+        const business = await this.findBusinessBySlugWithReviews(slug);
 
         if (!business) {
             throw new NotFoundException('Negocio no encontrado');
@@ -296,7 +303,7 @@ export class BusinessesService {
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
 
         try {
-            return await this.prisma.$transaction(async (tx) => {
+            const createdBusiness = await this.prisma.$transaction(async (tx) => {
                 await this.assertCityBelongsToProvince(tx, dto.provinceId, dto.cityId);
                 const effectiveOrganizationId = organizationId ?? await this.ensureOwnerOrganization(tx, userId);
 
@@ -343,6 +350,7 @@ export class BusinessesService {
                     },
                     include: this.fullInclude,
                 });
+                await this.syncBusinessLocation(tx, business.id, dto.latitude, dto.longitude);
 
                 // Only promote regular users; never downgrade admin users.
                 await tx.user.updateMany({
@@ -352,6 +360,10 @@ export class BusinessesService {
 
                 return business;
             });
+
+            this.publishBusinessChangedEvent(createdBusiness.id, createdBusiness.slug, 'created');
+
+            return createdBusiness;
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -370,7 +382,7 @@ export class BusinessesService {
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
 
         try {
-            return await this.prisma.$transaction(async (tx) => {
+            const updatedBusiness = await this.prisma.$transaction(async (tx) => {
                 const business = await tx.business.findUnique({
                     where: { id },
                     select: {
@@ -379,6 +391,8 @@ export class BusinessesService {
                         organizationId: true,
                         provinceId: true,
                         cityId: true,
+                        latitude: true,
+                        longitude: true,
                     },
                 });
 
@@ -408,7 +422,7 @@ export class BusinessesService {
                     await tx.businessFeature.deleteMany({ where: { businessId: id } });
                 }
 
-                return tx.business.update({
+                const updatedBusiness = await tx.business.update({
                     where: { id },
                     data: {
                         name: dto.name,
@@ -437,7 +451,17 @@ export class BusinessesService {
                     },
                     include: this.fullInclude,
                 });
+
+                const nextLatitude = dto.latitude ?? updatedBusiness.latitude ?? business.latitude ?? undefined;
+                const nextLongitude = dto.longitude ?? updatedBusiness.longitude ?? business.longitude ?? undefined;
+                await this.syncBusinessLocation(tx, id, nextLatitude, nextLongitude);
+
+                return updatedBusiness;
             });
+
+            this.publishBusinessChangedEvent(updatedBusiness.id, updatedBusiness.slug, 'updated');
+
+            return updatedBusiness;
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -478,6 +502,7 @@ export class BusinessesService {
 
         try {
             await this.prisma.business.delete({ where: { id } });
+            this.publishBusinessChangedEvent(id, business.slug, 'deleted');
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -486,19 +511,21 @@ export class BusinessesService {
     }
 
     async findNearby(query: NearbyQueryDto) {
-        const radius = query.radius || 5;
-        const earthRadiusKm = 6371;
-        const latDelta = radius / 111;
-        const cosLat = Math.cos((query.lat * Math.PI) / 180);
-        const safeCosLat = Math.abs(cosLat) < 0.01 ? 0.01 : cosLat;
-        const lngDelta = radius / (111 * safeCosLat);
-        const minLat = query.lat - latDelta;
-        const maxLat = query.lat + latDelta;
-        const minLng = query.lng - lngDelta;
-        const maxLng = query.lng + lngDelta;
+        const cacheKey = hashedCacheKey(BusinessesService.NEARBY_CACHE_PREFIX, query);
+        return this.redisService.rememberJson(cacheKey, 60, async () => {
+            const radius = query.radius || 5;
+            const earthRadiusKm = 6371;
+            const latDelta = radius / 111;
+            const cosLat = Math.cos((query.lat * Math.PI) / 180);
+            const safeCosLat = Math.abs(cosLat) < 0.01 ? 0.01 : cosLat;
+            const lngDelta = radius / (111 * safeCosLat);
+            const minLat = query.lat - latDelta;
+            const maxLat = query.lat + latDelta;
+            const minLng = query.lng - lngDelta;
+            const maxLng = query.lng + lngDelta;
 
-        // Haversine formula using raw SQL for optimal PostgreSQL performance
-        const businesses = await this.prisma.$queryRaw`
+            // Haversine formula using raw SQL for optimal PostgreSQL performance
+            const businesses = await this.prisma.$queryRaw`
       SELECT 
         b.*,
         (
@@ -510,6 +537,7 @@ export class BusinessesService {
         ) AS distance
       FROM businesses b
       WHERE b.verified = true
+        AND b."deletedAt" IS NULL
         AND b.latitude IS NOT NULL
         AND b.longitude IS NOT NULL
         AND b.latitude BETWEEN ${minLat} AND ${maxLat}
@@ -525,7 +553,8 @@ export class BusinessesService {
       LIMIT 50
     `;
 
-        return businesses;
+            return businesses;
+        });
     }
 
     async verify(id: string) {
@@ -542,6 +571,7 @@ export class BusinessesService {
             });
 
             await this.reputationService.recalculateBusinessReputation(id);
+            this.publishBusinessChangedEvent(id, business.slug, 'verified');
 
             return business;
         } catch (error) {
@@ -560,6 +590,135 @@ export class BusinessesService {
         }
 
         return slug;
+    }
+
+    private publishBusinessChangedEvent(
+        businessId: string,
+        slug: string | null,
+        operation: 'created' | 'updated' | 'verified' | 'deleted',
+    ): void {
+        this.domainEventsService.publishBusinessChanged({
+            businessId,
+            slug,
+            operation,
+        });
+    }
+
+    private async syncBusinessLocation(
+        client: PrismaService | Prisma.TransactionClient,
+        businessId: string,
+        latitude?: number,
+        longitude?: number,
+    ): Promise<void> {
+        try {
+            const hasLatitude = Number.isFinite(latitude);
+            const hasLongitude = Number.isFinite(longitude);
+
+            if (!hasLatitude || !hasLongitude) {
+                await client.$executeRaw`
+                    UPDATE businesses
+                    SET location = NULL
+                    WHERE id = ${businessId}
+                `;
+                return;
+            }
+
+            await client.$executeRaw`
+                UPDATE businesses
+                SET location = ST_SetSRID(ST_MakePoint(${longitude as number}, ${latitude as number}), 4326)
+                WHERE id = ${businessId}
+            `;
+        } catch (error) {
+            this.logger.warn(
+                `Could not sync PostGIS location for business "${businessId}" (${error instanceof Error ? error.message : String(error)})`,
+            );
+        }
+    }
+
+    private findBusinessByIdWithReviews(id: string) {
+        return this.prisma.business.findUnique({
+            where: { id },
+            include: {
+                ...this.fullInclude,
+                reviews: {
+                    where: {
+                        moderationStatus: 'APPROVED',
+                        isSpam: false,
+                    },
+                    include: {
+                        user: { select: { id: true, name: true } },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 20,
+                },
+            },
+        });
+    }
+
+    private findBusinessBySlugWithReviews(slug: string) {
+        return this.prisma.business.findUnique({
+            where: { slug },
+            include: {
+                ...this.fullInclude,
+                reviews: {
+                    where: {
+                        moderationStatus: 'APPROVED',
+                        isSpam: false,
+                    },
+                    include: {
+                        user: { select: { id: true, name: true } },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 20,
+                },
+            },
+        });
+    }
+
+    private findPublicBusinessById(id: string) {
+        return this.prisma.business.findFirst({
+            where: {
+                id,
+                verified: true,
+            },
+            include: {
+                ...this.fullInclude,
+                reviews: {
+                    where: {
+                        moderationStatus: 'APPROVED',
+                        isSpam: false,
+                    },
+                    include: {
+                        user: { select: { id: true, name: true } },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 20,
+                },
+            },
+        });
+    }
+
+    private findPublicBusinessBySlug(slug: string) {
+        return this.prisma.business.findFirst({
+            where: {
+                slug,
+                verified: true,
+            },
+            include: {
+                ...this.fullInclude,
+                reviews: {
+                    where: {
+                        moderationStatus: 'APPROVED',
+                        isSpam: false,
+                    },
+                    include: {
+                        user: { select: { id: true, name: true } },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 20,
+                },
+            },
+        });
     }
 
     private async ensureOwnerOrganization(

@@ -213,11 +213,23 @@ async function main() {
     }
     console.log(`✅ ${features.length} features created`);
 
+
+    await prisma.$executeRaw`
+        UPDATE businesses
+        SET location = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
+        WHERE latitude IS NOT NULL
+          AND longitude IS NOT NULL
+    `;
+    console.log('✅ Business locations synced to PostGIS geometry column');
+
     console.log('\n🎉 Seed completado exitosamente!');
 }
 
 main()
-    .catch(console.error)
+    .catch((error: unknown) => {
+        console.error('Seed failed:', error);
+        process.exitCode = 1;
+    })
     .finally(async () => {
         await prisma.$disconnect();
     });

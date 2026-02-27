@@ -14,6 +14,8 @@ import { OrgContextGuard } from '../organizations/guards/org-context.guard';
 import { OptionalOrgContextGuard } from '../organizations/guards/optional-org-context.guard';
 import { OrgRolesGuard } from '../organizations/guards/org-roles.guard';
 import { OrganizationRole } from '../generated/prisma/client';
+import { Policy } from '../core/authorization/policy.decorator';
+import { PolicyGuard } from '../core/authorization/policy.guard';
 
 @Controller('businesses')
 export class BusinessesController {
@@ -61,7 +63,8 @@ export class BusinessesController {
     }
 
     @Post()
-    @UseGuards(JwtAuthGuard, OptionalOrgContextGuard)
+    @UseGuards(JwtAuthGuard, OptionalOrgContextGuard, PolicyGuard)
+    @Policy({ resource: 'business', action: 'create' })
     async create(
         @Body() dto: CreateBusinessDto,
         @CurrentUser('id') userId: string,
@@ -73,8 +76,9 @@ export class BusinessesController {
     }
 
     @Put(':id')
-    @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+    @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard, PolicyGuard)
     @OrgRoles('OWNER', 'MANAGER')
+    @Policy({ resource: 'business', action: 'update', resourceIdParam: 'id' })
     async update(
         @Param('id', new ParseUUIDPipe()) id: string,
         @Body() dto: UpdateBusinessDto,
@@ -87,8 +91,9 @@ export class BusinessesController {
     }
 
     @Delete(':id')
-    @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+    @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard, PolicyGuard)
     @OrgRoles('OWNER', 'MANAGER')
+    @Policy({ resource: 'business', action: 'delete', resourceIdParam: 'id' })
     async delete(
         @Param('id', new ParseUUIDPipe()) id: string,
         @CurrentUser('id') userId: string,

@@ -9,10 +9,19 @@ Incluye frontend web, backend API y base de datos PostgreSQL en un monorepo con 
 
 - Frontend: React 19 + Vite 7 + TypeScript + TailwindCSS 4
 - Backend: NestJS + TypeScript
-- Base de datos: PostgreSQL + Prisma ORM
+- Base de datos: PostgreSQL + Prisma ORM + PostGIS
 - Auth: JWT (Passport)
+- Cache/Busqueda: Redis + Meilisearch (fallback a PostgreSQL)
+- Observabilidad: Prometheus (`/api/observability/metrics`)
 - Monorepo: pnpm workspaces
 - Contenedores: Docker + Docker Compose
+
+## Arquitectura SuperApp
+
+La propuesta de escalado B2B2C (Discovery + SaaS + Marketplace) esta documentada en:
+
+- `docs/SUPERAPP_ARCHITECTURE.md`
+- `docs/MONOLITH_MODULAR_STRUCTURE.md`
 
 ## Estructura
 
@@ -95,6 +104,17 @@ Servicios:
 - `CORS_ORIGIN=http://localhost:5173`
 - `THROTTLE_TTL_MS=60000`
 - `THROTTLE_LIMIT=120`
+- `REDIS_URL=redis://localhost:6379`
+- `REDIS_CACHE_TTL_SECONDS=120`
+- `MEILISEARCH_HOST=http://localhost:7700`
+- `MEILISEARCH_API_KEY=masterKeyChangeMe`
+- `MEILISEARCH_INDEX_BUSINESSES=businesses`
+- `CIRCUIT_BREAKER_FAILURE_THRESHOLD=5`
+- `CIRCUIT_BREAKER_COOLDOWN_MS=60000`
+- `JSON_API_RESPONSE_ENABLED=false`
+- `SENTRY_DSN=`
+- `SENTRY_ENVIRONMENT=development`
+- `SENTRY_TRACES_SAMPLE_RATE=0`
 
 `apps/web/.env`:
 
@@ -110,13 +130,17 @@ docker-compose up -d --build
 
 Nota:
 - El servicio `migrate` ejecuta `prisma migrate deploy` automáticamente antes de levantar la API.
+- El servicio `seed` ejecuta `prisma seed` para cargar datos base (planes/categorías/provincias/features).
 - La salud de la API ahora se valida con `/api/health/ready` (DB + esquema).
+- Se incluyen `redis` (cache distribuido) y `meilisearch` (búsqueda full-text).
+- La base de datos usa imagen PostGIS para consultas geoespaciales nativas.
 
 Servicios en Docker:
 
 - Web (nginx): http://localhost:8080 (default)
 - API: http://localhost:3000 (default)
 - PostgreSQL: localhost:5432 (default)
+- Meilisearch: http://localhost:7700 (default)
 
 Si tienes puertos ocupados, puedes sobrescribirlos:
 
@@ -127,7 +151,7 @@ DB_PORT=55432 API_PORT=3100 WEB_PORT=8081 docker-compose up -d --build
 Para ver logs:
 
 ```bash
-docker-compose logs -f api web db
+docker-compose logs -f api web db redis meilisearch
 ```
 
 Para apagar servicios:
@@ -150,12 +174,16 @@ docker-compose down
 | PUT | /api/businesses/:id | Si | Actualizar negocio |
 | DELETE | /api/businesses/:id | Si | Eliminar negocio |
 | GET | /api/businesses/nearby | No | Buscar negocios cercanos |
+| GET | /api/discovery/businesses/nearby | No | Discovery geoespacial con PostGIS |
+| GET | /api/search/businesses | No | Busqueda full-text con filtros |
+| POST | /api/search/businesses/reindex | Admin | Reindexar documentos de negocios |
 | PUT | /api/businesses/:id/verify | Admin | Aprobar negocio |
 | GET | /api/categories | No | Listar categorias |
 | GET | /api/categories/:id | No | Ver categoria |
 | POST | /api/categories | Admin | Crear categoria |
 | PUT | /api/categories/:id | Admin | Editar categoria |
 | DELETE | /api/categories/:id | Admin | Eliminar categoria |
+| GET | /api/features | No | Listar features |
 | GET | /api/provinces | No | Listar provincias |
 | GET | /api/provinces/:id/cities | No | Ciudades por provincia |
 | POST | /api/reviews | Si | Crear resena |
@@ -177,6 +205,7 @@ docker-compose down
 | GET | /api/organizations/:id/audit-logs | Si | Ver actividad auditada de la organizacion |
 | GET | /api/health | No | Liveness check |
 | GET | /api/health/ready | No | Readiness check (DB) |
+| GET | /api/observability/metrics | No | Metricas Prometheus |
 
 Notas multi-tenant:
 - Para endpoints de operacion por tenant (`/api/businesses/my`, `POST/PUT/DELETE /api/businesses/*`, uploads) enviar `x-organization-id`.
@@ -208,6 +237,8 @@ Reglas aplicadas:
 - `pnpm build`: Build de todo el monorepo
 - `pnpm lint`: Lint de todo el monorepo
 - `pnpm smoke:api`: Smoke de endpoints health
+- `pnpm smoke:full`: Smoke integral (API + datos base + marketplace público + health web)
+- `pnpm smoke:saas`: Smoke end-to-end de flujos SaaS y marketplace
 - `pnpm db:generate`: Prisma generate
 - `pnpm db:migrate`: Prisma migrate dev
 - `pnpm db:migrate:deploy`: Prisma migrate deploy

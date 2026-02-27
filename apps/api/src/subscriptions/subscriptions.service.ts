@@ -16,6 +16,7 @@ import {
 } from '../generated/prisma/client';
 import { PlansService } from '../plans/plans.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
 import { CreateCheckoutSessionDto } from './dto/subscription.dto';
 
 @Injectable()
@@ -27,6 +28,8 @@ export class SubscriptionsService {
         private readonly plansService: PlansService,
         @Inject(ConfigService)
         private readonly configService: ConfigService,
+        @Inject(CircuitBreakerService)
+        private readonly circuitBreaker: CircuitBreakerService,
     ) { }
 
     async getCurrent(organizationId: string) {
@@ -75,48 +78,52 @@ export class SubscriptionsService {
 
         let customerId = currentSubscription.providerCustomerId;
         if (!customerId) {
-            const customer = await stripe.customers.create({
-                email: organization.ownerUser.email,
-                name: organization.ownerUser.name,
-                metadata: {
-                    organizationId,
-                },
-            });
+            const customer = await this.circuitBreaker.execute('stripe', () =>
+                stripe.customers.create({
+                    email: organization.ownerUser.email,
+                    name: organization.ownerUser.name,
+                    metadata: {
+                        organizationId,
+                    },
+                }),
+            );
             customerId = customer.id;
         }
 
-        const checkoutSession = await stripe.checkout.sessions.create({
-            mode: 'subscription',
-            success_url: dto.successUrl,
-            cancel_url: dto.cancelUrl,
-            customer: customerId,
-            line_items: [
-                {
-                    price_data: {
-                        currency: normalizedCurrency,
-                        unit_amount: Math.round(monthlyPrice * 100),
-                        recurring: {
-                            interval: 'month',
+        const checkoutSession = await this.circuitBreaker.execute('stripe', () =>
+            stripe.checkout.sessions.create({
+                mode: 'subscription',
+                success_url: dto.successUrl,
+                cancel_url: dto.cancelUrl,
+                customer: customerId,
+                line_items: [
+                    {
+                        price_data: {
+                            currency: normalizedCurrency,
+                            unit_amount: Math.round(monthlyPrice * 100),
+                            recurring: {
+                                interval: 'month',
+                            },
+                            product_data: {
+                                name: `AquiTa.do ${targetPlan.name}`,
+                                description: targetPlan.description ?? undefined,
+                            },
                         },
-                        product_data: {
-                            name: `AquiTa.do ${targetPlan.name}`,
-                            description: targetPlan.description ?? undefined,
-                        },
+                        quantity: 1,
                     },
-                    quantity: 1,
-                },
-            ],
-            metadata: {
-                organizationId,
-                planCode: targetPlan.code,
-            },
-            subscription_data: {
+                ],
                 metadata: {
                     organizationId,
                     planCode: targetPlan.code,
                 },
-            },
-        });
+                subscription_data: {
+                    metadata: {
+                        organizationId,
+                        planCode: targetPlan.code,
+                    },
+                },
+            }),
+        );
 
         await this.prisma.subscription.update({
             where: { id: currentSubscription.id },
@@ -154,9 +161,13 @@ export class SubscriptionsService {
             );
         }
 
-        const updatedStripeSubscription = await stripe.subscriptions.update(
-            subscription.providerSubscriptionId,
-            { cancel_at_period_end: true },
+        const providerSubscriptionId = subscription.providerSubscriptionId!;
+        const updatedStripeSubscription = await this.circuitBreaker.execute(
+            'stripe',
+            () => stripe.subscriptions.update(
+                providerSubscriptionId,
+                { cancel_at_period_end: true },
+            ),
         );
 
         const mappedStatus = this.mapStripeStatus(updatedStripeSubscription.status);

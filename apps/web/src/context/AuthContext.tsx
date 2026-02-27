@@ -2,6 +2,7 @@
 import { createContext, useCallback, useState, useEffect, ReactNode } from 'react';
 import { clearAccessToken, getAccessToken, setAccessToken } from '../api/client';
 import { authApi } from '../api/endpoints';
+import { UserRole, isUserRole } from '../auth/roles';
 
 interface User {
     id: string;
@@ -9,7 +10,7 @@ interface User {
     email: string;
     phone?: string;
     avatarUrl?: string | null;
-    role: string;
+    role: UserRole;
 }
 
 interface AuthContextType {
@@ -24,6 +25,7 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isAdmin: boolean;
     isBusinessOwner: boolean;
+    isCustomer: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,17 +51,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshToken: string;
         user: User;
     }) => {
+        const normalizedRole: UserRole = isUserRole(payload.user.role) ? payload.user.role : 'USER';
+        const normalizedUser: User = {
+            ...payload.user,
+            role: normalizedRole,
+        };
+
         setToken(payload.accessToken);
         setRefreshToken(payload.refreshToken);
-        setUser(payload.user);
+        setUser(normalizedUser);
         setAccessToken(payload.accessToken);
         localStorage.setItem('refreshToken', payload.refreshToken);
-        localStorage.setItem('user', JSON.stringify(payload.user));
+        localStorage.setItem('user', JSON.stringify(normalizedUser));
     }, []);
 
     const refreshProfile = useCallback(async () => {
         const response = await authApi.getProfile();
-        const profile = response.data as User;
+        const profileData = response.data as User;
+        const profile: User = {
+            ...profileData,
+            role: isUserRole(profileData.role) ? profileData.role : 'USER',
+        };
         setUser(profile);
         localStorage.setItem('user', JSON.stringify(profile));
     }, []);
@@ -164,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 isAuthenticated: !!token,
                 isAdmin: user?.role === 'ADMIN',
                 isBusinessOwner: user?.role === 'BUSINESS_OWNER',
+                isCustomer: user?.role === 'USER',
             }}
         >
             {children}

@@ -215,6 +215,8 @@ model Business {
   address                 String                     @db.VarChar(500)
   latitude                Float?
   longitude               Float?
+  location                Unsupported("geometry(Point, 4326)")?
+  deletedAt               DateTime?
   verified                Boolean                    @default(false)
   verifiedAt              DateTime?
   verificationStatus      BusinessVerificationStatus @default(UNVERIFIED)
@@ -251,8 +253,10 @@ model Business {
   @@index([slug])
   @@index([ownerId])
   @@index([organizationId])
+  @@index([organizationId, deletedAt, verified, createdAt])
   @@index([provinceId])
   @@index([latitude, longitude])
+  @@index([deletedAt])
   @@index([verified])
   @@index([verified, createdAt])
   @@index([provinceId, verified, createdAt])
@@ -466,6 +470,7 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([action])
+  @@index([targetType, targetId, createdAt])
   @@map("audit_logs")
 }
 
@@ -612,6 +617,7 @@ model Promotion {
   redemptionsCount Int          @default(0)
   isFlashOffer     Boolean      @default(false)
   isActive         Boolean      @default(true)
+  deletedAt        DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
@@ -620,6 +626,7 @@ model Promotion {
 
   @@index([businessId, isActive, endsAt])
   @@index([organizationId, isActive])
+  @@index([organizationId, deletedAt, isActive, endsAt])
   @@index([couponCode])
   @@map("promotions")
 }
@@ -642,6 +649,7 @@ model Booking {
   quotedAmount   Decimal?      @db.Decimal(12, 2)
   depositAmount  Decimal?      @db.Decimal(12, 2)
   currency       String        @default("DOP") @db.VarChar(3)
+  deletedAt      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -650,6 +658,7 @@ model Booking {
 
   @@index([businessId, scheduledFor])
   @@index([organizationId, status])
+  @@index([organizationId, deletedAt, status, scheduledFor])
   @@index([userId, createdAt])
   @@map("bookings")
 }
@@ -739,12 +748,14 @@ model Conversation {
   lastMessageAt      DateTime           @default(now())
   convertedBookingId String?            @unique
   convertedBooking   Booking?           @relation(fields: [convertedBookingId], references: [id], onDelete: SetNull)
+  deletedAt          DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
   messages ConversationMessage[]
 
   @@index([organizationId, status, lastMessageAt])
+  @@index([organizationId, deletedAt, status, lastMessageAt])
   @@index([businessId, status, lastMessageAt])
   @@index([customerUserId, status, lastMessageAt])
   @@map("conversations")

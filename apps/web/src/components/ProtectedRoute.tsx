@@ -1,12 +1,18 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
+import { UserRole, resolveRoleHomePath } from '../auth/roles';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
-    roles?: string[];
+    roles?: UserRole[];
+    unauthorizedRedirectTo?: string;
 }
 
-export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
+export function ProtectedRoute({
+    children,
+    roles,
+    unauthorizedRedirectTo,
+}: ProtectedRouteProps) {
     const { isAuthenticated, user, loading } = useAuth();
 
     if (loading) {
@@ -22,7 +28,8 @@ export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
     }
 
     if (roles && user && !roles.includes(user.role)) {
-        return <Navigate to="/" replace />;
+        const fallbackPath = unauthorizedRedirectTo ?? resolveRoleHomePath(user.role);
+        return <Navigate to={fallbackPath} replace />;
     }
 
     return <>{children}</>;

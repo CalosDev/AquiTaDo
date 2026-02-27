@@ -4,6 +4,7 @@ import {
     ForbiddenException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import slugify from 'slugify';
@@ -20,14 +21,21 @@ import {
     PromotionLifecycleStatus,
     UpdatePromotionDto,
 } from './dto/promotion.dto';
+import { RedisService } from '../cache/redis.service';
+import { hashedCacheKey } from '../cache/cache-key';
 
 type PrismaClientLike = PrismaService | Prisma.TransactionClient;
 
 @Injectable()
 export class PromotionsService {
+    private readonly logger = new Logger(PromotionsService.name);
+    private static readonly PUBLIC_PROMOTIONS_CACHE_PREFIX = 'public:promotions:list';
+
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
+        @Inject(RedisService)
+        private readonly redisService: RedisService,
     ) { }
 
     private readonly includeRelations = {
@@ -49,56 +57,59 @@ export class PromotionsService {
     };
 
     async listPublic(query: ListPublicPromotionsQueryDto) {
-        const page = query.page ?? 1;
-        const limit = query.limit ?? 12;
-        const skip = (page - 1) * limit;
-        const now = new Date();
+        const cacheKey = hashedCacheKey(PromotionsService.PUBLIC_PROMOTIONS_CACHE_PREFIX, query);
+        return this.redisService.rememberJson(cacheKey, 120, async () => {
+            const page = query.page ?? 1;
+            const limit = query.limit ?? 12;
+            const skip = (page - 1) * limit;
+            const now = new Date();
 
-        const where: Prisma.PromotionWhereInput = {
-            isActive: true,
-            startsAt: { lte: now },
-            endsAt: { gte: now },
-            business: {
-                verified: true,
-            },
-        };
+            const where: Prisma.PromotionWhereInput = {
+                isActive: true,
+                startsAt: { lte: now },
+                endsAt: { gte: now },
+                business: {
+                    verified: true,
+                },
+            };
 
-        if (query.businessId) {
-            where.businessId = query.businessId;
-        }
+            if (query.businessId) {
+                where.businessId = query.businessId;
+            }
 
-        if (query.flashOnly) {
-            where.isFlashOffer = true;
-        }
+            if (query.flashOnly) {
+                where.isFlashOffer = true;
+            }
 
-        if (query.search?.trim()) {
-            const needle = query.search.trim();
-            where.OR = [
-                { title: { contains: needle, mode: 'insensitive' } },
-                { description: { contains: needle, mode: 'insensitive' } },
-                { couponCode: { contains: needle, mode: 'insensitive' } },
-                { business: { name: { contains: needle, mode: 'insensitive' } } },
-            ];
-        }
+            if (query.search?.trim()) {
+                const needle = query.search.trim();
+                where.OR = [
+                    { title: { contains: needle, mode: 'insensitive' } },
+                    { description: { contains: needle, mode: 'insensitive' } },
+                    { couponCode: { contains: needle, mode: 'insensitive' } },
+                    { business: { name: { contains: needle, mode: 'insensitive' } } },
+                ];
+            }
 
-        const [data, total] = await Promise.all([
-            this.prisma.promotion.findMany({
-                where,
-                include: this.includeRelations,
-                orderBy: [{ isFlashOffer: 'desc' }, { createdAt: 'desc' }],
-                skip,
-                take: limit,
-            }),
-            this.prisma.promotion.count({ where }),
-        ]);
+            const [data, total] = await Promise.all([
+                this.prisma.promotion.findMany({
+                    where,
+                    include: this.includeRelations,
+                    orderBy: [{ isFlashOffer: 'desc' }, { createdAt: 'desc' }],
+                    skip,
+                    take: limit,
+                }),
+                this.prisma.promotion.count({ where }),
+            ]);
 
-        return {
-            data,
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-        };
+            return {
+                data,
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            };
+        });
     }
 
     async listMine(organizationId: string, query: ListMyPromotionsQueryDto) {
@@ -189,7 +200,7 @@ export class PromotionsService {
         const endsAt = new Date(dto.endsAt);
         this.assertDateRange(startsAt, endsAt);
 
-        return this.prisma.$transaction(async (tx) => {
+        const createdPromotion = await this.prisma.$transaction(async (tx) => {
             await this.assertActiveSubscription(tx, organizationId);
             await this.assertBusinessBelongsToOrganization(tx, dto.businessId, organizationId);
             await this.assertPromotionLimit(tx, organizationId);
@@ -227,6 +238,9 @@ export class PromotionsService {
                 throw error;
             }
         });
+
+        await this.invalidatePublicPromotionsCache();
+        return createdPromotion;
     }
 
     async update(
@@ -283,7 +297,7 @@ export class PromotionsService {
         }
 
         try {
-            return await this.prisma.promotion.update({
+            const updatedPromotion = await this.prisma.promotion.update({
                 where: { id },
                 data: {
                     businessId: dto.businessId,
@@ -301,6 +315,9 @@ export class PromotionsService {
                 },
                 include: this.includeRelations,
             });
+
+            await this.invalidatePublicPromotionsCache();
+            return updatedPromotion;
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -334,6 +351,7 @@ export class PromotionsService {
         await this.prisma.promotion.delete({
             where: { id },
         });
+        await this.invalidatePublicPromotionsCache();
 
         return { message: 'Promoción eliminada exitosamente' };
     }
@@ -497,6 +515,16 @@ export class PromotionsService {
         }
 
         return slug;
+    }
+
+    private async invalidatePublicPromotionsCache(): Promise<void> {
+        try {
+            await this.redisService.deleteByPrefix(`${PromotionsService.PUBLIC_PROMOTIONS_CACHE_PREFIX}:`);
+        } catch (error) {
+            this.logger.warn(
+                `Failed to invalidate promotions cache (${error instanceof Error ? error.message : String(error)})`,
+            );
+        }
     }
 
     private handlePrismaError(error: unknown): void {

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.4
     container_name: aquita_postgres
     restart: unless-stopped
     init: true
@@ -18,6 +18,36 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: aquita_redis
+    restart: unless-stopped
+    init: true
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.13
+    container_name: aquita_meilisearch
+    restart: unless-stopped
+    init: true
+    environment:
+      MEILI_NO_ANALYTICS: 'true'
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-masterKeyChangeMe}
+    ports:
+      - '${MEILI_PORT:-7700}:7700'
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://127.0.0.1:7700/health >/dev/null 2>&1 || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   migrate:
     build:
       context: .
@@ -31,6 +61,21 @@ services:
       DATABASE_URL: postgresql://aquita:aquita123@db:5432/aquita_db
     command: ['pnpm', '--filter', '@aquita/api', 'prisma:migrate:deploy']
 
+  seed:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://aquita:aquita123@db:5432/aquita_db
+    command: ['pnpm', '--filter', '@aquita/api', 'prisma:seed']
+
   api:
     container_name: aquita_api
     build:
@@ -43,6 +88,12 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      seed:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://aquita:aquita123@db:5432/aquita_db
       JWT_SECRET: change-this-secret-minimum-16-chars
@@ -51,6 +102,13 @@ services:
       CORS_ORIGIN: http://localhost:8080
       THROTTLE_TTL_MS: 60000
       THROTTLE_LIMIT: 120
+      REDIS_URL: redis://redis:6379
+      REDIS_CACHE_TTL_SECONDS: 120
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${MEILI_MASTER_KEY:-masterKeyChangeMe}
+      MEILISEARCH_INDEX_BUSINESSES: businesses
+      CIRCUIT_BREAKER_FAILURE_THRESHOLD: 5
+      CIRCUIT_BREAKER_COOLDOWN_MS: 60000
     ports:
       - '${API_PORT:-3000}:3000'
     volumes:
@@ -95,4 +153,5 @@ services:
 
 volumes:
   postgres_data:
+  meili_data:
   uploads_data:

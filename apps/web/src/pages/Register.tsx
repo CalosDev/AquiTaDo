@@ -21,7 +21,7 @@ export function Register() {
         setLoading(true);
         try {
             await register(formData.name, formData.email, formData.password, formData.phone || undefined);
-            navigate('/');
+            navigate('/app');
         } catch (err: unknown) {
             const error = err as { response?: { data?: { message?: string } } };
             setError(error.response?.data?.message || 'Error al registrarse');
