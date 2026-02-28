@@ -58,7 +58,9 @@ export class AiService {
     }
 
     async askConcierge(dto: AskConciergeDto) {
-        const normalizedQuery = dto.query.trim();
+        const normalizedQuery = typeof dto?.query === 'string'
+            ? dto.query.trim()
+            : '';
         if (!normalizedQuery) {
             throw new BadRequestException('La consulta no puede estar vacia');
         }

@@ -110,8 +110,18 @@ export class WhatsAppService {
         dto: CreateClickToChatDto,
         userId?: string,
     ) {
+        const businessId = typeof dto?.businessId === 'string'
+            ? dto.businessId.trim()
+            : '';
+        if (!businessId) {
+            throw new BadRequestException('businessId es requerido');
+        }
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(businessId)) {
+            throw new BadRequestException('businessId debe ser un UUID valido');
+        }
+
         const business = await this.prisma.business.findUnique({
-            where: { id: dto.businessId },
+            where: { id: businessId },
             select: {
                 id: true,
                 name: true,

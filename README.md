@@ -236,7 +236,8 @@ docker-compose down
 | PATCH | /api/organizations/:id/subscription | Si (OWNER/ADMIN) | Cambiar plan/estado de suscripcion |
 | GET | /api/organizations/:id/usage | Si | Ver uso y limites del plan |
 | GET | /api/organizations/:id/audit-logs | Si | Ver actividad auditada de la organizacion |
-| POST | /api/analytics/events/growth | Opcional | Registrar evento de growth (search/click/whatsapp) |
+| POST | /api/events/business (alias: /api/telemetry/business) | Opcional | Registrar evento de negocio (views/clicks/conversiones) |
+| POST | /api/events/growth (alias: /api/telemetry/growth) | Opcional | Registrar evento de growth (search/click/whatsapp) |
 | GET | /api/analytics/growth/insights | Admin | Insights de demanda/oferta y conversion |
 | GET | /api/health | No | Liveness check |
 | GET | /api/health/ready | No | Readiness check (DB) |
