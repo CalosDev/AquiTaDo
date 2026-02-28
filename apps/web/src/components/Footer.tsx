@@ -16,8 +16,8 @@ export function Footer() {
                             </span>
                         </Link>
                         <p className="text-gray-400 text-sm leading-relaxed max-w-md">
-                            El directorio inteligente de negocios locales en República Dominicana.
-                            Descubre restaurantes, tiendas, hoteles y más cerca de ti.
+                            El directorio inteligente de negocios locales en Republica Dominicana.
+                            Descubre restaurantes, tiendas, hoteles y mas cerca de ti.
                         </p>
                         <div className="flex gap-2 mt-4">
                             <span className="inline-block w-8 h-5 rounded-sm" style={{ background: '#CE1126' }}></span>
@@ -40,19 +40,19 @@ export function Footer() {
                     <div>
                         <h4 className="font-display font-semibold text-white mb-4">Contacto</h4>
                         <ul className="space-y-2 text-sm">
-                            <li>📧 info@aquita.do</li>
-                            <li>📱 +1 (809) 555-0000</li>
-                            <li>📍 Santo Domingo, RD</li>
+                            <li>Email: info@aquita.do</li>
+                            <li>Telefono: +1 (809) 555-0000</li>
+                            <li>Ubicacion: Santo Domingo, RD</li>
                         </ul>
                     </div>
                 </div>
 
                 <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <p className="text-sm text-gray-500">
-                        © {new Date().getFullYear()} AquiTa.do — Hecho con ❤️ en República Dominicana
+                        (c) {new Date().getFullYear()} AquiTa.do - Hecho en Republica Dominicana
                     </p>
                     <div className="flex gap-4 text-sm text-gray-500">
-                        <Link to="/terms" className="hover:text-white transition-colors">Términos</Link>
+                        <Link to="/terms" className="hover:text-white transition-colors">Terminos</Link>
                         <Link to="/privacy" className="hover:text-white transition-colors">Privacidad</Link>
                     </div>
                 </div>

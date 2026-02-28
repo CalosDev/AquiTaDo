@@ -62,7 +62,7 @@ export function RegisterBusiness() {
             setCategories(catRes.data);
             setProvinces(provRes.data);
         } catch (err: unknown) {
-            setError(getApiErrorMessage(err, 'No se pudieron cargar categorías y provincias'));
+            setError(getApiErrorMessage(err, 'No se pudieron cargar categorias y provincias'));
         } finally {
             setLoadingData(false);
         }
@@ -106,7 +106,7 @@ export function RegisterBusiness() {
             if (formData.latitude) {
                 const parsedLatitude = Number.parseFloat(formData.latitude);
                 if (!Number.isFinite(parsedLatitude)) {
-                    setError('La latitud ingresada no es válida');
+                    setError('La latitud ingresada no es valida');
                     setLoading(false);
                     return;
                 }
@@ -115,7 +115,7 @@ export function RegisterBusiness() {
             if (formData.longitude) {
                 const parsedLongitude = Number.parseFloat(formData.longitude);
                 if (!Number.isFinite(parsedLongitude)) {
-                    setError('La longitud ingresada no es válida');
+                    setError('La longitud ingresada no es valida');
                     setLoading(false);
                     return;
                 }
@@ -138,7 +138,7 @@ export function RegisterBusiness() {
                 <div className="text-center mb-8">
                     <h1 className="font-display text-3xl font-bold text-gray-900">Registra tu Negocio</h1>
                     <p className="text-gray-500 mt-2">
-                        Llega a miles de clientes en República Dominicana
+                        Llega a miles de clientes en Republica Dominicana
                     </p>
                 </div>
 
@@ -156,7 +156,7 @@ export function RegisterBusiness() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Basic Info */}
                     <div>
-                        <h3 className="font-display font-semibold text-gray-800 mb-3">Información Básica</h3>
+                        <h3 className="font-display font-semibold text-gray-800 mb-3">Informacion Basica</h3>
                         <div className="space-y-4">
                             <div>
                                 <label className="text-sm font-medium text-gray-700 mb-1 block">Nombre del negocio *</label>
@@ -170,7 +170,7 @@ export function RegisterBusiness() {
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-gray-700 mb-1 block">Descripción *</label>
+                                <label className="text-sm font-medium text-gray-700 mb-1 block">Descripcion *</label>
                                 <textarea
                                     required
                                     value={formData.description}
@@ -188,7 +188,7 @@ export function RegisterBusiness() {
                         <h3 className="font-display font-semibold text-gray-800 mb-3">Contacto</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="text-sm font-medium text-gray-700 mb-1 block">Teléfono</label>
+                                <label className="text-sm font-medium text-gray-700 mb-1 block">Telefono</label>
                                 <input
                                     type="tel"
                                     value={formData.phone}
@@ -212,10 +212,10 @@ export function RegisterBusiness() {
 
                     {/* Location */}
                     <div>
-                        <h3 className="font-display font-semibold text-gray-800 mb-3">Ubicación</h3>
+                        <h3 className="font-display font-semibold text-gray-800 mb-3">Ubicacion</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-sm font-medium text-gray-700 mb-1 block">Dirección *</label>
+                                <label className="text-sm font-medium text-gray-700 mb-1 block">Direccion *</label>
                                 <input
                                     type="text"
                                     required
@@ -284,7 +284,7 @@ export function RegisterBusiness() {
 
                     {/* Categories */}
                     <div>
-                        <h3 className="font-display font-semibold text-gray-800 mb-3">Categorías</h3>
+                        <h3 className="font-display font-semibold text-gray-800 mb-3">Categorias</h3>
                         <div className="flex flex-wrap gap-2">
                             {categories.map((cat) => (
                                 <button

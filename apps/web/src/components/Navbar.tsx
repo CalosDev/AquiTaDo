@@ -5,7 +5,7 @@ import { useOrganization } from '../context/useOrganization';
 import { resolveRoleHomeLabel, resolveRoleHomePath } from '../auth/roles';
 
 export function Navbar() {
-    const { isAuthenticated, user, logout, isAdmin, isBusinessOwner } = useAuth();
+    const { isAuthenticated, user, logout } = useAuth();
     const { activeOrganization } = useOrganization();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
@@ -37,27 +37,15 @@ export function Navbar() {
                         </Link>
                         {isAuthenticated ? (
                             <>
-                                {(isBusinessOwner || isAdmin) && (
-                                    <Link to={roleHomePath} className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
-                                        {roleHomeLabel}
-                                    </Link>
-                                )}
-                                {!isBusinessOwner && !isAdmin && (
-                                    <Link to={roleHomePath} className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
-                                        {roleHomeLabel}
-                                    </Link>
-                                )}
+                                <Link to={roleHomePath} className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                    {roleHomeLabel}
+                                </Link>
                                 <Link to="/organization" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
                                     Organizacion
                                 </Link>
                                 <Link to="/profile" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
                                     Perfil
                                 </Link>
-                                {isAdmin && (
-                                    <Link to="/admin" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
-                                        Admin
-                                    </Link>
-                                )}
                                 <Link to="/register-business" className="btn-accent text-sm">
                                     + Registrar Negocio
                                 </Link>
@@ -113,27 +101,15 @@ export function Navbar() {
                                     <Link to="/register-business" className="py-2 text-accent-600 font-medium" onClick={() => setMenuOpen(false)}>
                                         + Registrar Negocio
                                     </Link>
-                                    {(isBusinessOwner || isAdmin) && (
-                                        <Link to={roleHomePath} className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
-                                            {roleHomeLabel}
-                                        </Link>
-                                    )}
-                                    {!isBusinessOwner && !isAdmin && (
-                                        <Link to={roleHomePath} className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
-                                            {roleHomeLabel}
-                                        </Link>
-                                    )}
+                                    <Link to={roleHomePath} className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                        {roleHomeLabel}
+                                    </Link>
                                     <Link to="/organization" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
                                         Organizacion
                                     </Link>
                                     <Link to="/profile" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
                                         Perfil
                                     </Link>
-                                    {isAdmin && (
-                                        <Link to="/admin" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
-                                            Admin
-                                        </Link>
-                                    )}
                                     <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="py-2 text-left text-red-500 font-medium">
                                         Salir
                                     </button>
