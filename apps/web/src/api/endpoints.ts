@@ -267,7 +267,7 @@ export const analyticsApi = {
         occurredAt?: string;
         visitorId?: string;
         amount?: number;
-    }) => api.post('/analytics/events', data),
+    }) => api.post('/telemetry/business', data),
     getMyDashboard: (params?: { days?: number }) => api.get('/analytics/dashboard/my', { params }),
     getBusinessAnalytics: (businessId: string, params?: { days?: number }) =>
         api.get(`/analytics/business/${businessId}`, { params }),
@@ -300,7 +300,7 @@ export const analyticsApi = {
         searchQuery?: string;
         metadata?: Record<string, unknown>;
         occurredAt?: string;
-    }) => api.post('/analytics/events/growth', data),
+    }) => api.post('/telemetry/growth', data),
     getGrowthInsights: (params?: {
         days?: number;
         provinceId?: string;

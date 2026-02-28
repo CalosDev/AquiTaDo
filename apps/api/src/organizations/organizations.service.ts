@@ -84,24 +84,15 @@ export class OrganizationsService {
                 data: { role: 'BUSINESS_OWNER' },
             });
 
-            const freePlan = await tx.plan.upsert({
+            const freePlan = await tx.plan.findUnique({
                 where: { code: 'FREE' },
-                update: { active: true },
-                create: {
-                    code: 'FREE',
-                    name: 'Free',
-                    description: 'Plan inicial para presencia digital básica',
-                    priceMonthly: '0',
-                    currency: 'DOP',
-                    transactionFeeBps: 1200,
-                    maxBusinesses: 1,
-                    maxMembers: 3,
-                    maxImagesPerBusiness: 10,
-                    maxPromotions: 1,
-                    analyticsRetentionDays: 30,
-                    active: true,
-                },
+                select: { id: true },
             });
+            if (!freePlan) {
+                throw new BadRequestException(
+                    'No existe el plan FREE en la base de datos. Ejecuta el seed de planes.',
+                );
+            }
 
             await tx.subscription.create({
                 data: {
@@ -1072,3 +1063,4 @@ export class OrganizationsService {
         });
     }
 }
+

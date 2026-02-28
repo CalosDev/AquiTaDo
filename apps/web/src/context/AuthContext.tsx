@@ -30,6 +30,21 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function isTokenExpiredOrNearExpiry(token: string): boolean {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1] ?? ''));
+        const expSeconds = Number(payload?.exp);
+        if (!Number.isFinite(expSeconds)) {
+            return false;
+        }
+
+        // Refresh one minute before expiration to avoid bootstrap 401 noise.
+        return (expSeconds * 1000) <= (Date.now() + 60_000);
+    } catch {
+        return true;
+    }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
@@ -86,23 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
-            try {
-                if (savedToken) {
-                    setToken(savedToken);
-                }
-                if (savedRefreshToken) {
-                    setRefreshToken(savedRefreshToken);
-                }
-
-                await refreshProfile();
-            } catch {
-                if (!savedRefreshToken) {
-                    clearSession();
-                    setLoading(false);
-                    return;
-                }
-
+            if (savedRefreshToken) {
                 try {
+                    setRefreshToken(savedRefreshToken);
                     const refreshResponse = await authApi.refresh({ refreshToken: savedRefreshToken });
                     const { accessToken, refreshToken: rotatedRefreshToken, user: refreshedUser } = refreshResponse.data;
                     applySession({
@@ -112,7 +113,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     });
                 } catch {
                     clearSession();
+                } finally {
+                    setLoading(false);
                 }
+                return;
+            }
+
+            if (!savedToken || isTokenExpiredOrNearExpiry(savedToken)) {
+                clearSession();
+                setLoading(false);
+                return;
+            }
+
+            try {
+                setToken(savedToken);
+                await refreshProfile();
+            } catch {
+                clearSession();
             } finally {
                 setLoading(false);
             }
