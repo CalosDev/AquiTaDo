@@ -30,6 +30,23 @@ function parseCsvConfig(value: string | undefined, fallback: string[]): string[]
     return parsed.length > 0 ? parsed : fallback;
 }
 
+function normalizeCorsOrigin(value: string): string | null {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    if (trimmed === '*') {
+        return '*';
+    }
+
+    try {
+        return new URL(trimmed).origin;
+    } catch {
+        return trimmed.replace(/\/+$/, '');
+    }
+}
+
 function resolveCorsSettings(): CorsSettings {
     const rawCorsOrigin = process.env.CORS_ORIGIN?.trim();
     const methods = parseCsvConfig(
@@ -77,10 +94,23 @@ function resolveCorsSettings(): CorsSettings {
         };
     }
 
-    const origins = rawCorsOrigin
+    const normalizedOrigins = rawCorsOrigin
         .split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean);
+        .map((origin) => normalizeCorsOrigin(origin))
+        .filter((origin): origin is string => Boolean(origin));
+
+    const hasWildcard = normalizedOrigins.includes('*');
+    const origins = [...new Set(normalizedOrigins.filter((origin) => origin !== '*'))];
+
+    if (hasWildcard && origins.length === 0) {
+        return {
+            origin: true,
+            credentials: false,
+            methods,
+            allowedHeaders,
+            exposedHeaders,
+        };
+    }
 
     if (origins.length === 0) {
         return {

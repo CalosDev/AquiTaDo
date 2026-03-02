@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="AquiTaDo">
+  <defs>
+    <linearGradient id="g" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9" />
+      <stop offset="100%" stop-color="#22c55e" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="#0f172a" />
+  <path fill="url(#g)" d="M128 36 44 86v84l84 50 84-50V86l-84-50Zm0 28 56 33-56 33-56-33 56-33Zm-64 56 52 30v56l-52-31v-55Zm76 86v-56l52-30v55l-52 31Z" />
+</svg>
