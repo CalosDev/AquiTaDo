@@ -35,6 +35,8 @@ export function Navbar() {
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const canAccessOrganization = roleCapabilities.canManageOrganizations;
+    const organizationName = activeOrganization?.name?.trim() ?? '';
+    const showOrganizationChip = organizationName.length > 0 && organizationName.length <= 18;
 
     const handleLogout = () => {
         void logout().finally(() => {
@@ -102,7 +104,7 @@ export function Navbar() {
                             </div>
                         </Link>
 
-                        <div className="hidden md:flex items-center gap-4 xl:gap-6 min-w-0">
+                        <div className="hidden lg:flex items-center gap-3 xl:gap-5 min-w-0">
                             <Link to="/businesses" className="nav-link">Negocios</Link>
                             <Link to="/about" className="nav-link">Nosotros</Link>
                             {installPromptEvent && (
@@ -121,12 +123,21 @@ export function Navbar() {
                                     )}
                                     <Link to="/profile" className="nav-link">Perfil</Link>
                                     {canRegisterBusiness && (
-                                        <Link to="/register-business" className="btn-accent text-sm whitespace-nowrap shrink-0">+ Registrar Negocio</Link>
+                                        <Link to="/register-business" className="btn-accent text-sm whitespace-nowrap shrink-0">
+                                            <span className="xl:hidden">+ Negocio</span>
+                                            <span className="hidden xl:inline 2xl:hidden">+ Registrar</span>
+                                            <span className="hidden 2xl:inline">+ Registrar Negocio</span>
+                                        </Link>
                                     )}
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <span className="chip !py-1 whitespace-nowrap">{roleBadgeLabel(user?.role)}</span>
-                                        {activeOrganization && (
-                                            <span className="chip-danger !py-1 max-w-[120px] xl:max-w-[170px] truncate hidden lg:inline-flex">{activeOrganization.name}</span>
+                                    <div className="flex items-center gap-2 min-w-0 shrink-0">
+                                        <span className="chip !py-1 whitespace-nowrap shrink-0">{roleBadgeLabel(user?.role)}</span>
+                                        {showOrganizationChip && (
+                                            <span
+                                                className="chip-danger !py-1 max-w-[140px] 2xl:max-w-[180px] truncate overflow-hidden"
+                                                title={organizationName}
+                                            >
+                                                {organizationName}
+                                            </span>
                                         )}
                                         <span className="text-sm text-slate-500 whitespace-nowrap">Hola, {user?.name?.split(' ')[0]}</span>
                                         <button
@@ -148,7 +159,7 @@ export function Navbar() {
 
                         <button
                             type="button"
-                            className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-700"
+                            className="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-700"
                             onClick={() => setMenuOpen((previous) => !previous)}
                             aria-label={menuOpen ? 'Cerrar menu principal' : 'Abrir menu principal'}
                             aria-expanded={menuOpen}
@@ -165,7 +176,7 @@ export function Navbar() {
                     </div>
 
                     {menuOpen && (
-                        <div id="mobile-main-menu" className="md:hidden pb-4 pt-2 animate-slide-down">
+                        <div id="mobile-main-menu" className="lg:hidden pb-4 pt-2 animate-slide-down">
                             <div className="surface-panel p-2">
                                 <Link
                                     to="/businesses"
