@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">AquiTa.do</title>
+  <desc id="desc">Marketplace local y SaaS para negocios de Republica Dominicana</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="70" y="70" width="1060" height="490" rx="28" fill="#ffffff" fill-opacity="0.08"/>
+  <text x="120" y="255" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="78" font-weight="700">AquiTa.do</text>
+  <text x="120" y="330" fill="#bfdbfe" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="500">SaaS + Marketplace para negocios locales</text>
+  <text x="120" y="390" fill="#dbeafe" font-family="Segoe UI, Arial, sans-serif" font-size="28">Reservas, promociones, reputacion y analitica en una sola plataforma</text>
+  <text x="120" y="500" fill="#e2e8f0" font-family="Segoe UI, Arial, sans-serif" font-size="24">Republica Dominicana</text>
+</svg>

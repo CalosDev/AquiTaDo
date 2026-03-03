@@ -35,7 +35,6 @@ interface BusinessVerificationStatusPayload {
 
 interface VerificationForm {
     documentType: VerificationDocument['documentType'];
-    fileUrl: string;
     notes: string;
 }
 
@@ -45,6 +44,8 @@ interface DashboardVerificationTabProps {
     businesses: BusinessOption[];
     verificationForm: VerificationForm;
     setVerificationForm: Dispatch<SetStateAction<VerificationForm>>;
+    selectedDocumentFile: File | null;
+    setSelectedDocumentFile: Dispatch<SetStateAction<File | null>>;
     handleSubmitVerificationDocument: (event: FormEvent) => Promise<void>;
     uploadingVerificationDocument: boolean;
     submittingBusinessVerification: boolean;
@@ -61,6 +62,8 @@ export function DashboardVerificationTab({
     businesses,
     verificationForm,
     setVerificationForm,
+    selectedDocumentFile,
+    setSelectedDocumentFile,
     handleSubmitVerificationDocument,
     uploadingVerificationDocument,
     submittingBusinessVerification,
@@ -106,16 +109,17 @@ export function DashboardVerificationTab({
 
                     <form onSubmit={(event) => void handleSubmitVerificationDocument(event)} className="space-y-2">
                         <input
+                            key={selectedDocumentFile?.name ?? 'empty-document-file'}
                             className="input-field text-sm"
-                            placeholder="URL del documento"
-                            value={verificationForm.fileUrl}
-                            onChange={(event) =>
-                                setVerificationForm((previous) => ({
-                                    ...previous,
-                                    fileUrl: event.target.value,
-                                }))
-                            }
+                            type="file"
+                            accept=".pdf,image/jpeg,image/png,image/webp"
+                            onChange={(event) => setSelectedDocumentFile(event.target.files?.[0] ?? null)}
                         />
+                        {selectedDocumentFile && (
+                            <p className="text-xs text-gray-500">
+                                Archivo: {selectedDocumentFile.name}
+                            </p>
+                        )}
                         <button type="submit" className="btn-secondary text-sm" disabled={uploadingVerificationDocument}>
                             {uploadingVerificationDocument ? 'Subiendo...' : 'Subir documento'}
                         </button>

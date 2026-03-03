@@ -383,9 +383,9 @@ export function DashboardBusiness() {
     const [submittingBusinessVerification, setSubmittingBusinessVerification] = useState(false);
     const [verificationForm, setVerificationForm] = useState({
         documentType: 'ID_CARD' as VerificationDocument['documentType'],
-        fileUrl: '',
         notes: '',
     });
+    const [selectedDocumentFile, setSelectedDocumentFile] = useState<File | null>(null);
 
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
@@ -982,8 +982,8 @@ export function DashboardBusiness() {
             setErrorMessage('Selecciona un negocio para subir documentos');
             return;
         }
-        if (!verificationForm.fileUrl.trim()) {
-            setErrorMessage('Debes indicar URL del documento');
+        if (!selectedDocumentFile) {
+            setErrorMessage('Debes seleccionar un archivo de documento');
             return;
         }
 
@@ -991,15 +991,21 @@ export function DashboardBusiness() {
         setErrorMessage('');
         setSuccessMessage('');
         try {
+            const uploadResponse = await verificationApi.uploadDocumentFile(
+                selectedVerificationBusinessId,
+                selectedDocumentFile,
+            );
+            const uploadedFileUrl = uploadResponse.data?.fileUrl as string | undefined;
+            if (!uploadedFileUrl) {
+                throw new Error('No se recibió URL del documento');
+            }
+
             await verificationApi.submitDocument({
                 businessId: selectedVerificationBusinessId,
                 documentType: verificationForm.documentType,
-                fileUrl: verificationForm.fileUrl.trim(),
+                fileUrl: uploadedFileUrl,
             });
-            setVerificationForm((previous) => ({
-                ...previous,
-                fileUrl: '',
-            }));
+            setSelectedDocumentFile(null);
             await loadVerificationData();
             setSuccessMessage('Documento de verificación cargado');
         } catch (error) {
@@ -1382,6 +1388,8 @@ export function DashboardBusiness() {
                                 businesses={businesses}
                                 verificationForm={verificationForm}
                                 setVerificationForm={setVerificationForm}
+                                selectedDocumentFile={selectedDocumentFile}
+                                setSelectedDocumentFile={setSelectedDocumentFile}
                                 handleSubmitVerificationDocument={handleSubmitVerificationDocument}
                                 uploadingVerificationDocument={uploadingVerificationDocument}
                                 submittingBusinessVerification={submittingBusinessVerification}

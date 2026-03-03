@@ -7,7 +7,7 @@ export type SeoMetaInput = {
     noindex?: boolean;
 };
 
-const DEFAULT_OG_IMAGE = '/vite.svg';
+const DEFAULT_OG_IMAGE = '/og-default.svg';
 
 function upsertMetaByName(name: string, content: string): void {
     let element = document.querySelector(`meta[name="${name}"]`);
@@ -80,4 +80,22 @@ export function applySeoMeta(input: SeoMetaInput): void {
     upsertMetaByName('twitter:title', input.title);
     upsertMetaByName('twitter:description', input.description);
     upsertMetaByName('twitter:image', imageUrl);
+}
+
+export function upsertJsonLd(id: string, payload: Record<string, unknown>): void {
+    let script = document.querySelector(`script[data-jsonld-id="${id}"]`);
+    if (!script) {
+        script = document.createElement('script');
+        script.setAttribute('type', 'application/ld+json');
+        script.setAttribute('data-jsonld-id', id);
+        document.head.appendChild(script);
+    }
+    script.textContent = JSON.stringify(payload);
+}
+
+export function removeJsonLd(id: string): void {
+    const script = document.querySelector(`script[data-jsonld-id="${id}"]`);
+    if (script?.parentElement) {
+        script.parentElement.removeChild(script);
+    }
 }

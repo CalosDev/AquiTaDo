@@ -412,6 +412,14 @@ export const adsApi = {
 
 // ---- Verification ----
 export const verificationApi = {
+    uploadDocumentFile: (businessId: string, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('businessId', businessId);
+        return api.post('/verification/documents/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
     submitDocument: (data: {
         businessId: string;
         documentType: 'ID_CARD' | 'TAX_CERTIFICATE' | 'BUSINESS_LICENSE' | 'ADDRESS_PROOF' | 'SELFIE' | 'OTHER';

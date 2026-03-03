@@ -6,7 +6,7 @@ import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
-import { applySeoMeta } from '../seo/meta';
+import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 
 interface Business {
     id: string;
@@ -91,15 +91,56 @@ export function BusinessDetails() {
 
     useEffect(() => {
         if (!business) {
+            removeJsonLd('business-details');
             return;
         }
 
         const canonicalPath = `/businesses/${business.slug || business.id}`;
         const description = business.description?.trim().slice(0, 160) || `Perfil de ${business.name} en AquiTa.do`;
+        const averageRatingValue =
+            business.reviews && business.reviews.length > 0
+                ? Number(
+                    (
+                        business.reviews.reduce((accumulator, review) => accumulator + review.rating, 0)
+                        / business.reviews.length
+                    ).toFixed(1),
+                )
+                : null;
         applySeoMeta({
             title: `${business.name} | AquiTa.do`,
             description,
             canonicalPath,
+        });
+
+        upsertJsonLd('business-details', {
+            '@context': 'https://schema.org',
+            '@type': 'LocalBusiness',
+            name: business.name,
+            description,
+            image: business.images?.[0]?.url,
+            telephone: business.phone || undefined,
+            url: `${window.location.origin}${canonicalPath}`,
+            address: {
+                '@type': 'PostalAddress',
+                streetAddress: business.address,
+                addressLocality: business.city?.name || undefined,
+                addressRegion: business.province?.name || undefined,
+                addressCountry: 'DO',
+            },
+            geo: (typeof business.latitude === 'number' && typeof business.longitude === 'number')
+                ? {
+                    '@type': 'GeoCoordinates',
+                    latitude: business.latitude,
+                    longitude: business.longitude,
+                }
+                : undefined,
+            aggregateRating: business._count?.reviews
+                ? {
+                    '@type': 'AggregateRating',
+                    ratingValue: averageRatingValue ?? undefined,
+                    reviewCount: business._count.reviews,
+                }
+                : undefined,
         });
     }, [business]);
 
