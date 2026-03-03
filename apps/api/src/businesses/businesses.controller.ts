@@ -122,15 +122,15 @@ export class BusinessesController {
 
     @Delete(':id')
     @UseGuards(JwtAuthGuard, RolesGuard, OrgContextGuard, OrgRolesGuard, PolicyGuard)
-    @Roles('BUSINESS_OWNER')
+    @Roles('BUSINESS_OWNER', 'ADMIN')
     @OrgRoles('OWNER', 'MANAGER')
     @Policy({ resource: 'business', action: 'delete', resourceIdParam: 'id' })
     async delete(
         @Param('id', new ParseUUIDPipe()) id: string,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
-        @CurrentOrganization('organizationId') organizationId: string,
-        @CurrentOrganization('organizationRole') organizationRole: OrganizationRole,
+        @CurrentOrganization('organizationId') organizationId?: string,
+        @CurrentOrganization('organizationRole') organizationRole?: OrganizationRole,
     ) {
         return this.businessesService.delete(id, userId, userRole, organizationId, organizationRole);
     }

@@ -116,6 +116,8 @@ export function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'verification'>('businesses');
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [confirmDeleteBusinessId, setConfirmDeleteBusinessId] = useState<string | null>(null);
+    const [confirmDeleteCategoryId, setConfirmDeleteCategoryId] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [verificationLoading, setVerificationLoading] = useState(false);
@@ -193,23 +195,29 @@ export function AdminDashboard() {
     };
 
     const handleDeleteBusiness = async (businessId: string) => {
-        if (!window.confirm('Seguro que deseas eliminar este negocio?')) {
-            return;
-        }
-
         setProcessingId(businessId);
         setErrorMessage('');
         setSuccessMessage('');
 
         try {
             await businessApi.delete(businessId);
-            await loadData();
+            setBusinesses((current) => current.filter((business) => business.id !== businessId));
             setSuccessMessage('Negocio eliminado correctamente');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar el negocio'));
         } finally {
             setProcessingId(null);
+            setConfirmDeleteBusinessId(null);
         }
+    };
+
+    const requestBusinessDelete = (businessId: string) => {
+        if (confirmDeleteBusinessId === businessId) {
+            void handleDeleteBusiness(businessId);
+            return;
+        }
+
+        setConfirmDeleteBusinessId(businessId);
     };
 
     const handleCreateCategory = async (event: React.FormEvent) => {
@@ -284,26 +292,32 @@ export function AdminDashboard() {
     };
 
     const deleteCategory = async (categoryId: string) => {
-        if (!window.confirm('Seguro que deseas eliminar esta categoría?')) {
-            return;
-        }
-
         setProcessingId(categoryId);
         setErrorMessage('');
         setSuccessMessage('');
 
         try {
             await categoryApi.delete(categoryId);
-            await loadData();
+            setCategories((current) => current.filter((category) => category.id !== categoryId));
             if (editingCategoryId === categoryId) {
                 cancelCategoryEdit();
             }
-            setSuccessMessage('Categoría eliminada correctamente');
+            setSuccessMessage('Categoria eliminada correctamente');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar la categoría'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar la categoria'));
         } finally {
             setProcessingId(null);
+            setConfirmDeleteCategoryId(null);
         }
+    };
+
+    const requestCategoryDelete = (categoryId: string) => {
+        if (confirmDeleteCategoryId === categoryId) {
+            void deleteCategory(categoryId);
+            return;
+        }
+
+        setConfirmDeleteCategoryId(categoryId);
     };
 
     const handleReviewVerification = async (
@@ -503,17 +517,38 @@ export function AdminDashboard() {
                                                                     : 'Aprobar'}
                                                             </button>
                                                         )}
-                                                        <button
-                                                            onClick={() =>
-                                                                void handleDeleteBusiness(business.id)
-                                                            }
-                                                            disabled={processingId === business.id}
-                                                            className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50"
-                                                        >
-                                                            {processingId === business.id
-                                                                ? 'Procesando...'
-                                                                : 'Eliminar'}
-                                                        </button>
+                                                        {confirmDeleteBusinessId === business.id ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        void handleDeleteBusiness(business.id)
+                                                                    }
+                                                                    disabled={processingId === business.id}
+                                                                    className="text-xs bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+                                                                >
+                                                                    {processingId === business.id
+                                                                        ? 'Procesando...'
+                                                                        : 'Confirmar'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setConfirmDeleteBusinessId(null)}
+                                                                    disabled={processingId === business.id}
+                                                                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50"
+                                                                >
+                                                                    Cancelar
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() =>
+                                                                    requestBusinessDelete(business.id)
+                                                                }
+                                                                disabled={processingId === business.id}
+                                                                className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50"
+                                                            >
+                                                                Eliminar
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -667,14 +702,37 @@ export function AdminDashboard() {
                                                         >
                                                             Editar
                                                         </button>
-                                                        <button
-                                                            type="button"
-                                                            className="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50"
-                                                            onClick={() => void deleteCategory(category.id)}
-                                                            disabled={processingId === category.id}
-                                                        >
-                                                            Eliminar
-                                                        </button>
+                                                        {confirmDeleteCategoryId === category.id ? (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    className="text-xs bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+                                                                    onClick={() => void deleteCategory(category.id)}
+                                                                    disabled={processingId === category.id}
+                                                                >
+                                                                    {processingId === category.id
+                                                                        ? 'Procesando...'
+                                                                        : 'Confirmar'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-secondary text-xs"
+                                                                    onClick={() => setConfirmDeleteCategoryId(null)}
+                                                                    disabled={processingId === category.id}
+                                                                >
+                                                                    Cancelar
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-50"
+                                                                onClick={() => requestCategoryDelete(category.id)}
+                                                                disabled={processingId === category.id}
+                                                            >
+                                                                Eliminar
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}

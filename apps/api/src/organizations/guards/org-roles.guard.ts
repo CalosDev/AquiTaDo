@@ -22,6 +22,9 @@ export class OrgRolesGuard implements CanActivate {
         }
 
         const request = context.switchToHttp().getRequest<RequestWithOrganizationContext>();
+        if (request.user?.role === 'ADMIN') {
+            return true;
+        }
 
         const organizationRole = request.organizationContext?.organizationRole;
         if (!organizationRole) {

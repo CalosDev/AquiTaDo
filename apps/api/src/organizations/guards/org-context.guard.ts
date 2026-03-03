@@ -35,6 +35,32 @@ export class OrgContextGuard implements CanActivate {
         }
 
         const organizationId = this.resolveOrganizationId(request);
+
+        if (user.role === 'ADMIN') {
+            if (!organizationId) {
+                request.organizationContext = null;
+                return true;
+            }
+
+            if (!this.uuidPattern.test(organizationId)) {
+                throw new BadRequestException('El organizationId debe ser un UUID valido');
+            }
+
+            const organizationExists = await this.prisma.organization.findUnique({
+                where: { id: organizationId },
+                select: { id: true },
+            });
+
+            if (!organizationExists) {
+                throw new NotFoundException('Organizacion no encontrada');
+            }
+
+            request.organizationContext = {
+                organizationId,
+                organizationRole: 'OWNER',
+            };
+            return true;
+        }
         if (!organizationId) {
             request.organizationContext = null;
             if (this.isOrganizationRequired()) {

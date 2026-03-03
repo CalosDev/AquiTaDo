@@ -626,9 +626,9 @@ export class BusinessesService {
     async delete(
         id: string,
         _userId: string,
-        _userRole: string,
-        organizationId: string,
-        organizationRole: OrganizationRole,
+        userRole: string,
+        organizationId?: string,
+        organizationRole?: OrganizationRole,
     ) {
         const business = await this.prisma.business.findUnique({
             where: { id },
@@ -643,12 +643,18 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        if (business.organizationId !== organizationId) {
-            throw new NotFoundException('Negocio no encontrado');
-        }
+        if (userRole !== 'ADMIN') {
+            if (!organizationId) {
+                throw new ForbiddenException('Debes seleccionar una organizacion activa');
+            }
 
-        if (organizationRole === 'STAFF') {
-            throw new ForbiddenException('No tienes permisos para eliminar este negocio');
+            if (business.organizationId !== organizationId) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            if (!organizationRole || organizationRole === 'STAFF') {
+                throw new ForbiddenException('No tienes permisos para eliminar este negocio');
+            }
         }
 
         const imageUrls = business.images.map((image) => image.url);

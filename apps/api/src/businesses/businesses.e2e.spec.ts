@@ -317,6 +317,36 @@ describe('BusinessesController (e2e)', () => {
             .expect(404);
     });
 
+    it('allows admins to soft-delete businesses without organization context', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
+        const admin = await createUser('ADMIN');
+        const ownerToken = signToken(owner.id, owner.role);
+        const adminToken = signToken(admin.id, admin.role);
+        const province = await createProvince();
+        const seed = makeSeed();
+
+        const created = await request(app.getHttpServer())
+            .post('/api/businesses')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .send(makeCreateBusinessPayload(seed, province.id))
+            .expect(201);
+
+        const businessId = String(created.body.id);
+
+        const deleted = await request(app.getHttpServer())
+            .delete(`/api/businesses/${businessId}`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .expect(200);
+
+        expect(deleted.body).toMatchObject({
+            message: 'Negocio eliminado exitosamente',
+        });
+
+        await request(app.getHttpServer())
+            .get(`/api/businesses/${businessId}`)
+            .expect(404);
+    });
+
     it('allows admins to verify businesses and then exposes them publicly', async () => {
         const owner = await createUser('BUSINESS_OWNER');
         const admin = await createUser('ADMIN');
