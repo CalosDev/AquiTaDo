@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { useAuth } from '../context/useAuth';
 import { applySeoMeta } from '../seo/meta';
 
 function resolveRouteSeo(pathname: string): { title: string; description: string; noindex?: boolean } {
@@ -111,6 +112,7 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
 
 export function MainLayout() {
     const location = useLocation();
+    const { isAuthenticated } = useAuth();
     const routeSeo = useMemo(
         () => resolveRouteSeo(location.pathname),
         [location.pathname],
@@ -131,7 +133,7 @@ export function MainLayout() {
             <main className="flex-1 min-h-[calc(100dvh-11rem)]">
                 <Outlet />
             </main>
-            <Footer />
+            {!isAuthenticated && <Footer />}
         </div>
     );
 }

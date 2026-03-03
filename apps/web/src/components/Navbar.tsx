@@ -106,7 +106,9 @@ export function Navbar() {
 
                         <div className="hidden lg:flex items-center gap-3 xl:gap-5 min-w-0">
                             <Link to="/businesses" className="nav-link">Negocios</Link>
-                            <Link to="/about" className="nav-link">Nosotros</Link>
+                            {!isAuthenticated && (
+                                <Link to="/about" className="nav-link">Nosotros</Link>
+                            )}
                             {installPromptEvent && (
                                 <button type="button" className="btn-secondary text-sm" onClick={() => void handleInstallApp()}>
                                     Instalar app
@@ -185,13 +187,15 @@ export function Navbar() {
                                 >
                                     Negocios
                                 </Link>
-                                <Link
-                                    to="/about"
-                                    className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
-                                    onClick={() => setMenuOpen(false)}
-                                >
-                                    Nosotros
-                                </Link>
+                                {!isAuthenticated && (
+                                    <Link
+                                        to="/about"
+                                        className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                        onClick={() => setMenuOpen(false)}
+                                    >
+                                        Nosotros
+                                    </Link>
+                                )}
                                 {installPromptEvent && (
                                     <button
                                         type="button"
