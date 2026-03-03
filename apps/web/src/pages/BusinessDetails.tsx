@@ -309,6 +309,22 @@ export function BusinessDetails() {
         ? new Date(business.createdAt).getFullYear()
         : null;
     const currentImage = business?.images?.[activeImage] ?? business?.images?.[0];
+    const mapCoordinates =
+        typeof business?.latitude === 'number' && typeof business?.longitude === 'number'
+            ? {
+                lat: business.latitude,
+                lng: business.longitude,
+            }
+            : null;
+    const mapBounds = mapCoordinates
+        ? `${mapCoordinates.lng - 0.01}%2C${mapCoordinates.lat - 0.01}%2C${mapCoordinates.lng + 0.01}%2C${mapCoordinates.lat + 0.01}`
+        : null;
+    const openStreetMapEmbedUrl = mapCoordinates && mapBounds
+        ? `https://www.openstreetmap.org/export/embed.html?bbox=${mapBounds}&layer=mapnik&marker=${mapCoordinates.lat}%2C${mapCoordinates.lng}`
+        : null;
+    const googleMapsDirectionsUrl = mapCoordinates
+        ? `https://www.google.com/maps/search/?api=1&query=${mapCoordinates.lat},${mapCoordinates.lng}`
+        : null;
     const contactExperimentVariant = `business_contact_button:${contactVariant}`;
     const whatsappDirectUrl = business?.whatsapp
         ? `https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`
@@ -689,7 +705,7 @@ export function BusinessDetails() {
                         {/* Features */}
                         {business.features && business.features.length > 0 && (
                             <div className="mt-6">
-                                <h3 className="font-display font-semibold text-gray-900 mb-3">Caracteristicas</h3>
+                                <h2 className="font-display font-semibold text-gray-900 mb-3">Caracteristicas</h2>
                                 <div className="flex flex-wrap gap-2">
                                     {business.features.map((bf, i) => (
                                         <span key={i} className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-700">
@@ -702,27 +718,38 @@ export function BusinessDetails() {
                     </div>
 
                     {/* Map */}
-                    {typeof business.latitude === 'number' && typeof business.longitude === 'number' && (
+                    {openStreetMapEmbedUrl && (
                         <div className="card p-6">
-                            <h3 className="font-display font-semibold text-gray-900 mb-3">Ubicacion</h3>
+                            <h2 className="font-display font-semibold text-gray-900 mb-3">Ubicacion</h2>
                             <div className="h-64 bg-gray-100 rounded-xl flex items-center justify-center">
                                 <iframe
                                     width="100%"
                                     height="100%"
                                     style={{ border: 0, borderRadius: '0.75rem' }}
                                     loading="lazy"
-                                    src={`https://maps.google.com/maps?q=${business.latitude},${business.longitude}&z=15&output=embed`}
+                                    src={openStreetMapEmbedUrl}
+                                    title={`Mapa de ubicacion de ${business.name}`}
                                     allowFullScreen
                                 ></iframe>
                             </div>
+                            {googleMapsDirectionsUrl && (
+                                <a
+                                    href={googleMapsDirectionsUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-3 inline-flex text-sm font-medium text-primary-700 hover:text-primary-800 underline underline-offset-2"
+                                >
+                                    Ver ruta en Google Maps
+                                </a>
+                            )}
                         </div>
                     )}
 
                     {/* Reviews */}
                     <div className="card p-6">
-                        <h3 className="font-display font-semibold text-gray-900 mb-4">
+                        <h2 className="font-display font-semibold text-gray-900 mb-4">
                             Resenas ({business.reviews?.length || 0})
-                        </h3>
+                        </h2>
 
                         {/* Review Form */}
                         {!isAuthenticated && (
@@ -791,7 +818,7 @@ export function BusinessDetails() {
                                                 ))}
                                             </div>
                                         </div>
-                                        <span className="text-xs text-gray-400">
+                                        <span className="text-xs text-gray-500">
                                             {new Date(review.createdAt).toLocaleDateString('es-DO')}
                                         </span>
                                     </div>
@@ -799,7 +826,7 @@ export function BusinessDetails() {
                                 </div>
                             ))}
                             {(!business.reviews || business.reviews.length === 0) && (
-                                <p className="text-gray-400 text-sm text-center py-4">
+                                <p className="text-gray-600 text-sm text-center py-4">
                                     Aun no hay resenas. Se el primero en opinar!
                                 </p>
                             )}
@@ -810,7 +837,7 @@ export function BusinessDetails() {
                 {/* Sidebar - Contact */}
                 <div className="space-y-6">
                     <div className="card p-6 lg:sticky lg:top-24 border-t-4 border-accent-600">
-                        <h3 className="font-display font-semibold text-gray-900 mb-4">Contacto</h3>
+                        <h2 className="font-display font-semibold text-gray-900 mb-4">Contacto</h2>
                         <div className="flex flex-wrap gap-2 mb-4">
                             {business.verified && (
                                 <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
@@ -863,7 +890,7 @@ export function BusinessDetails() {
                                 >
                                     <span className="text-lg">Tel</span>
                                     <div>
-                                        <div className="text-xs text-gray-400">Telefono</div>
+                                        <div className="text-xs text-gray-600">Telefono</div>
                                         <div className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{business.phone}</div>
                                     </div>
                                 </a>
@@ -881,7 +908,7 @@ export function BusinessDetails() {
                                 >
                                     <span className="text-lg">WA</span>
                                     <div>
-                                        <div className="text-xs text-gray-400">WhatsApp</div>
+                                        <div className="text-xs text-gray-600">WhatsApp</div>
                                         <div className="text-sm font-medium text-green-700">
                                             {contactVariant === 'emphasis' ? 'Chatea ahora' : business.whatsapp}
                                         </div>
@@ -891,16 +918,16 @@ export function BusinessDetails() {
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
                                 <span className="text-lg">Dir</span>
                                 <div>
-                                    <div className="text-xs text-gray-400">Direccion</div>
+                                    <div className="text-xs text-gray-600">Direccion</div>
                                     <div className="text-sm text-gray-700">{business.address}</div>
                                 </div>
                             </div>
                         </div>
 
                         <div className="mt-6 border-t border-gray-100 pt-6">
-                            <h4 className="font-display font-semibold text-gray-900 mb-3">
+                            <h3 className="font-display font-semibold text-gray-900 mb-3">
                                 Mensaje directo
-                            </h4>
+                            </h3>
 
                             {!isAuthenticated && (
                                 <form onSubmit={handlePublicLeadSubmit} className="space-y-3">
