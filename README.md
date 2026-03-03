@@ -304,7 +304,17 @@ Separacion aplicada:
 - `pnpm smoke:api`: Smoke de endpoints health
 - `pnpm smoke:full`: Smoke integral (API + datos base + marketplace publico + health web)
 - `pnpm smoke:saas`: Smoke end-to-end de flujos SaaS y marketplace
+- `pnpm smoke:prod`: Smoke de produccion (health + catalogo + IA concierge + check-ins + rutas web)
 - `pnpm db:generate`: Prisma generate
 - `pnpm db:migrate`: Prisma migrate dev
 - `pnpm db:migrate:deploy`: Prisma migrate deploy
 - `pnpm db:seed`: Seed inicial
+
+Ejemplo smoke en produccion (PowerShell):
+
+```powershell
+$env:SMOKE_PROD_API_BASE_URL="https://aquitado.onrender.com"
+$env:SMOKE_PROD_WEB_BASE_URL="https://aquitado.vercel.app"
+$env:SMOKE_PROD_SKIP_CHECKINS="1"   # usar "0" cuando migracion check-ins este aplicada
+pnpm smoke:prod
+```
