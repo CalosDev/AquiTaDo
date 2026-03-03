@@ -1,6 +1,7 @@
 import {
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
@@ -18,6 +19,8 @@ import {
 
 @Injectable()
 export class AnalyticsService {
+    private readonly logger = new Logger(AnalyticsService.name);
+
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
@@ -26,73 +29,99 @@ export class AnalyticsService {
     async trackBusinessEvent(dto: TrackBusinessEventDto) {
         const eventTime = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
         const analyticsDate = this.toDateOnly(eventTime);
+        const trackedAt = eventTime.toISOString();
 
-        return this.prisma.$transaction(async (tx) => {
-            const business = await tx.business.findUnique({
-                where: { id: dto.businessId },
-                select: {
-                    id: true,
-                    organizationId: true,
-                },
-            });
+        try {
+            const result = await this.prisma.$transaction(async (tx) => {
+                const business = await tx.business.findUnique({
+                    where: { id: dto.businessId },
+                    select: {
+                        id: true,
+                        organizationId: true,
+                    },
+                });
 
-            if (!business) {
-                throw new NotFoundException('Negocio no encontrado');
-            }
+                if (!business) {
+                    return {
+                        received: false,
+                        businessId: dto.businessId,
+                        eventType: dto.eventType,
+                        trackedAt,
+                        reason: 'business_not_found',
+                    } as const;
+                }
 
-            let uniqueVisitors = 0;
-            if (dto.eventType === AnalyticsEventType.VIEW) {
-                uniqueVisitors = await this.registerUniqueVisitor(
-                    tx,
-                    business.organizationId,
-                    dto.businessId,
-                    analyticsDate,
-                    dto.visitorId,
-                );
-            }
+                let uniqueVisitors = 0;
+                if (dto.eventType === AnalyticsEventType.VIEW) {
+                    uniqueVisitors = await this.registerUniqueVisitor(
+                        tx,
+                        business.organizationId,
+                        dto.businessId,
+                        analyticsDate,
+                        dto.visitorId,
+                    );
+                }
 
-            const views = dto.eventType === AnalyticsEventType.VIEW ? 1 : 0;
-            const clicks = dto.eventType === AnalyticsEventType.CLICK ? 1 : 0;
-            const conversions = dto.eventType === AnalyticsEventType.CONVERSION ? 1 : 0;
-            const reservationRequests = dto.eventType === AnalyticsEventType.RESERVATION_REQUEST ? 1 : 0;
-            const grossRevenueIncrement = dto.eventType === AnalyticsEventType.CONVERSION
-                ? Number(dto.amount ?? 0)
-                : 0;
+                const views = dto.eventType === AnalyticsEventType.VIEW ? 1 : 0;
+                const clicks = dto.eventType === AnalyticsEventType.CLICK ? 1 : 0;
+                const conversions = dto.eventType === AnalyticsEventType.CONVERSION ? 1 : 0;
+                const reservationRequests = dto.eventType === AnalyticsEventType.RESERVATION_REQUEST ? 1 : 0;
+                const rawAmount = Number(dto.amount ?? 0);
+                const safeAmount = Number.isFinite(rawAmount) ? rawAmount : 0;
+                const grossRevenueIncrement = dto.eventType === AnalyticsEventType.CONVERSION
+                    ? Math.max(safeAmount, 0)
+                    : 0;
 
-            await tx.businessAnalytics.upsert({
-                where: {
-                    businessId_date: {
+                await tx.businessAnalytics.upsert({
+                    where: {
+                        businessId_date: {
+                            businessId: dto.businessId,
+                            date: analyticsDate,
+                        },
+                    },
+                    update: {
+                        views: { increment: views },
+                        uniqueVisitors: { increment: uniqueVisitors },
+                        clicks: { increment: clicks },
+                        conversions: { increment: conversions },
+                        reservationRequests: { increment: reservationRequests },
+                        grossRevenue: { increment: new Prisma.Decimal(grossRevenueIncrement.toFixed(2)) },
+                    },
+                    create: {
                         businessId: dto.businessId,
                         date: analyticsDate,
+                        views,
+                        uniqueVisitors,
+                        clicks,
+                        conversions,
+                        reservationRequests,
+                        grossRevenue: new Prisma.Decimal(grossRevenueIncrement.toFixed(2)),
                     },
-                },
-                update: {
-                    views: { increment: views },
-                    uniqueVisitors: { increment: uniqueVisitors },
-                    clicks: { increment: clicks },
-                    conversions: { increment: conversions },
-                    reservationRequests: { increment: reservationRequests },
-                    grossRevenue: { increment: new Prisma.Decimal(grossRevenueIncrement.toFixed(2)) },
-                },
-                create: {
+                });
+
+                return {
+                    received: true,
                     businessId: dto.businessId,
-                    date: analyticsDate,
-                    views,
-                    uniqueVisitors,
-                    clicks,
-                    conversions,
-                    reservationRequests,
-                    grossRevenue: new Prisma.Decimal(grossRevenueIncrement.toFixed(2)),
-                },
+                    eventType: dto.eventType,
+                    trackedAt,
+                } as const;
             });
 
+            return result;
+        } catch (error) {
+            this.logger.warn(
+                `Analytics tracking skipped for business ${dto.businessId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
             return {
-                received: true,
+                received: false,
                 businessId: dto.businessId,
                 eventType: dto.eventType,
-                trackedAt: eventTime.toISOString(),
+                trackedAt,
+                reason: 'analytics_unavailable',
             };
-        });
+        }
     }
 
     async trackGrowthEvent(dto: TrackGrowthEventDto & { userId?: string }) {

@@ -291,7 +291,7 @@ export function BusinessesList() {
         }
 
         let active = true;
-        void favoritesApi.getFavoriteBusinesses({ limit: 200 })
+        void favoritesApi.getFavoriteBusinesses({ limit: 100 })
             .then((response) => {
                 if (!active) {
                     return;
