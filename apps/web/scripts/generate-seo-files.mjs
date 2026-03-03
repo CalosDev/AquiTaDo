@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -72,7 +72,7 @@ function normalizeBaseUrl(value) {
 }
 
 function buildSitemap(baseUrl) {
-    const nowIso = new Date().toISOString();
+    const lastmod = resolveLastmod();
     const staticPaths = ['/', '/businesses', '/terms', '/privacy'];
     const categoryPaths = CATEGORY_SLUGS.map((slug) => `/negocios/categoria/${slug}`);
     const provincePaths = PROVINCE_SLUGS.map((slug) => `/negocios/provincia/${slug}`);
@@ -114,7 +114,7 @@ function buildSitemap(baseUrl) {
             loc: `${baseUrl}${path}`,
             changefreq,
             priority,
-            lastmod: nowIso,
+            lastmod,
         };
     });
 
@@ -125,11 +125,31 @@ function buildSitemap(baseUrl) {
     return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
 }
 
+function resolveLastmod() {
+    const override = process.env.SITEMAP_LASTMOD?.trim();
+    if (override) {
+        return override;
+    }
+
+    // Keep sitemap deterministic by day to avoid dirty git state on every build.
+    return new Date().toISOString().slice(0, 10);
+}
+
 function buildRobots(baseUrl) {
     return `User-agent: *\nAllow: /\n\nSitemap: ${baseUrl}/sitemap.xml\n`;
 }
 
+function writeIfChanged(path, content) {
+    if (existsSync(path)) {
+        const current = readFileSync(path, 'utf8');
+        if (current === content) {
+            return;
+        }
+    }
+    writeFileSync(path, content, 'utf8');
+}
+
 const baseUrl = normalizeBaseUrl(process.env.VITE_PUBLIC_WEB_URL);
 mkdirSync(publicDir, { recursive: true });
-writeFileSync(resolve(publicDir, 'robots.txt'), buildRobots(baseUrl), 'utf8');
-writeFileSync(resolve(publicDir, 'sitemap.xml'), buildSitemap(baseUrl), 'utf8');
+writeIfChanged(resolve(publicDir, 'robots.txt'), buildRobots(baseUrl));
+writeIfChanged(resolve(publicDir, 'sitemap.xml'), buildSitemap(baseUrl));

@@ -2,7 +2,7 @@
   "name": "aquita",
   "version": "1.0.0",
   "private": true,
-  "description": "AquiTa.do — Directorio inteligente de negocios locales en República Dominicana",
+  "description": "AquiTa.do - Directorio inteligente de negocios locales en Republica Dominicana",
   "scripts": {
     "dev": "pnpm --parallel -r run dev",
     "dev:web": "pnpm --filter @aquita/web dev",

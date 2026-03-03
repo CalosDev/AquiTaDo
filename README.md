@@ -155,10 +155,10 @@ docker compose up -d --build
 ```
 
 Nota:
-- El servicio `migrate` ejecuta `prisma migrate deploy` automáticamente antes de levantar la API.
-- El servicio `seed` ejecuta `prisma seed` para cargar datos base (planes/categorías/provincias/features).
+- El servicio `migrate` ejecuta `prisma migrate deploy` automaticamente antes de levantar la API.
+- El servicio `seed` ejecuta `prisma seed` para cargar datos base (planes/categorias/provincias/features).
 - La salud de la API ahora se valida con `/api/health/ready` (DB + esquema).
-- Se incluyen `redis` (cache distribuido) y `meilisearch` (búsqueda full-text).
+- Se incluyen `redis` (cache distribuido) y `meilisearch` (busqueda full-text).
 - La base de datos usa imagen PostGIS para consultas geoespaciales nativas.
 
 Servicios en Docker:
@@ -296,7 +296,7 @@ Separacion aplicada:
 - `pnpm build`: Build de todo el monorepo
 - `pnpm lint`: Lint de todo el monorepo
 - `pnpm smoke:api`: Smoke de endpoints health
-- `pnpm smoke:full`: Smoke integral (API + datos base + marketplace público + health web)
+- `pnpm smoke:full`: Smoke integral (API + datos base + marketplace publico + health web)
 - `pnpm smoke:saas`: Smoke end-to-end de flujos SaaS y marketplace
 - `pnpm db:generate`: Prisma generate
 - `pnpm db:migrate`: Prisma migrate dev

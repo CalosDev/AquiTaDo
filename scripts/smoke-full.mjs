@@ -10,7 +10,7 @@ function normalizeBaseUrl(rawUrl, fallbackUrl) {
     return normalized;
 }
 
-async function request(url, accept = 'application/json') {
+async function request(url, accept = 'application/json', token) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -19,6 +19,7 @@ async function request(url, accept = 'application/json') {
             signal: controller.signal,
             headers: {
                 accept,
+                ...(token ? { authorization: `Bearer ${token}` } : {}),
             },
         });
 
@@ -127,11 +128,28 @@ async function checkPublicMarketplace(apiBaseUrl) {
     assert(Number.isInteger(discoveryPayload?.count), '/api/discovery/businesses/nearby.count must be an integer');
 }
 
-async function checkObservability(apiBaseUrl) {
-    const metricsResponse = await request(`${apiBaseUrl}/api/observability/metrics`, 'text/plain');
+async function checkObservability(apiBaseUrl, adminToken) {
+    const unauthorizedResponse = await request(
+        `${apiBaseUrl}/api/observability/metrics`,
+        'application/json',
+    );
+    assert(
+        unauthorizedResponse.response.status === 401 || unauthorizedResponse.response.status === 403,
+        `/api/observability/metrics must be protected; expected 401/403 and got ${unauthorizedResponse.response.status}`,
+    );
+
+    if (!adminToken) {
+        return;
+    }
+
+    const metricsResponse = await request(
+        `${apiBaseUrl}/api/observability/metrics`,
+        'text/plain',
+        adminToken,
+    );
     assert(
         metricsResponse.response.ok,
-        `/api/observability/metrics failed with HTTP ${metricsResponse.response.status}`,
+        `/api/observability/metrics with admin token failed with HTTP ${metricsResponse.response.status}`,
     );
     assert(
         metricsResponse.text.includes('aquita_http_requests_total'),
@@ -149,6 +167,7 @@ async function main() {
     const apiBaseUrl = normalizeBaseUrl(process.env.FULL_SMOKE_API_BASE_URL, DEFAULT_API_BASE_URL);
     const webBaseUrl = normalizeBaseUrl(process.env.FULL_SMOKE_WEB_BASE_URL, DEFAULT_WEB_BASE_URL);
     const skipWebCheck = process.env.FULL_SMOKE_SKIP_WEB === '1';
+    const adminToken = process.env.FULL_SMOKE_ADMIN_TOKEN?.trim();
 
     console.log(`Running full smoke test (api=${apiBaseUrl}, web=${webBaseUrl})`);
 
@@ -161,8 +180,12 @@ async function main() {
     await checkPublicMarketplace(apiBaseUrl);
     console.log('OK public marketplace and search endpoints');
 
-    await checkObservability(apiBaseUrl);
-    console.log('OK observability metrics endpoint');
+    await checkObservability(apiBaseUrl, adminToken);
+    console.log(
+        adminToken
+            ? 'OK observability metrics endpoint (protected + admin access validated)'
+            : 'OK observability metrics endpoint is protected (401/403)',
+    );
 
     if (!skipWebCheck) {
         await checkWebHealth(webBaseUrl);

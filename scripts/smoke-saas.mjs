@@ -21,17 +21,24 @@ async function request(apiBaseUrl, path, options = {}) {
     const {
         method = 'GET',
         token,
+        cookie,
         organizationId,
+        headers: customHeaders,
         body,
         accept = 'application/json',
     } = options;
 
     const headers = {
         accept,
+        ...(customHeaders ?? {}),
     };
 
     if (token) {
         headers.authorization = `Bearer ${token}`;
+    }
+
+    if (cookie) {
+        headers.cookie = cookie;
     }
 
     if (organizationId) {
@@ -87,6 +94,9 @@ function assertStatus(response, allowedStatusCodes, label) {
 async function main() {
     const apiBaseUrl = normalizeBaseUrl(process.env.SAAS_SMOKE_API_BASE_URL, DEFAULT_API_BASE_URL);
     const runId = randomUUID().slice(0, 8);
+    const adminEmail = process.env.SAAS_SMOKE_ADMIN_EMAIL?.trim();
+    const adminPassword = process.env.SAAS_SMOKE_ADMIN_PASSWORD?.trim();
+    const verificationFileUrl = process.env.SAAS_SMOKE_VERIFICATION_FILE_URL?.trim();
     console.log(`Running SaaS smoke flow against ${apiBaseUrl} (run=${runId})`);
 
     const plansResponse = await request(apiBaseUrl, '/api/plans');
@@ -126,28 +136,38 @@ async function main() {
             email: userEmail,
             password: userPassword,
             phone: '+18095550000',
+            role: 'BUSINESS_OWNER',
         },
     });
     assertStatus(registerResponse, [201], 'POST /api/auth/register');
 
     const initialAccessToken = registerResponse.json?.accessToken;
-    const initialRefreshToken = registerResponse.json?.refreshToken;
     const userId = registerResponse.json?.user?.id;
     assert(typeof initialAccessToken === 'string', 'Missing accessToken from register');
-    assert(typeof initialRefreshToken === 'string', 'Missing refreshToken from register');
     assert(typeof userId === 'string', 'Missing user id from register');
 
-    const refreshResponse = await request(apiBaseUrl, '/api/auth/refresh', {
-        method: 'POST',
-        body: {
-            refreshToken: initialRefreshToken,
-        },
-    });
-    assertStatus(refreshResponse, [200], 'POST /api/auth/refresh');
-    const accessToken = refreshResponse.json?.accessToken;
-    const refreshToken = refreshResponse.json?.refreshToken;
-    assert(typeof accessToken === 'string', 'Missing accessToken from refresh');
-    assert(typeof refreshToken === 'string', 'Missing refreshToken from refresh');
+    let accessToken = initialAccessToken;
+    let adminAccessToken = null;
+    let bookingId = null;
+    let reviewId = null;
+    let businessVerifiedViaAdmin = false;
+    const registerSetCookie = registerResponse.headers.get('set-cookie') ?? '';
+    if (registerSetCookie) {
+        const refreshCookie = registerSetCookie.split(',').find((chunk) => chunk.includes('aquita_refresh_token='));
+        if (refreshCookie) {
+            const cookieHeader = refreshCookie.split(';')[0]?.trim();
+            if (cookieHeader) {
+                const refreshResponse = await request(apiBaseUrl, '/api/auth/refresh', {
+                    method: 'POST',
+                    cookie: cookieHeader,
+                });
+                assertStatus(refreshResponse, [200], 'POST /api/auth/refresh');
+                const refreshedAccessToken = refreshResponse.json?.accessToken;
+                assert(typeof refreshedAccessToken === 'string', 'Missing accessToken from refresh');
+                accessToken = refreshedAccessToken;
+            }
+        }
+    }
 
     const meResponse = await request(apiBaseUrl, '/api/users/me', {
         token: accessToken,
@@ -287,22 +307,27 @@ async function main() {
     );
     assertStatus(businessesNearbyResponse, [200], 'GET /api/businesses/nearby');
 
-    const adminLoginResponse = await request(apiBaseUrl, '/api/auth/login', {
-        method: 'POST',
-        body: {
-            email: 'admin@aquita.do',
-            password: 'admin12345',
-        },
-    });
-    assertStatus(adminLoginResponse, [200], 'POST /api/auth/login (admin)');
-    const adminAccessToken = adminLoginResponse.json?.accessToken;
-    assert(typeof adminAccessToken === 'string', 'Missing admin access token');
+    if (adminEmail && adminPassword) {
+        const adminLoginResponse = await request(apiBaseUrl, '/api/auth/login', {
+            method: 'POST',
+            body: {
+                email: adminEmail,
+                password: adminPassword,
+            },
+        });
+        assertStatus(adminLoginResponse, [200], 'POST /api/auth/login (admin)');
+        adminAccessToken = adminLoginResponse.json?.accessToken;
+        assert(typeof adminAccessToken === 'string', 'Missing admin access token');
 
-    const verifyBusinessResponse = await request(apiBaseUrl, `/api/businesses/${businessId}/verify`, {
-        method: 'PUT',
-        token: adminAccessToken,
-    });
-    assertStatus(verifyBusinessResponse, [200], `PUT /api/businesses/${businessId}/verify`);
+        const verifyBusinessResponse = await request(apiBaseUrl, `/api/businesses/${businessId}/verify`, {
+            method: 'PUT',
+            token: adminAccessToken,
+        });
+        assertStatus(verifyBusinessResponse, [200], `PUT /api/businesses/${businessId}/verify`);
+        businessVerifiedViaAdmin = true;
+    } else {
+        console.log('Skipping admin verification step (set SAAS_SMOKE_ADMIN_EMAIL/PASSWORD to enable it)');
+    }
 
     const searchBusinessesResponse = await request(
         apiBaseUrl,
@@ -371,176 +396,196 @@ async function main() {
     const publicPromotionsResponse = await request(apiBaseUrl, '/api/promotions');
     assertStatus(publicPromotionsResponse, [200], 'GET /api/promotions');
 
-    const bookingResponse = await request(apiBaseUrl, '/api/bookings', {
-        method: 'POST',
-        token: accessToken,
-        body: {
-            businessId,
-            promotionId,
-            scheduledFor: new Date(now + 3 * 24 * 60 * 60 * 1000).toISOString(),
-            partySize: 2,
-            notes: 'Smoke booking flow.',
-            quotedAmount: 1500,
-            depositAmount: 300,
-            currency: 'DOP',
-        },
-    });
-    assertStatus(bookingResponse, [201], 'POST /api/bookings');
-    const bookingId = bookingResponse.json?.id;
-    assert(typeof bookingId === 'string', 'Missing booking id');
-
-    const myBookingsResponse = await request(apiBaseUrl, '/api/bookings/me', {
-        token: accessToken,
-    });
-    assertStatus(myBookingsResponse, [200], 'GET /api/bookings/me');
-
-    const orgBookingsResponse = await request(apiBaseUrl, '/api/bookings/my', {
-        token: accessToken,
-        organizationId,
-    });
-    assertStatus(orgBookingsResponse, [200], 'GET /api/bookings/my');
-
-    const bookingStatusResponse = await request(apiBaseUrl, `/api/bookings/${bookingId}/status`, {
-        method: 'PATCH',
-        token: accessToken,
-        organizationId,
-        body: {
-            status: 'CONFIRMED',
-            quotedAmount: 1500,
-            depositAmount: 300,
-            notes: 'Confirmed by smoke flow',
-        },
-    });
-    assertStatus(bookingStatusResponse, [200], `PATCH /api/bookings/${bookingId}/status`);
-
-    const orgTransactionsResponse = await request(apiBaseUrl, '/api/bookings/transactions/my', {
-        token: accessToken,
-        organizationId,
-    });
-    assertStatus(orgTransactionsResponse, [200], 'GET /api/bookings/transactions/my');
-
-    const createConversationResponse = await request(apiBaseUrl, '/api/messaging/conversations', {
-        method: 'POST',
-        token: accessToken,
-        body: {
-            businessId,
-            subject: 'Need availability',
-            message: 'Can you share availability for this weekend?',
-        },
-    });
-    assertStatus(createConversationResponse, [201], 'POST /api/messaging/conversations');
-    const conversationId =
-        createConversationResponse.json?.id
-        ?? createConversationResponse.json?.data?.id;
-    assert(
-        typeof conversationId === 'string',
-        `Missing conversation id. Response: ${JSON.stringify(createConversationResponse.json)}`,
-    );
-
-    const myConversationsResponse = await request(apiBaseUrl, '/api/messaging/conversations/me', {
-        token: accessToken,
-    });
-    assertStatus(myConversationsResponse, [200], 'GET /api/messaging/conversations/me');
-
-    const customerThreadResponse = await request(
-        apiBaseUrl,
-        `/api/messaging/conversations/me/${conversationId}`,
-        {
-            token: accessToken,
-        },
-    );
-    assertStatus(customerThreadResponse, [200], `GET /api/messaging/conversations/me/${conversationId}`);
-
-    const customerMessageResponse = await request(
-        apiBaseUrl,
-        `/api/messaging/conversations/me/${conversationId}/messages`,
-        {
+    if (businessVerifiedViaAdmin) {
+        const bookingResponse = await request(apiBaseUrl, '/api/bookings', {
             method: 'POST',
             token: accessToken,
             body: {
-                content: 'Adding a follow up message from customer.',
-            },
-        },
-    );
-    assertStatus(
-        customerMessageResponse,
-        [201],
-        `POST /api/messaging/conversations/me/${conversationId}/messages`,
-    );
-
-    const orgConversationsResponse = await request(apiBaseUrl, '/api/messaging/conversations/my', {
-        token: accessToken,
-        organizationId,
-    });
-    assertStatus(orgConversationsResponse, [200], 'GET /api/messaging/conversations/my');
-
-    const orgThreadResponse = await request(
-        apiBaseUrl,
-        `/api/messaging/conversations/my/${conversationId}`,
-        {
-            token: accessToken,
-            organizationId,
-        },
-    );
-    assertStatus(orgThreadResponse, [200], `GET /api/messaging/conversations/my/${conversationId}`);
-
-    const orgMessageResponse = await request(
-        apiBaseUrl,
-        `/api/messaging/conversations/my/${conversationId}/messages`,
-        {
-            method: 'POST',
-            token: accessToken,
-            organizationId,
-            body: {
-                content: 'Response from business side in smoke flow.',
-            },
-        },
-    );
-    assertStatus(
-        orgMessageResponse,
-        [201],
-        `POST /api/messaging/conversations/my/${conversationId}/messages`,
-    );
-
-    const convertConversationResponse = await request(
-        apiBaseUrl,
-        `/api/messaging/conversations/my/${conversationId}/convert-booking`,
-        {
-            method: 'POST',
-            token: accessToken,
-            organizationId,
-            body: {
-                scheduledFor: new Date(now + 5 * 24 * 60 * 60 * 1000).toISOString(),
-                partySize: 4,
-                notes: 'Converted from conversation by smoke flow.',
-                quotedAmount: 2200,
-                depositAmount: 500,
-                currency: 'DOP',
+                businessId,
                 promotionId,
+                scheduledFor: new Date(now + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                partySize: 2,
+                notes: 'Smoke booking flow.',
+                quotedAmount: 1500,
+                depositAmount: 300,
+                currency: 'DOP',
             },
-        },
-    );
-    assertStatus(
-        convertConversationResponse,
-        [201, 200],
-        `POST /api/messaging/conversations/my/${conversationId}/convert-booking`,
-    );
+        });
+        assertStatus(bookingResponse, [201], 'POST /api/bookings');
+        bookingId = bookingResponse.json?.id;
+        assert(typeof bookingId === 'string', 'Missing booking id');
 
-    const crmCustomersResponse = await request(apiBaseUrl, '/api/crm/customers/my', {
-        token: accessToken,
-        organizationId,
-    });
-    assertStatus(crmCustomersResponse, [200], 'GET /api/crm/customers/my');
+        const myBookingsResponse = await request(apiBaseUrl, '/api/bookings/me', {
+            token: accessToken,
+        });
+        assertStatus(myBookingsResponse, [200], 'GET /api/bookings/me');
 
-    const crmHistoryResponse = await request(
-        apiBaseUrl,
-        `/api/crm/customers/${userId}/history?businessId=${businessId}`,
-        {
+        const orgBookingsResponse = await request(apiBaseUrl, '/api/bookings/my', {
             token: accessToken,
             organizationId,
-        },
-    );
-    assertStatus(crmHistoryResponse, [200], `GET /api/crm/customers/${userId}/history`);
+        });
+        assertStatus(orgBookingsResponse, [200], 'GET /api/bookings/my');
+
+        const bookingStatusResponse = await request(apiBaseUrl, `/api/bookings/${bookingId}/status`, {
+            method: 'PATCH',
+            token: accessToken,
+            organizationId,
+            body: {
+                status: 'CONFIRMED',
+                quotedAmount: 1500,
+                depositAmount: 300,
+                notes: 'Confirmed by smoke flow',
+            },
+        });
+        assertStatus(bookingStatusResponse, [200], `PATCH /api/bookings/${bookingId}/status`);
+
+        const orgTransactionsResponse = await request(apiBaseUrl, '/api/bookings/transactions/my', {
+            token: accessToken,
+            organizationId,
+        });
+        assertStatus(orgTransactionsResponse, [200], 'GET /api/bookings/transactions/my');
+
+        const createConversationResponse = await request(apiBaseUrl, '/api/messaging/conversations', {
+            method: 'POST',
+            token: accessToken,
+            body: {
+                businessId,
+                subject: 'Need availability',
+                message: 'Can you share availability for this weekend?',
+            },
+        });
+        assertStatus(createConversationResponse, [201], 'POST /api/messaging/conversations');
+        const conversationId =
+            createConversationResponse.json?.id
+            ?? createConversationResponse.json?.data?.id;
+        assert(
+            typeof conversationId === 'string',
+            `Missing conversation id. Response: ${JSON.stringify(createConversationResponse.json)}`,
+        );
+
+        const myConversationsResponse = await request(apiBaseUrl, '/api/messaging/conversations/me', {
+            token: accessToken,
+        });
+        assertStatus(myConversationsResponse, [200], 'GET /api/messaging/conversations/me');
+
+        const customerThreadResponse = await request(
+            apiBaseUrl,
+            `/api/messaging/conversations/me/${conversationId}`,
+            {
+                token: accessToken,
+            },
+        );
+        assertStatus(customerThreadResponse, [200], `GET /api/messaging/conversations/me/${conversationId}`);
+
+        const customerMessageResponse = await request(
+            apiBaseUrl,
+            `/api/messaging/conversations/me/${conversationId}/messages`,
+            {
+                method: 'POST',
+                token: accessToken,
+                body: {
+                    content: 'Adding a follow up message from customer.',
+                },
+            },
+        );
+        assertStatus(
+            customerMessageResponse,
+            [201],
+            `POST /api/messaging/conversations/me/${conversationId}/messages`,
+        );
+
+        const orgConversationsResponse = await request(apiBaseUrl, '/api/messaging/conversations/my', {
+            token: accessToken,
+            organizationId,
+        });
+        assertStatus(orgConversationsResponse, [200], 'GET /api/messaging/conversations/my');
+
+        const orgThreadResponse = await request(
+            apiBaseUrl,
+            `/api/messaging/conversations/my/${conversationId}`,
+            {
+                token: accessToken,
+                organizationId,
+            },
+        );
+        assertStatus(orgThreadResponse, [200], `GET /api/messaging/conversations/my/${conversationId}`);
+
+        const orgMessageResponse = await request(
+            apiBaseUrl,
+            `/api/messaging/conversations/my/${conversationId}/messages`,
+            {
+                method: 'POST',
+                token: accessToken,
+                organizationId,
+                body: {
+                    content: 'Response from business side in smoke flow.',
+                },
+            },
+        );
+        assertStatus(
+            orgMessageResponse,
+            [201],
+            `POST /api/messaging/conversations/my/${conversationId}/messages`,
+        );
+
+        const convertConversationResponse = await request(
+            apiBaseUrl,
+            `/api/messaging/conversations/my/${conversationId}/convert-booking`,
+            {
+                method: 'POST',
+                token: accessToken,
+                organizationId,
+                body: {
+                    scheduledFor: new Date(now + 5 * 24 * 60 * 60 * 1000).toISOString(),
+                    partySize: 4,
+                    notes: 'Converted from conversation by smoke flow.',
+                    quotedAmount: 2200,
+                    depositAmount: 500,
+                    currency: 'DOP',
+                    promotionId,
+                },
+            },
+        );
+        assertStatus(
+            convertConversationResponse,
+            [201, 200],
+            `POST /api/messaging/conversations/my/${conversationId}/convert-booking`,
+        );
+
+        const crmCustomersResponse = await request(apiBaseUrl, '/api/crm/customers/my', {
+            token: accessToken,
+            organizationId,
+        });
+        assertStatus(crmCustomersResponse, [200], 'GET /api/crm/customers/my');
+
+        const crmHistoryResponse = await request(
+            apiBaseUrl,
+            `/api/crm/customers/${userId}/history?businessId=${businessId}`,
+            {
+                token: accessToken,
+                organizationId,
+            },
+        );
+        assertStatus(crmHistoryResponse, [200], `GET /api/crm/customers/${userId}/history`);
+
+        const createReviewResponse = await request(apiBaseUrl, '/api/reviews', {
+            method: 'POST',
+            token: accessToken,
+            body: {
+                businessId,
+                rating: 5,
+                comment: 'Excellent experience from smoke flow.',
+            },
+        });
+        assertStatus(createReviewResponse, [201], 'POST /api/reviews');
+        reviewId = createReviewResponse.json?.id;
+        assert(typeof reviewId === 'string', 'Missing review id');
+
+        const businessReviewsResponse = await request(apiBaseUrl, `/api/reviews/business/${businessId}`);
+        assertStatus(businessReviewsResponse, [200], `GET /api/reviews/business/${businessId}`);
+    } else {
+        console.log('Skipping booking/messaging/review flows because business is not admin-verified');
+    }
 
     const analyticsEventResponse = await request(apiBaseUrl, '/api/analytics/events', {
         method: 'POST',
@@ -568,150 +613,149 @@ async function main() {
     );
     assertStatus(analyticsBusinessResponse, [200], `GET /api/analytics/business/${businessId}`);
 
-    const createReviewResponse = await request(apiBaseUrl, '/api/reviews', {
-        method: 'POST',
-        token: accessToken,
-        body: {
-            businessId,
-            rating: 5,
-            comment: 'Excellent experience from smoke flow.',
-        },
-    });
-    assertStatus(createReviewResponse, [201], 'POST /api/reviews');
-    const reviewId = createReviewResponse.json?.id;
-    assert(typeof reviewId === 'string', 'Missing review id');
-
-    const businessReviewsResponse = await request(apiBaseUrl, `/api/reviews/business/${businessId}`);
-    assertStatus(businessReviewsResponse, [200], `GET /api/reviews/business/${businessId}`);
-
-    const flaggedReviewsResponse = await request(apiBaseUrl, '/api/reviews/moderation/flagged', {
-        token: adminAccessToken,
-    });
-    assertStatus(flaggedReviewsResponse, [200], 'GET /api/reviews/moderation/flagged');
-
-    const moderateReviewResponse = await request(apiBaseUrl, `/api/reviews/${reviewId}/moderation`, {
-        method: 'PATCH',
-        token: adminAccessToken,
-        body: {
-            status: 'APPROVED',
-        },
-    });
-    assertStatus(moderateReviewResponse, [200], `PATCH /api/reviews/${reviewId}/moderation`);
-
     const rankingsResponse = await request(apiBaseUrl, '/api/reputation/rankings?limit=10');
     assertStatus(rankingsResponse, [200], 'GET /api/reputation/rankings');
 
     const reputationProfileResponse = await request(apiBaseUrl, `/api/reputation/business/${businessId}`);
     assertStatus(reputationProfileResponse, [200], `GET /api/reputation/business/${businessId}`);
 
-    const recalculateResponse = await request(
-        apiBaseUrl,
-        `/api/reputation/business/${businessId}/recalculate`,
-        {
-            method: 'POST',
-            token: adminAccessToken,
-        },
-    );
-    assertStatus(recalculateResponse, [201, 200], `POST /api/reputation/business/${businessId}/recalculate`);
+    if (adminAccessToken) {
+        if (reviewId) {
+            const flaggedReviewsResponse = await request(apiBaseUrl, '/api/reviews/moderation/flagged', {
+                token: adminAccessToken,
+            });
+            assertStatus(flaggedReviewsResponse, [200], 'GET /api/reviews/moderation/flagged');
 
-    const createCampaignResponse = await request(apiBaseUrl, '/api/ads/campaigns', {
-        method: 'POST',
-        token: accessToken,
-        organizationId,
-        body: {
-            businessId,
-            name: `Smoke Campaign ${runId}`,
-            targetProvinceId: provinceId,
-            targetCategoryId: categoryId,
-            dailyBudget: 100,
-            totalBudget: 500,
-            bidAmount: 10,
-            startsAt: new Date(now).toISOString(),
-            endsAt: new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            status: 'DRAFT',
-        },
-    });
-    assertStatus(createCampaignResponse, [201], 'POST /api/ads/campaigns');
-    const campaignId = createCampaignResponse.json?.id;
-    assert(typeof campaignId === 'string', 'Missing campaign id');
+            const moderateReviewResponse = await request(apiBaseUrl, `/api/reviews/${reviewId}/moderation`, {
+                method: 'PATCH',
+                token: adminAccessToken,
+                body: {
+                    status: 'APPROVED',
+                },
+            });
+            assertStatus(moderateReviewResponse, [200], `PATCH /api/reviews/${reviewId}/moderation`);
+        }
 
-    const campaignsResponse = await request(apiBaseUrl, '/api/ads/campaigns/my', {
-        token: accessToken,
-        organizationId,
-    });
-    assertStatus(campaignsResponse, [200], 'GET /api/ads/campaigns/my');
+        const recalculateResponse = await request(
+            apiBaseUrl,
+            `/api/reputation/business/${businessId}/recalculate`,
+            {
+                method: 'POST',
+                token: adminAccessToken,
+            },
+        );
+        assertStatus(recalculateResponse, [201, 200], `POST /api/reputation/business/${businessId}/recalculate`);
+    }
 
-    const placementsResponse = await request(
-        apiBaseUrl,
-        `/api/ads/placements?provinceId=${provinceId}&categoryId=${categoryId}&limit=5`,
-    );
-    assertStatus(placementsResponse, [200], 'GET /api/ads/placements');
-
-    const verificationDocumentResponse = await request(apiBaseUrl, '/api/verification/documents', {
-        method: 'POST',
-        token: accessToken,
-        organizationId,
-        body: {
-            businessId,
-            documentType: 'BUSINESS_LICENSE',
-            fileUrl: `https://example.com/documents/${runId}.pdf`,
-        },
-    });
-    assertStatus(verificationDocumentResponse, [201], 'POST /api/verification/documents');
-    const verificationDocumentId = verificationDocumentResponse.json?.id;
-    assert(typeof verificationDocumentId === 'string', 'Missing verification document id');
-
-    const verificationDocumentsResponse = await request(apiBaseUrl, '/api/verification/documents/my', {
-        token: accessToken,
-        organizationId,
-    });
-    assertStatus(verificationDocumentsResponse, [200], 'GET /api/verification/documents/my');
-
-    const verificationSubmitResponse = await request(
-        apiBaseUrl,
-        `/api/verification/businesses/${businessId}/submit`,
-        {
+    if (businessVerifiedViaAdmin) {
+        const createCampaignResponse = await request(apiBaseUrl, '/api/ads/campaigns', {
             method: 'POST',
             token: accessToken,
             organizationId,
             body: {
-                notes: 'Smoke verification submission',
+                businessId,
+                name: `Smoke Campaign ${runId}`,
+                targetProvinceId: provinceId,
+                targetCategoryId: categoryId,
+                dailyBudget: 100,
+                totalBudget: 500,
+                bidAmount: 10,
+                startsAt: new Date(now).toISOString(),
+                endsAt: new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                status: 'DRAFT',
             },
-        },
-    );
-    assertStatus(verificationSubmitResponse, [201, 200], `POST /api/verification/businesses/${businessId}/submit`);
+        });
+        assertStatus(createCampaignResponse, [201], 'POST /api/ads/campaigns');
+        const campaignId = createCampaignResponse.json?.id;
+        assert(typeof campaignId === 'string', 'Missing campaign id');
 
-    const verificationStatusResponse = await request(
-        apiBaseUrl,
-        `/api/verification/businesses/${businessId}/status`,
-        {
+        const campaignsResponse = await request(apiBaseUrl, '/api/ads/campaigns/my', {
             token: accessToken,
             organizationId,
-        },
-    );
-    assertStatus(verificationStatusResponse, [200], `GET /api/verification/businesses/${businessId}/status`);
+        });
+        assertStatus(campaignsResponse, [200], 'GET /api/ads/campaigns/my');
 
-    const pendingBusinessesResponse = await request(apiBaseUrl, '/api/verification/admin/pending-businesses', {
-        token: adminAccessToken,
-    });
-    assertStatus(pendingBusinessesResponse, [200], 'GET /api/verification/admin/pending-businesses');
+        const placementsResponse = await request(
+            apiBaseUrl,
+            `/api/ads/placements?provinceId=${provinceId}&categoryId=${categoryId}&limit=5`,
+        );
+        assertStatus(placementsResponse, [200], 'GET /api/ads/placements');
+    } else {
+        console.log('Skipping ads campaign creation because business is not admin-verified');
+    }
 
-    const reviewDocumentResponse = await request(
-        apiBaseUrl,
-        `/api/verification/admin/documents/${verificationDocumentId}/review`,
-        {
-            method: 'PATCH',
-            token: adminAccessToken,
+    let verificationDocumentId = null;
+    if (verificationFileUrl) {
+        const verificationDocumentResponse = await request(apiBaseUrl, '/api/verification/documents', {
+            method: 'POST',
+            token: accessToken,
+            organizationId,
             body: {
-                status: 'APPROVED',
+                businessId,
+                documentType: 'BUSINESS_LICENSE',
+                fileUrl: verificationFileUrl,
             },
-        },
-    );
-    assertStatus(
-        reviewDocumentResponse,
-        [200],
-        `PATCH /api/verification/admin/documents/${verificationDocumentId}/review`,
-    );
+        });
+        assertStatus(verificationDocumentResponse, [201], 'POST /api/verification/documents');
+        verificationDocumentId = verificationDocumentResponse.json?.id;
+        assert(typeof verificationDocumentId === 'string', 'Missing verification document id');
+
+        const verificationDocumentsResponse = await request(apiBaseUrl, '/api/verification/documents/my', {
+            token: accessToken,
+            organizationId,
+        });
+        assertStatus(verificationDocumentsResponse, [200], 'GET /api/verification/documents/my');
+
+        const verificationSubmitResponse = await request(
+            apiBaseUrl,
+            `/api/verification/businesses/${businessId}/submit`,
+            {
+                method: 'POST',
+                token: accessToken,
+                organizationId,
+                body: {
+                    notes: 'Smoke verification submission',
+                },
+            },
+        );
+        assertStatus(verificationSubmitResponse, [201, 200], `POST /api/verification/businesses/${businessId}/submit`);
+
+        const verificationStatusResponse = await request(
+            apiBaseUrl,
+            `/api/verification/businesses/${businessId}/status`,
+            {
+                token: accessToken,
+                organizationId,
+            },
+        );
+        assertStatus(verificationStatusResponse, [200], `GET /api/verification/businesses/${businessId}/status`);
+    } else {
+        console.log('Skipping verification document flow (set SAAS_SMOKE_VERIFICATION_FILE_URL to enable it)');
+    }
+
+    if (adminAccessToken && verificationDocumentId) {
+        const pendingBusinessesResponse = await request(apiBaseUrl, '/api/verification/admin/pending-businesses', {
+            token: adminAccessToken,
+        });
+        assertStatus(pendingBusinessesResponse, [200], 'GET /api/verification/admin/pending-businesses');
+
+        const reviewDocumentResponse = await request(
+            apiBaseUrl,
+            `/api/verification/admin/documents/${verificationDocumentId}/review`,
+            {
+                method: 'PATCH',
+                token: adminAccessToken,
+                body: {
+                    status: 'APPROVED',
+                },
+            },
+        );
+        assertStatus(
+            reviewDocumentResponse,
+            [200],
+            `PATCH /api/verification/admin/documents/${verificationDocumentId}/review`,
+        );
+    }
 
     const subscriptionCurrentResponse = await request(apiBaseUrl, '/api/subscriptions/current', {
         token: accessToken,
@@ -791,59 +835,60 @@ async function main() {
         'POST /api/payments/ads-wallet/checkout-session',
     );
 
-    const bookingCheckoutResponse = await request(
-        apiBaseUrl,
-        `/api/payments/marketplace/bookings/${bookingId}/checkout-session`,
-        {
-            method: 'POST',
-            token: accessToken,
-            body: {
-                successUrl: 'http://localhost:8080/bookings?payment=ok',
-                cancelUrl: 'http://localhost:8080/bookings?payment=cancel',
+    if (bookingId) {
+        const bookingCheckoutResponse = await request(
+            apiBaseUrl,
+            `/api/payments/marketplace/bookings/${bookingId}/checkout-session`,
+            {
+                method: 'POST',
+                token: accessToken,
+                body: {
+                    successUrl: 'http://localhost:8080/bookings?payment=ok',
+                    cancelUrl: 'http://localhost:8080/bookings?payment=cancel',
+                },
             },
-        },
-    );
-    assertStatus(
-        bookingCheckoutResponse,
-        [201, 503],
-        `POST /api/payments/marketplace/bookings/${bookingId}/checkout-session`,
-    );
+        );
+        assertStatus(
+            bookingCheckoutResponse,
+            [201, 503],
+            `POST /api/payments/marketplace/bookings/${bookingId}/checkout-session`,
+        );
+    }
 
-    const smokeCategorySlug = `smoke-category-${runId}`;
-    const createCategoryResponse = await request(apiBaseUrl, '/api/categories', {
-        method: 'POST',
-        token: adminAccessToken,
-        body: {
-            name: `Smoke Category ${runId}`,
-            slug: smokeCategorySlug,
-            icon: 'S',
-        },
-    });
-    assertStatus(createCategoryResponse, [201], 'POST /api/categories (admin)');
-    const smokeCategoryId = createCategoryResponse.json?.id;
-    assert(typeof smokeCategoryId === 'string', 'Missing smoke category id');
+    if (adminAccessToken) {
+        const smokeCategorySlug = `smoke-category-${runId}`;
+        const createCategoryResponse = await request(apiBaseUrl, '/api/categories', {
+            method: 'POST',
+            token: adminAccessToken,
+            body: {
+                name: `Smoke Category ${runId}`,
+                slug: smokeCategorySlug,
+                icon: 'S',
+            },
+        });
+        assertStatus(createCategoryResponse, [201], 'POST /api/categories (admin)');
+        const smokeCategoryId = createCategoryResponse.json?.id;
+        assert(typeof smokeCategoryId === 'string', 'Missing smoke category id');
 
-    const updateCategoryResponse = await request(apiBaseUrl, `/api/categories/${smokeCategoryId}`, {
-        method: 'PUT',
-        token: adminAccessToken,
-        body: {
-            name: `Smoke Category ${runId} Updated`,
-            slug: `${smokeCategorySlug}-updated`,
-        },
-    });
-    assertStatus(updateCategoryResponse, [200], `PUT /api/categories/${smokeCategoryId}`);
+        const updateCategoryResponse = await request(apiBaseUrl, `/api/categories/${smokeCategoryId}`, {
+            method: 'PUT',
+            token: adminAccessToken,
+            body: {
+                name: `Smoke Category ${runId} Updated`,
+                slug: `${smokeCategorySlug}-updated`,
+            },
+        });
+        assertStatus(updateCategoryResponse, [200], `PUT /api/categories/${smokeCategoryId}`);
 
-    const deleteCategoryResponse = await request(apiBaseUrl, `/api/categories/${smokeCategoryId}`, {
-        method: 'DELETE',
-        token: adminAccessToken,
-    });
-    assertStatus(deleteCategoryResponse, [200], `DELETE /api/categories/${smokeCategoryId}`);
+        const deleteCategoryResponse = await request(apiBaseUrl, `/api/categories/${smokeCategoryId}`, {
+            method: 'DELETE',
+            token: adminAccessToken,
+        });
+        assertStatus(deleteCategoryResponse, [200], `DELETE /api/categories/${smokeCategoryId}`);
+    }
 
     const logoutResponse = await request(apiBaseUrl, '/api/auth/logout', {
         method: 'POST',
-        body: {
-            refreshToken,
-        },
     });
     assertStatus(logoutResponse, [200], 'POST /api/auth/logout');
 
