@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     Inject,
     Injectable,
@@ -38,6 +39,12 @@ export class AuthService {
             throw new ConflictException('El correo electronico ya esta registrado');
         }
 
+        if (dto.role === 'ADMIN') {
+            throw new BadRequestException('No puedes registrarte con rol ADMIN');
+        }
+
+        const requestedRole: Role = dto.role === 'BUSINESS_OWNER' ? 'BUSINESS_OWNER' : 'USER';
+
         const hashedPassword = await bcrypt.hash(dto.password, 12);
 
         const user = await this.prisma.user.create({
@@ -46,6 +53,7 @@ export class AuthService {
                 email: dto.email.trim().toLowerCase(),
                 password: hashedPassword,
                 phone: dto.phone?.trim(),
+                role: requestedRole,
             },
         });
 

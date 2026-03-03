@@ -19,7 +19,13 @@ interface AuthContextType {
     refreshToken: string | null;
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
-    register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
+    register: (
+        name: string,
+        email: string,
+        password: string,
+        phone?: string,
+        role?: 'USER' | 'BUSINESS_OWNER',
+    ) => Promise<void>;
     refreshProfile: () => Promise<void>;
     logout: () => Promise<void>;
     isAuthenticated: boolean;
@@ -155,8 +161,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
     };
 
-    const register = async (name: string, email: string, password: string, phone?: string) => {
-        const response = await authApi.register({ name, email, password, phone });
+    const register = async (
+        name: string,
+        email: string,
+        password: string,
+        phone?: string,
+        role?: 'USER' | 'BUSINESS_OWNER',
+    ) => {
+        const response = await authApi.register({ name, email, password, phone, role });
         const { accessToken, user: userData } = response.data;
         applySession({
             accessToken,

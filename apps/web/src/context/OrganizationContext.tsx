@@ -34,7 +34,7 @@ interface OrganizationContextType {
 export const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
-    const { isAuthenticated, loading: authLoading } = useAuth();
+    const { isAuthenticated, loading: authLoading, user } = useAuth();
     const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
     const [activeOrganizationId, setActiveOrganizationIdState] = useState<string | null>(
         localStorage.getItem(ACTIVE_ORGANIZATION_STORAGE_KEY),
@@ -59,7 +59,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const refreshOrganizations = useCallback(async (preferredOrganizationId?: string | null) => {
-        if (!isAuthenticated) {
+        const canUseOrganizations = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+        if (!isAuthenticated || !canUseOrganizations) {
             clearOrganizationState();
             setLoading(false);
             return;
@@ -88,21 +89,22 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false);
         }
-    }, [clearOrganizationState, isAuthenticated, setActiveOrganizationId]);
+    }, [clearOrganizationState, isAuthenticated, setActiveOrganizationId, user?.role]);
 
     useEffect(() => {
         if (authLoading) {
             return;
         }
 
-        if (!isAuthenticated) {
+        const canUseOrganizations = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+        if (!isAuthenticated || !canUseOrganizations) {
             clearOrganizationState();
             setLoading(false);
             return;
         }
 
         void refreshOrganizations();
-    }, [authLoading, clearOrganizationState, isAuthenticated, refreshOrganizations]);
+    }, [authLoading, clearOrganizationState, isAuthenticated, refreshOrganizations, user?.role]);
 
     const activeOrganization = useMemo(
         () =>

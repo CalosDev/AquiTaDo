@@ -5,7 +5,13 @@ import { useAuth } from '../context/useAuth';
 export function Register() {
     const { register } = useAuth();
     const navigate = useNavigate();
-    const [formData, setFormData] = useState({ name: '', email: '', password: '', phone: '' });
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: '',
+        phone: '',
+        accountType: 'USER' as 'USER' | 'BUSINESS_OWNER',
+    });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -20,7 +26,13 @@ export function Register() {
 
         setLoading(true);
         try {
-            await register(formData.name, formData.email, formData.password, formData.phone || undefined);
+            await register(
+                formData.name,
+                formData.email,
+                formData.password,
+                formData.phone || undefined,
+                formData.accountType,
+            );
             navigate('/app');
         } catch (err: unknown) {
             const requestError = err as { response?: { data?: { message?: string } } };
@@ -76,6 +88,23 @@ export function Register() {
                                 className="input-field"
                                 placeholder="tu@correo.com"
                             />
+                        </div>
+                        <div>
+                            <label htmlFor="register-account-type" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Tipo de cuenta
+                            </label>
+                            <select
+                                id="register-account-type"
+                                value={formData.accountType}
+                                onChange={(e) => setFormData({
+                                    ...formData,
+                                    accountType: e.target.value as 'USER' | 'BUSINESS_OWNER',
+                                })}
+                                className="input-field"
+                            >
+                                <option value="USER">Cliente (descubrir y reservar)</option>
+                                <option value="BUSINESS_OWNER">Negocio (vender y gestionar)</option>
+                            </select>
                         </div>
                         <div>
                             <label htmlFor="register-phone" className="text-sm font-medium text-gray-700 mb-1 block">

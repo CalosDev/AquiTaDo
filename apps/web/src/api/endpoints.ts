@@ -34,7 +34,7 @@ function resolveCachedRequest<T>(
 
 // ---- Auth ----
 export const authApi = {
-    register: (data: { name: string; email: string; password: string; phone?: string }) =>
+    register: (data: { name: string; email: string; password: string; phone?: string; role?: 'USER' | 'BUSINESS_OWNER' }) =>
         api.post('/auth/register', data),
     login: (data: { email: string; password: string }) =>
         api.post('/auth/login', data),
