@@ -64,6 +64,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: E2E API
+        run: pnpm test:e2e:api
+
       - name: Build
         run: pnpm build
 

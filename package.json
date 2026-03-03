@@ -43,7 +43,9 @@
   "pnpm": {
     "overrides": {
       "hono": "4.11.10",
-      "lodash": "4.17.23"
+      "lodash": "4.17.23",
+      "multer": "2.1.0",
+      "fast-xml-parser": "5.3.8"
     }
   }
 }
