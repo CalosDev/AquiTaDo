@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
 import { resolveRoleHomeLabel, resolveRoleHomePath } from '../auth/roles';
+import { getRoleCapabilities } from '../auth/capabilities';
 
 export function Navbar() {
     const { isAuthenticated, user, logout } = useAuth();
@@ -11,10 +12,9 @@ export function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const roleHomePath = resolveRoleHomePath(user?.role);
     const roleHomeLabel = resolveRoleHomeLabel(user?.role);
-    const isAdmin = user?.role === 'ADMIN';
-    const isBusinessOwner = user?.role === 'BUSINESS_OWNER';
-    const canRegisterBusiness = isBusinessOwner;
-    const canAccessOrganization = isBusinessOwner;
+    const roleCapabilities = getRoleCapabilities(user?.role);
+    const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
+    const canAccessOrganization = roleCapabilities.canManageOrganizations;
 
     const handleLogout = () => {
         void logout().finally(() => {
@@ -58,7 +58,7 @@ export function Navbar() {
                                     </Link>
                                 )}
                                 <div className="flex items-center gap-3">
-                                    {isAdmin && (
+                                    {roleCapabilities.isPlatformOperator && (
                                         <span className="text-xs px-2 py-1 rounded-full bg-accent-50 text-accent-700 font-medium">
                                             Modo Plataforma
                                         </span>
@@ -114,7 +114,7 @@ export function Navbar() {
                             </Link>
                             {isAuthenticated ? (
                                 <>
-                                    {isAdmin && (
+                                    {roleCapabilities.isPlatformOperator && (
                                         <p className="pt-1 text-xs uppercase tracking-wide text-gray-400 font-semibold">
                                             Plataforma
                                         </p>

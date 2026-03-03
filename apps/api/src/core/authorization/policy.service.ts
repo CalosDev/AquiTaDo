@@ -11,7 +11,6 @@ type Principal = {
 type OrganizationContext = {
     organizationId: string;
     organizationRole: OrganizationRole | null;
-    isGlobalAdmin: boolean;
 } | null;
 
 @Injectable()
@@ -30,10 +29,6 @@ export class PolicyService {
         policy: ResourcePolicy,
         resourceId?: string,
     ): Promise<void> {
-        if (principal.role === 'ADMIN') {
-            return;
-        }
-
         if (policy.resource === 'business') {
             await this.assertBusinessPolicy(principal, organizationContext, policy.action, resourceId);
             return;

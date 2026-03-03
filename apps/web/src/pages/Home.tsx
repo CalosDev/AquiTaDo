@@ -5,6 +5,7 @@ import { analyticsApi, businessApi, categoryApi, locationApi } from '../api/endp
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { useAuth } from '../context/useAuth';
+import { getRoleCapabilities } from '../auth/capabilities';
 
 interface Category {
     id: string;
@@ -93,17 +94,18 @@ export function Home() {
         }).catch(() => undefined);
     };
 
-    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER';
+    const roleCapabilities = getRoleCapabilities(user?.role);
+    const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const registerBusinessPath = !isAuthenticated
         ? '/register'
-        : user?.role === 'ADMIN'
+        : roleCapabilities.canAccessAdminPanel
             ? '/admin'
             : canRegisterBusiness
             ? '/register-business'
             : '/businesses';
     const registerBusinessLabel = !isAuthenticated
         ? 'Crear Cuenta y Registrar Negocio'
-        : user?.role === 'ADMIN'
+        : roleCapabilities.canAccessAdminPanel
             ? 'Ir al Panel Admin'
         : canRegisterBusiness
             ? 'Registrar mi Negocio Gratis'

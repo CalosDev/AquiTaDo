@@ -25,7 +25,7 @@ import {
 } from './dto/organization.dto';
 import { getOrganizationPlanLimits } from './organization-plan-limits';
 
-type ActorOrgRole = OrganizationRole | 'ADMIN';
+type ActorOrgRole = OrganizationRole;
 type PrismaClientLike = PrismaService | Prisma.TransactionClient;
 type AuditLogClient = PrismaClientLike;
 
@@ -160,8 +160,7 @@ export class OrganizationsService {
 
         return {
             ...organization,
-            actorRole: actorRole === 'ADMIN' ? 'OWNER' : actorRole,
-            isGlobalAdmin: actorRole === 'ADMIN',
+            actorRole,
         };
     }
 
@@ -286,8 +285,7 @@ export class OrganizationsService {
 
         return {
             ...organization,
-            actorRole: actorRole === 'ADMIN' ? 'OWNER' : actorRole,
-            isGlobalAdmin: actorRole === 'ADMIN',
+            actorRole,
             limits: usageSnapshot.limits,
             usage: usageSnapshot.usage,
             remaining: usageSnapshot.remaining,
@@ -301,7 +299,7 @@ export class OrganizationsService {
         userRole: string,
     ) {
         const actorRole = await this.resolveActorRole(organizationId, userId, userRole);
-        if (actorRole !== 'ADMIN' && actorRole !== 'OWNER') {
+        if (actorRole !== 'OWNER') {
             throw new ForbiddenException('Solo el owner puede actualizar la suscripción de la organización');
         }
 
@@ -710,8 +708,8 @@ export class OrganizationsService {
             }
         }
 
-        if (dto.role === 'OWNER' && actorRole !== 'ADMIN') {
-            throw new ForbiddenException('Solo un admin global puede asignar rol OWNER');
+        if (dto.role === 'OWNER') {
+            throw new ForbiddenException('No se puede asignar rol OWNER desde este endpoint');
         }
 
         const updatedMembership = await this.prisma.organizationMember.update({
@@ -953,7 +951,7 @@ export class OrganizationsService {
     private async resolveActorRole(
         organizationId: string,
         userId: string,
-        userRole: string,
+        _userRole: string,
     ): Promise<ActorOrgRole> {
         const organization = await this.prisma.organization.findUnique({
             where: { id: organizationId },
@@ -962,10 +960,6 @@ export class OrganizationsService {
 
         if (!organization) {
             throw new NotFoundException('Organización no encontrada');
-        }
-
-        if (userRole === 'ADMIN') {
-            return 'ADMIN';
         }
 
         const membership = await this.prisma.organizationMember.findUnique({
@@ -986,20 +980,12 @@ export class OrganizationsService {
     }
 
     private assertCanManageOrganization(actorRole: ActorOrgRole): void {
-        if (actorRole === 'ADMIN') {
-            return;
-        }
-
         if (actorRole !== 'OWNER' && actorRole !== 'MANAGER') {
             throw new ForbiddenException('No tienes permisos para gestionar esta organización');
         }
     }
 
     private assertInvitePermission(actorRole: ActorOrgRole, inviteRole: OrganizationRole): void {
-        if (actorRole === 'ADMIN') {
-            return;
-        }
-
         if (actorRole === 'OWNER') {
             if (inviteRole === 'OWNER') {
                 throw new ForbiddenException('No puedes invitar otro OWNER desde este endpoint');

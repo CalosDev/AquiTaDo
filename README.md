@@ -23,6 +23,7 @@ La propuesta de escalado B2B2C (Discovery + SaaS + Marketplace) esta documentada
 - `docs/SUPERAPP_ARCHITECTURE.md`
 - `docs/MONOLITH_MODULAR_STRUCTURE.md`
 - `docs/PRODUCTION_BLINDAJE_PROMPT4.md`
+- `docs/ROLE_ACCESS_MATRIX.md`
 
 ## Estructura
 
@@ -208,7 +209,7 @@ Para E2E de API:
 | GET | /api/businesses | No | Listar negocios (filtros/paginacion) |
 | GET | /api/businesses/my | Si | Listar negocios de la organizacion activa |
 | GET | /api/businesses/:id | No | Detalle negocio |
-| POST | /api/businesses | Si (BUSINESS_OWNER/ADMIN) | Crear negocio |
+| POST | /api/businesses | Si (BUSINESS_OWNER) | Crear negocio |
 | PUT | /api/businesses/:id | Si | Actualizar negocio |
 | DELETE | /api/businesses/:id | Si | Eliminar negocio |
 | GET | /api/businesses/nearby | No | Buscar negocios cercanos |
@@ -237,7 +238,7 @@ Para E2E de API:
 | PATCH | /api/whatsapp/conversations/my/:id/status | Si (OWNER/MANAGER) | Cambiar estado de conversacion |
 | POST | /api/upload/business-image | Si | Subir imagen negocio |
 | DELETE | /api/upload/business-image/:imageId | Si | Eliminar imagen negocio |
-| POST | /api/organizations | Si | Crear organizacion |
+| POST | /api/organizations | Si (BUSINESS_OWNER) | Crear organizacion |
 | GET | /api/organizations/mine | Si | Organizaciones del usuario |
 | GET | /api/organizations/:id | Si | Detalle de organizacion |
 | PATCH | /api/organizations/:id | Si | Actualizar organizacion |
@@ -248,7 +249,7 @@ Para E2E de API:
 | POST | /api/organizations/:id/invites | Si | Crear invitacion de miembro |
 | POST | /api/organizations/invites/:token/accept | Si | Aceptar invitacion |
 | GET | /api/organizations/:id/subscription | Si | Ver plan y estado de suscripcion |
-| PATCH | /api/organizations/:id/subscription | Si (OWNER/ADMIN) | Cambiar plan/estado de suscripcion |
+| PATCH | /api/organizations/:id/subscription | Si (OWNER) | Cambiar plan/estado de suscripcion |
 | GET | /api/organizations/:id/usage | Si | Ver uso y limites del plan |
 | GET | /api/organizations/:id/audit-logs | Si | Ver actividad auditada de la organizacion |
 | POST | /api/events/business (alias: /api/telemetry/business) | Opcional | Registrar evento de negocio (views/clicks/conversiones) |
@@ -277,9 +278,14 @@ Reglas aplicadas:
 
 ## Roles
 
-- `USER`: Buscar negocios y publicar resenas
-- `BUSINESS_OWNER`: Todo lo de USER + gestionar sus negocios
-- `ADMIN`: Todo lo anterior + moderacion y categorias
+- `USER` (consumo B2C): buscar negocios, ver detalle, reservar, mensajeria y resenas.
+- `BUSINESS_OWNER` (operacion SaaS por tenant): crear/gestionar negocios, promociones, inbox, CRM, facturacion y organizacion.
+- `ADMIN` (gobierno de plataforma): moderacion global, verificacion/KYC, categorias, reportes globales y observabilidad.
+
+Separacion aplicada:
+- `USER` no puede crear negocios ni administrar organizaciones.
+- `BUSINESS_OWNER` no puede acceder al panel admin global.
+- `ADMIN` no opera organizaciones/negocios por flujos tenant (`x-organization-id`).
 
 ## Scripts raiz
 

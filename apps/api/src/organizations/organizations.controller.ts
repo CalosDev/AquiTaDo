@@ -27,6 +27,8 @@ import {
 import { OrganizationsService } from './organizations.service';
 
 @Controller('organizations')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('BUSINESS_OWNER')
 export class OrganizationsController {
     constructor(
         @Inject(OrganizationsService)
@@ -34,8 +36,6 @@ export class OrganizationsController {
     ) { }
 
     @Post()
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('BUSINESS_OWNER', 'ADMIN')
     async create(
         @Body() dto: CreateOrganizationDto,
         @CurrentUser('id') userId: string,
@@ -44,13 +44,11 @@ export class OrganizationsController {
     }
 
     @Get('mine')
-    @UseGuards(JwtAuthGuard)
     async findMine(@CurrentUser('id') userId: string) {
         return this.organizationsService.findMine(userId);
     }
 
     @Get(':id')
-    @UseGuards(JwtAuthGuard)
     async findById(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
@@ -60,7 +58,6 @@ export class OrganizationsController {
     }
 
     @Patch(':id')
-    @UseGuards(JwtAuthGuard)
     async update(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Body() dto: UpdateOrganizationDto,
@@ -71,7 +68,6 @@ export class OrganizationsController {
     }
 
     @Get(':id/members')
-    @UseGuards(JwtAuthGuard)
     async listMembers(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
@@ -81,7 +77,6 @@ export class OrganizationsController {
     }
 
     @Get(':id/invites')
-    @UseGuards(JwtAuthGuard)
     async listInvites(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
@@ -91,7 +86,6 @@ export class OrganizationsController {
     }
 
     @Get(':id/subscription')
-    @UseGuards(JwtAuthGuard)
     async getSubscription(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
@@ -101,7 +95,6 @@ export class OrganizationsController {
     }
 
     @Patch(':id/subscription')
-    @UseGuards(JwtAuthGuard)
     async updateSubscription(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Body() dto: UpdateOrganizationSubscriptionDto,
@@ -112,7 +105,6 @@ export class OrganizationsController {
     }
 
     @Get(':id/usage')
-    @UseGuards(JwtAuthGuard)
     async getUsage(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
@@ -122,7 +114,6 @@ export class OrganizationsController {
     }
 
     @Get(':id/audit-logs')
-    @UseGuards(JwtAuthGuard)
     async listAuditLogs(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Query() query: ListOrganizationAuditLogsQueryDto,
@@ -138,7 +129,6 @@ export class OrganizationsController {
     }
 
     @Post(':id/invites')
-    @UseGuards(JwtAuthGuard)
     @Throttle({ default: { limit: 10, ttl: 60_000 } })
     async inviteMember(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
@@ -150,7 +140,7 @@ export class OrganizationsController {
     }
 
     @Post('invites/:token/accept')
-    @UseGuards(JwtAuthGuard)
+    @Roles('USER', 'BUSINESS_OWNER')
     @Throttle({ default: { limit: 20, ttl: 60_000 } })
     async acceptInvite(
         @Param('token') token: string,
@@ -160,7 +150,6 @@ export class OrganizationsController {
     }
 
     @Patch(':id/members/:userId/role')
-    @UseGuards(JwtAuthGuard)
     async updateMemberRole(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Param('userId', new ParseUUIDPipe()) memberUserId: string,
@@ -178,7 +167,6 @@ export class OrganizationsController {
     }
 
     @Delete(':id/members/:userId')
-    @UseGuards(JwtAuthGuard)
     async removeMember(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Param('userId', new ParseUUIDPipe()) memberUserId: string,

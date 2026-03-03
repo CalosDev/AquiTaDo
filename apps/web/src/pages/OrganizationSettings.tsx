@@ -25,7 +25,6 @@ interface OrganizationDetail {
     name: string;
     slug: string;
     actorRole: OrgRole;
-    isGlobalAdmin: boolean;
     _count?: {
         businesses: number;
         members: number;
@@ -62,7 +61,6 @@ interface OrganizationSubscription {
     subscriptionStatus: SubscriptionStatus;
     subscriptionRenewsAt: string | null;
     actorRole: OrgRole;
-    isGlobalAdmin: boolean;
     limits: {
         maxBusinesses: number | null;
         maxMembers: number | null;
@@ -153,38 +151,28 @@ export function OrganizationSettings() {
     const [successMessage, setSuccessMessage] = useState('');
 
     const actorRole = organizationDetail?.actorRole ?? null;
-    const isGlobalAdmin = organizationDetail?.isGlobalAdmin ?? false;
 
-    const canManageOrganization = isGlobalAdmin || actorRole === 'OWNER' || actorRole === 'MANAGER';
+    const canManageOrganization = actorRole === 'OWNER' || actorRole === 'MANAGER';
     const canManageMembers = canManageOrganization;
-    const canManageSubscription = isGlobalAdmin || actorRole === 'OWNER';
+    const canManageSubscription = actorRole === 'OWNER';
 
     const inviteRoleOptions = useMemo(() => {
-        if (isGlobalAdmin) {
-            return ['OWNER', 'MANAGER', 'STAFF'] as OrgRole[];
-        }
-
         if (actorRole === 'OWNER') {
             return ['MANAGER', 'STAFF'] as OrgRole[];
         }
 
         return ['STAFF'] as OrgRole[];
-    }, [actorRole, isGlobalAdmin]);
+    }, [actorRole]);
 
-    const memberRoleOptions = useCallback((targetMemberRole: OrgRole): OrgRole[] => {
-        if (isGlobalAdmin) {
-            if (targetMemberRole === 'OWNER') {
-                return ['OWNER', 'MANAGER', 'STAFF'];
-            }
-            return ['MANAGER', 'STAFF'];
-        }
+    const memberRoleOptions = useCallback((_targetMemberRole: OrgRole): OrgRole[] => {
+        void _targetMemberRole;
 
         if (actorRole === 'OWNER') {
             return ['MANAGER', 'STAFF'];
         }
 
         return ['STAFF'];
-    }, [actorRole, isGlobalAdmin]);
+    }, [actorRole]);
 
     const loadOrganizationDetail = useCallback(async () => {
         if (!activeOrganizationId) {

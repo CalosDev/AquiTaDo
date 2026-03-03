@@ -3,6 +3,7 @@ import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } f
 import { getApiErrorMessage } from '../api/error';
 import { organizationApi } from '../api/endpoints';
 import { useAuth } from './useAuth';
+import { getRoleCapabilities } from '../auth/capabilities';
 
 const ACTIVE_ORGANIZATION_STORAGE_KEY = 'activeOrganizationId';
 
@@ -35,6 +36,7 @@ export const OrganizationContext = createContext<OrganizationContextType | undef
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
     const { isAuthenticated, loading: authLoading, user } = useAuth();
+    const roleCapabilities = getRoleCapabilities(user?.role);
     const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
     const [activeOrganizationId, setActiveOrganizationIdState] = useState<string | null>(
         localStorage.getItem(ACTIVE_ORGANIZATION_STORAGE_KEY),
@@ -59,7 +61,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const refreshOrganizations = useCallback(async (preferredOrganizationId?: string | null) => {
-        const canUseOrganizations = user?.role === 'BUSINESS_OWNER';
+        const canUseOrganizations = roleCapabilities.canManageOrganizations;
         if (!isAuthenticated || !canUseOrganizations) {
             clearOrganizationState();
             setLoading(false);
@@ -89,14 +91,14 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false);
         }
-    }, [clearOrganizationState, isAuthenticated, setActiveOrganizationId, user?.role]);
+    }, [clearOrganizationState, isAuthenticated, roleCapabilities.canManageOrganizations, setActiveOrganizationId]);
 
     useEffect(() => {
         if (authLoading) {
             return;
         }
 
-        const canUseOrganizations = user?.role === 'BUSINESS_OWNER';
+        const canUseOrganizations = roleCapabilities.canManageOrganizations;
         if (!isAuthenticated || !canUseOrganizations) {
             clearOrganizationState();
             setLoading(false);
@@ -104,7 +106,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         }
 
         void refreshOrganizations();
-    }, [authLoading, clearOrganizationState, isAuthenticated, refreshOrganizations, user?.role]);
+    }, [authLoading, clearOrganizationState, isAuthenticated, refreshOrganizations, roleCapabilities.canManageOrganizations]);
 
     const activeOrganization = useMemo(
         () =>

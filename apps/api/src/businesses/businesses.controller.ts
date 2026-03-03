@@ -39,7 +39,8 @@ export class BusinessesController {
     }
 
     @Get('my')
-    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard, OrgContextGuard)
+    @Roles('BUSINESS_OWNER')
     async findMine(
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
@@ -73,7 +74,7 @@ export class BusinessesController {
 
     @Post()
     @UseGuards(JwtAuthGuard, RolesGuard, OptionalOrgContextGuard, PolicyGuard)
-    @Roles('BUSINESS_OWNER', 'ADMIN')
+    @Roles('BUSINESS_OWNER')
     @Policy({ resource: 'business', action: 'create' })
     async create(
         @Body() dto: CreateBusinessDto,
@@ -86,7 +87,8 @@ export class BusinessesController {
     }
 
     @Put(':id')
-    @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard, PolicyGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard, OrgContextGuard, OrgRolesGuard, PolicyGuard)
+    @Roles('BUSINESS_OWNER')
     @OrgRoles('OWNER', 'MANAGER')
     @Policy({ resource: 'business', action: 'update', resourceIdParam: 'id' })
     async update(
@@ -101,7 +103,8 @@ export class BusinessesController {
     }
 
     @Delete(':id')
-    @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard, PolicyGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard, OrgContextGuard, OrgRolesGuard, PolicyGuard)
+    @Roles('BUSINESS_OWNER')
     @OrgRoles('OWNER', 'MANAGER')
     @Policy({ resource: 'business', action: 'delete', resourceIdParam: 'id' })
     async delete(

@@ -292,7 +292,7 @@ export class BusinessesService {
     async create(
         dto: CreateBusinessDto,
         userId: string,
-        userRole: string,
+        _userRole: string,
         organizationId?: string,
         organizationRole?: OrganizationRole,
     ) {
@@ -310,7 +310,7 @@ export class BusinessesService {
                 await this.assertCityBelongsToProvince(tx, dto.provinceId, dto.cityId);
                 const effectiveOrganizationId = organizationId ?? await this.ensureOwnerOrganization(tx, userId);
 
-                if (organizationId && userRole !== 'ADMIN') {
+                if (organizationId) {
                     if (!organizationRole) {
                         throw new ForbiddenException('No tienes permisos para crear negocios en esta organización');
                     }
@@ -377,7 +377,7 @@ export class BusinessesService {
         id: string,
         dto: UpdateBusinessDto,
         _userId: string,
-        userRole: string,
+        _userRole: string,
         organizationId: string,
         organizationRole: OrganizationRole,
     ) {
@@ -403,14 +403,12 @@ export class BusinessesService {
                     throw new NotFoundException('Negocio no encontrado');
                 }
 
-                if (userRole !== 'ADMIN') {
-                    if (business.organizationId !== organizationId) {
-                        throw new NotFoundException('Negocio no encontrado');
-                    }
+                if (business.organizationId !== organizationId) {
+                    throw new NotFoundException('Negocio no encontrado');
+                }
 
-                    if (organizationRole === 'STAFF') {
-                        throw new ForbiddenException('No tienes permisos para editar este negocio');
-                    }
+                if (organizationRole === 'STAFF') {
+                    throw new ForbiddenException('No tienes permisos para editar este negocio');
                 }
 
                 const targetProvinceId = dto.provinceId ?? business.provinceId;
@@ -474,7 +472,7 @@ export class BusinessesService {
     async delete(
         id: string,
         _userId: string,
-        userRole: string,
+        _userRole: string,
         organizationId: string,
         organizationRole: OrganizationRole,
     ) {
@@ -491,14 +489,12 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        if (userRole !== 'ADMIN') {
-            if (business.organizationId !== organizationId) {
-                throw new NotFoundException('Negocio no encontrado');
-            }
+        if (business.organizationId !== organizationId) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
 
-            if (organizationRole === 'STAFF') {
-                throw new ForbiddenException('No tienes permisos para eliminar este negocio');
-            }
+        if (organizationRole === 'STAFF') {
+            throw new ForbiddenException('No tienes permisos para eliminar este negocio');
         }
 
         const imageUrls = business.images.map((image) => image.url);

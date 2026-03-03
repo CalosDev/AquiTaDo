@@ -58,13 +58,10 @@ export class OrgContextGuard implements CanActivate {
             throw new NotFoundException('Organización no encontrada');
         }
 
-        if (user.role === 'ADMIN') {
-            request.organizationContext = {
-                organizationId,
-                organizationRole: 'OWNER',
-                isGlobalAdmin: true,
-            };
-            return true;
+        if (user.role !== 'BUSINESS_OWNER') {
+            throw new ForbiddenException(
+                'Solo BUSINESS_OWNER puede operar con contexto de organización',
+            );
         }
 
         const membership = await this.prisma.organizationMember.findUnique({
@@ -84,7 +81,6 @@ export class OrgContextGuard implements CanActivate {
         request.organizationContext = {
             organizationId,
             organizationRole: membership.role as OrganizationRole,
-            isGlobalAdmin: false,
         };
         return true;
     }
