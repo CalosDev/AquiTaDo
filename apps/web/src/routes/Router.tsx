@@ -15,6 +15,7 @@ const DashboardBusiness = lazy(async () => ({ default: (await import('../pages/D
 const AdminDashboard = lazy(async () => ({ default: (await import('../pages/AdminDashboard')).AdminDashboard }));
 const Terms = lazy(async () => ({ default: (await import('../pages/Terms')).Terms }));
 const Privacy = lazy(async () => ({ default: (await import('../pages/Privacy')).Privacy }));
+const About = lazy(async () => ({ default: (await import('../pages/About')).About }));
 const NotFound = lazy(async () => ({ default: (await import('../pages/NotFound')).NotFound }));
 const OrganizationSettings = lazy(async () => ({ default: (await import('../pages/OrganizationSettings')).OrganizationSettings }));
 const AcceptInvite = lazy(async () => ({ default: (await import('../pages/AcceptInvite')).AcceptInvite }));
@@ -54,6 +55,7 @@ export function AppRouter() {
                     <Route path="/register" element={<Register />} />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/about" element={<About />} />
                     <Route
                         path="/app"
                         element={

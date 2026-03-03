@@ -96,6 +96,13 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
         };
     }
 
+    if (pathname === '/about') {
+        return {
+            title: 'Sobre AquiTa.do | Proyecto y Equipo',
+            description: 'Conoce la vision del proyecto AquiTa.do y el equipo que construye la plataforma para Republica Dominicana.',
+        };
+    }
+
     return {
         title: 'AquiTa.do',
         description: 'Plataforma local de descubrimiento, SaaS y marketplace para negocios en Republica Dominicana.',

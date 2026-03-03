@@ -67,6 +67,7 @@ export function Navbar() {
 
                         <div className="hidden md:flex items-center gap-4 xl:gap-6 min-w-0">
                             <Link to="/businesses" className="nav-link">Negocios</Link>
+                            <Link to="/about" className="nav-link">Sobre</Link>
                             {isAuthenticated ? (
                                 <>
                                     <Link to={roleHomePath} className="nav-link">{roleHomeLabel}</Link>
@@ -127,6 +128,13 @@ export function Navbar() {
                                     onClick={() => setMenuOpen(false)}
                                 >
                                     Negocios
+                                </Link>
+                                <Link
+                                    to="/about"
+                                    className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                    onClick={() => setMenuOpen(false)}
+                                >
+                                    Sobre
                                 </Link>
 
                                 {isAuthenticated ? (

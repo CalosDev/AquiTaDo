@@ -73,7 +73,7 @@ function normalizeBaseUrl(value) {
 
 function buildSitemap(baseUrl) {
     const lastmod = resolveLastmod();
-    const staticPaths = ['/', '/businesses', '/terms', '/privacy'];
+    const staticPaths = ['/', '/businesses', '/about', '/terms', '/privacy'];
     const categoryPaths = CATEGORY_SLUGS.map((slug) => `/negocios/categoria/${slug}`);
     const provincePaths = PROVINCE_SLUGS.map((slug) => `/negocios/provincia/${slug}`);
     const intentPaths = INTENT_SLUGS.map((slug) => `/negocios/intencion/${slug}`);
