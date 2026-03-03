@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, categoryApi, reviewApi, verificationApi } from '../api/endpoints';
+import { analyticsApi, businessApi, categoryApi, observabilityApi, reviewApi, verificationApi } from '../api/endpoints';
 
 interface Business {
     id: string;
@@ -87,6 +87,14 @@ interface ModerationQueueItem {
     };
 }
 
+interface ObservabilitySummary {
+    totalRequests: number;
+    errors5xx: number;
+    averageLatencyMs: number;
+    rateLimitHits: number;
+    externalFailures: number;
+}
+
 type CategoryForm = {
     name: string;
     slug: string;
@@ -99,6 +107,87 @@ const EMPTY_CATEGORY_FORM: CategoryForm = {
     icon: '',
 };
 const DELETE_CONFIRMATION_TEXT = 'ELIMINAR';
+const EMPTY_OBSERVABILITY_SUMMARY: ObservabilitySummary = {
+    totalRequests: 0,
+    errors5xx: 0,
+    averageLatencyMs: 0,
+    rateLimitHits: 0,
+    externalFailures: 0,
+};
+
+function sumMetric(metricText: string, metricName: string): number {
+    const escaped = metricName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escaped}(?:\\{[^}]*\\})?\\s+([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)$`);
+    return metricText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith('#'))
+        .reduce((acc, line) => {
+            const match = line.match(pattern);
+            if (!match) {
+                return acc;
+            }
+            const parsed = Number.parseFloat(match[1]);
+            return Number.isFinite(parsed) ? acc + parsed : acc;
+        }, 0);
+}
+
+function sumMetricByLabelPattern(
+    metricText: string,
+    metricName: string,
+    labelPattern: RegExp,
+): number {
+    const escaped = metricName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escaped}\\{([^}]*)\\}\\s+([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)$`);
+    return metricText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith('#'))
+        .reduce((acc, line) => {
+            const match = line.match(pattern);
+            if (!match) {
+                return acc;
+            }
+            const labels = match[1] ?? '';
+            if (!labelPattern.test(labels)) {
+                return acc;
+            }
+            const parsed = Number.parseFloat(match[2]);
+            return Number.isFinite(parsed) ? acc + parsed : acc;
+        }, 0);
+}
+
+function parseObservabilitySummary(metricText: string): ObservabilitySummary {
+    const totalRequests = Math.round(sumMetric(metricText, 'aquita_http_requests_total'));
+    const errors5xx = Math.round(
+        sumMetricByLabelPattern(
+            metricText,
+            'aquita_http_requests_total',
+            /status="5\d{2}"/,
+        ),
+    );
+    const durationSumSeconds = sumMetric(metricText, 'aquita_http_request_duration_seconds_sum');
+    const durationCount = sumMetric(metricText, 'aquita_http_request_duration_seconds_count');
+    const averageLatencyMs = durationCount > 0
+        ? Number(((durationSumSeconds / durationCount) * 1000).toFixed(2))
+        : 0;
+    const rateLimitHits = Math.round(sumMetric(metricText, 'aquita_rate_limit_hits_total'));
+    const externalFailures = Math.round(
+        sumMetricByLabelPattern(
+            metricText,
+            'aquita_external_dependency_calls_total',
+            /success="false"/,
+        ),
+    );
+
+    return {
+        totalRequests,
+        errors5xx,
+        averageLatencyMs,
+        rateLimitHits,
+        externalFailures,
+    };
+}
 
 function toSlug(value: string): string {
     return value
@@ -114,7 +203,7 @@ function toSlug(value: string): string {
 export function AdminDashboard() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'verification'>('businesses');
+    const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'verification' | 'observability'>('businesses');
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [confirmDeleteBusinessId, setConfirmDeleteBusinessId] = useState<string | null>(null);
@@ -129,6 +218,9 @@ export function AdminDashboard() {
     const [flaggedReviews, setFlaggedReviews] = useState<FlaggedReview[]>([]);
     const [moderationQueue, setModerationQueue] = useState<ModerationQueueItem[]>([]);
     const [generatingReport, setGeneratingReport] = useState(false);
+    const [observabilityLoading, setObservabilityLoading] = useState(false);
+    const [observabilityRaw, setObservabilityRaw] = useState('');
+    const [observabilitySummary, setObservabilitySummary] = useState<ObservabilitySummary>(EMPTY_OBSERVABILITY_SUMMARY);
 
     const [newCategoryForm, setNewCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -180,6 +272,29 @@ export function AdminDashboard() {
             void loadVerificationData();
         }
     }, [activeTab, loadVerificationData]);
+
+    const loadObservabilityData = useCallback(async () => {
+        setObservabilityLoading(true);
+        setErrorMessage('');
+        try {
+            const response = await observabilityApi.getMetrics();
+            const payload = typeof response.data === 'string'
+                ? response.data
+                : String(response.data ?? '');
+            setObservabilityRaw(payload);
+            setObservabilitySummary(parseObservabilitySummary(payload));
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar observabilidad'));
+        } finally {
+            setObservabilityLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'observability') {
+            void loadObservabilityData();
+        }
+    }, [activeTab, loadObservabilityData]);
 
     const handleVerifyBusiness = async (businessId: string) => {
         setProcessingId(businessId);
@@ -401,9 +516,10 @@ export function AdminDashboard() {
     };
 
     const tabs = [
-        { key: 'businesses', label: 'Negocios', icon: '🏪' },
-        { key: 'categories', label: 'Categorías', icon: '📁' },
-        { key: 'verification', label: 'KYC + Data Layer', icon: '🛡️' },
+        { key: 'businesses', label: 'Negocios', icon: 'N' },
+        { key: 'categories', label: 'Categorias', icon: 'C' },
+        { key: 'verification', label: 'KYC + Data Layer', icon: 'K' },
+        { key: 'observability', label: 'Observabilidad', icon: 'O' },
     ] as const;
 
     return (
@@ -996,8 +1112,57 @@ export function AdminDashboard() {
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'observability' && (
+                        <div className="space-y-4">
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                                    <h3 className="font-display font-semibold text-gray-900">Resumen operativo</h3>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary text-xs"
+                                        onClick={() => void loadObservabilityData()}
+                                        disabled={observabilityLoading}
+                                    >
+                                        {observabilityLoading ? 'Actualizando...' : 'Actualizar'}
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Requests totales</p>
+                                        <p className="text-xl font-semibold text-gray-900">{observabilitySummary.totalRequests}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Errores 5xx</p>
+                                        <p className="text-xl font-semibold text-red-700">{observabilitySummary.errors5xx}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Latencia promedio</p>
+                                        <p className="text-xl font-semibold text-primary-700">{observabilitySummary.averageLatencyMs} ms</p>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Rate limit hits</p>
+                                        <p className="text-xl font-semibold text-amber-700">{observabilitySummary.rateLimitHits}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Fallas externas</p>
+                                        <p className="text-xl font-semibold text-purple-700">{observabilitySummary.externalFailures}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="card p-5">
+                                <h3 className="font-display font-semibold text-gray-900 mb-3">Raw metrics (Prometheus)</h3>
+                                <pre className="max-h-[420px] overflow-auto rounded-xl border border-gray-100 bg-slate-950 p-4 text-[11px] leading-5 text-slate-100">
+                                    {observabilityRaw || 'Sin datos de metricas'}
+                                </pre>
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
         </div>
     );
 }
+

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, favoritesApi, messagingApi, reviewApi, whatsappApi } from '../api/endpoints';
+import { analyticsApi, businessApi, checkinsApi, favoritesApi, messagingApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
@@ -31,6 +31,36 @@ interface Business {
     reviews?: { id: string; rating: number; comment?: string; user: { name: string }; createdAt: string }[];
     _count?: { reviews: number };
     owner?: { name: string };
+}
+
+interface CheckInStats {
+    businessId: string;
+    totalCheckIns: number;
+    last24HoursCheckIns: number;
+    verifiedCheckIns: number;
+    uniqueUsers: number;
+}
+
+async function getCurrentLocation() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        return null;
+    }
+
+    return new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+            (position) =>
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                }),
+            () => resolve(null),
+            {
+                enableHighAccuracy: false,
+                timeout: 5000,
+                maximumAge: 60_000,
+            },
+        );
+    });
 }
 
 function formatDaysAgo(value?: string): string | null {
@@ -88,6 +118,11 @@ export function BusinessDetails() {
     const [listProcessing, setListProcessing] = useState(false);
     const [favoriteInfoMessage, setFavoriteInfoMessage] = useState('');
     const [favoriteErrorMessage, setFavoriteErrorMessage] = useState('');
+    const [checkInStats, setCheckInStats] = useState<CheckInStats | null>(null);
+    const [checkInStatsLoading, setCheckInStatsLoading] = useState(false);
+    const [checkInProcessing, setCheckInProcessing] = useState(false);
+    const [checkInInfoMessage, setCheckInInfoMessage] = useState('');
+    const [checkInErrorMessage, setCheckInErrorMessage] = useState('');
 
     const loadBusiness = useCallback(async () => {
         if (!slug) {
@@ -179,6 +214,27 @@ export function BusinessDetails() {
             active = false;
         };
     }, [business?.id, isAuthenticated, isCustomerRole]);
+
+    const loadCheckInStats = useCallback(async () => {
+        if (!business?.id) {
+            setCheckInStats(null);
+            return;
+        }
+
+        setCheckInStatsLoading(true);
+        try {
+            const response = await checkinsApi.getBusinessStats(business.id);
+            setCheckInStats(response.data as CheckInStats);
+        } catch {
+            setCheckInStats(null);
+        } finally {
+            setCheckInStatsLoading(false);
+        }
+    }, [business?.id]);
+
+    useEffect(() => {
+        void loadCheckInStats();
+    }, [loadCheckInStats]);
 
     useEffect(() => {
         if (!business) {
@@ -530,6 +586,48 @@ export function BusinessDetails() {
         }
     };
 
+    const handleCreateCheckIn = async () => {
+        if (!business?.id || !isAuthenticated || !isCustomerRole) {
+            return;
+        }
+
+        setCheckInProcessing(true);
+        setCheckInErrorMessage('');
+        setCheckInInfoMessage('');
+
+        try {
+            const coordinates = await getCurrentLocation();
+            const response = await checkinsApi.create({
+                businessId: business.id,
+                latitude: coordinates?.latitude,
+                longitude: coordinates?.longitude,
+            });
+
+            const reward = response.data?.reward as
+                | {
+                    pointsAwarded?: number;
+                    verifiedLocation?: boolean;
+                    loyaltyTier?: string;
+                    checkinStreak?: number;
+                }
+                | undefined;
+
+            const pointsAwarded = Number(reward?.pointsAwarded ?? 0);
+            const verifiedLabel = reward?.verifiedLocation ? ' con GPS verificado' : '';
+            const streakLabel = reward?.checkinStreak ? ` · racha ${reward.checkinStreak}` : '';
+            const tierLabel = reward?.loyaltyTier ? ` · tier ${reward.loyaltyTier}` : '';
+
+            setCheckInInfoMessage(
+                `Check-in registrado: +${pointsAwarded} pts${verifiedLabel}${streakLabel}${tierLabel}`,
+            );
+            await loadCheckInStats();
+        } catch (error) {
+            setCheckInErrorMessage(getApiErrorMessage(error, 'No se pudo registrar el check-in'));
+        } finally {
+            setCheckInProcessing(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center py-32">
@@ -701,6 +799,64 @@ export function BusinessDetails() {
                                 </form>
                             </div>
                         )}
+
+                        <div className="mt-5 rounded-xl border border-accent-100 bg-accent-50/40 p-4">
+                            <div className="flex items-center justify-between gap-2">
+                                <h2 className="font-display font-semibold text-gray-900">Actividad local</h2>
+                                {checkInStatsLoading ? (
+                                    <span className="text-xs text-gray-500">Actualizando...</span>
+                                ) : null}
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div className="rounded-lg bg-white border border-accent-100 px-3 py-2">
+                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Check-ins</p>
+                                    <p className="text-base font-semibold text-gray-900">
+                                        {checkInStats?.totalCheckIns ?? 0}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-white border border-accent-100 px-3 py-2">
+                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Ult 24h</p>
+                                    <p className="text-base font-semibold text-gray-900">
+                                        {checkInStats?.last24HoursCheckIns ?? 0}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-white border border-accent-100 px-3 py-2">
+                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">GPS verif.</p>
+                                    <p className="text-base font-semibold text-gray-900">
+                                        {checkInStats?.verifiedCheckIns ?? 0}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-white border border-accent-100 px-3 py-2">
+                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Usuarios</p>
+                                    <p className="text-base font-semibold text-gray-900">
+                                        {checkInStats?.uniqueUsers ?? 0}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {isAuthenticated && isCustomerRole ? (
+                                <div className="mt-3 space-y-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleCreateCheckIn()}
+                                        disabled={checkInProcessing}
+                                        className="btn-secondary text-sm"
+                                    >
+                                        {checkInProcessing ? 'Registrando...' : 'Hacer check-in y ganar puntos'}
+                                    </button>
+                                    {checkInInfoMessage ? (
+                                        <p className="text-xs text-green-700">{checkInInfoMessage}</p>
+                                    ) : null}
+                                    {checkInErrorMessage ? (
+                                        <p className="text-xs text-red-700">{checkInErrorMessage}</p>
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <p className="mt-3 text-xs text-gray-600">
+                                    Inicia sesion como usuario para registrar check-ins y ganar puntos.
+                                </p>
+                            )}
+                        </div>
 
                         {/* Features */}
                         {business.features && business.features.length > 0 && (

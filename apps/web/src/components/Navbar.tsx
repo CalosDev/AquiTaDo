@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { resolveRoleHomeLabel, resolveRoleHomePath } from '../auth/roles';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
+
+interface BeforeInstallPromptEvent extends Event {
+    prompt: () => Promise<void>;
+    userChoice: Promise<{
+        outcome: 'accepted' | 'dismissed';
+        platform: string;
+    }>;
+}
 
 function roleBadgeLabel(role: string | undefined): string {
     if (role === 'ADMIN') {
@@ -20,6 +28,7 @@ export function Navbar() {
     const { activeOrganization } = useOrganization();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
+    const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
 
     const roleHomePath = resolveRoleHomePath(user?.role);
     const roleHomeLabel = resolveRoleHomeLabel(user?.role);
@@ -32,6 +41,34 @@ export function Navbar() {
             navigate('/');
         });
     };
+
+    const handleInstallApp = async () => {
+        if (!installPromptEvent) {
+            return;
+        }
+
+        await installPromptEvent.prompt();
+        const choice = await installPromptEvent.userChoice;
+        if (choice.outcome === 'accepted') {
+            setInstallPromptEvent(null);
+        }
+    };
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const handler = (event: Event) => {
+            event.preventDefault();
+            setInstallPromptEvent(event as BeforeInstallPromptEvent);
+        };
+
+        window.addEventListener('beforeinstallprompt', handler);
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handler);
+        };
+    }, []);
 
     return (
         <header className="sticky top-0 z-50">
@@ -68,6 +105,11 @@ export function Navbar() {
                         <div className="hidden md:flex items-center gap-4 xl:gap-6 min-w-0">
                             <Link to="/businesses" className="nav-link">Negocios</Link>
                             <Link to="/about" className="nav-link">Nosotros</Link>
+                            {installPromptEvent && (
+                                <button type="button" className="btn-secondary text-sm" onClick={() => void handleInstallApp()}>
+                                    Instalar app
+                                </button>
+                            )}
                             {isAuthenticated ? (
                                 <>
                                     <Link to={roleHomePath} className="nav-link">{roleHomeLabel}</Link>
@@ -139,6 +181,18 @@ export function Navbar() {
                                 >
                                     Nosotros
                                 </Link>
+                                {installPromptEvent && (
+                                    <button
+                                        type="button"
+                                        className="touch-target mt-1 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-primary-700 hover:bg-primary-50"
+                                        onClick={() => {
+                                            void handleInstallApp();
+                                            setMenuOpen(false);
+                                        }}
+                                    >
+                                        Instalar app
+                                    </button>
+                                )}
 
                                 {isAuthenticated ? (
                                     <>

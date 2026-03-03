@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { aiApi, analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { formatNumberDo } from '../lib/market';
@@ -32,6 +32,16 @@ interface Province {
     name: string;
     slug: string;
     _count?: { businesses: number };
+}
+
+interface AiConciergeMatch {
+    id: string;
+    name: string;
+    slug: string;
+    address: string;
+    score: number;
+    link: string;
+    whatsapp?: string | null;
 }
 
 const INTENT_LINKS = [
@@ -117,6 +127,13 @@ export function Home() {
     const [totalBusinesses, setTotalBusinesses] = useState(0);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
+    const [aiQuery, setAiQuery] = useState('');
+    const [aiCategoryId, setAiCategoryId] = useState('');
+    const [aiProvinceId, setAiProvinceId] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState('');
+    const [aiAnswer, setAiAnswer] = useState('');
+    const [aiMatches, setAiMatches] = useState<AiConciergeMatch[]>([]);
 
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
@@ -247,6 +264,44 @@ export function Home() {
         });
     };
 
+    const handleAiSearch = async (event: React.FormEvent) => {
+        event.preventDefault();
+        const query = aiQuery.trim();
+        if (!query) {
+            setAiError('Escribe una consulta para el asistente');
+            return;
+        }
+
+        setAiLoading(true);
+        setAiError('');
+
+        try {
+            const response = await aiApi.askConcierge({
+                query,
+                categoryId: aiCategoryId || undefined,
+                provinceId: aiProvinceId || undefined,
+                limit: 6,
+            });
+
+            setAiAnswer(String(response.data?.answer || ''));
+            setAiMatches((response.data?.data ?? []) as AiConciergeMatch[]);
+
+            void trackGrowthEvent({
+                eventType: 'SEARCH_QUERY',
+                searchQuery: query,
+                categoryId: aiCategoryId || undefined,
+                provinceId: aiProvinceId || undefined,
+                metadata: { source: 'home-ai-concierge' },
+            });
+        } catch (error) {
+            setAiAnswer('');
+            setAiMatches([]);
+            setAiError(getApiErrorMessage(error, 'No se pudo consultar el asistente'));
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
     return (
         <div className="animate-fade-in">
             {loadError && (
@@ -351,6 +406,95 @@ export function Home() {
             </section>
 
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+                <div className="card p-6 md:p-8 border-t-4 border-primary-600 mb-8">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-primary-700 font-semibold">Asistente IA</p>
+                            <h2 className="font-display text-2xl md:text-3xl font-bold text-gray-900 mt-1">
+                                Pregunta en lenguaje natural
+                            </h2>
+                            <p className="text-gray-600 mt-2 max-w-2xl">
+                                Ejemplo: "Donde hay comida criolla con parqueo en Piantini?".
+                            </p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleAiSearch} className="mt-5 space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <input
+                                value={aiQuery}
+                                onChange={(event) => setAiQuery(event.target.value)}
+                                placeholder="Que negocio necesitas hoy?"
+                                className="input-field md:col-span-2"
+                                aria-label="Consulta al asistente IA"
+                            />
+                            <select
+                                value={aiCategoryId}
+                                onChange={(event) => setAiCategoryId(event.target.value)}
+                                className="input-field"
+                                aria-label="Filtrar por categoria"
+                            >
+                                <option value="">Todas las categorias</option>
+                                {categories.map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                        {category.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={aiProvinceId}
+                                onChange={(event) => setAiProvinceId(event.target.value)}
+                                className="input-field"
+                                aria-label="Filtrar por provincia"
+                            >
+                                <option value="">Todas las provincias</option>
+                                {provinces.map((province) => (
+                                    <option key={province.id} value={province.id}>
+                                        {province.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button type="submit" className="btn-primary" disabled={aiLoading}>
+                                {aiLoading ? 'Consultando...' : 'Consultar asistente'}
+                            </button>
+                            {aiError ? <p className="text-sm text-red-700">{aiError}</p> : null}
+                        </div>
+                    </form>
+
+                    {(aiAnswer || aiMatches.length > 0) && (
+                        <div className="mt-5 space-y-4">
+                            {aiAnswer ? (
+                                <div className="rounded-xl border border-primary-100 bg-primary-50/40 px-4 py-3 text-sm text-gray-800">
+                                    {aiAnswer}
+                                </div>
+                            ) : null}
+
+                            {aiMatches.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {aiMatches.map((match) => (
+                                        <Link
+                                            key={match.id}
+                                            to={match.slug ? `/businesses/${match.slug}` : `/businesses/${match.id}`}
+                                            onClick={() => handleBusinessClick(match.id)}
+                                            className="rounded-xl border border-gray-100 bg-white p-4 hover:border-primary-200 transition-colors"
+                                        >
+                                            <p className="font-semibold text-gray-900">{match.name}</p>
+                                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{match.address}</p>
+                                            <p className="text-xs text-primary-700 mt-2 font-medium">
+                                                Afinidad {Math.round(match.score * 100)}%
+                                            </p>
+                                        </Link>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500">No hubo coincidencias para esa consulta.</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 <div className="section-shell p-5 md:p-7">
                     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>

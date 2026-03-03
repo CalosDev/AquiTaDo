@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiErrorMessage } from '../api/error';
-import { bookingsApi, favoritesApi, messagingApi } from '../api/endpoints';
+import { bookingsApi, checkinsApi, favoritesApi, messagingApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { formatDateTimeDo } from '../lib/market';
 
@@ -74,10 +74,48 @@ interface UserBusinessList {
     }>;
 }
 
+interface CheckInItem {
+    id: string;
+    createdAt: string;
+    pointsAwarded: number;
+    verifiedLocation: boolean;
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+        address: string;
+        province?: {
+            id: string;
+            name: string;
+            slug: string;
+        } | null;
+        city?: {
+            id: string;
+            name: string;
+        } | null;
+    };
+}
+
+interface CheckInSummary {
+    loyaltyPoints: number;
+    checkinCount: number;
+    checkinStreak: number;
+    loyaltyTier: 'NUEVO' | 'EXPLORADOR' | 'LOCAL_PRO' | 'EMBAJADOR';
+    lastCheckinAt?: string | null;
+}
+
 const EMPTY_BOOKINGS: BookingItem[] = [];
 const EMPTY_CONVERSATIONS: ConversationItem[] = [];
 const EMPTY_FAVORITES: FavoriteBusinessItem[] = [];
 const EMPTY_LISTS: UserBusinessList[] = [];
+const EMPTY_CHECKINS: CheckInItem[] = [];
+const EMPTY_CHECKIN_SUMMARY: CheckInSummary = {
+    loyaltyPoints: 0,
+    checkinCount: 0,
+    checkinStreak: 0,
+    loyaltyTier: 'NUEVO',
+    lastCheckinAt: null,
+};
 
 function formatDateTime(value: string): string {
     return formatDateTimeDo(value, {
@@ -121,11 +159,12 @@ export function CustomerDashboard() {
     const dashboardQuery = useQuery({
         queryKey: ['customer-dashboard'],
         queryFn: async () => {
-            const [bookingsResponse, conversationsResponse, favoritesResponse, listsResponse] = await Promise.all([
+            const [bookingsResponse, conversationsResponse, favoritesResponse, listsResponse, checkinsResponse] = await Promise.all([
                 bookingsApi.getMineAsUser({ limit: 6 }),
                 messagingApi.getMyConversations({ limit: 6 }),
                 favoritesApi.getFavoriteBusinesses({ limit: 6 }),
                 favoritesApi.getMyLists({ limit: 6 }),
+                checkinsApi.getMine({ limit: 6 }),
             ]);
 
             const bookings = ((bookingsResponse.data?.data ?? []) as BookingItem[])
@@ -137,6 +176,8 @@ export function CustomerDashboard() {
                 conversations,
                 favorites: (favoritesResponse.data?.data ?? []) as FavoriteBusinessItem[],
                 lists: (listsResponse.data?.data ?? []) as UserBusinessList[],
+                checkins: (checkinsResponse.data?.data ?? []) as CheckInItem[],
+                checkinSummary: (checkinsResponse.data?.summary ?? EMPTY_CHECKIN_SUMMARY) as CheckInSummary,
             };
         },
     });
@@ -149,6 +190,8 @@ export function CustomerDashboard() {
     const conversations = dashboardQuery.data?.conversations ?? EMPTY_CONVERSATIONS;
     const favorites = dashboardQuery.data?.favorites ?? EMPTY_FAVORITES;
     const lists = dashboardQuery.data?.lists ?? EMPTY_LISTS;
+    const checkins = dashboardQuery.data?.checkins ?? EMPTY_CHECKINS;
+    const checkinSummary = dashboardQuery.data?.checkinSummary ?? EMPTY_CHECKIN_SUMMARY;
 
     const nextBooking = useMemo(() => {
         const now = Date.now();
@@ -198,7 +241,7 @@ export function CustomerDashboard() {
                 </section>
             )}
 
-            <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                 <article className="card p-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Reservas</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{bookings.length}</p>
@@ -222,6 +265,13 @@ export function CustomerDashboard() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Favoritos</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{favorites.length}</p>
                     <p className="text-sm text-gray-500 mt-1">Guardados para comparar</p>
+                </article>
+                <article className="card p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Loyalty</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{checkinSummary.loyaltyPoints}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Tier {checkinSummary.loyaltyTier} - racha {checkinSummary.checkinStreak}
+                    </p>
                 </article>
             </section>
 
@@ -289,6 +339,39 @@ export function CustomerDashboard() {
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <article className="card p-6">
                     <div className="flex items-center justify-between mb-4">
+                        <h2 className="font-display text-xl font-bold text-gray-900">Mis check-ins</h2>
+                        <span className="text-xs rounded-full bg-primary-50 text-primary-700 px-2 py-0.5">
+                            {checkinSummary.checkinCount} total
+                        </span>
+                    </div>
+                    {checkins.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                            Aun no tienes check-ins. Haz check-in desde el detalle de un negocio para ganar puntos.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {checkins.map((entry) => (
+                                <div key={entry.id} className="rounded-xl border border-gray-100 p-4">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <p className="font-semibold text-gray-900">{entry.business.name}</p>
+                                        <span className="text-xs px-2 py-1 rounded-full bg-primary-100 text-primary-700 font-semibold">
+                                            +{entry.pointsAwarded} pts
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {entry.business.province?.name || entry.business.address}
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-2">
+                                        {formatDateTime(entry.createdAt)} - {entry.verifiedLocation ? 'Ubicacion verificada' : 'Sin verificacion GPS'}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </article>
+
+                <article className="card p-6">
+                    <div className="flex items-center justify-between mb-4">
                         <h2 className="font-display text-xl font-bold text-gray-900">Mis favoritos</h2>
                         <Link to="/businesses" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
                             Explorar
@@ -334,7 +417,7 @@ export function CustomerDashboard() {
                                         <p className="text-sm text-gray-600 mt-2 line-clamp-2">{list.description}</p>
                                     ) : null}
                                     <p className="text-xs text-gray-500 mt-2">
-                                        {list.items.slice(0, 2).map((item) => item.business.name).join(' · ') || 'Sin negocios aun'}
+                                        {list.items.slice(0, 2).map((item) => item.business.name).join(' - ') || 'Sin negocios aun'}
                                     </p>
                                 </div>
                             ))}

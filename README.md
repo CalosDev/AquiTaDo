@@ -8,6 +8,7 @@ Incluye frontend web, backend API y base de datos PostgreSQL en un monorepo con 
 ## Stack
 
 - Frontend: React 19 + Vite 7 + TypeScript + TailwindCSS 4
+- PWA: manifest + service worker + offline fallback
 - Backend: NestJS + TypeScript
 - Base de datos: PostgreSQL + Prisma ORM + PostGIS
 - Auth: JWT (Passport)
@@ -146,6 +147,10 @@ Servicios:
 
 - `VITE_API_URL=http://localhost:3000`
 - `VITE_API_TIMEOUT_MS=30000` (opcional, default 30000ms)
+
+Nota PWA:
+- La app registra `service-worker.js` automaticamente y expone `manifest.webmanifest`.
+- En navegadores compatibles se habilita boton "Instalar app".
 
 ## Docker (stack completo)
 

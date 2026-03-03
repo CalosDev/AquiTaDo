@@ -429,6 +429,33 @@ export const favoritesApi = {
         api.delete(`/favorites/lists/${listId}/items/${businessId}`),
 };
 
+// ---- Check-ins / Loyalty ----
+export const checkinsApi = {
+    create: (data: {
+        businessId: string;
+        latitude?: number;
+        longitude?: number;
+        note?: string;
+    }) => api.post('/checkins', data),
+    getMine: (params?: { page?: number; limit?: number }) =>
+        api.get('/checkins/my', { params }),
+    getBusinessStats: (businessId: string) =>
+        api.get(`/checkins/business/${businessId}/stats`),
+};
+
+// ---- AI Concierge ----
+export const aiApi = {
+    askConcierge: (data: {
+        query: string;
+        categoryId?: string;
+        provinceId?: string;
+        cityId?: string;
+        lat?: number;
+        lng?: number;
+        limit?: number;
+    }) => api.post('/ai/concierge/query', data),
+};
+
 // ---- Reputation ----
 export const reputationApi = {
     getRankings: (params?: { provinceId?: string; limit?: number }) =>
@@ -497,4 +524,9 @@ export const verificationApi = {
         documentId: string,
         data: { status: 'PENDING' | 'APPROVED' | 'REJECTED'; rejectionReason?: string },
     ) => api.patch(`/verification/admin/documents/${documentId}/review`, data),
+};
+
+// ---- Observability ----
+export const observabilityApi = {
+    getMetrics: () => api.get<string>('/observability/metrics', { responseType: 'text' }),
 };

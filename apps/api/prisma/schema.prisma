@@ -239,9 +239,13 @@ model User {
   phone     String?  @db.VarChar(20)
   avatarUrl String?  @db.VarChar(500)
   role      Role     @default(USER)
-  twoFactorEnabled       Boolean   @default(false)
-  twoFactorSecret        String?   @db.VarChar(128)
-  twoFactorPendingSecret String?   @db.VarChar(128)
+  loyaltyPoints         Int       @default(0)
+  checkinCount          Int       @default(0)
+  checkinStreak         Int       @default(0)
+  lastCheckinAt         DateTime?
+  twoFactorEnabled       Boolean  @default(false)
+  twoFactorSecret        String?  @db.VarChar(128)
+  twoFactorPendingSecret String?  @db.VarChar(128)
   twoFactorEnabledAt     DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -267,10 +271,12 @@ model User {
   growthEvents             GrowthEvent[]
   favoriteBusinesses       UserFavoriteBusiness[]
   businessLists            UserBusinessList[]
+  checkIns                 CheckIn[]
   salesLeadsAsCustomer     SalesLead[]                    @relation("SalesLeadCustomer")
   salesLeadsCreated        SalesLead[]                    @relation("SalesLeadCreator")
 
   @@index([email])
+  @@index([loyaltyPoints])
   @@index([twoFactorEnabled])
   @@map("users")
 }
@@ -330,6 +336,7 @@ model Business {
   growthEvents          GrowthEvent[]
   favoritedByUsers      UserFavoriteBusiness[]
   listedByUsers         UserBusinessListItem[]
+  checkIns              CheckIn[]
   salesLeads            SalesLead[]
 
   @@index([slug])
@@ -384,6 +391,7 @@ model Organization {
   verificationDocuments BusinessVerificationDocument[]
   adWalletTopups        AdWalletTopup[]
   growthEvents          GrowthEvent[]
+  checkIns              CheckIn[]
   salesLeads            SalesLead[]
 
   @@index([ownerUserId])
@@ -611,6 +619,30 @@ model Review {
   @@index([moderationStatus, createdAt])
   @@index([businessId, moderationStatus, isSpam, createdAt])
   @@map("reviews")
+}
+
+model CheckIn {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId        String
+  business          Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  latitude          Float?
+  longitude         Float?
+  verifiedLocation  Boolean   @default(false)
+  distanceMeters    Int?
+  pointsAwarded     Int       @default(0)
+  streakApplied     Int       @default(0)
+  note              String?   @db.VarChar(220)
+  createdAt         DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([businessId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([verifiedLocation, createdAt])
+  @@map("check_ins")
 }
 
 model BusinessImage {
