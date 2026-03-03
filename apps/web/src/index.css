@@ -86,7 +86,7 @@
   }
 
   .nav-link {
-    @apply relative text-slate-600 hover:text-primary-700 font-semibold transition-colors;
+    @apply relative whitespace-nowrap text-slate-600 hover:text-primary-700 font-semibold transition-colors;
   }
 
   .nav-link::after {

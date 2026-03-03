@@ -65,7 +65,7 @@ export function Navbar() {
                             </div>
                         </Link>
 
-                        <div className="hidden md:flex items-center gap-6">
+                        <div className="hidden md:flex items-center gap-4 xl:gap-6 min-w-0">
                             <Link to="/businesses" className="nav-link">Negocios</Link>
                             {isAuthenticated ? (
                                 <>
@@ -75,18 +75,18 @@ export function Navbar() {
                                     )}
                                     <Link to="/profile" className="nav-link">Perfil</Link>
                                     {canRegisterBusiness && (
-                                        <Link to="/register-business" className="btn-accent text-sm">+ Registrar Negocio</Link>
+                                        <Link to="/register-business" className="btn-accent text-sm whitespace-nowrap">+ Registrar Negocio</Link>
                                     )}
-                                    <div className="flex items-center gap-2">
-                                        <span className="chip !py-1">{roleBadgeLabel(user?.role)}</span>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="chip !py-1 whitespace-nowrap">{roleBadgeLabel(user?.role)}</span>
                                         {activeOrganization && (
-                                            <span className="chip-danger !py-1 max-w-[170px] truncate">{activeOrganization.name}</span>
+                                            <span className="chip-danger !py-1 max-w-[140px] xl:max-w-[170px] truncate">{activeOrganization.name}</span>
                                         )}
-                                        <span className="text-sm text-slate-500">Hola, {user?.name?.split(' ')[0]}</span>
+                                        <span className="text-sm text-slate-500 whitespace-nowrap">Hola, {user?.name?.split(' ')[0]}</span>
                                         <button
                                             type="button"
                                             onClick={handleLogout}
-                                            className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition-colors hover:border-accent-300 hover:text-accent-700"
+                                            className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition-colors hover:border-accent-300 hover:text-accent-700 whitespace-nowrap"
                                         >
                                             Salir
                                         </button>
