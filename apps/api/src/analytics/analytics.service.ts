@@ -468,7 +468,17 @@ export class AnalyticsService {
         const now = new Date();
         const rangeStart = this.toDateOnly(new Date(now.getTime() - (normalizedDays - 1) * 86_400_000));
 
-        const [records, activePromotions, pendingBookings, confirmedBookings, subscription] = await Promise.all([
+        const [
+            records,
+            activePromotions,
+            pendingBookings,
+            confirmedBookings,
+            subscription,
+            growthEventsSummary,
+            bookingsCreated,
+            successfulTransactionsSummary,
+            adSpendSummary,
+        ] = await Promise.all([
             this.prisma.businessAnalytics.findMany({
                 where: {
                     business: {
@@ -523,6 +533,48 @@ export class AnalyticsService {
                             transactionFeeBps: true,
                         },
                     },
+                },
+            }),
+            this.prisma.growthEvent.groupBy({
+                by: ['eventType'],
+                where: {
+                    organizationId,
+                    occurredAt: { gte: rangeStart },
+                },
+                _count: {
+                    _all: true,
+                },
+            }),
+            this.prisma.booking.count({
+                where: {
+                    organizationId,
+                    createdAt: { gte: rangeStart },
+                    deletedAt: null,
+                },
+            }),
+            this.prisma.transaction.aggregate({
+                where: {
+                    organizationId,
+                    createdAt: { gte: rangeStart },
+                    status: 'SUCCEEDED',
+                },
+                _sum: {
+                    grossAmount: true,
+                    platformFeeAmount: true,
+                    netAmount: true,
+                },
+            }),
+            this.prisma.adEvent.aggregate({
+                where: {
+                    occurredAt: { gte: rangeStart },
+                    campaign: {
+                        is: {
+                            organizationId,
+                        },
+                    },
+                },
+                _sum: {
+                    costAmount: true,
                 },
             }),
         ]);
@@ -614,6 +666,29 @@ export class AnalyticsService {
             .sort((left, right) => right.views - left.views)
             .slice(0, 5);
 
+        const growthEventsMap = new Map(
+            growthEventsSummary.map((item) => [item.eventType, item._count._all]),
+        );
+        const searchQueries = growthEventsMap.get(GrowthEventType.SEARCH_QUERY) ?? 0;
+        const contactClicks = growthEventsMap.get(GrowthEventType.CONTACT_CLICK) ?? 0;
+        const whatsappClicks = growthEventsMap.get(GrowthEventType.WHATSAPP_CLICK) ?? 0;
+        const bookingIntents = growthEventsMap.get(GrowthEventType.BOOKING_INTENT) ?? 0;
+
+        const transactionRevenue = Number(
+            successfulTransactionsSummary._sum.grossAmount?.toString() ?? '0',
+        );
+        const transactionFees = Number(
+            successfulTransactionsSummary._sum.platformFeeAmount?.toString() ?? '0',
+        );
+        const adSpend = Number(adSpendSummary._sum.costAmount?.toString() ?? '0');
+        const monthlySubscriptionCost = Number(
+            subscription?.plan.priceMonthly?.toString() ?? '0',
+        );
+        const proratedSubscriptionCost = monthlySubscriptionCost * (normalizedDays / 30);
+        const totalCosts = transactionFees + adSpend + proratedSubscriptionCost;
+        const periodRevenue = transactionRevenue > 0 ? transactionRevenue : totals.grossRevenue;
+        const netRevenue = periodRevenue - totalCosts;
+
         return {
             range: {
                 days: normalizedDays,
@@ -639,6 +714,36 @@ export class AnalyticsService {
                 activePromotions,
                 pendingBookings,
                 confirmedBookings,
+            },
+            funnel: {
+                searchQueries,
+                contactClicks,
+                whatsappClicks,
+                bookingIntents,
+                bookingsCreated,
+                searchToContactRate: searchQueries > 0
+                    ? Number(((contactClicks / searchQueries) * 100).toFixed(2))
+                    : 0,
+                contactToWhatsappRate: contactClicks > 0
+                    ? Number(((whatsappClicks / contactClicks) * 100).toFixed(2))
+                    : 0,
+                whatsappToBookingRate: whatsappClicks > 0
+                    ? Number(((bookingIntents / whatsappClicks) * 100).toFixed(2))
+                    : 0,
+                bookingIntentToBookingRate: bookingIntents > 0
+                    ? Number(((bookingsCreated / bookingIntents) * 100).toFixed(2))
+                    : 0,
+            },
+            roi: {
+                periodRevenue: this.roundMoney(periodRevenue),
+                transactionFees: this.roundMoney(transactionFees),
+                adSpend: this.roundMoney(adSpend),
+                subscriptionCost: this.roundMoney(proratedSubscriptionCost),
+                totalCosts: this.roundMoney(totalCosts),
+                netRevenue: this.roundMoney(netRevenue),
+                roiPercent: totalCosts > 0
+                    ? Number(((netRevenue / totalCosts) * 100).toFixed(2))
+                    : 0,
             },
             subscription: subscription
                 ? {

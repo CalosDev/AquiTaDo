@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { getRoleCapabilities } from '../auth/capabilities';
 import { getApiErrorMessage } from '../api/error';
 import { analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
-import { OptimizedImage } from '../components/OptimizedImage';
+import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { formatNumberDo } from '../lib/market';
-import { useAuth } from '../context/useAuth';
-import { getRoleCapabilities } from '../auth/capabilities';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 interface Category {
     id: string;
@@ -35,15 +35,47 @@ interface Province {
 }
 
 const INTENT_LINKS = [
-    { slug: 'con-delivery', label: 'Con delivery', emoji: '🛵' },
-    { slug: 'con-parqueo', label: 'Con parqueo', emoji: '🅿️' },
-    { slug: 'pet-friendly', label: 'Pet friendly', emoji: '🐾' },
-    { slug: 'con-reservas', label: 'Con reservas', emoji: '📅' },
-    { slug: 'accesibles', label: 'Accesibles', emoji: '♿' },
+    { slug: 'con-delivery', label: 'Con delivery', subtitle: 'Entrega rapida', icon: 'MOTO' },
+    { slug: 'con-parqueo', label: 'Con parqueo', subtitle: 'Llega sin estres', icon: 'PARK' },
+    { slug: 'pet-friendly', label: 'Pet friendly', subtitle: 'Aceptan mascotas', icon: 'PET' },
+    { slug: 'con-reservas', label: 'Con reservas', subtitle: 'Agenda facil', icon: 'BOOK' },
+    { slug: 'accesibles', label: 'Accesibles', subtitle: 'Entrada inclusiva', icon: 'ACCESS' },
 ];
+
+const OPERATING_POINTS = [
+    {
+        title: 'Descubre mejor',
+        description: 'Filtros por categoria, provincia e intencion para encontrar opciones reales en minutos.',
+    },
+    {
+        title: 'Contacta directo',
+        description: 'WhatsApp y mensajeria integrada para convertir busqueda en conversacion inmediata.',
+    },
+    {
+        title: 'Opera como SaaS',
+        description: 'Panel de negocio con CRM, reservas, promociones, facturacion y analitica accionable.',
+    },
+];
+
+function trackGrowthEvent(payload: {
+    eventType: 'SEARCH_QUERY' | 'SEARCH_RESULT_CLICK';
+    categoryId?: string;
+    provinceId?: string;
+    businessId?: string;
+    metadata?: Record<string, unknown>;
+    searchQuery?: string;
+}) {
+    return analyticsApi.trackGrowthEvent({
+        ...payload,
+        visitorId: getOrCreateVisitorId(),
+        sessionId: getOrCreateSessionId(),
+    }).catch(() => undefined);
+}
 
 export function Home() {
     const { isAuthenticated, user } = useAuth();
+    const navigate = useNavigate();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [categories, setCategories] = useState<Category[]>([]);
     const [recentBusinesses, setRecentBusinesses] = useState<Business[]>([]);
@@ -51,7 +83,26 @@ export function Home() {
     const [totalBusinesses, setTotalBusinesses] = useState(0);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
-    const navigate = useNavigate();
+
+    const roleCapabilities = getRoleCapabilities(user?.role);
+    const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
+    const registerBusinessPath = !isAuthenticated
+        ? '/register'
+        : roleCapabilities.canAccessAdminPanel
+            ? '/admin'
+            : canRegisterBusiness
+                ? '/register-business'
+                : '/businesses';
+    const registerBusinessLabel = !isAuthenticated
+        ? 'Crear cuenta y registrar negocio'
+        : roleCapabilities.canAccessAdminPanel
+            ? 'Ir al panel admin'
+            : canRegisterBusiness
+                ? 'Registrar mi negocio'
+                : 'Explorar negocios';
+
+    const topCategories = useMemo(() => categories.slice(0, 10), [categories]);
+    const topProvinces = useMemo(() => provinces.slice(0, 10), [provinces]);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -77,294 +128,314 @@ export function Home() {
         void loadData();
     }, [loadData]);
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            void analyticsApi.trackGrowthEvent({
-                eventType: 'SEARCH_QUERY',
-                visitorId: getOrCreateVisitorId(),
-                sessionId: getOrCreateSessionId(),
-                searchQuery: searchQuery.trim(),
-                metadata: {
-                    source: 'home-hero',
-                },
-            }).catch(() => undefined);
-            navigate(`/businesses?search=${encodeURIComponent(searchQuery)}`);
+    const handleSearch = (event: React.FormEvent) => {
+        event.preventDefault();
+        const normalizedQuery = searchQuery.trim();
+        if (!normalizedQuery) {
+            return;
         }
+
+        void trackGrowthEvent({
+            eventType: 'SEARCH_QUERY',
+            searchQuery: normalizedQuery,
+            metadata: { source: 'home-hero-search' },
+        });
+
+        navigate(`/businesses?search=${encodeURIComponent(normalizedQuery)}`);
     };
 
-    const trackBusinessClick = (businessId: string, source: string) => {
-        void analyticsApi.trackGrowthEvent({
+    const handleBusinessClick = (businessId: string) => {
+        void trackGrowthEvent({
             eventType: 'SEARCH_RESULT_CLICK',
             businessId,
-            visitorId: getOrCreateVisitorId(),
-            sessionId: getOrCreateSessionId(),
-            metadata: { source },
-        }).catch(() => undefined);
+            metadata: { source: 'home-recent-businesses' },
+        });
     };
-
-    const roleCapabilities = getRoleCapabilities(user?.role);
-    const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
-    const registerBusinessPath = !isAuthenticated
-        ? '/register'
-        : roleCapabilities.canAccessAdminPanel
-            ? '/admin'
-            : canRegisterBusiness
-            ? '/register-business'
-            : '/businesses';
-    const registerBusinessLabel = !isAuthenticated
-        ? 'Crear Cuenta y Registrar Negocio'
-        : roleCapabilities.canAccessAdminPanel
-            ? 'Ir al Panel Admin'
-        : canRegisterBusiness
-            ? 'Registrar mi Negocio Gratis'
-            : 'Explorar Negocios';
 
     return (
         <div className="animate-fade-in">
             {loadError && (
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         {loadError}
                     </div>
                 </div>
             )}
 
-            {/* Hero Section */}
             <section className="gradient-hero relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
-                    <div className="text-center max-w-3xl mx-auto">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-white/35 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-blue-100 mb-6">
-                            <span className="inline-flex h-2 w-2 rounded-full bg-accent-300"></span>
-                            Hecho para Republica Dominicana
+                <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,#ffffff2b_1px,transparent_1px),linear-gradient(to_bottom,#ffffff2b_1px,transparent_1px)] [background-size:36px_36px]"></div>
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+                    <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
+                        <div className="lg:col-span-7">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-blue-100">
+                                <span className="h-2 w-2 rounded-full bg-red-300"></span>
+                                Dominicano desde el diseno
+                            </div>
+                            <h1 className="mt-5 font-display text-4xl md:text-6xl font-extrabold leading-tight text-white">
+                                El ecosistema local para
+                                <span className="block text-accent-300"> descubrir, vender y crecer en RD</span>
+                            </h1>
+                            <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-blue-100">
+                                AquiTa.do conecta personas con negocios verificados y le da a cada local
+                                herramientas SaaS para operar mejor: reservas, CRM, mensajeria, promociones y mas.
+                            </p>
+
+                            <form onSubmit={handleSearch} className="mt-8 max-w-3xl">
+                                <div className="hero-glass-card p-2 md:p-3">
+                                    <div className="flex flex-col gap-2 md:flex-row">
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(event) => setSearchQuery(event.target.value)}
+                                            placeholder="Busca restaurantes, colmados, salones, farmacias..."
+                                            aria-label="Buscar negocios"
+                                            className="input-field flex-1 !border-white/50 !bg-white text-sm md:text-base"
+                                        />
+                                        <button type="submit" className="btn-accent whitespace-nowrap">
+                                            Buscar ahora
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+
+                            <div className="mt-7 flex flex-wrap gap-3">
+                                <span className="chip !bg-white/10 !text-white !border-white/30">
+                                    {loading ? '...' : formatNumberDo(totalBusinesses)} negocios
+                                </span>
+                                <span className="chip !bg-white/10 !text-white !border-white/30">
+                                    {loading ? '...' : provinces.length} provincias
+                                </span>
+                                <span className="chip !bg-white/10 !text-white !border-white/30">
+                                    {loading ? '...' : categories.length} categorias
+                                </span>
+                            </div>
                         </div>
-                        <h1 className="font-display text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight">
-                            Descubre lo mejor de{' '}
-                            <span className="text-accent-400">República Dominicana</span>
-                        </h1>
-                        <p className="text-lg md:text-xl text-blue-100 mb-10 leading-relaxed">
-                            Encuentra negocios locales, restaurantes, tiendas y servicios cerca de ti.
-                            El directorio más completo del país.
-                        </p>
 
-                        {/* Search Bar */}
-                        <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto">
-                            <div className="flex bg-white rounded-2xl shadow-2xl shadow-black/20 overflow-hidden">
-                                <div className="flex-1 flex items-center px-5">
-                                    <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar negocios, restaurantes, servicios..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full py-4 text-gray-700 placeholder-gray-400"
-                                        aria-label="Buscar negocios"
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    className="bg-accent-600 hover:bg-accent-700 text-white font-semibold px-8 py-4 transition-colors"
-                                >
-                                    Buscar
-                                </button>
-                            </div>
-                        </form>
+                        <div className="lg:col-span-5">
+                            <div className="hero-glass-card p-6 md:p-7 text-white">
+                                <p className="text-xs uppercase tracking-[0.18em] text-blue-200 font-semibold">Radar local</p>
+                                <h2 className="mt-2 font-display text-2xl font-bold">Que esta moviendo el mercado</h2>
 
-                        {/* Quick Stats */}
-                        <div className="flex justify-center gap-8 mt-10">
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-white">
-                                    {loading ? '...' : formatNumberDo(totalBusinesses)}
+                                <div className="mt-5 space-y-3">
+                                    {topCategories.slice(0, 4).map((category) => (
+                                        <Link
+                                            key={category.id}
+                                            to={category.slug ? `/negocios/categoria/${category.slug}` : `/businesses?categoryId=${category.id}`}
+                                            onClick={() => {
+                                                void trackGrowthEvent({
+                                                    eventType: 'SEARCH_QUERY',
+                                                    categoryId: category.id,
+                                                    metadata: { source: 'home-radar-category' },
+                                                });
+                                            }}
+                                            className="flex items-center justify-between rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/20"
+                                        >
+                                            <span>{category.name}</span>
+                                            <span className="text-blue-100">
+                                                {formatNumberDo(category._count?.businesses ?? 0)}
+                                            </span>
+                                        </Link>
+                                    ))}
                                 </div>
-                                <div className="text-sm text-blue-100">Negocios</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-white">{loading ? '...' : provinces.length}</div>
-                                <div className="text-sm text-blue-100">Provincias</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-white">{loading ? '...' : categories.length}</div>
-                                <div className="text-sm text-blue-200">Categorías</div>
+
+                                <div className="mt-5 rounded-2xl border border-white/20 bg-white/10 p-4">
+                                    <p className="text-xs uppercase tracking-wide text-blue-100">Cobertura</p>
+                                    <p className="mt-1 font-semibold">
+                                        {topProvinces.length > 0
+                                            ? `${topProvinces[0].name}, ${topProvinces[1]?.name ?? 'Santiago'} y mas`
+                                            : 'Santo Domingo, Santiago y mas'}
+                                    </p>
+                                    <p className="mt-1 text-sm text-blue-100">
+                                        Pensado para el contexto local dominicano y preparado para escalar.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* Categories */}
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                <div className="text-center mb-10">
-                    <h2 className="font-display text-3xl font-bold text-gray-900 mb-3">
-                        Explora por Categoría
-                    </h2>
-                    <p className="text-gray-500">Encuentra exactamente lo que necesitas</p>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                    {categories.slice(0, 15).map((cat) => (
-                        <Link
-                            key={cat.id}
-                            to={cat.slug ? `/negocios/categoria/${cat.slug}` : `/businesses?categoryId=${cat.id}`}
-                            onClick={() => {
-                                void analyticsApi.trackGrowthEvent({
-                                    eventType: 'SEARCH_QUERY',
-                                    categoryId: cat.id,
-                                    visitorId: getOrCreateVisitorId(),
-                                    sessionId: getOrCreateSessionId(),
-                                    metadata: { source: 'home-category' },
-                                }).catch(() => undefined);
-                            }}
-                            className="card hover-lift p-5 text-center group cursor-pointer"
-                        >
-                            <div className="text-3xl mb-2">{cat.icon || '📁'}</div>
-                            <h3 className="font-semibold text-gray-800 text-sm group-hover:text-primary-600 transition-colors">
-                                {cat.name}
-                            </h3>
-                            {cat._count && (
-                                <span className="text-xs text-gray-400 mt-1">{cat._count.businesses} negocios</span>
-                            )}
-                        </Link>
-                    ))}
-                </div>
-            </section>
-
-            {/* Provinces */}
-            <section className="bg-gradient-to-b from-primary-50/70 to-white border-y border-primary-100/70 py-16">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center mb-10">
-                        <h2 className="font-display text-3xl font-bold text-gray-900 mb-3">
-                            Busca por Provincia
-                        </h2>
-                        <p className="text-gray-500">Negocios en toda la República Dominicana</p>
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+                <div className="section-shell p-5 md:p-7">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <h2 className="section-title !text-2xl md:!text-3xl">Explora por intencion</h2>
+                            <p className="section-subtitle">Rutas rapidas para encontrar justo lo que necesitas.</p>
+                        </div>
                     </div>
-                    <div className="flex flex-wrap justify-center gap-3">
-                        {provinces.slice(0, 16).map((prov) => (
+                    <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        {INTENT_LINKS.map((intent) => (
                             <Link
-                                key={prov.id}
-                                to={prov.slug ? `/negocios/provincia/${prov.slug}` : `/businesses?provinceId=${prov.id}`}
+                                key={intent.slug}
+                                to={`/negocios/intencion/${intent.slug}`}
                                 onClick={() => {
-                                    void analyticsApi.trackGrowthEvent({
+                                    void trackGrowthEvent({
                                         eventType: 'SEARCH_QUERY',
-                                        provinceId: prov.id,
-                                        visitorId: getOrCreateVisitorId(),
-                                        sessionId: getOrCreateSessionId(),
-                                        metadata: { source: 'home-province' },
-                                    }).catch(() => undefined);
+                                        metadata: { source: 'home-intent-card', intent: intent.slug },
+                                    });
                                 }}
-                                className="px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-600 border border-gray-200 hover:border-primary-500 hover:text-primary-600 hover:shadow-md transition-all hover-lift"
+                                className="surface-panel p-4 transition-all hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md"
                             >
-                                📍 {prov.name}
+                                <p className="text-[11px] uppercase tracking-[0.16em] text-primary-600 font-bold">{intent.icon}</p>
+                                <p className="mt-2 font-display text-lg font-semibold text-slate-900">{intent.label}</p>
+                                <p className="mt-1 text-sm text-slate-600">{intent.subtitle}</p>
                             </Link>
                         ))}
                     </div>
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-                <div className="text-center mb-8">
-                    <h2 className="font-display text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-                        Explora por Intencion
-                    </h2>
-                    <p className="text-gray-500">
-                        Encuentra negocios segun lo que necesitas ahora mismo.
-                    </p>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {INTENT_LINKS.map((intent) => (
-                        <Link
-                            key={intent.slug}
-                            to={`/negocios/intencion/${intent.slug}`}
-                            onClick={() => {
-                                void analyticsApi.trackGrowthEvent({
-                                    eventType: 'SEARCH_QUERY',
-                                    visitorId: getOrCreateVisitorId(),
-                                    sessionId: getOrCreateSessionId(),
-                                    metadata: {
-                                        source: 'home-intent',
-                                        intent: intent.slug,
-                                    },
-                                }).catch(() => undefined);
-                            }}
-                            className="rounded-2xl border border-primary-100 bg-white px-4 py-3 text-center hover:border-primary-300 hover:shadow-md transition-all hover-lift"
-                        >
-                            <div className="text-xl mb-1">{intent.emoji}</div>
-                            <p className="text-sm font-semibold text-gray-800">{intent.label}</p>
-                        </Link>
-                    ))}
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+                <div className="grid gap-8 lg:grid-cols-2">
+                    <div className="section-shell p-6">
+                        <div className="flex items-end justify-between gap-4">
+                            <div>
+                                <h3 className="font-display text-2xl font-bold text-slate-900">Categorias top</h3>
+                                <p className="mt-1 text-sm text-slate-600">Directorio organizado para conversion real.</p>
+                            </div>
+                            <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
+                                Ver todo
+                            </Link>
+                        </div>
+                        <div className="mt-5 grid grid-cols-2 gap-3">
+                            {topCategories.slice(0, 8).map((category) => (
+                                <Link
+                                    key={category.id}
+                                    to={category.slug ? `/negocios/categoria/${category.slug}` : `/businesses?categoryId=${category.id}`}
+                                    onClick={() => {
+                                        void trackGrowthEvent({
+                                            eventType: 'SEARCH_QUERY',
+                                            categoryId: category.id,
+                                            metadata: { source: 'home-category-grid' },
+                                        });
+                                    }}
+                                    className="surface-panel p-3 text-sm font-semibold text-slate-700 transition-colors hover:border-primary-300 hover:text-primary-700"
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="truncate">{category.name}</span>
+                                        <span className="text-xs text-slate-400">{category._count?.businesses ?? 0}</span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="section-shell p-6">
+                        <div className="flex items-end justify-between gap-4">
+                            <div>
+                                <h3 className="font-display text-2xl font-bold text-slate-900">Provincias activas</h3>
+                                <p className="mt-1 text-sm text-slate-600">Cobertura local con enfoque en demanda real.</p>
+                            </div>
+                        </div>
+                        <div className="mt-5 flex flex-wrap gap-2.5">
+                            {topProvinces.map((province) => (
+                                <Link
+                                    key={province.id}
+                                    to={province.slug ? `/negocios/provincia/${province.slug}` : `/businesses?provinceId=${province.id}`}
+                                    onClick={() => {
+                                        void trackGrowthEvent({
+                                            eventType: 'SEARCH_QUERY',
+                                            provinceId: province.id,
+                                            metadata: { source: 'home-province-chip' },
+                                        });
+                                    }}
+                                    className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100"
+                                >
+                                    {province.name}
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            {/* Recent Businesses */}
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                <div className="flex justify-between items-center mb-10">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <h2 className="font-display text-3xl font-bold text-gray-900 mb-2">
-                            Negocios Recientes
-                        </h2>
-                        <p className="text-gray-500">Los últimos en unirse a AquiTa.do</p>
+                        <h2 className="section-title !text-3xl">Negocios recientes</h2>
+                        <p className="section-subtitle">Perfiles nuevos listos para recibir clientes.</p>
                     </div>
-                    <Link to="/businesses" className="btn-secondary text-sm">
-                        Ver todos →
-                    </Link>
+                    <Link to="/businesses" className="btn-secondary text-sm w-fit">Ver todo el directorio</Link>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {recentBusinesses.map((biz) => (
-                        <Link
-                            key={biz.id}
-                            to={`/businesses/${biz.slug || biz.id}`}
-                            onClick={() => trackBusinessClick(biz.id, 'home-recent')}
-                            className="card hover-lift group"
-                        >
-                            <div className="h-48 bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center">
-                                {biz.images?.[0] ? (
-                                    <OptimizedImage
-                                        src={biz.images[0].url}
-                                        alt={biz.name}
-                                        className="w-full h-full object-cover"
-                                        loading="lazy"
-                                        decoding="async"
-                                    />
-                                ) : (
-                                    <span className="text-5xl">🏪</span>
-                                )}
-                            </div>
-                            <div className="p-5">
-                                <h3 className="font-display font-semibold text-lg text-gray-900 group-hover:text-primary-600 transition-colors mb-1">
-                                    {biz.name}
-                                </h3>
-                                <p className="text-sm text-gray-500 mb-2 flex items-center gap-1">
-                                    📍 {biz.province?.name || biz.address}
-                                </p>
-                                <p className="text-sm text-gray-600 line-clamp-2">
-                                    {biz.description}
-                                </p>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-                {recentBusinesses.length === 0 && (
-                    <div className="text-center py-16 text-gray-400">
-                        <p className="text-5xl mb-4">🏗️</p>
-                        <p className="text-lg">Aún no hay negocios registrados. ¡Sé el primero!</p>
-                        <Link to={registerBusinessPath} className="btn-primary mt-4 inline-block">
-                            {registerBusinessLabel}
-                        </Link>
+
+                {recentBusinesses.length === 0 ? (
+                    <div className="section-shell mt-6 p-10 text-center">
+                        <p className="font-display text-2xl font-semibold text-slate-800">Aun no hay negocios registrados.</p>
+                        <p className="mt-2 text-sm text-slate-600">Se el primero en posicionar tu marca local.</p>
+                        <Link to={registerBusinessPath} className="btn-primary mt-5 inline-flex">{registerBusinessLabel}</Link>
+                    </div>
+                ) : (
+                    <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                        {recentBusinesses.map((business) => (
+                            <Link
+                                key={business.id}
+                                to={`/businesses/${business.slug || business.id}`}
+                                onClick={() => handleBusinessClick(business.id)}
+                                className="card group"
+                            >
+                                <div className="relative h-48 bg-gradient-to-br from-primary-50 to-accent-50">
+                                    {business.images?.[0] ? (
+                                        <OptimizedImage
+                                            src={business.images[0].url}
+                                            alt={business.name}
+                                            className="h-full w-full object-cover"
+                                            loading="lazy"
+                                            decoding="async"
+                                        />
+                                    ) : (
+                                        <div className="h-full w-full flex items-center justify-center text-sm font-semibold text-primary-700">
+                                            Imagen pendiente
+                                        </div>
+                                    )}
+                                    <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-primary-700">
+                                        Nuevo
+                                    </div>
+                                </div>
+                                <div className="p-5">
+                                    <h3 className="font-display text-xl font-semibold text-slate-900 group-hover:text-primary-700 transition-colors">
+                                        {business.name}
+                                    </h3>
+                                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        {business.province?.name || business.address}
+                                    </p>
+                                    <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-600">
+                                        {business.description}
+                                    </p>
+                                </div>
+                            </Link>
+                        ))}
                     </div>
                 )}
             </section>
 
-            {/* CTA Section */}
-            <section className="gradient-hero py-16">
-                <div className="max-w-4xl mx-auto px-4 text-center">
-                    <h2 className="font-display text-3xl md:text-4xl font-extrabold text-white mb-4">
-                        ¿Tienes un negocio en RD?
-                    </h2>
-                    <p className="text-blue-100 text-lg mb-8">
-                        Regístrate gratis y llega a miles de clientes potenciales
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+                <div className="section-shell p-6 md:p-8">
+                    <h2 className="section-title !text-3xl">Por que AquiTa.do es diferente</h2>
+                    <p className="section-subtitle mt-2">
+                        No es solo un listado: es una plataforma operativa para clientes y negocios.
                     </p>
-                    <Link to={registerBusinessPath} className="btn-accent text-lg px-10 py-3.5 hover-lift">
+                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+                        {OPERATING_POINTS.map((point) => (
+                            <article key={point.title} className="surface-panel p-5">
+                                <h3 className="font-display text-xl font-semibold text-slate-900">{point.title}</h3>
+                                <p className="mt-2 text-sm leading-relaxed text-slate-600">{point.description}</p>
+                            </article>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <section className="gradient-hero mt-14">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
+                    <p className="chip !bg-white/10 !text-white !border-white/30 mx-auto w-fit">Impulsa tu presencia local</p>
+                    <h2 className="mt-4 font-display text-3xl md:text-5xl font-extrabold text-white">
+                        Lleva tu negocio del barrio al siguiente nivel
+                    </h2>
+                    <p className="mt-4 text-base md:text-lg text-blue-100 max-w-2xl mx-auto">
+                        Crea tu perfil, recibe contactos, activa promociones y opera tu embudo de ventas
+                        desde un solo dashboard.
+                    </p>
+                    <Link to={registerBusinessPath} className="btn-accent mt-8 inline-flex text-base md:text-lg px-8">
                         {registerBusinessLabel}
                     </Link>
                 </div>

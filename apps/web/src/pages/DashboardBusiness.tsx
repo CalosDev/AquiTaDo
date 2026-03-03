@@ -60,6 +60,26 @@ interface DashboardPayload {
         pendingBookings: number;
         confirmedBookings: number;
     };
+    funnel: {
+        searchQueries: number;
+        contactClicks: number;
+        whatsappClicks: number;
+        bookingIntents: number;
+        bookingsCreated: number;
+        searchToContactRate: number;
+        contactToWhatsappRate: number;
+        whatsappToBookingRate: number;
+        bookingIntentToBookingRate: number;
+    };
+    roi: {
+        periodRevenue: number;
+        transactionFees: number;
+        adSpend: number;
+        subscriptionCost: number;
+        totalCosts: number;
+        netRevenue: number;
+        roiPercent: number;
+    };
     subscription: {
         status: string;
         currentPeriodEnd: string | null;
@@ -1170,6 +1190,48 @@ export function DashboardBusiness() {
                         Reservas confirmadas: <strong>{metrics?.marketplace.confirmedBookings || 0}</strong>
                     </p>
                     <p className="text-sm text-gray-600 mt-2">Tasa de conversión: <strong>{metrics?.totals.conversionRate || 0}%</strong></p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="card p-5">
+                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Embudo de conversion</h2>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="rounded-xl border border-gray-100 p-3">
+                            <p className="text-gray-500">Busquedas</p>
+                            <p className="text-xl font-semibold text-gray-900">{metrics?.funnel.searchQueries ?? 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-gray-100 p-3">
+                            <p className="text-gray-500">Contactos</p>
+                            <p className="text-xl font-semibold text-gray-900">{metrics?.funnel.contactClicks ?? 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-gray-100 p-3">
+                            <p className="text-gray-500">WhatsApp</p>
+                            <p className="text-xl font-semibold text-gray-900">{metrics?.funnel.whatsappClicks ?? 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-gray-100 p-3">
+                            <p className="text-gray-500">Intentos reserva</p>
+                            <p className="text-xl font-semibold text-gray-900">{metrics?.funnel.bookingIntents ?? 0}</p>
+                        </div>
+                    </div>
+                    <div className="mt-4 text-sm text-gray-600 space-y-1">
+                        <p>Busqueda a contacto: <strong>{metrics?.funnel.searchToContactRate ?? 0}%</strong></p>
+                        <p>Contacto a WhatsApp: <strong>{metrics?.funnel.contactToWhatsappRate ?? 0}%</strong></p>
+                        <p>WhatsApp a intento: <strong>{metrics?.funnel.whatsappToBookingRate ?? 0}%</strong></p>
+                        <p>Intento a reserva: <strong>{metrics?.funnel.bookingIntentToBookingRate ?? 0}%</strong></p>
+                    </div>
+                </div>
+                <div className="card p-5">
+                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">ROI del periodo</h2>
+                    <div className="space-y-2 text-sm text-gray-600">
+                        <p>Ingresos: <strong className="text-gray-900">{formatCurrency(metrics?.roi.periodRevenue ?? 0)}</strong></p>
+                        <p>Fees plataforma: <strong className="text-gray-900">{formatCurrency(metrics?.roi.transactionFees ?? 0)}</strong></p>
+                        <p>Gasto en ads: <strong className="text-gray-900">{formatCurrency(metrics?.roi.adSpend ?? 0)}</strong></p>
+                        <p>Suscripcion prorrateada: <strong className="text-gray-900">{formatCurrency(metrics?.roi.subscriptionCost ?? 0)}</strong></p>
+                        <p>Costos totales: <strong className="text-gray-900">{formatCurrency(metrics?.roi.totalCosts ?? 0)}</strong></p>
+                        <p>Neto: <strong className={(metrics?.roi.netRevenue ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}>{formatCurrency(metrics?.roi.netRevenue ?? 0)}</strong></p>
+                        <p>ROI: <strong className={(metrics?.roi.roiPercent ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}>{metrics?.roi.roiPercent ?? 0}%</strong></p>
+                    </div>
                 </div>
             </div>
 

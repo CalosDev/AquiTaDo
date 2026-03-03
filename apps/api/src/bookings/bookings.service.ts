@@ -3,10 +3,12 @@ import {
     ForbiddenException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import {
     BookingStatus,
+    GrowthEventType,
     OrganizationRole,
     Prisma,
     Promotion,
@@ -24,6 +26,8 @@ import {
 
 @Injectable()
 export class BookingsService {
+    private readonly logger = new Logger(BookingsService.name);
+
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
@@ -150,6 +154,28 @@ export class BookingsService {
                     scheduledFor: scheduledForDate.toISOString(),
                 },
                 reminderAt,
+            );
+        }
+
+        try {
+            await this.prisma.growthEvent.create({
+                data: {
+                    eventType: GrowthEventType.BOOKING_INTENT,
+                    businessId: booking.businessId,
+                    organizationId: booking.organizationId,
+                    userId: userId,
+                    metadata: {
+                        bookingId: booking.id,
+                        source: 'bookings.create',
+                        promotionId: booking.promotion?.id ?? null,
+                    } as Prisma.InputJsonValue,
+                },
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to persist growth event BOOKING_INTENT for booking ${booking.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
             );
         }
 

@@ -192,7 +192,11 @@ export function BusinessesList() {
             return;
         }
 
-        if (categories.length === 0 || provinces.length === 0) {
+        if (categorySlug && categories.length === 0) {
+            return;
+        }
+
+        if (provinceSlug && provinces.length === 0) {
             return;
         }
 
@@ -340,6 +344,30 @@ export function BusinessesList() {
         value: string,
         options: { resetPage?: boolean } = {},
     ) => {
+        const isSeoRoutePinnedFilter =
+            (key === 'categoryId' && Boolean(categorySlug))
+            || (key === 'provinceId' && Boolean(provinceSlug))
+            || (key === 'feature' && Boolean(intentSlug));
+
+        if (isSeoRoutePinnedFilter) {
+            const params = new URLSearchParams(searchParams);
+            if (value) {
+                params.set(key, value);
+            } else {
+                params.delete(key);
+            }
+
+            if (options.resetPage ?? true) {
+                params.set('page', '1');
+            }
+
+            navigate({
+                pathname: '/businesses',
+                search: params.toString() ? `?${params.toString()}` : '',
+            });
+            return;
+        }
+
         setSearchParams((prev) => {
             const params = new URLSearchParams(prev);
             if (value) {
@@ -354,7 +382,7 @@ export function BusinessesList() {
 
             return params;
         });
-    }, [setSearchParams]);
+    }, [setSearchParams, categorySlug, provinceSlug, intentSlug, searchParams, navigate]);
 
     const handleToggleFavorite = async (event: React.MouseEvent<HTMLButtonElement>, businessId: string) => {
         event.preventDefault();

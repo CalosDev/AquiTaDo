@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { OrganizationRole, Prisma, SalesLeadStage } from '../generated/prisma/client';
+import { GrowthEventType, OrganizationRole, Prisma, SalesLeadStage } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
     CreateBusinessDto,
@@ -205,6 +205,28 @@ export class BusinessesService {
                 createdAt: true,
             },
         });
+
+        try {
+            await this.prisma.growthEvent.create({
+                data: {
+                    eventType: GrowthEventType.CONTACT_CLICK,
+                    businessId: business.id,
+                    organizationId: business.organizationId,
+                    metadata: {
+                        source: 'public-business-page',
+                        leadId: createdLead.id,
+                        preferredChannel,
+                        businessSlug: business.slug,
+                    } as Prisma.InputJsonValue,
+                },
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to persist growth event CONTACT_CLICK for business ${business.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
 
         try {
             await this.notificationsQueueService.enqueuePublicLeadAlert({

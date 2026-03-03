@@ -1,78 +1,96 @@
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/useAuth';
 import { getRoleCapabilities } from '../auth/capabilities';
+import { useAuth } from '../context/useAuth';
 
 export function Footer() {
     const { isAuthenticated, user } = useAuth();
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
+
     const registerBusinessPath = !isAuthenticated
         ? '/register'
         : roleCapabilities.canAccessAdminPanel
             ? '/admin'
-        : canRegisterBusiness
-            ? '/register-business'
-            : '/businesses';
+            : canRegisterBusiness
+                ? '/register-business'
+                : '/businesses';
+
     const registerBusinessLabel = !isAuthenticated
-        ? 'Crear Cuenta'
+        ? 'Crear cuenta'
         : roleCapabilities.canAccessAdminPanel
-            ? 'Panel Admin'
-        : canRegisterBusiness
-            ? 'Registrar Negocio'
-            : 'Explorar Negocios';
+            ? 'Panel admin'
+            : canRegisterBusiness
+                ? 'Registrar negocio'
+                : 'Explorar negocios';
 
     return (
-        <footer className="bg-primary-900 text-slate-200 border-t border-primary-800">
+        <footer className="mt-16 border-t border-primary-100 bg-primary-900 text-slate-200">
             <div className="flag-ribbon" aria-hidden="true"></div>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    {/* Brand */}
-                    <div className="col-span-1 md:col-span-2">
-                        <Link to="/" className="flex items-center gap-2 mb-4 hover-lift">
-                            <div className="w-9 h-9 rounded-xl gradient-hero flex items-center justify-center text-white font-bold text-lg">
-                                A
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                    <div className="lg:col-span-5">
+                        <Link to="/" className="inline-flex items-center gap-3">
+                            <div className="relative h-11 w-11 overflow-hidden rounded-2xl border border-primary-300/60 bg-white">
+                                <div className="absolute inset-y-0 left-0 w-1/2 bg-primary-700"></div>
+                                <div className="absolute inset-y-0 right-0 w-1/2 bg-accent-600"></div>
+                                <span className="absolute inset-0 flex items-center justify-center font-display text-lg font-bold text-white">A</span>
                             </div>
-                            <span className="font-display font-bold text-xl text-white">
-                                Aqui<span className="text-accent-400">Ta</span>.do
-                            </span>
+                            <div>
+                                <p className="font-display text-2xl font-bold text-white">
+                                    Aqui<span className="text-accent-400">Ta</span>.do
+                                </p>
+                                <p className="text-xs uppercase tracking-wide text-primary-200">
+                                    SuperApp local para Republica Dominicana
+                                </p>
+                            </div>
                         </Link>
-                        <p className="text-slate-300 text-sm leading-relaxed max-w-md">
-                            El directorio inteligente de negocios locales en Republica Dominicana.
-                            Descubre restaurantes, tiendas, hoteles y mas cerca de ti.
+                        <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">
+                            Descubre negocios confiables, reserva servicios y conecta por WhatsApp
+                            en una sola plataforma pensada para el mercado dominicano.
                         </p>
-                        <div className="flex gap-2 mt-4">
-                            <span className="inline-block w-8 h-5 rounded-sm" style={{ background: '#CE1126' }}></span>
-                            <span className="inline-block w-8 h-5 rounded-sm" style={{ background: '#002D62' }}></span>
-                            <span className="inline-block w-8 h-5 rounded-sm border border-gray-600" style={{ background: '#FFFFFF' }}></span>
+                        <div className="mt-5 flex flex-wrap gap-2">
+                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Discovery</span>
+                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">SaaS</span>
+                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Marketplace</span>
                         </div>
                     </div>
 
-                    {/* Links */}
-                    <div>
-                        <h4 className="font-display font-semibold text-white mb-4">Explora</h4>
-                        <ul className="space-y-2 text-sm text-slate-300">
-                            <li><Link to="/businesses" className="hover:text-accent-300 transition-colors">Negocios</Link></li>
-                            <li><Link to={registerBusinessPath} className="hover:text-accent-300 transition-colors">{registerBusinessLabel}</Link></li>
-                            <li><Link to="/register" className="hover:text-accent-300 transition-colors">Crear Cuenta</Link></li>
+                    <div className="lg:col-span-2">
+                        <h4 className="font-display text-base font-semibold text-white">Explorar</h4>
+                        <ul className="mt-3 space-y-2 text-sm text-slate-300">
+                            <li><Link to="/businesses" className="hover:text-white transition-colors">Negocios</Link></li>
+                            <li><Link to="/negocios/intencion/con-delivery" className="hover:text-white transition-colors">Con delivery</Link></li>
+                            <li><Link to="/negocios/intencion/pet-friendly" className="hover:text-white transition-colors">Pet friendly</Link></li>
+                            <li><Link to="/negocios/intencion/con-reservas" className="hover:text-white transition-colors">Con reservas</Link></li>
                         </ul>
                     </div>
 
-                    {/* Contact */}
-                    <div>
-                        <h4 className="font-display font-semibold text-white mb-4">Contacto</h4>
-                        <ul className="space-y-2 text-sm text-slate-300">
-                            <li>Email: info@aquita.do</li>
-                            <li>Telefono: +1 (809) 555-0000</li>
-                            <li>Ubicacion: Santo Domingo, RD</li>
+                    <div className="lg:col-span-2">
+                        <h4 className="font-display text-base font-semibold text-white">Negocios</h4>
+                        <ul className="mt-3 space-y-2 text-sm text-slate-300">
+                            <li><Link to={registerBusinessPath} className="hover:text-white transition-colors">{registerBusinessLabel}</Link></li>
+                            <li><Link to="/dashboard" className="hover:text-white transition-colors">Panel negocio</Link></li>
+                            <li><Link to="/organization" className="hover:text-white transition-colors">Organizacion</Link></li>
+                            <li><Link to="/admin" className="hover:text-white transition-colors">Moderacion</Link></li>
                         </ul>
+                    </div>
+
+                    <div className="lg:col-span-3">
+                        <h4 className="font-display text-base font-semibold text-white">Contacto</h4>
+                        <ul className="mt-3 space-y-2 text-sm text-slate-300">
+                            <li>info@aquita.do</li>
+                            <li>+1 (809) 555-0000</li>
+                            <li>Santo Domingo, RD</li>
+                        </ul>
+                        <p className="mt-4 text-xs leading-relaxed text-slate-400">
+                            Disponible para expansion regional en Latinoamerica.
+                        </p>
                     </div>
                 </div>
 
-                <div className="border-t border-primary-800/80 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <p className="text-sm text-slate-400">
-                        (c) {new Date().getFullYear()} AquiTa.do - Hecho en Republica Dominicana
-                    </p>
-                    <div className="flex gap-4 text-sm text-slate-400">
+                <div className="mt-10 flex flex-col gap-3 border-t border-primary-800/70 pt-6 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                    <p>(c) {new Date().getFullYear()} AquiTa.do. Todos los derechos reservados.</p>
+                    <div className="flex items-center gap-4">
                         <Link to="/terms" className="hover:text-white transition-colors">Terminos</Link>
                         <Link to="/privacy" className="hover:text-white transition-colors">Privacidad</Link>
                     </div>

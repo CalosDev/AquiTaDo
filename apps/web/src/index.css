@@ -1,7 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
 @layer base {
+  :root {
+    --rd-blue: #002d62;
+    --rd-red: #ce1126;
+    --rd-white: #ffffff;
+    --surface-0: #f5f8ff;
+    --surface-1: #ffffff;
+    --ink-900: #0f172a;
+    --ink-700: #334155;
+  }
+
   * {
     margin: 0;
     padding: 0;
@@ -9,15 +20,19 @@
   }
 
   body {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Manrope', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
-    color: #1e293b;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(0, 45, 98, 0.10), transparent 38%),
+      radial-gradient(circle at 85% 10%, rgba(206, 17, 38, 0.10), transparent 36%),
+      linear-gradient(180deg, #f8fbff 0%, #f2f7ff 48%, #ffffff 100%);
+    color: var(--ink-900);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Sora', sans-serif;
+    letter-spacing: -0.02em;
   }
 
   :where(a, button, input, select, textarea):focus-visible {
@@ -36,8 +51,32 @@
 }
 
 @layer components {
+  .section-shell {
+    @apply rounded-3xl border border-primary-100 bg-white/90 backdrop-blur-sm shadow-sm;
+  }
+
+  .surface-panel {
+    @apply rounded-2xl border border-primary-100/70 bg-white shadow-sm;
+  }
+
+  .section-title {
+    @apply font-display text-3xl md:text-4xl font-bold text-slate-900 tracking-tight;
+  }
+
+  .section-subtitle {
+    @apply text-slate-600 text-base md:text-lg;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700;
+  }
+
+  .chip-danger {
+    @apply inline-flex items-center gap-2 rounded-full border border-accent-200 bg-accent-50 px-3 py-1.5 text-xs font-semibold text-accent-700;
+  }
+
   .nav-link {
-    @apply relative text-gray-600 hover:text-primary-700 font-medium transition-colors;
+    @apply relative text-slate-600 hover:text-primary-700 font-semibold transition-colors;
   }
 
   .nav-link::after {
@@ -69,33 +108,34 @@
   }
 
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-primary-700/25 hover:shadow-xl hover:shadow-primary-700/35 hover:-translate-y-0.5 active:translate-y-0;
+    @apply bg-primary-700 hover:bg-primary-800 text-white font-semibold py-2.5 px-6 rounded-2xl transition-all duration-200 shadow-lg shadow-primary-700/25 hover:shadow-xl hover:shadow-primary-800/35 hover:-translate-y-0.5 active:translate-y-0;
   }
 
   .btn-secondary {
-    @apply bg-white hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-6 rounded-xl border border-gray-200 transition-all duration-200 hover:shadow-md;
+    @apply bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2.5 px-6 rounded-2xl border border-slate-200 transition-all duration-200 hover:shadow-md;
   }
 
   .btn-accent {
-    @apply bg-accent-600 hover:bg-accent-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-accent-600/25 hover:shadow-xl hover:shadow-accent-700/30;
+    @apply bg-accent-600 hover:bg-accent-700 text-white font-semibold py-2.5 px-6 rounded-2xl transition-all duration-200 shadow-lg shadow-accent-600/25 hover:shadow-xl hover:shadow-accent-700/30;
   }
 
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary-100 hover:-translate-y-0.5;
+    @apply bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary-200 hover:-translate-y-0.5;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all duration-200 bg-white;
+    @apply w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all duration-200 bg-white;
   }
 
   .glass {
-    @apply bg-white/80 backdrop-blur-lg border border-white/20;
+    @apply bg-white/80 backdrop-blur-lg border border-white/40;
   }
 
   .gradient-hero {
     background:
-      radial-gradient(circle at 85% 12%, rgba(206, 17, 38, 0.26) 0%, rgba(206, 17, 38, 0) 42%),
-      linear-gradient(135deg, #002d62 0%, #0f4fa8 55%, #2c6fd6 100%);
+      radial-gradient(circle at 88% 12%, rgba(206, 17, 38, 0.34) 0%, rgba(206, 17, 38, 0) 44%),
+      radial-gradient(circle at 18% 80%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 40%),
+      linear-gradient(135deg, #001f45 0%, #003c81 46%, #0f5ec6 100%);
   }
 
   .gradient-accent {
@@ -104,6 +144,10 @@
 
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-700 to-accent-600;
+  }
+
+  .hero-glass-card {
+    @apply rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md shadow-2xl shadow-black/20;
   }
 
   .flag-ribbon {
