@@ -15,12 +15,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ReputationService } from '../reputation/reputation.service';
 import { NotificationsQueueService } from '../notifications/notifications.queue.service';
+import { UploadsService } from '../uploads/uploads.service';
 import {
     ListVerificationDocumentsQueryDto,
     ReviewBusinessVerificationDto,
     ReviewVerificationDocumentDto,
     SubmitBusinessVerificationDto,
     SubmitVerificationDocumentDto,
+    UploadVerificationDocumentDto,
 } from './dto/verification.dto';
 
 type PrismaClientLike = PrismaService | Prisma.TransactionClient;
@@ -36,7 +38,26 @@ export class VerificationService {
         private readonly reputationService: ReputationService,
         @Inject(NotificationsQueueService)
         private readonly notificationsQueueService: NotificationsQueueService,
+        @Inject(UploadsService)
+        private readonly uploadsService: UploadsService,
     ) { }
+
+    async uploadDocumentFile(
+        organizationId: string,
+        actorGlobalRole: string,
+        organizationRole: OrganizationRole | null,
+        file: Express.Multer.File,
+        dto: UploadVerificationDocumentDto,
+    ) {
+        this.assertCanSubmitDocuments(actorGlobalRole, organizationRole);
+        return this.uploadsService.uploadVerificationDocument(
+            file,
+            dto.businessId,
+            actorGlobalRole,
+            organizationId,
+            organizationRole,
+        );
+    }
 
     async submitDocument(
         organizationId: string,
@@ -555,12 +576,53 @@ export class VerificationService {
             throw new BadRequestException('La URL del documento es obligatoria');
         }
 
-        if (
-            !normalized.startsWith('http://') &&
-            !normalized.startsWith('https://') &&
-            !normalized.startsWith('/uploads/')
-        ) {
-            throw new BadRequestException('La URL del documento debe ser absoluta o del bucket interno');
+        if (normalized.startsWith('/uploads/verification/')) {
+            return;
+        }
+
+        if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+            throw new BadRequestException('La URL del documento debe provenir del storage de la plataforma');
+        }
+
+        let parsed: URL;
+        try {
+            parsed = new URL(normalized);
+        } catch {
+            throw new BadRequestException('La URL del documento no es válida');
+        }
+
+        if (!parsed.pathname.includes('/verification/')) {
+            throw new BadRequestException('La URL del documento debe pertenecer a verificación interna');
+        }
+
+        const configuredPublicBase = process.env.STORAGE_PUBLIC_BASE_URL?.trim().replace(/\/+$/, '');
+        if (configuredPublicBase) {
+            if (!normalized.startsWith(`${configuredPublicBase}/`)) {
+                throw new BadRequestException('La URL del documento no pertenece al bucket configurado');
+            }
+            return;
+        }
+
+        const bucket = process.env.STORAGE_S3_BUCKET?.trim();
+        const region = (process.env.STORAGE_S3_REGION || 'us-east-1').trim();
+        const endpoint = process.env.STORAGE_S3_ENDPOINT?.trim().replace(/\/+$/, '');
+        const forcePathStyle = ['1', 'true'].includes(
+            (process.env.STORAGE_S3_FORCE_PATH_STYLE || 'false').trim().toLowerCase(),
+        );
+
+        const allowedPrefixes: string[] = [];
+        if (endpoint) {
+            allowedPrefixes.push(forcePathStyle && bucket
+                ? `${endpoint}/${bucket}/`
+                : `${endpoint}/`);
+        }
+
+        if (bucket) {
+            allowedPrefixes.push(`https://${bucket}.s3.${region}.amazonaws.com/`);
+        }
+
+        if (!allowedPrefixes.some((prefix) => normalized.startsWith(prefix))) {
+            throw new BadRequestException('La URL del documento no pertenece al storage autorizado');
         }
     }
 }

@@ -29,6 +29,12 @@ export class UploadsService {
         'image/png': 'png',
         'image/webp': 'webp',
     };
+    private readonly allowedDocumentMimeTypes: Record<string, string> = {
+        'application/pdf': 'pdf',
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+    };
     private readonly uploadsRoot = path.resolve(process.cwd(), 'uploads');
 
     async uploadBusinessImage(
@@ -104,6 +110,58 @@ export class UploadsService {
         }
     }
 
+    async uploadVerificationDocument(
+        file: Express.Multer.File,
+        businessId: string,
+        userRole: string,
+        organizationId: string,
+        organizationRole: OrganizationRole | null,
+    ) {
+        const extension = this.allowedDocumentMimeTypes[file.mimetype];
+        if (!extension) {
+            throw new BadRequestException('Formato de documento no permitido');
+        }
+
+        const business = await this.prisma.business.findUnique({
+            where: { id: businessId },
+            select: {
+                id: true,
+                organizationId: true,
+                deletedAt: true,
+            },
+        });
+
+        if (!business || business.deletedAt) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        if (userRole !== 'ADMIN') {
+            if (!organizationRole) {
+                throw new ForbiddenException('No tienes permisos para subir documentos');
+            }
+
+            if (business.organizationId !== organizationId) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+        }
+
+        this.assertFileSafetyForDocument(file);
+
+        const storedAsset = await this.storeVerificationDocumentAsset(
+            file.buffer,
+            file.mimetype,
+            business.organizationId,
+            businessId,
+            extension,
+        );
+
+        return {
+            fileUrl: storedAsset.url,
+            mimeType: file.mimetype,
+            sizeBytes: file.size,
+        };
+    }
+
     async deleteBusinessImage(
         imageId: string,
         _userId: string,
@@ -159,27 +217,49 @@ export class UploadsService {
     ): Promise<StoredAsset> {
         const provider = this.resolveStorageProvider();
         if (provider === 's3') {
-            return this.uploadToS3(sourceBuffer, mimeType, businessId, extension);
+            return this.uploadToS3(sourceBuffer, mimeType, `businesses/${businessId}/${randomUUID()}.${extension}`);
         }
 
-        return this.storeLocalFile(sourceBuffer, businessId, extension);
+        return this.storeLocalFile(sourceBuffer, `businesses`, `${businessId}-${randomUUID()}.${extension}`);
+    }
+
+    private async storeVerificationDocumentAsset(
+        sourceBuffer: Buffer,
+        mimeType: string,
+        organizationId: string,
+        businessId: string,
+        extension: string,
+    ): Promise<StoredAsset> {
+        const provider = this.resolveStorageProvider();
+        const objectKey = `verification/${organizationId}/${businessId}/${randomUUID()}.${extension}`;
+
+        if (provider === 's3') {
+            return this.uploadToS3(sourceBuffer, mimeType, objectKey);
+        }
+
+        return this.storeLocalFile(
+            sourceBuffer,
+            `verification/${organizationId}/${businessId}`,
+            `${randomUUID()}.${extension}`,
+        );
     }
 
     private async storeLocalFile(
         sourceBuffer: Buffer,
-        businessId: string,
-        extension: string,
+        relativeDirectory: string,
+        fileName: string,
     ): Promise<StoredAsset> {
-        const uploadsDir = path.join(process.cwd(), 'uploads', 'businesses');
+        const uploadsDir = path.join(process.cwd(), 'uploads', ...relativeDirectory.split('/'));
         await fs.mkdir(uploadsDir, { recursive: true });
 
-        const fileName = `${businessId}-${randomUUID()}.${extension}`;
         const filePath = path.join(uploadsDir, fileName);
         await fs.writeFile(filePath, sourceBuffer);
-        void this.generateOptimizedVariants(sourceBuffer, filePath);
+        if (relativeDirectory.startsWith('businesses')) {
+            void this.generateOptimizedVariants(sourceBuffer, filePath);
+        }
 
         return {
-            url: `/uploads/businesses/${fileName}`,
+            url: `/uploads/${relativeDirectory}/${fileName}`,
             localPath: filePath,
         };
     }
@@ -187,12 +267,10 @@ export class UploadsService {
     private async uploadToS3(
         sourceBuffer: Buffer,
         mimeType: string,
-        businessId: string,
-        extension: string,
+        objectKey: string,
     ): Promise<StoredAsset> {
         const s3Client = this.resolveS3Client();
         const bucket = this.resolveS3Bucket();
-        const objectKey = `businesses/${businessId}/${randomUUID()}.${extension}`;
 
         await s3Client.send(new PutObjectCommand({
             Bucket: bucket,
@@ -319,6 +397,26 @@ export class UploadsService {
 
         const region = (process.env.STORAGE_S3_REGION || 'us-east-1').trim();
         return `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+    }
+
+    private assertFileSafetyForDocument(file: Express.Multer.File): void {
+        if (!file.buffer || file.buffer.length === 0) {
+            throw new BadRequestException('Documento vacío');
+        }
+
+        const mode = (process.env.UPLOAD_AV_SCAN_MODE || 'off').trim().toLowerCase();
+        if (mode === 'off') {
+            return;
+        }
+
+        // Basic executable signatures to avoid accidental binary uploads.
+        const signatureHex = file.buffer.subarray(0, 4).toString('hex').toLowerCase();
+        const blockedSignatures = new Set(['4d5a', '7f454c46', 'cafebabe', 'feedface', 'feedfacf']);
+        for (const blocked of blockedSignatures) {
+            if (signatureHex.startsWith(blocked)) {
+                throw new BadRequestException('Archivo rechazado por validación de seguridad');
+            }
+        }
     }
 
     private resolveObjectKeyFromUrl(assetUrl: string): string | null {

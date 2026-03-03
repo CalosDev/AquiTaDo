@@ -34,6 +34,7 @@ export class SearchService implements OnModuleInit {
     private readonly logger = new Logger(SearchService.name);
     private meiliClient: MeiliSearch | null = null;
     private meiliIndexUid = 'businesses';
+    private readonly meiliHost: string | null;
 
     constructor(
         @Inject(PrismaService)
@@ -44,11 +45,12 @@ export class SearchService implements OnModuleInit {
         private readonly redisService: RedisService,
         @Inject(AnalyticsService)
         private readonly analyticsService: AnalyticsService,
-    ) { }
+    ) {
+        this.meiliHost = this.configService.get<string>('MEILISEARCH_HOST')?.trim() ?? null;
+    }
 
     async onModuleInit() {
-        const meiliHost = this.configService.get<string>('MEILISEARCH_HOST')?.trim();
-        if (!meiliHost) {
+        if (!this.meiliHost) {
             this.logger.log('Meilisearch disabled: MEILISEARCH_HOST not configured');
             return;
         }
@@ -57,7 +59,7 @@ export class SearchService implements OnModuleInit {
             this.configService.get<string>('MEILISEARCH_INDEX_BUSINESSES')?.trim() || 'businesses';
 
         this.meiliClient = new MeiliSearch({
-            host: meiliHost,
+            host: this.meiliHost,
             apiKey: this.configService.get<string>('MEILISEARCH_API_KEY')?.trim() || undefined,
         });
 
@@ -69,6 +71,30 @@ export class SearchService implements OnModuleInit {
                 `Meilisearch setup failed; falling back to database search (${error instanceof Error ? error.message : String(error)})`,
             );
             this.meiliClient = null;
+        }
+    }
+
+    isConfigured(): boolean {
+        return Boolean(this.meiliHost);
+    }
+
+    async ping(): Promise<boolean | null> {
+        if (!this.meiliHost) {
+            return null;
+        }
+
+        if (!this.meiliClient) {
+            return false;
+        }
+
+        try {
+            await this.meiliClient.health();
+            return true;
+        } catch (error) {
+            this.logger.warn(
+                `Meilisearch ping failed (${error instanceof Error ? error.message : String(error)})`,
+            );
+            return false;
         }
     }
 
@@ -135,7 +161,10 @@ export class SearchService implements OnModuleInit {
 
         const limit = query.limit ?? 5000;
         const businesses = await this.prisma.business.findMany({
-            where: { verified: true },
+            where: {
+                verified: true,
+                deletedAt: null,
+            },
             include: this.searchInclude,
             orderBy: { updatedAt: 'desc' },
             take: limit,
@@ -164,7 +193,7 @@ export class SearchService implements OnModuleInit {
         });
 
         const index = this.meiliClient.index(this.meiliIndexUid);
-        if (!business || !business.verified) {
+        if (!business || business.deletedAt || !business.verified) {
             await index.deleteDocument(businessId);
             await this.invalidateSearchCache();
             return;
@@ -262,6 +291,7 @@ export class SearchService implements OnModuleInit {
         const skip = (query.page - 1) * query.limit;
         const where: Prisma.BusinessWhereInput = {
             verified: true,
+            deletedAt: null,
         };
 
         if (query.categoryId) {

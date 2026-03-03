@@ -2,6 +2,8 @@ import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ObservabilityService } from '../observability/observability.service';
+import { RedisService } from '../cache/redis.service';
+import { SearchService } from '../search/search.service';
 
 type HealthPayload = {
     service: 'aquita-api';
@@ -11,6 +13,8 @@ type HealthPayload = {
     checks?: {
         database: 'up';
         schema?: 'up';
+        redis?: 'up' | 'down' | 'disabled';
+        search?: 'up' | 'down' | 'disabled';
     };
     responseTimeMs?: number;
 };
@@ -24,6 +28,10 @@ export class HealthService {
         private readonly observabilityService: ObservabilityService,
         @Inject(ConfigService)
         private readonly configService: ConfigService,
+        @Inject(RedisService)
+        private readonly redisService: RedisService,
+        @Inject(SearchService)
+        private readonly searchService: SearchService,
     ) { }
 
     getLiveness(): HealthPayload {
@@ -62,6 +70,26 @@ export class HealthService {
                     },
                 });
             }
+            const [redisState, searchState] = await Promise.all([
+                this.redisService.ping(),
+                this.searchService.ping(),
+            ]);
+            const redis = redisState === null ? 'disabled' : redisState ? 'up' : 'down';
+            const search = searchState === null ? 'disabled' : searchState ? 'up' : 'down';
+
+            if (redis === 'down' || search === 'down') {
+                throw new ServiceUnavailableException({
+                    service: 'aquita-api',
+                    status: 'error',
+                    timestamp: new Date().toISOString(),
+                    checks: {
+                        database: 'up',
+                        schema: 'up',
+                        redis,
+                        search,
+                    },
+                });
+            }
 
             return {
                 service: 'aquita-api',
@@ -71,6 +99,8 @@ export class HealthService {
                 checks: {
                     database: 'up',
                     schema: 'up',
+                    redis,
+                    search,
                 },
                 responseTimeMs: Date.now() - startedAt,
             };

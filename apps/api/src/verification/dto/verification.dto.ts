@@ -29,6 +29,11 @@ export class SubmitVerificationDocumentDto {
     fileUrl!: string;
 }
 
+export class UploadVerificationDocumentDto {
+    @IsUUID()
+    businessId!: string;
+}
+
 export class ListVerificationDocumentsQueryDto {
     @IsOptional()
     @IsUUID()

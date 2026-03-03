@@ -202,7 +202,10 @@ export class BusinessesService {
 
     async findMine(_userId: string, _userRole: string, organizationId: string) {
         return this.prisma.business.findMany({
-            where: { organizationId },
+            where: {
+                organizationId,
+                deletedAt: null,
+            },
             select: this.mineListSelect,
             orderBy: { createdAt: 'desc' },
         });
@@ -692,8 +695,11 @@ export class BusinessesService {
     }
 
     private findBusinessByIdWithReviews(id: string) {
-        return this.prisma.business.findUnique({
-            where: { id },
+        return this.prisma.business.findFirst({
+            where: {
+                id,
+                deletedAt: null,
+            },
             include: {
                 ...this.fullInclude,
                 reviews: {
@@ -712,8 +718,11 @@ export class BusinessesService {
     }
 
     private findBusinessBySlugWithReviews(slug: string) {
-        return this.prisma.business.findUnique({
-            where: { slug },
+        return this.prisma.business.findFirst({
+            where: {
+                slug,
+                deletedAt: null,
+            },
             include: {
                 ...this.fullInclude,
                 reviews: {
@@ -736,6 +745,7 @@ export class BusinessesService {
             where: {
                 id,
                 verified: true,
+                deletedAt: null,
             },
             include: {
                 ...this.fullInclude,
@@ -759,6 +769,7 @@ export class BusinessesService {
             where: {
                 slug,
                 verified: true,
+                deletedAt: null,
             },
             include: {
                 ...this.fullInclude,
@@ -943,7 +954,10 @@ export class BusinessesService {
         }
 
         const businessCount = await tx.business.count({
-            where: { organizationId },
+            where: {
+                organizationId,
+                deletedAt: null,
+            },
         });
 
         if (businessCount >= limits.maxBusinesses) {
@@ -954,7 +968,9 @@ export class BusinessesService {
     }
 
     private buildWhere(query: BusinessQueryDto, includeUnverified: boolean): Record<string, unknown> {
-        const where: Record<string, unknown> = {};
+        const where: Record<string, unknown> = {
+            deletedAt: null,
+        };
 
         if (!includeUnverified) {
             where.verified = true;

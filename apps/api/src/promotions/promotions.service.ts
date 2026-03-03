@@ -68,6 +68,7 @@ export class PromotionsService {
             const now = new Date();
 
             const where: Prisma.PromotionWhereInput = {
+                deletedAt: null,
                 isActive: true,
                 startsAt: { lte: now },
                 endsAt: { gte: now },
@@ -122,7 +123,10 @@ export class PromotionsService {
         const skip = (page - 1) * limit;
         const now = new Date();
 
-        const where: Prisma.PromotionWhereInput = { organizationId };
+        const where: Prisma.PromotionWhereInput = {
+            organizationId,
+            deletedAt: null,
+        };
         const andFilters: Prisma.PromotionWhereInput[] = [];
 
         if (query.businessId) {
@@ -269,6 +273,7 @@ export class PromotionsService {
             select: {
                 id: true,
                 organizationId: true,
+                deletedAt: true,
                 businessId: true,
                 title: true,
                 discountType: true,
@@ -279,6 +284,10 @@ export class PromotionsService {
         });
 
         if (!existingPromotion) {
+            throw new NotFoundException('Promoción no encontrada');
+        }
+
+        if (existingPromotion.deletedAt) {
             throw new NotFoundException('Promoción no encontrada');
         }
 
@@ -349,10 +358,15 @@ export class PromotionsService {
             select: {
                 id: true,
                 organizationId: true,
+                deletedAt: true,
             },
         });
 
         if (!promotion) {
+            throw new NotFoundException('Promoción no encontrada');
+        }
+
+        if (promotion.deletedAt) {
             throw new NotFoundException('Promoción no encontrada');
         }
 
@@ -438,6 +452,7 @@ export class PromotionsService {
         const activeCount = await tx.promotion.count({
             where: {
                 organizationId,
+                deletedAt: null,
                 isActive: true,
                 endsAt: {
                     gte: new Date(),
@@ -497,10 +512,11 @@ export class PromotionsService {
             select: {
                 id: true,
                 organizationId: true,
+                deletedAt: true,
             },
         });
 
-        if (!business || business.organizationId !== organizationId) {
+        if (!business || business.deletedAt || business.organizationId !== organizationId) {
             throw new BadRequestException('El negocio no pertenece a la organización activa');
         }
     }

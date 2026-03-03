@@ -3,13 +3,19 @@ import {
     Controller,
     Get,
     Inject,
+    MaxFileSizeValidator,
     Param,
+    ParseFilePipe,
     ParseUUIDPipe,
     Patch,
     Post,
     Query,
+    UploadedFile,
     UseGuards,
+    UseInterceptors,
+    FileTypeValidator,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,6 +28,7 @@ import {
     ReviewVerificationDocumentDto,
     SubmitBusinessVerificationDto,
     SubmitVerificationDocumentDto,
+    UploadVerificationDocumentDto,
 } from './dto/verification.dto';
 import { VerificationService } from './verification.service';
 
@@ -44,6 +51,33 @@ export class VerificationController {
             organizationId,
             actorGlobalRole,
             organizationRole,
+            dto,
+        );
+    }
+
+    @Post('documents/upload')
+    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    @UseInterceptors(FileInterceptor('file'))
+    async uploadDocument(
+        @CurrentOrganization('organizationId') organizationId: string,
+        @CurrentOrganization('organizationRole') organizationRole: 'OWNER' | 'MANAGER' | 'STAFF' | null,
+        @CurrentUser('role') actorGlobalRole: string,
+        @UploadedFile(
+            new ParseFilePipe({
+                validators: [
+                    new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
+                    new FileTypeValidator({ fileType: /^(application\/pdf|image\/(jpeg|png|webp))$/i }),
+                ],
+            }),
+        )
+        file: Express.Multer.File,
+        @Body() dto: UploadVerificationDocumentDto,
+    ) {
+        return this.verificationService.uploadDocumentFile(
+            organizationId,
+            actorGlobalRole,
+            organizationRole,
+            file,
             dto,
         );
     }
