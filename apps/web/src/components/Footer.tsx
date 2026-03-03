@@ -3,14 +3,18 @@ import { useAuth } from '../context/useAuth';
 
 export function Footer() {
     const { isAuthenticated, user } = useAuth();
-    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER';
     const registerBusinessPath = !isAuthenticated
         ? '/register'
+        : user?.role === 'ADMIN'
+            ? '/admin'
         : canRegisterBusiness
             ? '/register-business'
             : '/businesses';
     const registerBusinessLabel = !isAuthenticated
         ? 'Crear Cuenta'
+        : user?.role === 'ADMIN'
+            ? 'Panel Admin'
         : canRegisterBusiness
             ? 'Registrar Negocio'
             : 'Explorar Negocios';

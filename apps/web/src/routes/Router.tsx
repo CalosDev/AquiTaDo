@@ -69,7 +69,7 @@ export function AppRouter() {
                     <Route
                         path="/organization"
                         element={
-                            <ProtectedRoute roles={['BUSINESS_OWNER', 'ADMIN']}>
+                            <ProtectedRoute roles={['BUSINESS_OWNER']}>
                                 <OrganizationSettings />
                             </ProtectedRoute>
                         }
@@ -93,7 +93,7 @@ export function AppRouter() {
                     <Route
                         path="/register-business"
                         element={
-                            <ProtectedRoute roles={['BUSINESS_OWNER', 'ADMIN']}>
+                            <ProtectedRoute roles={['BUSINESS_OWNER']}>
                                 <RegisterBusiness />
                             </ProtectedRoute>
                         }
@@ -101,7 +101,7 @@ export function AppRouter() {
                     <Route
                         path="/dashboard"
                         element={
-                            <ProtectedRoute roles={['BUSINESS_OWNER', 'ADMIN']}>
+                            <ProtectedRoute roles={['BUSINESS_OWNER']}>
                                 <DashboardBusiness />
                             </ProtectedRoute>
                         }

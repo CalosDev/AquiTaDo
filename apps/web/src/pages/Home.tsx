@@ -93,14 +93,18 @@ export function Home() {
         }).catch(() => undefined);
     };
 
-    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER';
     const registerBusinessPath = !isAuthenticated
         ? '/register'
-        : canRegisterBusiness
+        : user?.role === 'ADMIN'
+            ? '/admin'
+            : canRegisterBusiness
             ? '/register-business'
             : '/businesses';
     const registerBusinessLabel = !isAuthenticated
         ? 'Crear Cuenta y Registrar Negocio'
+        : user?.role === 'ADMIN'
+            ? 'Ir al Panel Admin'
         : canRegisterBusiness
             ? 'Registrar mi Negocio Gratis'
             : 'Explorar Negocios';

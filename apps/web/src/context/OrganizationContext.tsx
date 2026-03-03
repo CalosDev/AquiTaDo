@@ -59,7 +59,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const refreshOrganizations = useCallback(async (preferredOrganizationId?: string | null) => {
-        const canUseOrganizations = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+        const canUseOrganizations = user?.role === 'BUSINESS_OWNER';
         if (!isAuthenticated || !canUseOrganizations) {
             clearOrganizationState();
             setLoading(false);
@@ -96,7 +96,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        const canUseOrganizations = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+        const canUseOrganizations = user?.role === 'BUSINESS_OWNER';
         if (!isAuthenticated || !canUseOrganizations) {
             clearOrganizationState();
             setLoading(false);

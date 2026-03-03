@@ -11,8 +11,8 @@ export function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const roleHomePath = resolveRoleHomePath(user?.role);
     const roleHomeLabel = resolveRoleHomeLabel(user?.role);
-    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
-    const canAccessOrganization = canRegisterBusiness;
+    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER';
+    const canAccessOrganization = user?.role === 'BUSINESS_OWNER';
 
     const handleLogout = () => {
         void logout().finally(() => {
