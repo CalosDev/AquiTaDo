@@ -498,15 +498,71 @@ export class BusinessesService {
             }
         }
 
-        await this.deleteBusinessImageFiles(business.images.map((image) => image.url));
+        const imageUrls = business.images.map((image) => image.url);
+        const now = new Date();
 
         try {
-            await this.prisma.business.delete({ where: { id } });
+            await this.prisma.$transaction(async (tx) => {
+                await tx.businessImage.deleteMany({
+                    where: { businessId: id },
+                });
+
+                await tx.promotion.updateMany({
+                    where: {
+                        businessId: id,
+                        deletedAt: null,
+                    },
+                    data: {
+                        deletedAt: now,
+                        isActive: false,
+                    },
+                });
+
+                await tx.booking.updateMany({
+                    where: {
+                        businessId: id,
+                        deletedAt: null,
+                    },
+                    data: {
+                        deletedAt: now,
+                    },
+                });
+
+                await tx.conversation.updateMany({
+                    where: {
+                        businessId: id,
+                        deletedAt: null,
+                    },
+                    data: {
+                        deletedAt: now,
+                    },
+                });
+
+                await tx.business.update({
+                    where: { id },
+                    data: {
+                        deletedAt: now,
+                        verified: false,
+                        verificationStatus: 'SUSPENDED',
+                    },
+                });
+
+                await this.syncBusinessLocation(tx, id, undefined, undefined);
+            });
             this.publishBusinessChangedEvent(id, business.slug, 'deleted');
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
         }
+
+        try {
+            await this.deleteBusinessImageFiles(imageUrls);
+        } catch (error) {
+            this.logger.warn(
+                `Could not remove business image files for "${id}" (${error instanceof Error ? error.message : String(error)})`,
+            );
+        }
+
         return { message: 'Negocio eliminado exitosamente' };
     }
 

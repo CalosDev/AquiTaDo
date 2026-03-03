@@ -17,8 +17,8 @@ export function Login() {
             await login(formData.email, formData.password);
             navigate('/app');
         } catch (err: unknown) {
-            const error = err as { response?: { data?: { message?: string } } };
-            setError(error.response?.data?.message || 'Error al iniciar sesión');
+            const requestError = err as { response?: { data?: { message?: string } } };
+            setError(requestError.response?.data?.message || 'Error al iniciar sesion');
         } finally {
             setLoading(false);
         }
@@ -33,7 +33,7 @@ export function Login() {
                             A
                         </div>
                         <h1 className="font-display text-2xl font-bold text-gray-900">Bienvenido de vuelta</h1>
-                        <p className="text-gray-500 text-sm mt-1">Inicia sesión en tu cuenta</p>
+                        <p className="text-gray-500 text-sm mt-1">Inicia sesion en tu cuenta</p>
                     </div>
 
                     {error && (
@@ -44,8 +44,11 @@ export function Login() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">Correo electrónico</label>
+                            <label htmlFor="login-email" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Correo electronico
+                            </label>
                             <input
+                                id="login-email"
                                 type="email"
                                 required
                                 value={formData.email}
@@ -55,25 +58,28 @@ export function Login() {
                             />
                         </div>
                         <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">Contraseña</label>
+                            <label htmlFor="login-password" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Contrasena
+                            </label>
                             <input
+                                id="login-password"
                                 type="password"
                                 required
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 className="input-field"
-                                placeholder="••••••••"
+                                placeholder="********"
                             />
                         </div>
                         <button type="submit" disabled={loading} className="btn-primary w-full">
-                            {loading ? 'Ingresando...' : 'Iniciar Sesión'}
+                            {loading ? 'Ingresando...' : 'Iniciar sesion'}
                         </button>
                     </form>
 
                     <p className="text-center text-sm text-gray-500 mt-6">
-                        ¿No tienes cuenta?{' '}
+                        No tienes cuenta?{' '}
                         <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                            Regístrate
+                            Registrate
                         </Link>
                     </p>
                 </div>

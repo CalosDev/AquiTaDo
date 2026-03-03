@@ -8,7 +8,9 @@
         "start": "nest start",
         "start:prod": "node dist/main",
         "lint": "eslint \"src/**/*.ts\" \"prisma/**/*.ts\"",
-        "test": "vitest run",
+        "test": "vitest run --exclude \"src/**/*.e2e.spec.ts\"",
+        "test:unit": "vitest run --exclude \"src/**/*.e2e.spec.ts\"",
+        "test:e2e": "node ./scripts/run-e2e.mjs",
         "prisma:migrate": "pnpm exec prisma migrate dev",
         "prisma:migrate:deploy": "pnpm exec prisma migrate deploy",
         "prisma:generate": "pnpm exec prisma generate",
@@ -17,6 +19,7 @@
         "prisma:studio": "pnpm exec prisma studio"
     },
     "dependencies": {
+        "@aws-sdk/client-s3": "^3.908.0",
         "@nestjs/common": "^11.1.14",
         "@nestjs/config": "^4.0.3",
         "@nestjs/core": "^11.1.14",

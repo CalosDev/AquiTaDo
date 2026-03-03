@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     adsApi,
@@ -245,6 +245,15 @@ const TABS: Array<{ key: DashboardTab; label: string }> = [
     { key: 'ads', label: 'Ads' },
     { key: 'verification', label: 'Verificación' },
 ];
+const DashboardBillingTab = lazy(async () => ({
+    default: (await import('../components/dashboard-business/DashboardBillingTab')).DashboardBillingTab,
+}));
+const DashboardAdsTab = lazy(async () => ({
+    default: (await import('../components/dashboard-business/DashboardAdsTab')).DashboardAdsTab,
+}));
+const DashboardVerificationTab = lazy(async () => ({
+    default: (await import('../components/dashboard-business/DashboardVerificationTab')).DashboardVerificationTab,
+}));
 
 function asNumber(value: string | number | null | undefined): number {
     if (value === null || value === undefined) return 0;
@@ -1287,482 +1296,6 @@ export function DashboardBusiness() {
         </div>
     );
 
-    const renderBilling = () => {
-        const invoiceStatuses = Object.entries(billingSummary?.invoices.byStatus || {});
-        const paymentStatuses = Object.entries(billingSummary?.payments.byStatus || {});
-        const monthlyFiscalRows = fiscalSummary?.monthly ?? [];
-
-        return (
-            <div className="space-y-6">
-                <div className="card p-5">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div>
-                            <label className="text-xs text-gray-500 block mb-1">Desde</label>
-                            <input type="date" className="input-field text-sm" value={billingRange.from} onChange={(event) => setBillingRange((previous) => ({ ...previous, from: event.target.value }))} />
-                        </div>
-                        <div>
-                            <label className="text-xs text-gray-500 block mb-1">Hasta</label>
-                            <input type="date" className="input-field text-sm" value={billingRange.to} onChange={(event) => setBillingRange((previous) => ({ ...previous, to: event.target.value }))} />
-                        </div>
-                        <button type="button" className="btn-primary text-sm" onClick={() => void loadBillingSummary()} disabled={billingLoading}>{billingLoading ? 'Cargando...' : 'Actualizar'}</button>
-                        <button type="button" className="btn-secondary text-sm" onClick={() => void handleDownloadCsv('invoices')} disabled={exportingCsv === 'invoices'}>{exportingCsv === 'invoices' ? 'Exportando...' : 'Facturas CSV'}</button>
-                        <button type="button" className="btn-secondary text-sm" onClick={() => void handleDownloadCsv('payments')} disabled={exportingCsv === 'payments'}>{exportingCsv === 'payments' ? 'Exportando...' : 'Pagos CSV'}</button>
-                        <button type="button" className="btn-secondary text-sm" onClick={() => void handleDownloadCsv('fiscal')} disabled={exportingCsv === 'fiscal'}>{exportingCsv === 'fiscal' ? 'Exportando...' : 'Reporte fiscal CSV'}</button>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-                    <div className="card p-4 text-center"><p className="text-xs text-gray-500">Total facturado</p><p className="text-xl font-bold text-primary-700">{formatCurrency(billingSummary?.invoices.total || 0)}</p></div>
-                    <div className="card p-4 text-center"><p className="text-xs text-gray-500">Cobrado</p><p className="text-xl font-bold text-emerald-700">{formatCurrency(billingSummary?.payments.totalCollected || 0)}</p></div>
-                    <div className="card p-4 text-center"><p className="text-xs text-gray-500">Fallido</p><p className="text-xl font-bold text-red-700">{formatCurrency(billingSummary?.payments.totalFailed || 0)}</p></div>
-                    <div className="card p-4 text-center"><p className="text-xs text-gray-500">Comisión plataforma</p><p className="text-xl font-bold text-amber-700">{formatCurrency(billingSummary?.marketplace.platformFeeAmount || 0)}</p></div>
-                    <div className="card p-4 text-center"><p className="text-xs text-gray-500">ITBIS acumulado</p><p className="text-xl font-bold text-indigo-700">{formatCurrency(fiscalSummary?.totals.tax || 0)}</p></div>
-                    <div className="card p-4 text-center"><p className="text-xs text-gray-500">Facturas pagadas</p><p className="text-xl font-bold text-teal-700">{fiscalSummary?.totals.invoicesPaid || 0}</p></div>
-                </div>
-
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div className="card p-5">
-                        <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Facturas por estado</h3>
-                        <div className="space-y-2">
-                            {invoiceStatuses.length > 0 ? invoiceStatuses.map(([status, row]) => (
-                                <div key={status} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
-                                    <span className="text-sm text-gray-700">{status}</span>
-                                    <span className="text-sm text-gray-900">{row.count} · {formatCurrency(row.total)}</span>
-                                </div>
-                            )) : <p className="text-sm text-gray-500">Sin datos de facturas.</p>}
-                        </div>
-                    </div>
-                    <div className="card p-5">
-                        <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Pagos por estado</h3>
-                        <div className="space-y-2">
-                            {paymentStatuses.length > 0 ? paymentStatuses.map(([status, row]) => (
-                                <div key={status} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
-                                    <span className="text-sm text-gray-700">{status}</span>
-                                    <span className="text-sm text-gray-900">{row.count} · {formatCurrency(row.total)}</span>
-                                </div>
-                            )) : <p className="text-sm text-gray-500">Sin datos de pagos.</p>}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="card p-5">
-                    <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Resumen fiscal mensual</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="border-b border-gray-100 text-gray-500">
-                                <tr>
-                                    <th className="text-left py-2">Periodo</th>
-                                    <th className="text-left py-2">Emitidas</th>
-                                    <th className="text-left py-2">Pagadas</th>
-                                    <th className="text-left py-2">Subtotal</th>
-                                    <th className="text-left py-2">ITBIS</th>
-                                    <th className="text-left py-2">Total</th>
-                                    <th className="text-left py-2">Cobrado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {monthlyFiscalRows.length > 0 ? monthlyFiscalRows.map((row) => (
-                                    <tr key={row.period} className="border-b border-gray-50">
-                                        <td className="py-2">{row.period}</td>
-                                        <td className="py-2">{row.invoicesIssued}</td>
-                                        <td className="py-2">{row.invoicesPaid}</td>
-                                        <td className="py-2">{formatCurrency(row.subtotal)}</td>
-                                        <td className="py-2">{formatCurrency(row.tax)}</td>
-                                        <td className="py-2">{formatCurrency(row.total)}</td>
-                                        <td className="py-2">{formatCurrency(row.paidTotal)}</td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td className="py-3 text-gray-500" colSpan={7}>Sin datos fiscales en el rango seleccionado.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const renderAds = () => (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="card p-5 xl:col-span-1">
-                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Ads Wallet</h3>
-                <div className="rounded-xl border border-gray-100 p-3 mb-5 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-gray-500">Saldo disponible</p>
-                        <button
-                            type="button"
-                            className="btn-secondary text-xs"
-                            onClick={() => void loadAdCampaigns()}
-                            disabled={adsLoading}
-                        >
-                            Refrescar
-                        </button>
-                    </div>
-                    <p className={`text-2xl font-bold ${adsWalletBalance > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {formatCurrency(adsWalletBalance)}
-                    </p>
-                    <form onSubmit={handleCreateAdsWalletTopup} className="flex items-end gap-2">
-                        <div className="flex-1">
-                            <label className="text-xs text-gray-500 block mb-1">Recargar saldo (DOP)</label>
-                            <input
-                                type="number"
-                                min="1"
-                                step="0.01"
-                                className="input-field text-sm"
-                                value={adsWalletTopupAmount}
-                                onChange={(event) => setAdsWalletTopupAmount(event.target.value)}
-                            />
-                        </div>
-                        <button type="submit" className="btn-primary text-sm" disabled={creatingAdsWalletTopup}>
-                            {creatingAdsWalletTopup ? 'Conectando...' : 'Recargar'}
-                        </button>
-                    </form>
-                    <p className="text-xs text-gray-500">Cada clic válido descuenta el CPC de la campaña desde este saldo.</p>
-                </div>
-
-                <div className="mb-5">
-                    <p className="text-xs text-gray-500 mb-2">Últimas recargas</p>
-                    <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                        {adsWalletTopups.length > 0 ? adsWalletTopups.slice(0, 8).map((topup) => {
-                            const status = resolveAdsWalletTopupStatus(topup.status);
-                            return (
-                                <div key={topup.id} className="rounded-lg border border-gray-100 px-3 py-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="text-xs font-medium text-gray-900">{formatCurrency(topup.amount)}</p>
-                                        <span className={`text-[11px] px-2 py-0.5 rounded-full ${status.className}`}>
-                                            {status.label}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-gray-500 mt-1">
-                                        {formatDateTime(topup.paidAt || topup.createdAt)}
-                                    </p>
-                                    {topup.failureReason ? (
-                                        <p className="text-[11px] text-red-600 mt-1">{topup.failureReason}</p>
-                                    ) : null}
-                                </div>
-                            );
-                        }) : <p className="text-sm text-gray-500">Sin recargas registradas.</p>}
-                    </div>
-                </div>
-
-                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Nueva campaña</h3>
-                <form onSubmit={handleCreateCampaign} className="space-y-3">
-                    <select
-                        className="input-field text-sm"
-                        value={campaignForm.businessId}
-                        onChange={(event) =>
-                            setCampaignForm((previous) => ({
-                                ...previous,
-                                businessId: event.target.value,
-                            }))
-                        }
-                    >
-                        <option value="">Selecciona negocio</option>
-                        {businesses.map((business) => (
-                            <option key={business.id} value={business.id}>{business.name}</option>
-                        ))}
-                    </select>
-                    <input
-                        className="input-field text-sm"
-                        placeholder="Nombre campaña"
-                        value={campaignForm.name}
-                        onChange={(event) =>
-                            setCampaignForm((previous) => ({
-                                ...previous,
-                                name: event.target.value,
-                            }))
-                        }
-                    />
-                    <div className="grid grid-cols-3 gap-2">
-                        <input
-                            type="number"
-                            min="1"
-                            step="0.01"
-                            className="input-field text-sm"
-                            placeholder="Diario"
-                            value={campaignForm.dailyBudget}
-                            onChange={(event) =>
-                                setCampaignForm((previous) => ({
-                                    ...previous,
-                                    dailyBudget: event.target.value,
-                                }))
-                            }
-                        />
-                        <input
-                            type="number"
-                            min="1"
-                            step="0.01"
-                            className="input-field text-sm"
-                            placeholder="Total"
-                            value={campaignForm.totalBudget}
-                            onChange={(event) =>
-                                setCampaignForm((previous) => ({
-                                    ...previous,
-                                    totalBudget: event.target.value,
-                                }))
-                            }
-                        />
-                        <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            className="input-field text-sm"
-                            placeholder="CPC"
-                            value={campaignForm.bidAmount}
-                            onChange={(event) =>
-                                setCampaignForm((previous) => ({
-                                    ...previous,
-                                    bidAmount: event.target.value,
-                                }))
-                            }
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <input
-                            type="datetime-local"
-                            className="input-field text-sm"
-                            value={campaignForm.startsAt}
-                            onChange={(event) =>
-                                setCampaignForm((previous) => ({
-                                    ...previous,
-                                    startsAt: event.target.value,
-                                }))
-                            }
-                        />
-                        <input
-                            type="datetime-local"
-                            className="input-field text-sm"
-                            value={campaignForm.endsAt}
-                            onChange={(event) =>
-                                setCampaignForm((previous) => ({
-                                    ...previous,
-                                    endsAt: event.target.value,
-                                }))
-                            }
-                        />
-                    </div>
-                    <select
-                        className="input-field text-sm"
-                        value={campaignForm.status}
-                        onChange={(event) =>
-                            setCampaignForm((previous) => ({
-                                ...previous,
-                                status: event.target.value as 'DRAFT' | 'ACTIVE',
-                            }))
-                        }
-                    >
-                        <option value="DRAFT">Borrador</option>
-                        <option value="ACTIVE">Activa</option>
-                    </select>
-                    <button type="submit" className="btn-primary text-sm" disabled={creatingCampaign}>
-                        {creatingCampaign ? 'Creando...' : 'Crear campaña'}
-                    </button>
-                </form>
-            </div>
-
-            <div className="card p-5 xl:col-span-2">
-                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Campañas actuales</h3>
-                <div className="space-y-2 max-h-[34rem] overflow-y-auto pr-1">
-                    {adsLoading ? (
-                        <p className="text-sm text-gray-500">Cargando campañas ads...</p>
-                    ) : campaigns.length > 0 ? (
-                        campaigns.map((campaign) => (
-                            <div key={campaign.id} className="rounded-xl border border-gray-100 p-3">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div>
-                                        <p className="font-medium text-gray-900">{campaign.name}</p>
-                                        <p className="text-xs text-gray-500">{campaign.business.name}</p>
-                                    </div>
-                                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                                        {campaign.status}
-                                    </span>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    CPC {formatCurrency(campaign.bidAmount)} ·
-                                    Presupuesto {formatCurrency(campaign.spentAmount)} / {formatCurrency(campaign.totalBudget)} ·
-                                    CTR {campaign.ctr}%
-                                </p>
-                                <div className="flex gap-2 mt-2">
-                                    {campaign.status !== 'ACTIVE' && campaign.status !== 'ENDED' && (
-                                        <button
-                                            type="button"
-                                            className="btn-primary text-xs"
-                                            disabled={updatingCampaignId === campaign.id}
-                                            onClick={() => void handleCampaignStatus(campaign.id, 'ACTIVE')}
-                                        >
-                                            Activar
-                                        </button>
-                                    )}
-                                    {campaign.status === 'ACTIVE' && (
-                                        <button
-                                            type="button"
-                                            className="btn-secondary text-xs"
-                                            disabled={updatingCampaignId === campaign.id}
-                                            onClick={() => void handleCampaignStatus(campaign.id, 'PAUSED')}
-                                        >
-                                            Pausar
-                                        </button>
-                                    )}
-                                    {campaign.status !== 'ENDED' && (
-                                        <button
-                                            type="button"
-                                            className="btn-secondary text-xs"
-                                            disabled={updatingCampaignId === campaign.id}
-                                            onClick={() => void handleCampaignStatus(campaign.id, 'ENDED')}
-                                        >
-                                            Finalizar
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <p className="text-sm text-gray-500">No hay campañas creadas.</p>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderVerification = () => (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="card p-5 xl:col-span-1">
-                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">KYC negocio</h3>
-                <div className="space-y-3">
-                    <select
-                        className="input-field text-sm"
-                        value={selectedVerificationBusinessId}
-                        onChange={(event) => setSelectedVerificationBusinessId(event.target.value)}
-                    >
-                        <option value="">Selecciona negocio</option>
-                        {businesses.map((business) => (
-                            <option key={business.id} value={business.id}>{business.name}</option>
-                        ))}
-                    </select>
-
-                    <select
-                        className="input-field text-sm"
-                        value={verificationForm.documentType}
-                        onChange={(event) =>
-                            setVerificationForm((previous) => ({
-                                ...previous,
-                                documentType: event.target.value as VerificationDocument['documentType'],
-                            }))
-                        }
-                    >
-                        <option value="ID_CARD">Cédula/ID</option>
-                        <option value="TAX_CERTIFICATE">RNC/Certificado fiscal</option>
-                        <option value="BUSINESS_LICENSE">Licencia comercial</option>
-                        <option value="ADDRESS_PROOF">Comprobante dirección</option>
-                        <option value="SELFIE">Selfie validación</option>
-                        <option value="OTHER">Otro</option>
-                    </select>
-
-                    <form onSubmit={handleSubmitVerificationDocument} className="space-y-2">
-                        <input
-                            className="input-field text-sm"
-                            placeholder="URL del documento"
-                            value={verificationForm.fileUrl}
-                            onChange={(event) =>
-                                setVerificationForm((previous) => ({
-                                    ...previous,
-                                    fileUrl: event.target.value,
-                                }))
-                            }
-                        />
-                        <button type="submit" className="btn-secondary text-sm" disabled={uploadingVerificationDocument}>
-                            {uploadingVerificationDocument ? 'Subiendo...' : 'Subir documento'}
-                        </button>
-                    </form>
-
-                    <textarea
-                        className="input-field text-sm"
-                        rows={3}
-                        placeholder="Notas de revisión (opcional)"
-                        value={verificationForm.notes}
-                        onChange={(event) =>
-                            setVerificationForm((previous) => ({
-                                ...previous,
-                                notes: event.target.value,
-                            }))
-                        }
-                    />
-                    <button
-                        type="button"
-                        className="btn-primary text-sm"
-                        disabled={submittingBusinessVerification || !selectedVerificationBusinessId}
-                        onClick={() => void handleSubmitBusinessVerification()}
-                    >
-                        {submittingBusinessVerification ? 'Enviando...' : 'Enviar a revisión'}
-                    </button>
-                </div>
-            </div>
-
-            <div className="card p-5 xl:col-span-2">
-                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Estado y documentos</h3>
-                {verificationLoading ? (
-                    <p className="text-sm text-gray-500">Cargando información de verificación...</p>
-                ) : (
-                    <div className="space-y-4">
-                        {verificationStatus ? (
-                            <div className="rounded-xl border border-gray-100 p-3 text-sm space-y-1">
-                                <p>
-                                    Estado: <strong>{verificationStatus.verificationStatus}</strong>
-                                </p>
-                                <p>
-                                    Verificado: <strong>{verificationStatus.verified ? 'Sí' : 'No'}</strong>
-                                </p>
-                                <p>
-                                    Riesgo: <strong>{verificationStatus.riskScore}/100</strong>
-                                </p>
-                                {verificationStatus.verificationNotes && (
-                                    <p className="text-gray-600">{verificationStatus.verificationNotes}</p>
-                                )}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-gray-500">Selecciona un negocio para ver su estado.</p>
-                        )}
-
-                        <div className="space-y-2 max-h-[28rem] overflow-y-auto pr-1">
-                            {verificationDocuments.length > 0 ? (
-                                verificationDocuments.map((document) => (
-                                    <div key={document.id} className="rounded-xl border border-gray-100 p-3">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <p className="text-sm font-medium text-gray-900">
-                                                {document.documentType}
-                                            </p>
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                                                {document.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500">
-                                            {document.business.name} · {formatDateTime(document.submittedAt)}
-                                        </p>
-                                        <a
-                                            href={document.fileUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="text-xs text-primary-700 underline"
-                                        >
-                                            Ver documento
-                                        </a>
-                                        {document.rejectionReason && (
-                                            <p className="text-xs text-red-600 mt-1">{document.rejectionReason}</p>
-                                        )}
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-sm text-gray-500">No hay documentos cargados.</p>
-                            )}
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in space-y-6">
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -1801,12 +1334,70 @@ export function DashboardBusiness() {
                     {activeTab === 'overview' && renderOverview()}
                     {activeTab === 'inbox' && renderInbox()}
                     {activeTab === 'crm' && renderCrm()}
-                    {activeTab === 'billing' && renderBilling()}
-                    {activeTab === 'ads' && renderAds()}
-                    {activeTab === 'verification' && renderVerification()}
+                    {activeTab === 'billing' && (
+                        <Suspense fallback={<div className="card p-5 text-sm text-gray-500">Cargando facturación...</div>}>
+                            <DashboardBillingTab
+                                billingRange={billingRange}
+                                setBillingRange={setBillingRange}
+                                loadBillingSummary={loadBillingSummary}
+                                billingLoading={billingLoading}
+                                handleDownloadCsv={handleDownloadCsv}
+                                exportingCsv={exportingCsv}
+                                billingSummary={billingSummary}
+                                fiscalSummary={fiscalSummary}
+                                formatCurrency={formatCurrency}
+                            />
+                        </Suspense>
+                    )}
+                    {activeTab === 'ads' && (
+                        <Suspense fallback={<div className="card p-5 text-sm text-gray-500">Cargando ads...</div>}>
+                            <DashboardAdsTab
+                                businesses={businesses}
+                                adsLoading={adsLoading}
+                                loadAdCampaigns={loadAdCampaigns}
+                                adsWalletBalance={adsWalletBalance}
+                                handleCreateAdsWalletTopup={handleCreateAdsWalletTopup}
+                                adsWalletTopupAmount={adsWalletTopupAmount}
+                                setAdsWalletTopupAmount={setAdsWalletTopupAmount}
+                                creatingAdsWalletTopup={creatingAdsWalletTopup}
+                                adsWalletTopups={adsWalletTopups}
+                                resolveAdsWalletTopupStatus={resolveAdsWalletTopupStatus}
+                                formatCurrency={formatCurrency}
+                                formatDateTime={formatDateTime}
+                                handleCreateCampaign={handleCreateCampaign}
+                                campaignForm={campaignForm}
+                                setCampaignForm={setCampaignForm}
+                                creatingCampaign={creatingCampaign}
+                                campaigns={campaigns}
+                                updatingCampaignId={updatingCampaignId}
+                                handleCampaignStatus={handleCampaignStatus}
+                            />
+                        </Suspense>
+                    )}
+                    {activeTab === 'verification' && (
+                        <Suspense fallback={<div className="card p-5 text-sm text-gray-500">Cargando verificación...</div>}>
+                            <DashboardVerificationTab
+                                selectedVerificationBusinessId={selectedVerificationBusinessId}
+                                setSelectedVerificationBusinessId={setSelectedVerificationBusinessId}
+                                businesses={businesses}
+                                verificationForm={verificationForm}
+                                setVerificationForm={setVerificationForm}
+                                handleSubmitVerificationDocument={handleSubmitVerificationDocument}
+                                uploadingVerificationDocument={uploadingVerificationDocument}
+                                submittingBusinessVerification={submittingBusinessVerification}
+                                handleSubmitBusinessVerification={handleSubmitBusinessVerification}
+                                verificationLoading={verificationLoading}
+                                verificationStatus={verificationStatus}
+                                verificationDocuments={verificationDocuments}
+                                formatDateTime={formatDateTime}
+                            />
+                        </Suspense>
+                    )}
                 </>
             )}
         </div>
     );
 }
+
+
 

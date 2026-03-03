@@ -2,13 +2,22 @@ import { Injectable, Inject, BadRequestException, ForbiddenException, Logger, No
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationRole } from '../generated/prisma/client';
+
+type StorageProvider = 'local' | 's3';
+type StoredAsset = {
+    url: string;
+    localPath?: string;
+    objectKey?: string;
+};
 
 @Injectable()
 export class UploadsService {
     private readonly logger = new Logger(UploadsService.name);
     private sharpLoadFailed = false;
+    private s3Client: S3Client | null = null;
 
     constructor(
         @Inject(PrismaService)
@@ -75,23 +84,22 @@ export class UploadsService {
             );
         }
 
-        const uploadsDir = path.join(process.cwd(), 'uploads', 'businesses');
-        await fs.mkdir(uploadsDir, { recursive: true });
-
-        const fileName = `${businessId}-${randomUUID()}.${extension}`;
-        const filePath = path.join(uploadsDir, fileName);
-        await fs.writeFile(filePath, file.buffer);
-        void this.generateOptimizedVariants(file.buffer, filePath);
+        const storedAsset = await this.storeBusinessImageAsset(
+            file.buffer,
+            file.mimetype,
+            businessId,
+            extension,
+        );
 
         try {
             return await this.prisma.businessImage.create({
                 data: {
-                    url: `/uploads/businesses/${fileName}`,
+                    url: storedAsset.url,
                     businessId,
                 },
             });
         } catch (error) {
-            await fs.unlink(filePath).catch(() => undefined);
+            await this.deleteStoredAsset(storedAsset).catch(() => undefined);
             throw error;
         }
     }
@@ -130,20 +138,106 @@ export class UploadsService {
             where: { id: imageId },
         });
 
-        const filePath = this.resolveUploadPath(image.url);
-        if (filePath) {
+        await this.deleteStoredAsset({
+            url: image.url,
+            localPath: this.resolveUploadPath(image.url) ?? undefined,
+            objectKey: this.resolveObjectKeyFromUrl(image.url) ?? undefined,
+        }).catch((error) => {
+            this.logger.warn(
+                `No se pudo eliminar el archivo de imagen (${error instanceof Error ? error.message : String(error)})`,
+            );
+        });
+
+        return { message: 'Imagen eliminada exitosamente' };
+    }
+
+    private async storeBusinessImageAsset(
+        sourceBuffer: Buffer,
+        mimeType: string,
+        businessId: string,
+        extension: string,
+    ): Promise<StoredAsset> {
+        const provider = this.resolveStorageProvider();
+        if (provider === 's3') {
+            return this.uploadToS3(sourceBuffer, mimeType, businessId, extension);
+        }
+
+        return this.storeLocalFile(sourceBuffer, businessId, extension);
+    }
+
+    private async storeLocalFile(
+        sourceBuffer: Buffer,
+        businessId: string,
+        extension: string,
+    ): Promise<StoredAsset> {
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'businesses');
+        await fs.mkdir(uploadsDir, { recursive: true });
+
+        const fileName = `${businessId}-${randomUUID()}.${extension}`;
+        const filePath = path.join(uploadsDir, fileName);
+        await fs.writeFile(filePath, sourceBuffer);
+        void this.generateOptimizedVariants(sourceBuffer, filePath);
+
+        return {
+            url: `/uploads/businesses/${fileName}`,
+            localPath: filePath,
+        };
+    }
+
+    private async uploadToS3(
+        sourceBuffer: Buffer,
+        mimeType: string,
+        businessId: string,
+        extension: string,
+    ): Promise<StoredAsset> {
+        const s3Client = this.resolveS3Client();
+        const bucket = this.resolveS3Bucket();
+        const objectKey = `businesses/${businessId}/${randomUUID()}.${extension}`;
+
+        await s3Client.send(new PutObjectCommand({
+            Bucket: bucket,
+            Key: objectKey,
+            Body: sourceBuffer,
+            ContentType: mimeType,
+            CacheControl: 'public, max-age=31536000, immutable',
+        }));
+
+        return {
+            url: this.resolvePublicObjectUrl(bucket, objectKey),
+            objectKey,
+        };
+    }
+
+    private async deleteStoredAsset(asset: StoredAsset): Promise<void> {
+        if (asset.localPath) {
             try {
-                await fs.unlink(filePath);
-                await this.deleteOptimizedSiblings(filePath);
+                await fs.unlink(asset.localPath);
+                await this.deleteOptimizedSiblings(asset.localPath);
             } catch (error) {
                 const code = (error as NodeJS.ErrnoException).code;
                 if (code !== 'ENOENT') {
                     throw error;
                 }
             }
+            return;
         }
 
-        return { message: 'Imagen eliminada exitosamente' };
+        const provider = this.resolveStorageProvider();
+        if (provider !== 's3') {
+            return;
+        }
+
+        const objectKey = asset.objectKey || this.resolveObjectKeyFromUrl(asset.url);
+        if (!objectKey) {
+            return;
+        }
+
+        const s3Client = this.resolveS3Client();
+        const bucket = this.resolveS3Bucket();
+        await s3Client.send(new DeleteObjectCommand({
+            Bucket: bucket,
+            Key: objectKey,
+        }));
     }
 
     private resolveUploadPath(assetUrl: string): string | null {
@@ -161,6 +255,91 @@ export class UploadsService {
         }
 
         return absolutePath;
+    }
+
+    private resolveStorageProvider(): StorageProvider {
+        const rawProvider = (process.env.STORAGE_PROVIDER || 'local').trim().toLowerCase();
+        return rawProvider === 's3' ? 's3' : 'local';
+    }
+
+    private resolveS3Client(): S3Client {
+        if (this.s3Client) {
+            return this.s3Client;
+        }
+
+        const region = (process.env.STORAGE_S3_REGION || 'us-east-1').trim();
+        const endpoint = process.env.STORAGE_S3_ENDPOINT?.trim();
+        const accessKeyId = process.env.STORAGE_S3_ACCESS_KEY_ID?.trim();
+        const secretAccessKey = process.env.STORAGE_S3_SECRET_ACCESS_KEY?.trim();
+        const forcePathStyle = ['1', 'true'].includes(
+            (process.env.STORAGE_S3_FORCE_PATH_STYLE || 'false').trim().toLowerCase(),
+        );
+
+        this.s3Client = new S3Client({
+            region,
+            ...(endpoint ? { endpoint } : {}),
+            ...(forcePathStyle ? { forcePathStyle: true } : {}),
+            ...(accessKeyId && secretAccessKey
+                ? {
+                    credentials: {
+                        accessKeyId,
+                        secretAccessKey,
+                    },
+                }
+                : {}),
+        });
+        return this.s3Client;
+    }
+
+    private resolveS3Bucket(): string {
+        const bucket = process.env.STORAGE_S3_BUCKET?.trim();
+        if (!bucket) {
+            throw new BadRequestException('STORAGE_S3_BUCKET no esta configurado');
+        }
+        return bucket;
+    }
+
+    private resolvePublicObjectUrl(bucket: string, objectKey: string): string {
+        const explicitPublicBaseUrl = process.env.STORAGE_PUBLIC_BASE_URL?.trim();
+        if (explicitPublicBaseUrl) {
+            return `${explicitPublicBaseUrl.replace(/\/+$/, '')}/${objectKey}`;
+        }
+
+        const endpoint = process.env.STORAGE_S3_ENDPOINT?.trim();
+        if (endpoint) {
+            const baseEndpoint = endpoint.replace(/\/+$/, '');
+            const forcePathStyle = ['1', 'true'].includes(
+                (process.env.STORAGE_S3_FORCE_PATH_STYLE || 'false').trim().toLowerCase(),
+            );
+            if (forcePathStyle) {
+                return `${baseEndpoint}/${bucket}/${objectKey}`;
+            }
+            return `${baseEndpoint}/${objectKey}`;
+        }
+
+        const region = (process.env.STORAGE_S3_REGION || 'us-east-1').trim();
+        return `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+    }
+
+    private resolveObjectKeyFromUrl(assetUrl: string): string | null {
+        const normalized = assetUrl.trim();
+        const publicBase = process.env.STORAGE_PUBLIC_BASE_URL?.trim().replace(/\/+$/, '');
+
+        if (publicBase && normalized.startsWith(`${publicBase}/`)) {
+            return decodeURIComponent(normalized.slice(publicBase.length + 1));
+        }
+
+        try {
+            const parsed = new URL(normalized);
+            const bucket = this.resolveS3Bucket();
+            const pathname = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+            if (pathname.startsWith(`${bucket}/`)) {
+                return pathname.slice(bucket.length + 1);
+            }
+            return pathname || null;
+        } catch {
+            return null;
+        }
     }
 
     private async resolveMaxImagesPerBusiness(organizationId: string): Promise<number | null> {

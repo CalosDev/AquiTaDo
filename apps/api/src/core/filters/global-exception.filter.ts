@@ -47,7 +47,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
                 message: 'Internal server error',
             };
 
-        if (this.sentryEnabled && this.sentryClient) {
+        if (status >= 500 && this.sentryEnabled && this.sentryClient) {
             this.sentryClient.captureException(exception, {
                 tags: {
                     module: 'api',

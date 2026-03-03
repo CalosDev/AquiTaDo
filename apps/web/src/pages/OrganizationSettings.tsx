@@ -435,8 +435,9 @@ export function OrganizationSettings() {
             )}
 
             <div className="card p-5 mb-6">
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Organización activa</label>
+                <label htmlFor="organization-active-id" className="text-sm font-medium text-gray-700 mb-2 block">Organizacion activa</label>
                 <select
+                    id="organization-active-id"
                     className="input-field"
                     value={activeOrganizationId || ''}
                     onChange={(event) => {
@@ -464,9 +465,10 @@ export function OrganizationSettings() {
                     </p>
                     <form onSubmit={handleCreateOrganization} className="flex flex-col sm:flex-row gap-3">
                         <input
+                            aria-label="Nombre de la organizacion"
                             type="text"
                             className="input-field"
-                            placeholder="Nombre de la organización"
+                            placeholder="Nombre de la organizacion"
                             value={organizationName}
                             onChange={(event) => setOrganizationName(event.target.value)}
                         />
@@ -494,8 +496,9 @@ export function OrganizationSettings() {
                                 <>
                                     <form onSubmit={handleUpdateOrganization} className="space-y-3">
                                         <div>
-                                            <label className="text-sm font-medium text-gray-700 mb-1 block">Nombre</label>
+                                            <label htmlFor="organization-name" className="text-sm font-medium text-gray-700 mb-1 block">Nombre</label>
                                             <input
+                                                id="organization-name"
                                                 type="text"
                                                 className="input-field"
                                                 value={editingName}
@@ -557,6 +560,7 @@ export function OrganizationSettings() {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <select
+                                                        aria-label={`Rol de ${member.user.name}`}
                                                         className="input-field text-sm min-w-[120px]"
                                                         value={member.role}
                                                         disabled={!canEditTarget || processing === `role-${member.userId}`}
@@ -601,8 +605,9 @@ export function OrganizationSettings() {
                                         </p>
                                     </div>
                                     <div>
-                                        <label className="text-xs text-gray-600 mb-1 block">Plan</label>
+                                        <label htmlFor="organization-plan" className="text-xs text-gray-600 mb-1 block">Plan</label>
                                         <select
+                                            id="organization-plan"
                                             className="input-field text-sm"
                                             value={subscriptionForm.plan}
                                             disabled={!canManageSubscription}
@@ -619,8 +624,9 @@ export function OrganizationSettings() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="text-xs text-gray-600 mb-1 block">Estado</label>
+                                        <label htmlFor="organization-subscription-status" className="text-xs text-gray-600 mb-1 block">Estado</label>
                                         <select
+                                            id="organization-subscription-status"
                                             className="input-field text-sm"
                                             value={subscriptionForm.subscriptionStatus}
                                             disabled={!canManageSubscription}
@@ -686,8 +692,9 @@ export function OrganizationSettings() {
                             {canManageMembers ? (
                                 <form onSubmit={handleInviteMember} className="space-y-3">
                                     <div>
-                                        <label className="text-xs text-gray-600 mb-1 block">Correo</label>
+                                        <label htmlFor="organization-invite-email" className="text-xs text-gray-600 mb-1 block">Correo</label>
                                         <input
+                                            id="organization-invite-email"
                                             type="email"
                                             className="input-field text-sm"
                                             value={inviteForm.email}
@@ -701,8 +708,9 @@ export function OrganizationSettings() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs text-gray-600 mb-1 block">Rol</label>
+                                        <label htmlFor="organization-invite-role" className="text-xs text-gray-600 mb-1 block">Rol</label>
                                         <select
+                                            id="organization-invite-role"
                                             className="input-field text-sm"
                                             value={inviteForm.role}
                                             onChange={(event) =>

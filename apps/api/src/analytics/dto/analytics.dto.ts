@@ -132,10 +132,6 @@ export class TrackGrowthEventDto {
     cityId?: string;
 
     @IsOptional()
-    @IsUUID()
-    userId?: string;
-
-    @IsOptional()
     @IsString()
     @MaxLength(255)
     visitorId?: string;

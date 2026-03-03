@@ -12,7 +12,7 @@ Incluye frontend web, backend API y base de datos PostgreSQL en un monorepo con 
 - Base de datos: PostgreSQL + Prisma ORM + PostGIS
 - Auth: JWT (Passport)
 - Cache/Busqueda: Redis + Meilisearch (fallback a PostgreSQL)
-- Observabilidad: Prometheus (`/api/observability/metrics`)
+- Observabilidad: Prometheus (`/api/observability/metrics`, solo Admin)
 - Monorepo: pnpm workspaces
 - Contenedores: Docker + Docker Compose
 
@@ -67,7 +67,7 @@ Copy-Item apps/web/.env.example apps/web/.env
 3. Levantar PostgreSQL:
 
 ```bash
-docker-compose up -d db
+docker compose up -d db
 ```
 
 4. Generar cliente Prisma y migrar:
@@ -148,7 +148,7 @@ Servicios:
 Levantar DB + API + Web:
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 Nota:
@@ -168,20 +168,34 @@ Servicios en Docker:
 Si tienes puertos ocupados, puedes sobrescribirlos:
 
 ```bash
-DB_PORT=55432 API_PORT=3100 WEB_PORT=8081 docker-compose up -d --build
+DB_PORT=55432 API_PORT=3100 WEB_PORT=8081 docker compose up -d --build
 ```
 
 Para ver logs:
 
 ```bash
-docker-compose logs -f api web db redis meilisearch
+docker compose logs -f api web db redis meilisearch
 ```
 
 Para apagar servicios:
 
 ```bash
-docker-compose down
+docker compose down
 ```
+
+## Pruebas
+
+- `pnpm test`: ejecuta pruebas unitarias/funcionales estables del monorepo (sin E2E que dependen de DB real).
+- `pnpm test:unit`: alias explicito de pruebas unitarias.
+- `pnpm test:e2e:api`: ejecuta E2E del backend (`apps/api`) y requiere PostgreSQL accesible + migraciones aplicadas.
+
+Para E2E de API:
+
+1. Asegura `DATABASE_URL` valido en `apps/api/.env`.
+2. Opcional recomendado: define `DATABASE_URL_E2E` para apuntar a una base de datos separada de pruebas.
+3. Levanta PostgreSQL (por ejemplo `docker compose up -d db`).
+4. Aplica esquema: `pnpm db:migrate`.
+5. Ejecuta: `pnpm test:e2e:api`.
 
 ## Endpoints API
 
@@ -193,7 +207,7 @@ docker-compose down
 | GET | /api/businesses | No | Listar negocios (filtros/paginacion) |
 | GET | /api/businesses/my | Si | Listar negocios de la organizacion activa |
 | GET | /api/businesses/:id | No | Detalle negocio |
-| POST | /api/businesses | Si | Crear negocio |
+| POST | /api/businesses | Si (BUSINESS_OWNER/ADMIN) | Crear negocio |
 | PUT | /api/businesses/:id | Si | Actualizar negocio |
 | DELETE | /api/businesses/:id | Si | Eliminar negocio |
 | GET | /api/businesses/nearby | No | Buscar negocios cercanos |
@@ -214,7 +228,7 @@ docker-compose down
 | PATCH | /api/ai/businesses/:businessId/assistant-config | Si (OWNER/MANAGER) | Configurar auto-respondedor IA |
 | POST | /api/ai/businesses/:businessId/reindex | Si (OWNER/MANAGER) | Reindexar embedding semantico |
 | POST | /api/ai/businesses/:businessId/auto-reply | Si (OWNER/MANAGER/STAFF) | Probar respuesta IA del negocio |
-| POST | /api/ai/reviews/:reviewId/analyze | Si | Analizar sentimiento de resena |
+| POST | /api/ai/reviews/:reviewId/analyze | Si (OWNER/MANAGER/STAFF) | Analizar sentimiento de resena |
 | GET | /api/whatsapp/webhook | No | Verificacion webhook Meta |
 | POST | /api/whatsapp/webhook | No | Recepcion de mensajes WhatsApp |
 | POST | /api/whatsapp/click-to-chat | Opcional | Generar link WhatsApp y registrar conversion |
@@ -242,7 +256,7 @@ docker-compose down
 | GET | /api/health | No | Liveness check |
 | GET | /api/health/ready | No | Readiness check (DB) |
 | GET | /api/health/dashboard | No | Salud operativa avanzada (latencia + saturacion) |
-| GET | /api/observability/metrics | No | Metricas Prometheus |
+| GET | /api/observability/metrics | Admin | Metricas Prometheus |
 
 Notas multi-tenant:
 - Para endpoints de operacion por tenant (`/api/businesses/my`, `POST/PUT/DELETE /api/businesses/*`, uploads) enviar `x-organization-id`.

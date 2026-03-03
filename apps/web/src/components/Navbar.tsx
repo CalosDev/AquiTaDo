@@ -11,6 +11,7 @@ export function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const roleHomePath = resolveRoleHomePath(user?.role);
     const roleHomeLabel = resolveRoleHomeLabel(user?.role);
+    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
 
     const handleLogout = () => {
         void logout().finally(() => {
@@ -46,9 +47,11 @@ export function Navbar() {
                                 <Link to="/profile" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
                                     Perfil
                                 </Link>
-                                <Link to="/register-business" className="btn-accent text-sm">
-                                    + Registrar Negocio
-                                </Link>
+                                {canRegisterBusiness && (
+                                    <Link to="/register-business" className="btn-accent text-sm">
+                                        + Registrar Negocio
+                                    </Link>
+                                )}
                                 <div className="flex items-center gap-3">
                                     {activeOrganization && (
                                         <span className="text-xs px-2 py-1 rounded-full bg-primary-50 text-primary-700 font-medium">
@@ -79,6 +82,9 @@ export function Navbar() {
                     <button
                         className="md:hidden p-2 rounded-lg hover:bg-gray-100"
                         onClick={() => setMenuOpen(!menuOpen)}
+                        aria-label={menuOpen ? 'Cerrar menu principal' : 'Abrir menu principal'}
+                        aria-expanded={menuOpen}
+                        aria-controls="mobile-main-menu"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             {menuOpen ? (
@@ -91,16 +97,18 @@ export function Navbar() {
                 </div>
 
                 {menuOpen && (
-                    <div className="md:hidden py-4 border-t border-gray-100 animate-slide-down">
+                    <div id="mobile-main-menu" className="md:hidden py-4 border-t border-gray-100 animate-slide-down">
                         <div className="flex flex-col gap-3">
                             <Link to="/businesses" className="py-2 text-gray-600 hover:text-primary-600 font-medium" onClick={() => setMenuOpen(false)}>
                                 Negocios
                             </Link>
                             {isAuthenticated ? (
                                 <>
-                                    <Link to="/register-business" className="py-2 text-accent-600 font-medium" onClick={() => setMenuOpen(false)}>
-                                        + Registrar Negocio
-                                    </Link>
+                                    {canRegisterBusiness && (
+                                        <Link to="/register-business" className="py-2 text-accent-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                            + Registrar Negocio
+                                        </Link>
+                                    )}
                                     <Link to={roleHomePath} className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
                                         {roleHomeLabel}
                                     </Link>

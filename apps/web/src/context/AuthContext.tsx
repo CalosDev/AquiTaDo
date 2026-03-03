@@ -48,22 +48,18 @@ function isTokenExpiredOrNearExpiry(token: string): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
-    const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     const clearSession = useCallback(() => {
         setToken(null);
-        setRefreshToken(null);
         setUser(null);
         clearAccessToken();
-        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         localStorage.removeItem('activeOrganizationId');
     }, []);
 
     const applySession = useCallback((payload: {
         accessToken: string;
-        refreshToken: string;
         user: User;
     }) => {
         const normalizedRole: UserRole = isUserRole(payload.user.role) ? payload.user.role : 'USER';
@@ -73,10 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         setToken(payload.accessToken);
-        setRefreshToken(payload.refreshToken);
         setUser(normalizedUser);
         setAccessToken(payload.accessToken);
-        localStorage.setItem('refreshToken', payload.refreshToken);
         localStorage.setItem('user', JSON.stringify(normalizedUser));
     }, []);
 
@@ -94,23 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const bootstrapAuth = async () => {
             const savedToken = getAccessToken();
-            const savedRefreshToken = localStorage.getItem('refreshToken');
 
-            if (!savedToken && !savedRefreshToken) {
-                setLoading(false);
-                return;
-            }
-
-            if (savedRefreshToken) {
+            if (savedToken && !isTokenExpiredOrNearExpiry(savedToken)) {
                 try {
-                    setRefreshToken(savedRefreshToken);
-                    const refreshResponse = await authApi.refresh({ refreshToken: savedRefreshToken });
-                    const { accessToken, refreshToken: rotatedRefreshToken, user: refreshedUser } = refreshResponse.data;
-                    applySession({
-                        accessToken,
-                        refreshToken: rotatedRefreshToken,
-                        user: refreshedUser,
-                    });
+                    setToken(savedToken);
+                    await refreshProfile();
                 } catch {
                     clearSession();
                 } finally {
@@ -119,15 +101,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
-            if (!savedToken || isTokenExpiredOrNearExpiry(savedToken)) {
-                clearSession();
-                setLoading(false);
-                return;
-            }
-
             try {
-                setToken(savedToken);
-                await refreshProfile();
+                const refreshResponse = await authApi.refresh();
+                const { accessToken, user: refreshedUser } = refreshResponse.data;
+
+                if (!accessToken || !refreshedUser) {
+                    clearSession();
+                    setLoading(false);
+                    return;
+                }
+
+                applySession({
+                    accessToken,
+                    user: refreshedUser,
+                });
             } catch {
                 clearSession();
             } finally {
@@ -149,32 +136,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (email: string, password: string) => {
         const response = await authApi.login({ email, password });
-        const { accessToken, refreshToken: newRefreshToken, user: userData } = response.data;
+        const { accessToken, user: userData } = response.data;
         applySession({
             accessToken,
-            refreshToken: newRefreshToken,
             user: userData,
         });
     };
 
     const register = async (name: string, email: string, password: string, phone?: string) => {
         const response = await authApi.register({ name, email, password, phone });
-        const { accessToken, refreshToken: newRefreshToken, user: userData } = response.data;
+        const { accessToken, user: userData } = response.data;
         applySession({
             accessToken,
-            refreshToken: newRefreshToken,
             user: userData,
         });
     };
 
     const logout = async () => {
-        const currentRefreshToken = refreshToken ?? localStorage.getItem('refreshToken');
-        if (currentRefreshToken) {
-            try {
-                await authApi.logout({ refreshToken: currentRefreshToken });
-            } catch {
-                // Ignore network/logout errors and clear client state anyway.
-            }
+        try {
+            await authApi.logout();
+        } catch {
+            // Ignore network/logout errors and clear client state anyway.
         }
         clearSession();
     };
@@ -184,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             value={{
                 user,
                 token,
-                refreshToken,
+                refreshToken: null,
                 loading,
                 login,
                 register,

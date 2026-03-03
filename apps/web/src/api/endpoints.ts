@@ -38,10 +38,8 @@ export const authApi = {
         api.post('/auth/register', data),
     login: (data: { email: string; password: string }) =>
         api.post('/auth/login', data),
-    refresh: (data: { refreshToken: string }) =>
-        api.post('/auth/refresh', data),
-    logout: (data: { refreshToken: string }) =>
-        api.post('/auth/logout', data),
+    refresh: () => api.post('/auth/refresh', {}),
+    logout: () => api.post('/auth/logout', {}),
     getProfile: () => api.get('/users/me'),
 };
 
@@ -59,7 +57,9 @@ export const businessApi = {
     getMine: () => api.get('/businesses/my'),
     getAllAdmin: (params?: Record<string, string | number | boolean>) =>
         api.get('/businesses/admin/all', { params }),
+    getByIdentifier: (identifier: string) => api.get(`/businesses/${identifier}`),
     getById: (id: string) => api.get(`/businesses/${id}`),
+    getBySlug: (slug: string) => api.get(`/businesses/${slug}`),
     create: (data: Record<string, unknown>) => api.post('/businesses', data),
     update: (id: string, data: Record<string, unknown>) => api.put(`/businesses/${id}`, data),
     delete: (id: string) => api.delete(`/businesses/${id}`),

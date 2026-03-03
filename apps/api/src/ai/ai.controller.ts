@@ -79,21 +79,33 @@ export class AiController {
     @OrgRoles('OWNER', 'MANAGER', 'STAFF')
     async generateAutoReply(
         @Param('businessId', new ParseUUIDPipe()) businessId: string,
+        @CurrentOrganization('organizationId') organizationId: string,
+        @CurrentUser('role') actorGlobalRole: string,
         @Body() dto: BusinessAutoReplyDto,
     ) {
         return this.aiService.generateBusinessAutoReply(
             businessId,
             dto.message,
             dto.customerName,
+            {
+                organizationId,
+                actorGlobalRole,
+            },
         );
     }
 
     @Post('reviews/:reviewId/analyze')
-    @UseGuards(AdvancedRateLimitGuard, JwtAuthGuard)
+    @UseGuards(AdvancedRateLimitGuard, JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
     @RateLimitPolicy('ai')
+    @OrgRoles('OWNER', 'MANAGER', 'STAFF')
     async analyzeReview(
         @Param('reviewId', new ParseUUIDPipe()) reviewId: string,
+        @CurrentOrganization('organizationId') organizationId: string,
+        @CurrentUser('role') actorGlobalRole: string,
     ) {
-        return this.aiService.analyzeReviewSentiment(reviewId);
+        return this.aiService.analyzeReviewSentiment(reviewId, {
+            organizationId,
+            actorGlobalRole,
+        });
     }
 }

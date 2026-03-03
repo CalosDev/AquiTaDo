@@ -1,6 +1,16 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/useAuth';
 
 export function Footer() {
+    const { isAuthenticated, user } = useAuth();
+    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+    const registerBusinessPath = isAuthenticated && !canRegisterBusiness
+        ? '/organization'
+        : '/register-business';
+    const registerBusinessLabel = isAuthenticated && !canRegisterBusiness
+        ? 'Crear Organizacion'
+        : 'Registrar Negocio';
+
     return (
         <footer className="bg-gray-900 text-gray-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -31,7 +41,7 @@ export function Footer() {
                         <h4 className="font-display font-semibold text-white mb-4">Explora</h4>
                         <ul className="space-y-2 text-sm">
                             <li><Link to="/businesses" className="hover:text-accent-400 transition-colors">Negocios</Link></li>
-                            <li><Link to="/register-business" className="hover:text-accent-400 transition-colors">Registrar Negocio</Link></li>
+                            <li><Link to={registerBusinessPath} className="hover:text-accent-400 transition-colors">{registerBusinessLabel}</Link></li>
                             <li><Link to="/register" className="hover:text-accent-400 transition-colors">Crear Cuenta</Link></li>
                         </ul>
                     </div>

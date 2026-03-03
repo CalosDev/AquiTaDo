@@ -73,6 +73,9 @@ describe('AuthController (e2e)', () => {
 
         expect(typeof response.body.accessToken).toBe('string');
         expect(response.body.accessToken.length).toBeGreaterThan(20);
+        expect(response.body.refreshToken).toBeUndefined();
+        expect(response.headers['set-cookie']).toBeDefined();
+        expect(String(response.headers['set-cookie']?.[0] ?? '')).toContain('aquita_refresh_token=');
         expect(response.body.user).toMatchObject({
             name: payload.name,
             email: payload.email,
@@ -126,6 +129,7 @@ describe('AuthController (e2e)', () => {
             .expect(200);
 
         expect(typeof response.body.accessToken).toBe('string');
+        expect(response.body.refreshToken).toBeUndefined();
         expect(response.body.user).toMatchObject({
             email: payload.email,
             name: payload.name,
@@ -153,5 +157,38 @@ describe('AuthController (e2e)', () => {
             statusCode: 401,
             error: 'Unauthorized',
         });
+    });
+
+    it('rotates refresh token via HttpOnly cookie flow', async () => {
+        const payload = makeRegisterPayload('refresh-cookie');
+
+        const registerResponse = await request(app.getHttpServer())
+            .post('/api/auth/register')
+            .send(payload)
+            .expect(201);
+
+        const rawCookieHeader = registerResponse.headers['set-cookie'];
+        const cookieHeader = Array.isArray(rawCookieHeader)
+            ? rawCookieHeader
+            : rawCookieHeader
+                ? [String(rawCookieHeader)]
+                : [];
+
+        expect(cookieHeader.length).toBeGreaterThan(0);
+        const refreshCookie = cookieHeader.find((cookie) =>
+            cookie.startsWith('aquita_refresh_token='),
+        );
+        expect(refreshCookie).toBeDefined();
+
+        const refreshResponse = await request(app.getHttpServer())
+            .post('/api/auth/refresh')
+            .set('Cookie', [refreshCookie as string])
+            .send({})
+            .expect(200);
+
+        expect(typeof refreshResponse.body.accessToken).toBe('string');
+        expect(refreshResponse.body.refreshToken).toBeUndefined();
+        expect(refreshResponse.headers['set-cookie']).toBeDefined();
+        expect(String(refreshResponse.headers['set-cookie']?.[0] ?? '')).toContain('aquita_refresh_token=');
     });
 });

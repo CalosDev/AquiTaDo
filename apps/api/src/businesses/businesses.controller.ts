@@ -1,6 +1,7 @@
 import {
     Controller, Get, Post, Put, Delete, Body, Param, ParseUUIDPipe, Query, UseGuards, Inject,
 } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import { BusinessesService } from './businesses.service';
 import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -54,20 +55,25 @@ export class BusinessesController {
         return this.businessesService.findAllAdmin(query);
     }
 
-    @Get(':id')
+    @Get(':identifier')
     @PublicCache({ maxAgeSeconds: 120, staleWhileRevalidateSeconds: 900 })
     @UseGuards(OptionalJwtAuthGuard, OptionalOrgContextGuard)
-    async findById(
-        @Param('id', new ParseUUIDPipe()) id: string,
+    async findByIdentifier(
+        @Param('identifier') identifier: string,
         @CurrentUser('id') userId?: string,
         @CurrentUser('role') userRole?: string,
         @CurrentOrganization('organizationId') organizationId?: string,
     ) {
-        return this.businessesService.findById(id, userId, userRole, organizationId);
+        if (isUUID(identifier)) {
+            return this.businessesService.findById(identifier, userId, userRole, organizationId);
+        }
+
+        return this.businessesService.findBySlug(identifier, userId, userRole, organizationId);
     }
 
     @Post()
-    @UseGuards(JwtAuthGuard, OptionalOrgContextGuard, PolicyGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard, OptionalOrgContextGuard, PolicyGuard)
+    @Roles('BUSINESS_OWNER', 'ADMIN')
     @Policy({ resource: 'business', action: 'create' })
     async create(
         @Body() dto: CreateBusinessDto,

@@ -232,7 +232,21 @@ async function bootstrap() {
 
     app.use(
         helmet({
-            contentSecurityPolicy: false,
+            contentSecurityPolicy: {
+                useDefaults: false,
+                directives: {
+                    defaultSrc: ["'none'"],
+                    baseUri: ["'none'"],
+                    frameAncestors: ["'none'"],
+                    objectSrc: ["'none'"],
+                    scriptSrc: ["'none'"],
+                    styleSrc: ["'none'"],
+                    fontSrc: ["'none'"],
+                    connectSrc: ["'self'"],
+                    imgSrc: ["'self'", 'data:', 'https:'],
+                    formAction: ["'self'"],
+                },
+            },
             crossOriginEmbedderPolicy: false,
             crossOriginResourcePolicy: { policy: 'cross-origin' },
             hsts: process.env.NODE_ENV === 'production'
@@ -310,6 +324,20 @@ async function bootstrap() {
             transformOptions: { enableImplicitConversion: true },
         }),
     );
+
+    const expressApp = app.getHttpAdapter().getInstance();
+    expressApp.get('/', (_request: Request, response: Response) => {
+        response.status(200).json({
+            service: 'aquita-api',
+            status: 'ok',
+            health: '/api/health',
+            ready: '/api/health/ready',
+        });
+    });
+
+    expressApp.head('/', (_request: Request, response: Response) => {
+        response.status(200).end();
+    });
 
     app.setGlobalPrefix('api');
     app.enableShutdownHooks();

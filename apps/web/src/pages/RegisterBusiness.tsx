@@ -124,7 +124,7 @@ export function RegisterBusiness() {
 
             const res = await businessApi.create(payload);
             await refreshProfile();
-            navigate(`/businesses/${res.data.id}`);
+            navigate(`/businesses/${res.data.slug || res.data.id}`);
         } catch (err: unknown) {
             setError(getApiErrorMessage(err, 'Error al registrar negocio'));
         } finally {
@@ -159,8 +159,9 @@ export function RegisterBusiness() {
                         <h3 className="font-display font-semibold text-gray-800 mb-3">Informacion Basica</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-sm font-medium text-gray-700 mb-1 block">Nombre del negocio *</label>
+                                <label htmlFor="register-business-name" className="text-sm font-medium text-gray-700 mb-1 block">Nombre del negocio *</label>
                                 <input
+                                    id="register-business-name"
                                     type="text"
                                     required
                                     value={formData.name}
@@ -170,8 +171,9 @@ export function RegisterBusiness() {
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-gray-700 mb-1 block">Descripcion *</label>
+                                <label htmlFor="register-business-description" className="text-sm font-medium text-gray-700 mb-1 block">Descripcion *</label>
                                 <textarea
+                                    id="register-business-description"
                                     required
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -188,8 +190,9 @@ export function RegisterBusiness() {
                         <h3 className="font-display font-semibold text-gray-800 mb-3">Contacto</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="text-sm font-medium text-gray-700 mb-1 block">Telefono</label>
+                                <label htmlFor="register-business-phone" className="text-sm font-medium text-gray-700 mb-1 block">Telefono</label>
                                 <input
+                                    id="register-business-phone"
                                     type="tel"
                                     value={formData.phone}
                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -198,8 +201,9 @@ export function RegisterBusiness() {
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-gray-700 mb-1 block">WhatsApp</label>
+                                <label htmlFor="register-business-whatsapp" className="text-sm font-medium text-gray-700 mb-1 block">WhatsApp</label>
                                 <input
+                                    id="register-business-whatsapp"
                                     type="tel"
                                     value={formData.whatsapp}
                                     onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
@@ -215,8 +219,9 @@ export function RegisterBusiness() {
                         <h3 className="font-display font-semibold text-gray-800 mb-3">Ubicacion</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-sm font-medium text-gray-700 mb-1 block">Direccion *</label>
+                                <label htmlFor="register-business-address" className="text-sm font-medium text-gray-700 mb-1 block">Direccion *</label>
                                 <input
+                                    id="register-business-address"
                                     type="text"
                                     required
                                     value={formData.address}
@@ -227,8 +232,9 @@ export function RegisterBusiness() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-sm font-medium text-gray-700 mb-1 block">Provincia *</label>
+                                    <label htmlFor="register-business-province" className="text-sm font-medium text-gray-700 mb-1 block">Provincia *</label>
                                     <select
+                                        id="register-business-province"
                                         required
                                         value={formData.provinceId}
                                         onChange={(e) => setFormData({ ...formData, provinceId: e.target.value, cityId: '' })}
@@ -241,8 +247,9 @@ export function RegisterBusiness() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium text-gray-700 mb-1 block">Ciudad</label>
+                                    <label htmlFor="register-business-city" className="text-sm font-medium text-gray-700 mb-1 block">Ciudad</label>
                                     <select
+                                        id="register-business-city"
                                         value={formData.cityId}
                                         onChange={(e) => setFormData({ ...formData, cityId: e.target.value })}
                                         className="input-field"
@@ -257,8 +264,9 @@ export function RegisterBusiness() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-sm font-medium text-gray-700 mb-1 block">Latitud</label>
+                                    <label htmlFor="register-business-latitude" className="text-sm font-medium text-gray-700 mb-1 block">Latitud</label>
                                     <input
+                                        id="register-business-latitude"
                                         type="number"
                                         step="any"
                                         value={formData.latitude}
@@ -268,8 +276,9 @@ export function RegisterBusiness() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium text-gray-700 mb-1 block">Longitud</label>
+                                    <label htmlFor="register-business-longitude" className="text-sm font-medium text-gray-700 mb-1 block">Longitud</label>
                                     <input
+                                        id="register-business-longitude"
                                         type="number"
                                         step="any"
                                         value={formData.longitude}

@@ -190,8 +190,26 @@ describe('BusinessesController (e2e)', () => {
         });
     });
 
-    it('creates a business and promotes owner role from USER to BUSINESS_OWNER', async () => {
-        const owner = await createUser('USER');
+    it('rejects business creation for USER role', async () => {
+        const regularUser = await createUser('USER');
+        const regularUserToken = signToken(regularUser.id, regularUser.role);
+        const province = await createProvince();
+        const seed = makeSeed();
+
+        const response = await request(app.getHttpServer())
+            .post('/api/businesses')
+            .set('Authorization', `Bearer ${regularUserToken}`)
+            .send(makeCreateBusinessPayload(seed, province.id))
+            .expect(403);
+
+        expect(response.body).toMatchObject({
+            statusCode: 403,
+            error: 'Forbidden',
+        });
+    });
+
+    it('creates a business for BUSINESS_OWNER role', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
         const ownerToken = signToken(owner.id, owner.role);
         const province = await createProvince();
         const seed = makeSeed();
@@ -210,13 +228,10 @@ describe('BusinessesController (e2e)', () => {
             },
         });
         expect(String(response.body.slug)).toContain(BUSINESS_SLUG_PREFIX);
-
-        const updatedOwner = await prisma.user.findUnique({ where: { id: owner.id } });
-        expect(updatedOwner?.role).toBe('BUSINESS_OWNER');
     });
 
     it('hides unverified business from public and allows owner access', async () => {
-        const owner = await createUser('USER');
+        const owner = await createUser('BUSINESS_OWNER');
         const ownerToken = signToken(owner.id, owner.role);
         const province = await createProvince();
         const seed = makeSeed();
@@ -246,7 +261,7 @@ describe('BusinessesController (e2e)', () => {
     });
 
     it('rejects update attempts from non-owner non-admin users', async () => {
-        const owner = await createUser('USER');
+        const owner = await createUser('BUSINESS_OWNER');
         const outsider = await createUser('USER');
         const ownerToken = signToken(owner.id, owner.role);
         const outsiderToken = signToken(outsider.id, outsider.role);
@@ -272,8 +287,38 @@ describe('BusinessesController (e2e)', () => {
         });
     });
 
+    it('soft-deletes a business and hides it from public results', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
+        const ownerToken = signToken(owner.id, owner.role);
+        const province = await createProvince();
+        const seed = makeSeed();
+
+        const created = await request(app.getHttpServer())
+            .post('/api/businesses')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .send(makeCreateBusinessPayload(seed, province.id))
+            .expect(201);
+
+        const businessId = String(created.body.id);
+        const organizationId = String(created.body.organization.id);
+
+        const deleted = await request(app.getHttpServer())
+            .delete(`/api/businesses/${businessId}`)
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .expect(200);
+
+        expect(deleted.body).toMatchObject({
+            message: 'Negocio eliminado exitosamente',
+        });
+
+        await request(app.getHttpServer())
+            .get(`/api/businesses/${businessId}`)
+            .expect(404);
+    });
+
     it('allows admins to verify businesses and then exposes them publicly', async () => {
-        const owner = await createUser('USER');
+        const owner = await createUser('BUSINESS_OWNER');
         const admin = await createUser('ADMIN');
         const ownerToken = signToken(owner.id, owner.role);
         const adminToken = signToken(admin.id, admin.role);
@@ -304,6 +349,16 @@ describe('BusinessesController (e2e)', () => {
 
         expect(publicView.body).toMatchObject({
             id: businessId,
+            verified: true,
+        });
+
+        const publicViewBySlug = await request(app.getHttpServer())
+            .get(`/api/businesses/${created.body.slug}`)
+            .expect(200);
+
+        expect(publicViewBySlug.body).toMatchObject({
+            id: businessId,
+            slug: created.body.slug,
             verified: true,
         });
     });

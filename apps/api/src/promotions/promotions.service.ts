@@ -73,6 +73,7 @@ export class PromotionsService {
                 endsAt: { gte: now },
                 business: {
                     verified: true,
+                    deletedAt: null,
                 },
             };
 
@@ -361,8 +362,12 @@ export class PromotionsService {
 
         this.assertCanManagePromotions(actorGlobalRole, organizationRole);
 
-        await this.prisma.promotion.delete({
+        await this.prisma.promotion.update({
             where: { id },
+            data: {
+                deletedAt: new Date(),
+                isActive: false,
+            },
         });
         await this.invalidatePublicPromotionsCache();
 

@@ -16,6 +16,8 @@ import { OrgContextGuard } from '../organizations/guards/org-context.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AdvancedRateLimitGuard } from '../security/advanced-rate-limit.guard';
+import { RateLimitPolicy } from '../security/rate-limit-policy.decorator';
 import { AnalyticsService } from './analytics.service';
 import {
     AnalyticsRangeQueryDto,
@@ -35,19 +37,22 @@ export class AnalyticsController {
     ) { }
 
     @Post('events')
+    @UseGuards(AdvancedRateLimitGuard)
+    @RateLimitPolicy('default')
     async trackEvent(@Body() dto: TrackBusinessEventDto) {
         return this.analyticsService.trackBusinessEvent(dto);
     }
 
     @Post('events/growth')
-    @UseGuards(OptionalJwtAuthGuard)
+    @UseGuards(AdvancedRateLimitGuard, OptionalJwtAuthGuard)
+    @RateLimitPolicy('default')
     async trackGrowthEvent(
         @Body() dto: TrackGrowthEventDto,
         @CurrentUser('id') userId?: string,
     ) {
         return this.analyticsService.trackGrowthEvent({
             ...dto,
-            userId: dto.userId ?? userId,
+            userId,
         });
     }
 

@@ -5,6 +5,7 @@ import {
     HttpStatus,
     Inject,
     Injectable,
+    Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -38,8 +39,9 @@ export class AdvancedRateLimitGuard implements CanActivate {
         private readonly configService: ConfigService,
         @Inject(RedisService)
         private readonly redisService: RedisService,
+        @Optional()
         @Inject(ObservabilityService)
-        private readonly observabilityService: ObservabilityService,
+        private readonly observabilityService?: ObservabilityService,
     ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -86,7 +88,7 @@ export class AdvancedRateLimitGuard implements CanActivate {
             const count = await this.incrementCounter(key, config.windowSeconds);
 
             if (count > check.limit) {
-                this.observabilityService.trackRateLimitHit(policy, check.identifier);
+                this.observabilityService?.trackRateLimitHit(policy, check.identifier);
                 response.setHeader('Retry-After', String(config.windowSeconds));
                 throw new HttpException(
                     {

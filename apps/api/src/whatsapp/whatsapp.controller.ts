@@ -18,6 +18,8 @@ import { CurrentOrganization } from '../organizations/decorators/current-organiz
 import { OrgRoles } from '../organizations/decorators/org-roles.decorator';
 import { OrgContextGuard } from '../organizations/guards/org-context.guard';
 import { OrgRolesGuard } from '../organizations/guards/org-roles.guard';
+import { AdvancedRateLimitGuard } from '../security/advanced-rate-limit.guard';
+import { RateLimitPolicy } from '../security/rate-limit-policy.decorator';
 import {
     CreateClickToChatDto,
     ListWhatsAppConversationsDto,
@@ -50,7 +52,8 @@ export class WhatsAppController {
     }
 
     @Post('click-to-chat')
-    @UseGuards(OptionalJwtAuthGuard)
+    @UseGuards(AdvancedRateLimitGuard, OptionalJwtAuthGuard)
+    @RateLimitPolicy('default')
     async createClickToChat(
         @Body() dto: CreateClickToChatDto,
         @CurrentUser('id') userId?: string,

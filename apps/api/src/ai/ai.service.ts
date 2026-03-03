@@ -36,6 +36,11 @@ type SentimentAnalysisResult = {
     isNegative: boolean;
 };
 
+type AiActorScope = {
+    organizationId: string;
+    actorGlobalRole: string;
+};
+
 /**
  * Orchestrates RAG querying, business auto-responses, and review sentiment analysis.
  */
@@ -126,6 +131,7 @@ export class AiService {
         businessId: string,
         userMessage: string,
         customerName?: string,
+        actorScope?: AiActorScope,
     ): Promise<{ reply: string; businessName: string; organizationId: string }> {
         const business = await this.prisma.business.findUnique({
             where: { id: businessId },
@@ -161,6 +167,14 @@ export class AiService {
         });
 
         if (!business) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        if (
+            actorScope &&
+            actorScope.actorGlobalRole !== 'ADMIN' &&
+            business.organizationId !== actorScope.organizationId
+        ) {
             throw new NotFoundException('Negocio no encontrado');
         }
 
@@ -277,7 +291,10 @@ export class AiService {
         };
     }
 
-    async analyzeReviewSentiment(reviewId: string): Promise<SentimentAnalysisResult> {
+    async analyzeReviewSentiment(
+        reviewId: string,
+        actorScope?: AiActorScope,
+    ): Promise<SentimentAnalysisResult> {
         const review = await this.prisma.review.findUnique({
             where: { id: reviewId },
             select: {
@@ -296,6 +313,14 @@ export class AiService {
         });
 
         if (!review) {
+            throw new NotFoundException('Resena no encontrada');
+        }
+
+        if (
+            actorScope &&
+            actorScope.actorGlobalRole !== 'ADMIN' &&
+            review.business.organizationId !== actorScope.organizationId
+        ) {
             throw new NotFoundException('Resena no encontrada');
         }
 

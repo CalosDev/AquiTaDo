@@ -6,6 +6,7 @@ import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
+import { applySeoMeta } from '../seo/meta';
 
 interface Business {
     id: string;
@@ -29,7 +30,7 @@ interface Business {
 }
 
 export function BusinessDetails() {
-    const { id } = useParams<{ id: string }>();
+    const { slug } = useParams<{ slug: string }>();
     const { isAuthenticated } = useAuth();
     const [business, setBusiness] = useState<Business | null>(null);
     const [loading, setLoading] = useState(true);
@@ -46,13 +47,13 @@ export function BusinessDetails() {
     const [contactVariant, setContactVariant] = useState('control');
 
     const loadBusiness = useCallback(async () => {
-        if (!id) {
+        if (!slug) {
             setLoading(false);
             return;
         }
 
         try {
-            const res = await businessApi.getById(id);
+            const res = await businessApi.getByIdentifier(slug);
             setBusiness(res.data);
             setActiveImage(0);
             setErrorMessage('');
@@ -62,7 +63,7 @@ export function BusinessDetails() {
         } finally {
             setLoading(false);
         }
-    }, [id]);
+    }, [slug]);
 
     useEffect(() => {
         void loadBusiness();
@@ -88,9 +89,23 @@ export function BusinessDetails() {
         }).catch(() => undefined);
     }, [business?.id]);
 
+    useEffect(() => {
+        if (!business) {
+            return;
+        }
+
+        const canonicalPath = `/businesses/${business.slug || business.id}`;
+        const description = business.description?.trim().slice(0, 160) || `Perfil de ${business.name} en AquiTa.do`;
+        applySeoMeta({
+            title: `${business.name} | AquiTa.do`,
+            description,
+            canonicalPath,
+        });
+    }, [business]);
+
     const handleReviewSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!id) return;
+        if (!business?.id) return;
         setSubmittingReview(true);
         setReviewErrorMessage('');
         setReviewSuccessMessage('');
@@ -98,7 +113,7 @@ export function BusinessDetails() {
             await reviewApi.create({
                 rating: reviewForm.rating,
                 comment: reviewForm.comment || undefined,
-                businessId: id,
+                businessId: business.id,
             });
             setReviewForm({ rating: 5, comment: '' });
             await loadBusiness();
@@ -112,7 +127,7 @@ export function BusinessDetails() {
 
     const handleMessageSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-        if (!id || !messageForm.content.trim()) {
+        if (!business?.id || !messageForm.content.trim()) {
             setMessageErrorMessage('Escribe un mensaje para el negocio');
             return;
         }
@@ -123,14 +138,14 @@ export function BusinessDetails() {
 
         try {
             await messagingApi.createConversation({
-                businessId: id,
+                businessId: business.id,
                 subject: messageForm.subject.trim() || undefined,
                 message: messageForm.content.trim(),
             });
             setMessageForm({ subject: '', content: '' });
             setMessageSuccessMessage('Mensaje enviado correctamente');
             void analyticsApi.trackEvent({
-                businessId: id,
+                businessId: business.id,
                 eventType: 'RESERVATION_REQUEST',
                 visitorId: getOrCreateVisitorId(),
             }).catch(() => undefined);

@@ -95,7 +95,7 @@ export class AnalyticsService {
         });
     }
 
-    async trackGrowthEvent(dto: TrackGrowthEventDto) {
+    async trackGrowthEvent(dto: TrackGrowthEventDto & { userId?: string }) {
         const occurredAt = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
         const visitorIdHash = dto.visitorId?.trim()
             ? createHash('sha256').update(dto.visitorId.trim()).digest('hex').slice(0, 64)

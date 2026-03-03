@@ -49,6 +49,10 @@ export class PolicyService {
         resourceId?: string,
     ): Promise<void> {
         if (action === 'create') {
+            if (principal.role !== 'BUSINESS_OWNER') {
+                throw new ForbiddenException('Only BUSINESS_OWNER can create businesses');
+            }
+
             if (!organizationContext?.organizationId) {
                 return;
             }

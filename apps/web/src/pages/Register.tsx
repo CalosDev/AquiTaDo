@@ -14,7 +14,7 @@ export function Register() {
         setError('');
 
         if (formData.password.length < 8) {
-            setError('La contraseña debe tener al menos 8 caracteres');
+            setError('La contrasena debe tener al menos 8 caracteres');
             return;
         }
 
@@ -23,8 +23,8 @@ export function Register() {
             await register(formData.name, formData.email, formData.password, formData.phone || undefined);
             navigate('/app');
         } catch (err: unknown) {
-            const error = err as { response?: { data?: { message?: string } } };
-            setError(error.response?.data?.message || 'Error al registrarse');
+            const requestError = err as { response?: { data?: { message?: string } } };
+            setError(requestError.response?.data?.message || 'Error al registrarse');
         } finally {
             setLoading(false);
         }
@@ -39,7 +39,7 @@ export function Register() {
                             A
                         </div>
                         <h1 className="font-display text-2xl font-bold text-gray-900">Crea tu cuenta</h1>
-                        <p className="text-gray-500 text-sm mt-1">Únete a la comunidad AquiTa.do</p>
+                        <p className="text-gray-500 text-sm mt-1">Unete a la comunidad AquiTa.do</p>
                     </div>
 
                     {error && (
@@ -50,19 +50,25 @@ export function Register() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">Nombre completo</label>
+                            <label htmlFor="register-name" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Nombre completo
+                            </label>
                             <input
+                                id="register-name"
                                 type="text"
                                 required
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 className="input-field"
-                                placeholder="Juan Pérez"
+                                placeholder="Juan Perez"
                             />
                         </div>
                         <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">Correo electrónico</label>
+                            <label htmlFor="register-email" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Correo electronico
+                            </label>
                             <input
+                                id="register-email"
                                 type="email"
                                 required
                                 value={formData.email}
@@ -72,8 +78,11 @@ export function Register() {
                             />
                         </div>
                         <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">Teléfono (opcional)</label>
+                            <label htmlFor="register-phone" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Telefono (opcional)
+                            </label>
                             <input
+                                id="register-phone"
                                 type="tel"
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -82,14 +91,17 @@ export function Register() {
                             />
                         </div>
                         <div>
-                            <label className="text-sm font-medium text-gray-700 mb-1 block">Contraseña</label>
+                            <label htmlFor="register-password" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Contrasena
+                            </label>
                             <input
+                                id="register-password"
                                 type="password"
                                 required
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 className="input-field"
-                                placeholder="Mínimo 8 caracteres"
+                                placeholder="Minimo 8 caracteres"
                             />
                         </div>
                         <button type="submit" disabled={loading} className="btn-primary w-full">
@@ -98,9 +110,9 @@ export function Register() {
                     </form>
 
                     <p className="text-center text-sm text-gray-500 mt-6">
-                        ¿Ya tienes cuenta?{' '}
+                        Ya tienes cuenta?{' '}
                         <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-                            Inicia sesión
+                            Inicia sesion
                         </Link>
                     </p>
                 </div>

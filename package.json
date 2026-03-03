@@ -12,6 +12,8 @@
     "build:api": "pnpm --filter @aquita/api build",
     "lint": "pnpm --parallel -r run lint",
     "test": "pnpm --parallel -r --if-present run test",
+    "test:unit": "pnpm --parallel -r --if-present run test:unit",
+    "test:e2e:api": "pnpm --filter @aquita/api test:e2e",
     "smoke:api": "node scripts/smoke-api.mjs",
     "smoke:full": "node scripts/smoke-full.mjs",
     "smoke:saas": "node scripts/smoke-saas.mjs",

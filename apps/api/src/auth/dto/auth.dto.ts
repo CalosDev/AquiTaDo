@@ -27,6 +27,7 @@ export class LoginDto {
 }
 
 export class RefreshTokenDto {
+    @IsOptional()
     @IsString()
     @IsNotEmpty()
     refreshToken!: string;

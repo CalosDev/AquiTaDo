@@ -45,7 +45,7 @@ export function AppRouter() {
                 <Route element={<MainLayout />}>
                     <Route path="/" element={<Home />} />
                     <Route path="/businesses" element={<BusinessesList />} />
-                    <Route path="/businesses/:id" element={<BusinessDetails />} />
+                    <Route path="/businesses/:slug" element={<BusinessDetails />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/terms" element={<Terms />} />
@@ -93,7 +93,7 @@ export function AppRouter() {
                     <Route
                         path="/register-business"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute roles={['BUSINESS_OWNER', 'ADMIN']}>
                                 <RegisterBusiness />
                             </ProtectedRoute>
                         }

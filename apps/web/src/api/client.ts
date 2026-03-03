@@ -72,6 +72,7 @@ export function clearAccessToken(): void {
 const api = axios.create({
     baseURL: API_BASE_URL,
     timeout: 15_000,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -87,7 +88,6 @@ function clearAuthStorage() {
         return;
     }
 
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     localStorage.removeItem('activeOrganizationId');
 }
@@ -114,29 +114,23 @@ async function requestAccessTokenRefresh(): Promise<string | null> {
         return null;
     }
 
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (!refreshToken) {
-        return null;
-    }
-
     refreshRequestPromise = axios
-        .post<{ accessToken: string; refreshToken: string; user?: unknown }>(
+        .post<{ accessToken: string; user?: unknown }>(
             `${API_BASE_URL}/auth/refresh`,
-            { refreshToken },
+            {},
             {
                 headers: { 'Content-Type': 'application/json' },
+                withCredentials: true,
             },
         )
         .then((response) => {
             const newAccessToken = response.data.accessToken;
-            const newRefreshToken = response.data.refreshToken;
 
-            if (!newAccessToken || !newRefreshToken) {
+            if (!newAccessToken) {
                 return null;
             }
 
             setAccessToken(newAccessToken);
-            localStorage.setItem('refreshToken', newRefreshToken);
 
             if (response.data.user) {
                 localStorage.setItem('user', JSON.stringify(response.data.user));

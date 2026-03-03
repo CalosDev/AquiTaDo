@@ -75,6 +75,17 @@ function assertRangeNumber(
     }
 }
 
+function assertInSet(config: EnvRecord, key: string, allowed: string[]): void {
+    if (config[key] === undefined) {
+        return;
+    }
+
+    const value = String(config[key]).trim().toLowerCase();
+    if (!allowed.includes(value)) {
+        throw new Error(`${key} must be one of: ${allowed.join(', ')}`);
+    }
+}
+
 export function validateEnv(config: EnvRecord): EnvRecord {
     const requiredVars = ['DATABASE_URL', 'JWT_SECRET'];
 
@@ -100,6 +111,15 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     if (config.JWT_REFRESH_TTL_DAYS !== undefined) {
         assertPositiveInteger(config, 'JWT_REFRESH_TTL_DAYS');
     }
+
+    assertNonEmptyString(config, 'AUTH_REFRESH_COOKIE_NAME');
+    assertNonEmptyString(config, 'AUTH_REFRESH_COOKIE_PATH');
+    assertBooleanLike(config, 'AUTH_REFRESH_COOKIE_SECURE');
+    assertInSet(config, 'AUTH_REFRESH_COOKIE_SAMESITE', ['lax', 'strict', 'none']);
+    assertInSet(config, 'STORAGE_PROVIDER', ['local', 's3']);
+    assertBooleanLike(config, 'STORAGE_S3_FORCE_PATH_STYLE');
+    assertValidUrl(config, 'STORAGE_S3_ENDPOINT', ['http:', 'https:']);
+    assertValidUrl(config, 'STORAGE_PUBLIC_BASE_URL', ['http:', 'https:']);
 
     assertPositiveInteger(config, 'PORT');
     assertPositiveInteger(config, 'THROTTLE_TTL_MS');
@@ -160,6 +180,17 @@ export function validateEnv(config: EnvRecord): EnvRecord {
             const value = config[key];
             if (typeof value !== 'string' || value.trim().length === 0) {
                 throw new Error(`${key} is required when WHATSAPP_ENABLED=true`);
+            }
+        }
+    }
+
+    const storageProvider = String(config.STORAGE_PROVIDER ?? 'local').trim().toLowerCase();
+    if (storageProvider === 's3') {
+        const requiredStorageVars = ['STORAGE_S3_BUCKET', 'STORAGE_S3_REGION'];
+        for (const key of requiredStorageVars) {
+            const value = config[key];
+            if (typeof value !== 'string' || value.trim().length === 0) {
+                throw new Error(`${key} is required when STORAGE_PROVIDER=s3`);
             }
         }
     }

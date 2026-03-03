@@ -226,8 +226,9 @@ export function BusinessesList() {
 
                         {/* Search */}
                         <div className="mb-5">
-                            <label className="text-sm font-medium text-gray-600 mb-1.5 block">Buscar</label>
+                            <label htmlFor="businesses-search" className="text-sm font-medium text-gray-600 mb-1.5 block">Buscar</label>
                             <input
+                                id="businesses-search"
                                 type="text"
                                 placeholder="Nombre o descripción..."
                                 value={searchInput}
@@ -238,8 +239,9 @@ export function BusinessesList() {
 
                         {/* Category */}
                         <div className="mb-5">
-                            <label className="text-sm font-medium text-gray-600 mb-1.5 block">Categoría</label>
+                            <label htmlFor="businesses-category" className="text-sm font-medium text-gray-600 mb-1.5 block">Categoría</label>
                             <select
+                                id="businesses-category"
                                 value={currentCategory}
                                 onChange={(e) => updateFilter('categoryId', e.target.value)}
                                 className="input-field text-sm"
@@ -255,8 +257,9 @@ export function BusinessesList() {
 
                         {/* Province */}
                         <div className="mb-5">
-                            <label className="text-sm font-medium text-gray-600 mb-1.5 block">Provincia</label>
+                            <label htmlFor="businesses-province" className="text-sm font-medium text-gray-600 mb-1.5 block">Provincia</label>
                             <select
+                                id="businesses-province"
                                 value={currentProvince}
                                 onChange={(e) => updateFilter('provinceId', e.target.value)}
                                 className="input-field text-sm"
@@ -309,7 +312,7 @@ export function BusinessesList() {
                                     {sponsoredPlacements.map((placement) => (
                                         <Link
                                             key={placement.campaign.id}
-                                            to={`/businesses/${placement.business.id}`}
+                                            to={`/businesses/${placement.business.slug || placement.business.id}`}
                                             onClick={() => {
                                                 void adsApi.trackClick(placement.campaign.id, {
                                                     visitorId: getOrCreateVisitorId(),
@@ -340,7 +343,7 @@ export function BusinessesList() {
                                 {businesses.map((biz) => (
                                     <Link
                                         key={biz.id}
-                                        to={`/businesses/${biz.id}`}
+                                        to={`/businesses/${biz.slug || biz.id}`}
                                         onClick={() => {
                                             trackBusinessClick(biz.id, 'businesses-list');
                                         }}

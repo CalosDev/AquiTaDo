@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { Request } from 'express';
+import { CookieOptions, Request, Response } from 'express';
 import { Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
@@ -29,13 +29,13 @@ export class AuthService {
         private readonly configService: ConfigService,
     ) { }
 
-    async register(dto: RegisterDto, request: Request) {
+    async register(dto: RegisterDto, request: Request, response: Response) {
         const existingUser = await this.prisma.user.findUnique({
             where: { email: dto.email.trim().toLowerCase() },
         });
 
         if (existingUser) {
-            throw new ConflictException('El correo electrónico ya está registrado');
+            throw new ConflictException('El correo electronico ya esta registrado');
         }
 
         const hashedPassword = await bcrypt.hash(dto.password, 12);
@@ -60,21 +60,22 @@ export class AuthService {
                 updatedAt: user.updatedAt,
             },
             request,
+            response,
         );
     }
 
-    async login(dto: LoginDto, request: Request) {
+    async login(dto: LoginDto, request: Request, response: Response) {
         const user = await this.prisma.user.findUnique({
             where: { email: dto.email.trim().toLowerCase() },
         });
 
         if (!user) {
-            throw new UnauthorizedException('Credenciales inválidas');
+            throw new UnauthorizedException('Credenciales invalidas');
         }
 
         const isPasswordValid = await bcrypt.compare(dto.password, user.password);
         if (!isPasswordValid) {
-            throw new UnauthorizedException('Credenciales inválidas');
+            throw new UnauthorizedException('Credenciales invalidas');
         }
 
         return this.issueAuthSession(
@@ -88,13 +89,22 @@ export class AuthService {
                 updatedAt: user.updatedAt,
             },
             request,
+            response,
         );
     }
 
-    async refresh(refreshToken: string, request: Request) {
-        const normalizedToken = refreshToken?.trim();
+    async refresh(
+        refreshTokenFromBody: string | undefined,
+        request: Request,
+        response: Response,
+    ) {
+        const normalizedToken = this.resolveRefreshToken(
+            request,
+            refreshTokenFromBody,
+            true,
+        );
         if (!normalizedToken) {
-            throw new UnauthorizedException('Refresh token inválido');
+            throw new UnauthorizedException('Refresh token invalido');
         }
 
         const payload = this.verifyRefreshToken(normalizedToken);
@@ -118,38 +128,43 @@ export class AuthService {
         });
 
         if (!storedRefreshToken || storedRefreshToken.revokedAt || storedRefreshToken.expiresAt <= new Date()) {
-            throw new UnauthorizedException('Refresh token inválido o expirado');
+            throw new UnauthorizedException('Refresh token invalido o expirado');
         }
 
         if (payload.sub !== storedRefreshToken.userId) {
-            throw new UnauthorizedException('Refresh token inválido');
+            throw new UnauthorizedException('Refresh token invalido');
         }
 
         return this.issueAuthSession(
             storedRefreshToken.user,
             request,
+            response,
             refreshTokenHash,
         );
     }
 
-    async logout(refreshToken: string) {
-        const normalizedToken = refreshToken?.trim();
-        if (!normalizedToken) {
-            return { message: 'Sesión cerrada' };
+    async logout(
+        refreshTokenFromBody: string | undefined,
+        request: Request,
+        response: Response,
+    ) {
+        const normalizedToken = this.resolveRefreshToken(request, refreshTokenFromBody, false);
+
+        if (normalizedToken) {
+            const tokenHash = this.hashToken(normalizedToken);
+            await this.prisma.refreshToken.updateMany({
+                where: {
+                    tokenHash,
+                    revokedAt: null,
+                },
+                data: {
+                    revokedAt: new Date(),
+                },
+            });
         }
 
-        const tokenHash = this.hashToken(normalizedToken);
-        await this.prisma.refreshToken.updateMany({
-            where: {
-                tokenHash,
-                revokedAt: null,
-            },
-            data: {
-                revokedAt: new Date(),
-            },
-        });
-
-        return { message: 'Sesión cerrada' };
+        this.clearRefreshCookie(response);
+        return { message: 'Sesion cerrada' };
     }
 
     private async issueAuthSession(
@@ -163,6 +178,7 @@ export class AuthService {
             updatedAt: Date;
         },
         request: Request,
+        response: Response,
         replacingTokenHash?: string,
     ) {
         const accessToken = this.generateAccessToken(user.id, user.role);
@@ -198,9 +214,14 @@ export class AuthService {
             });
         });
 
+        response.cookie(
+            this.resolveRefreshCookieName(),
+            refreshToken,
+            this.resolveRefreshCookieOptions(),
+        );
+
         return {
             accessToken,
-            refreshToken,
             user: {
                 id: user.id,
                 name: user.name,
@@ -233,7 +254,7 @@ export class AuthService {
         try {
             return this.jwtService.verify<AuthTokenPayload>(token, { secret: refreshSecret });
         } catch {
-            throw new UnauthorizedException('Refresh token inválido');
+            throw new UnauthorizedException('Refresh token invalido');
         }
     }
 
@@ -250,6 +271,103 @@ export class AuthService {
         }
 
         return Math.floor(configuredDays);
+    }
+
+    private resolveRefreshCookieName(): string {
+        const configuredName = this.configService.get<string>('AUTH_REFRESH_COOKIE_NAME')?.trim();
+        return configuredName && configuredName.length > 0
+            ? configuredName
+            : 'aquita_refresh_token';
+    }
+
+    private resolveRefreshCookieOptions(): CookieOptions {
+        const isProduction = (process.env.NODE_ENV ?? '').trim().toLowerCase() === 'production';
+        const configuredSameSite = (this.configService.get<string>('AUTH_REFRESH_COOKIE_SAMESITE') ?? '')
+            .trim()
+            .toLowerCase();
+        const sameSite: 'lax' | 'strict' | 'none' = configuredSameSite === 'strict'
+            ? 'strict'
+            : configuredSameSite === 'none'
+                ? 'none'
+                : configuredSameSite === 'lax'
+                    ? 'lax'
+                    : isProduction
+                        ? 'none'
+                        : 'lax';
+
+        const secureConfig = this.configService.get<string>('AUTH_REFRESH_COOKIE_SECURE');
+        const secure = secureConfig !== undefined
+            ? ['1', 'true'].includes(secureConfig.trim().toLowerCase())
+            : (sameSite === 'none' || isProduction);
+
+        const domain = this.configService.get<string>('AUTH_REFRESH_COOKIE_DOMAIN')?.trim() || undefined;
+        const path = this.configService.get<string>('AUTH_REFRESH_COOKIE_PATH')?.trim() || '/api/auth';
+
+        return {
+            httpOnly: true,
+            secure,
+            sameSite,
+            path,
+            maxAge: this.resolveRefreshTokenTtlDays() * 24 * 60 * 60 * 1000,
+            ...(domain ? { domain } : {}),
+        };
+    }
+
+    private clearRefreshCookie(response: Response): void {
+        const cookieOptions = this.resolveRefreshCookieOptions();
+        response.clearCookie(this.resolveRefreshCookieName(), {
+            httpOnly: true,
+            secure: cookieOptions.secure,
+            sameSite: cookieOptions.sameSite,
+            path: cookieOptions.path,
+            ...(cookieOptions.domain ? { domain: cookieOptions.domain } : {}),
+        });
+    }
+
+    private resolveRefreshToken(
+        request: Request,
+        refreshTokenFromBody: string | undefined,
+        required: boolean,
+    ): string | null {
+        const explicitToken = refreshTokenFromBody?.trim();
+        if (explicitToken) {
+            return explicitToken;
+        }
+
+        const cookieName = this.resolveRefreshCookieName();
+        const cookieToken = this.readCookieValue(request.headers.cookie, cookieName);
+        if (cookieToken) {
+            return cookieToken;
+        }
+
+        if (required) {
+            throw new UnauthorizedException('Refresh token invalido');
+        }
+
+        return null;
+    }
+
+    private readCookieValue(cookieHeader: string | undefined, key: string): string | null {
+        if (!cookieHeader || cookieHeader.trim().length === 0) {
+            return null;
+        }
+
+        const segments = cookieHeader.split(';');
+        for (const segment of segments) {
+            const [rawName, ...rawValueParts] = segment.trim().split('=');
+            if (!rawName || rawName !== key || rawValueParts.length === 0) {
+                continue;
+            }
+
+            const rawValue = rawValueParts.join('=');
+            try {
+                return decodeURIComponent(rawValue).trim();
+            } catch {
+                return rawValue.trim();
+            }
+        }
+
+        return null;
     }
 
     private hashToken(token: string): string {

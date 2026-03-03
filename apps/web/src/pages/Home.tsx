@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../api/error';
 import { analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
+import { useAuth } from '../context/useAuth';
 
 interface Category {
     id: string;
@@ -32,6 +33,7 @@ interface Province {
 }
 
 export function Home() {
+    const { isAuthenticated, user } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [categories, setCategories] = useState<Category[]>([]);
     const [recentBusinesses, setRecentBusinesses] = useState<Business[]>([]);
@@ -91,6 +93,14 @@ export function Home() {
         }).catch(() => undefined);
     };
 
+    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+    const registerBusinessPath = isAuthenticated && !canRegisterBusiness
+        ? '/organization'
+        : '/register-business';
+    const registerBusinessLabel = isAuthenticated && !canRegisterBusiness
+        ? 'Crear Organizacion para Negocio'
+        : 'Registrar mi Negocio Gratis';
+
     return (
         <div className="animate-fade-in">
             {loadError && (
@@ -127,7 +137,8 @@ export function Home() {
                                         placeholder="Buscar negocios, restaurantes, servicios..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full py-4 outline-none text-gray-700 placeholder-gray-400"
+                                        className="w-full py-4 text-gray-700 placeholder-gray-400"
+                                        aria-label="Buscar negocios"
                                     />
                                 </div>
                                 <button
@@ -245,7 +256,7 @@ export function Home() {
                     {recentBusinesses.map((biz) => (
                         <Link
                             key={biz.id}
-                            to={`/businesses/${biz.id}`}
+                            to={`/businesses/${biz.slug || biz.id}`}
                             onClick={() => trackBusinessClick(biz.id, 'home-recent')}
                             className="card group"
                         >
@@ -280,8 +291,8 @@ export function Home() {
                     <div className="text-center py-16 text-gray-400">
                         <p className="text-5xl mb-4">🏗️</p>
                         <p className="text-lg">Aún no hay negocios registrados. ¡Sé el primero!</p>
-                        <Link to="/register-business" className="btn-primary mt-4 inline-block">
-                            Registrar mi Negocio
+                        <Link to={registerBusinessPath} className="btn-primary mt-4 inline-block">
+                            {isAuthenticated && !canRegisterBusiness ? 'Crear Organizacion' : 'Registrar mi Negocio'}
                         </Link>
                     </div>
                 )}
@@ -296,8 +307,8 @@ export function Home() {
                     <p className="text-blue-100 text-lg mb-8">
                         Regístrate gratis y llega a miles de clientes potenciales
                     </p>
-                    <Link to="/register-business" className="btn-accent text-lg px-10 py-3.5">
-                        Registrar mi Negocio Gratis
+                    <Link to={registerBusinessPath} className="btn-accent text-lg px-10 py-3.5">
+                        {registerBusinessLabel}
                     </Link>
                 </div>
             </section>
