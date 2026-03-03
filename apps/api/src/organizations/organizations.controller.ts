@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import {
     CreateOrganizationDto,
@@ -32,7 +34,8 @@ export class OrganizationsController {
     ) { }
 
     @Post()
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('BUSINESS_OWNER', 'ADMIN')
     async create(
         @Body() dto: CreateOrganizationDto,
         @CurrentUser('id') userId: string,

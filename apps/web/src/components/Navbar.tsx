@@ -12,6 +12,7 @@ export function Navbar() {
     const roleHomePath = resolveRoleHomePath(user?.role);
     const roleHomeLabel = resolveRoleHomeLabel(user?.role);
     const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
+    const canAccessOrganization = canRegisterBusiness;
 
     const handleLogout = () => {
         void logout().finally(() => {
@@ -41,9 +42,11 @@ export function Navbar() {
                                 <Link to={roleHomePath} className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
                                     {roleHomeLabel}
                                 </Link>
-                                <Link to="/organization" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
-                                    Organizacion
-                                </Link>
+                                {canAccessOrganization && (
+                                    <Link to="/organization" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                        Organizacion
+                                    </Link>
+                                )}
                                 <Link to="/profile" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
                                     Perfil
                                 </Link>
@@ -112,9 +115,11 @@ export function Navbar() {
                                     <Link to={roleHomePath} className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
                                         {roleHomeLabel}
                                     </Link>
-                                    <Link to="/organization" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
-                                        Organizacion
-                                    </Link>
+                                    {canAccessOrganization && (
+                                        <Link to="/organization" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                            Organizacion
+                                        </Link>
+                                    )}
                                     <Link to="/profile" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
                                         Perfil
                                     </Link>

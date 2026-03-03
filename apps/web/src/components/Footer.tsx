@@ -4,12 +4,16 @@ import { useAuth } from '../context/useAuth';
 export function Footer() {
     const { isAuthenticated, user } = useAuth();
     const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
-    const registerBusinessPath = isAuthenticated && !canRegisterBusiness
-        ? '/organization'
-        : '/register-business';
-    const registerBusinessLabel = isAuthenticated && !canRegisterBusiness
-        ? 'Crear Organizacion'
-        : 'Registrar Negocio';
+    const registerBusinessPath = !isAuthenticated
+        ? '/register'
+        : canRegisterBusiness
+            ? '/register-business'
+            : '/businesses';
+    const registerBusinessLabel = !isAuthenticated
+        ? 'Crear Cuenta'
+        : canRegisterBusiness
+            ? 'Registrar Negocio'
+            : 'Explorar Negocios';
 
     return (
         <footer className="bg-gray-900 text-gray-300">

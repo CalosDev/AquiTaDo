@@ -69,7 +69,7 @@ export function AppRouter() {
                     <Route
                         path="/organization"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute roles={['BUSINESS_OWNER', 'ADMIN']}>
                                 <OrganizationSettings />
                             </ProtectedRoute>
                         }

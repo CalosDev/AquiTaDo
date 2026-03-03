@@ -94,12 +94,16 @@ export function Home() {
     };
 
     const canRegisterBusiness = user?.role === 'BUSINESS_OWNER' || user?.role === 'ADMIN';
-    const registerBusinessPath = isAuthenticated && !canRegisterBusiness
-        ? '/organization'
-        : '/register-business';
-    const registerBusinessLabel = isAuthenticated && !canRegisterBusiness
-        ? 'Crear Organizacion para Negocio'
-        : 'Registrar mi Negocio Gratis';
+    const registerBusinessPath = !isAuthenticated
+        ? '/register'
+        : canRegisterBusiness
+            ? '/register-business'
+            : '/businesses';
+    const registerBusinessLabel = !isAuthenticated
+        ? 'Crear Cuenta y Registrar Negocio'
+        : canRegisterBusiness
+            ? 'Registrar mi Negocio Gratis'
+            : 'Explorar Negocios';
 
     return (
         <div className="animate-fade-in">
@@ -292,7 +296,7 @@ export function Home() {
                         <p className="text-5xl mb-4">🏗️</p>
                         <p className="text-lg">Aún no hay negocios registrados. ¡Sé el primero!</p>
                         <Link to={registerBusinessPath} className="btn-primary mt-4 inline-block">
-                            {isAuthenticated && !canRegisterBusiness ? 'Crear Organizacion' : 'Registrar mi Negocio'}
+                            {registerBusinessLabel}
                         </Link>
                     </div>
                 )}
