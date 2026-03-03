@@ -135,6 +135,13 @@ interface SalesLead {
     closedAt?: string | null;
     lostReason?: string | null;
     createdAt: string;
+    metadata?: {
+        source?: string;
+        contactName?: string;
+        contactPhone?: string;
+        contactEmail?: string;
+        preferredChannel?: string;
+    } | null;
     business: { id: string; name: string; slug: string };
     customerUser?: { id: string; name: string; email: string } | null;
 }
@@ -1499,7 +1506,16 @@ export function DashboardBusiness() {
                                         </td>
                                         <td className="py-2">{lead.business.name}</td>
                                         <td className="py-2 text-xs text-gray-600">
-                                            {lead.customerUser?.name || 'Sin cliente'}
+                                            <p>{lead.customerUser?.name || lead.metadata?.contactName || 'Sin cliente'}</p>
+                                            {lead.metadata?.contactPhone ? (
+                                                <p className="text-[11px] text-gray-500">{lead.metadata.contactPhone}</p>
+                                            ) : null}
+                                            {lead.metadata?.contactEmail ? (
+                                                <p className="text-[11px] text-gray-500">{lead.metadata.contactEmail}</p>
+                                            ) : null}
+                                            {lead.metadata?.source ? (
+                                                <p className="text-[10px] text-primary-600 uppercase tracking-wide">{lead.metadata.source}</p>
+                                            ) : null}
                                         </td>
                                         <td className="py-2">{formatCurrency(lead.estimatedValue)}</td>
                                         <td className="py-2">

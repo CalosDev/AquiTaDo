@@ -6,6 +6,7 @@ import { OptimizedImage } from '../components/OptimizedImage';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
+import { calculateBusinessTrustScore } from '../lib/trust';
 
 interface Business {
     id: string;
@@ -13,6 +14,8 @@ interface Business {
     slug: string;
     description: string;
     address: string;
+    verified: boolean;
+    reputationScore?: number | string | null;
     province?: { name: string };
     images: { url: string }[];
     categories?: { category: { name: string; icon?: string } }[];
@@ -50,6 +53,34 @@ interface SponsoredPlacement {
     };
 }
 
+const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; description: string }> = {
+    'con-delivery': {
+        label: 'Negocios con delivery',
+        feature: 'delivery',
+        description: 'Encuentra negocios que ofrecen delivery en Republica Dominicana.',
+    },
+    'pet-friendly': {
+        label: 'Negocios pet friendly',
+        feature: 'pet friendly',
+        description: 'Descubre negocios pet friendly para salir con tus mascotas.',
+    },
+    'con-parqueo': {
+        label: 'Negocios con parqueo',
+        feature: 'estacionamiento',
+        description: 'Explora negocios con opciones de parqueo para clientes.',
+    },
+    'con-reservas': {
+        label: 'Negocios con reservaciones',
+        feature: 'reservaciones',
+        description: 'Compara negocios que aceptan reservaciones en linea o por WhatsApp.',
+    },
+    accesibles: {
+        label: 'Negocios accesibles',
+        feature: 'accesible',
+        description: 'Listado de negocios con facilidades de accesibilidad.',
+    },
+};
+
 function buildPagination(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
     if (totalPages <= 7) {
         return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -77,7 +108,11 @@ function buildPagination(currentPage: number, totalPages: number): Array<number 
 
 export function BusinessesList() {
     const { isAuthenticated, user } = useAuth();
-    const { categorySlug, provinceSlug } = useParams<{ categorySlug?: string; provinceSlug?: string }>();
+    const { categorySlug, provinceSlug, intentSlug } = useParams<{
+        categorySlug?: string;
+        provinceSlug?: string;
+        intentSlug?: string;
+    }>();
     const navigate = useNavigate();
     const isCustomerRole = user?.role === 'USER';
     const [searchParams, setSearchParams] = useSearchParams();
@@ -95,6 +130,7 @@ export function BusinessesList() {
     const currentSearch = searchParams.get('search') || '';
     const currentCategory = searchParams.get('categoryId') || '';
     const currentProvince = searchParams.get('provinceId') || '';
+    const currentFeature = searchParams.get('feature') || '';
     const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
     const currentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
     const [searchInput, setSearchInput] = useState(currentSearch);
@@ -110,7 +146,14 @@ export function BusinessesList() {
         () => provinces.find((province) => province.slug === provinceSlug || province.id === currentProvince) || null,
         [provinces, provinceSlug, currentProvince],
     );
+    const activeIntent = useMemo(
+        () => (intentSlug ? INTENT_FEATURE_MAP[intentSlug] || null : null),
+        [intentSlug],
+    );
     const seoCanonicalPath = useMemo(() => {
+        if (intentSlug) {
+            return `/negocios/intencion/${intentSlug}`;
+        }
         if (categorySlug && provinceSlug) {
             return `/negocios/${provinceSlug}/${categorySlug}`;
         }
@@ -121,7 +164,7 @@ export function BusinessesList() {
             return `/negocios/provincia/${provinceSlug}`;
         }
         return '/businesses';
-    }, [categorySlug, provinceSlug]);
+    }, [categorySlug, provinceSlug, intentSlug]);
 
     useEffect(() => {
         setSearchInput(currentSearch);
@@ -183,6 +226,26 @@ export function BusinessesList() {
         }, { replace: true });
     }, [categorySlug, provinceSlug, categories, provinces, setSearchParams]);
 
+    useEffect(() => {
+        if (!intentSlug) {
+            return;
+        }
+
+        const intentConfig = INTENT_FEATURE_MAP[intentSlug];
+        if (!intentConfig) {
+            return;
+        }
+
+        setSearchParams((previous) => {
+            const params = new URLSearchParams(previous);
+            params.set('feature', intentConfig.feature);
+            if (params.get('page') && params.get('page') !== '1') {
+                params.set('page', '1');
+            }
+            return params.toString() === previous.toString() ? previous : params;
+        }, { replace: true });
+    }, [intentSlug, setSearchParams]);
+
     const loadBusinesses = useCallback(async () => {
         setLoading(true);
         setLoadError('');
@@ -191,6 +254,7 @@ export function BusinessesList() {
             if (currentSearch) params.search = currentSearch;
             if (currentCategory) params.categoryId = currentCategory;
             if (currentProvince) params.provinceId = currentProvince;
+            if (currentFeature) params.feature = currentFeature;
 
             const [businessesRes, sponsoredRes] = await Promise.all([
                 businessApi.getAll(params),
@@ -210,7 +274,7 @@ export function BusinessesList() {
         } finally {
             setLoading(false);
         }
-    }, [currentCategory, currentPage, currentProvince, currentSearch]);
+    }, [currentCategory, currentFeature, currentPage, currentProvince, currentSearch]);
 
     useEffect(() => {
         void loadBusinesses();
@@ -266,9 +330,10 @@ export function BusinessesList() {
             metadata: {
                 source,
                 page: currentPage,
+                feature: currentFeature || undefined,
             },
         }).catch(() => undefined);
-    }, [currentCategory, currentPage, currentProvince, currentSearch]);
+    }, [currentCategory, currentFeature, currentPage, currentProvince, currentSearch]);
 
     const updateFilter = useCallback((
         key: string,
@@ -331,7 +396,9 @@ export function BusinessesList() {
     }, [searchInput, currentSearch, updateFilter]);
 
     useEffect(() => {
-        const headingBase = activeCategory && activeProvince
+        const headingBase = activeIntent
+            ? activeIntent.label
+            : activeCategory && activeProvince
             ? `${activeCategory.name} en ${activeProvince.name}`
             : activeCategory
                 ? `${activeCategory.name} en Republica Dominicana`
@@ -339,7 +406,9 @@ export function BusinessesList() {
                     ? `Negocios en ${activeProvince.name}`
                     : 'Directorio de negocios en Republica Dominicana';
 
-        const descriptionBase = activeCategory && activeProvince
+        const descriptionBase = activeIntent
+            ? `${activeIntent.description} Contacta por WhatsApp o telefono desde AquiTa.do.`
+            : activeCategory && activeProvince
             ? `Descubre ${activeCategory.name.toLowerCase()} en ${activeProvince.name}. Compara opciones locales, contacta por WhatsApp y reserva en AquiTa.do.`
             : activeCategory
                 ? `Explora ${activeCategory.name.toLowerCase()} en Republica Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
@@ -366,7 +435,12 @@ export function BusinessesList() {
             });
         }
 
-        if (activeCategory) {
+        if (activeIntent && intentSlug) {
+            breadcrumbItems.push({
+                name: activeIntent.label,
+                url: `${origin}/negocios/intencion/${intentSlug}`,
+            });
+        } else if (activeCategory) {
             breadcrumbItems.push({
                 name: activeCategory.name,
                 url: activeProvince
@@ -401,7 +475,7 @@ export function BusinessesList() {
         } else {
             removeJsonLd('businesses-list-itemlist');
         }
-    }, [activeCategory, activeProvince, businesses, seoCanonicalPath]);
+    }, [activeCategory, activeIntent, activeProvince, businesses, intentSlug, seoCanonicalPath]);
 
     useEffect(() => {
         return () => {
@@ -473,10 +547,22 @@ export function BusinessesList() {
                             </select>
                         </div>
 
+                        <div className="mb-5">
+                            <label htmlFor="businesses-feature" className="text-sm font-medium text-gray-600 mb-1.5 block">Intencion / servicio</label>
+                            <input
+                                id="businesses-feature"
+                                type="text"
+                                placeholder="Ej: delivery, parqueo, pet friendly"
+                                value={currentFeature}
+                                onChange={(e) => updateFilter('feature', e.target.value)}
+                                className="input-field text-sm"
+                            />
+                        </div>
+
                         <button
                             onClick={() => {
                                 setSearchInput('');
-                                if (categorySlug || provinceSlug) {
+                                if (categorySlug || provinceSlug || intentSlug) {
                                     navigate('/businesses');
                                     return;
                                 }
@@ -494,7 +580,9 @@ export function BusinessesList() {
                     <div className="flex justify-between items-center mb-6">
                         <div>
                             <h1 className="font-display text-2xl font-bold text-gray-900">
-                                {activeCategory && activeProvince
+                                {activeIntent
+                                    ? activeIntent.label
+                                    : activeCategory && activeProvince
                                     ? `${activeCategory.name} en ${activeProvince.name}`
                                     : activeCategory
                                         ? activeCategory.name
@@ -613,6 +701,27 @@ export function BusinessesList() {
                                             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                                 📍 {biz.province?.name || biz.address}
                                             </p>
+                                            {(() => {
+                                                const trust = calculateBusinessTrustScore({
+                                                    verified: biz.verified,
+                                                    reputationScore: biz.reputationScore,
+                                                    reviewsCount: biz._count?.reviews ?? 0,
+                                                    hasDescription: Boolean(biz.description?.trim()),
+                                                    hasAddress: Boolean(biz.address?.trim()),
+                                                    hasImages: Boolean(biz.images?.length),
+                                                });
+                                                return (
+                                                    <span className={`mt-1 inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                                        trust.level === 'ALTA'
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : trust.level === 'MEDIA'
+                                                                ? 'bg-amber-100 text-amber-700'
+                                                                : 'bg-red-100 text-red-700'
+                                                    }`}>
+                                                        Confianza {trust.score}/100
+                                                    </span>
+                                                );
+                                            })()}
                                             <p className="text-sm text-gray-600 mt-2 line-clamp-2">{biz.description}</p>
                                         </div>
                                     </Link>

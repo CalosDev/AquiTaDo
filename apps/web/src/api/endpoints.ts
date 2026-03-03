@@ -60,6 +60,16 @@ export const businessApi = {
     getByIdentifier: (identifier: string) => api.get(`/businesses/${identifier}`),
     getById: (id: string) => api.get(`/businesses/${id}`),
     getBySlug: (slug: string) => api.get(`/businesses/${slug}`),
+    createPublicLead: (
+        businessId: string,
+        data: {
+            contactName: string;
+            contactPhone: string;
+            contactEmail?: string;
+            message: string;
+            preferredChannel?: 'WHATSAPP' | 'PHONE' | 'EMAIL';
+        },
+    ) => api.post(`/businesses/${businessId}/public-lead`, data),
     create: (data: Record<string, unknown>) => api.post('/businesses', data),
     update: (id: string, data: Record<string, unknown>) => api.put(`/businesses/${id}`, data),
     delete: (id: string) => api.delete(`/businesses/${id}`),

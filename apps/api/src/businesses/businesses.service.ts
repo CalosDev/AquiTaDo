@@ -9,9 +9,15 @@ import {
 } from '@nestjs/common';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { OrganizationRole, Prisma } from '../generated/prisma/client';
+import { OrganizationRole, Prisma, SalesLeadStage } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
+import {
+    CreateBusinessDto,
+    UpdateBusinessDto,
+    BusinessQueryDto,
+    NearbyQueryDto,
+    CreatePublicLeadDto,
+} from './dto/business.dto';
 import slugify from 'slugify';
 import { getOrganizationPlanLimits } from '../organizations/organization-plan-limits';
 import { ReputationService } from '../reputation/reputation.service';
@@ -81,6 +87,7 @@ export class BusinessesService {
         description: true,
         address: true,
         verified: true,
+        reputationScore: true,
         verificationStatus: true,
         province: {
             select: { id: true, name: true, slug: true },
@@ -104,6 +111,70 @@ export class BusinessesService {
             select: { reviews: true },
         },
     };
+
+    async createPublicLead(
+        businessId: string,
+        dto: CreatePublicLeadDto,
+    ) {
+        const business = await this.prisma.business.findFirst({
+            where: {
+                id: businessId,
+                verified: true,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                ownerId: true,
+                organizationId: true,
+            },
+        });
+
+        if (!business) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        const contactName = dto.contactName.trim();
+        const contactEmail = dto.contactEmail?.trim().toLowerCase() || null;
+        const contactPhone = dto.contactPhone.trim();
+        const normalizedPhone = contactPhone.replace(/\D+/g, '');
+        const preferredChannel = dto.preferredChannel?.trim().toUpperCase() || null;
+        const message = dto.message.trim();
+
+        const stage: SalesLeadStage = 'LEAD';
+        const createdLead = await this.prisma.salesLead.create({
+            data: {
+                organizationId: business.organizationId,
+                businessId: business.id,
+                createdByUserId: business.ownerId,
+                stage,
+                title: `Lead web: ${contactName}`,
+                notes: message,
+                metadata: {
+                    source: 'public-business-page',
+                    contactName,
+                    contactPhone,
+                    contactPhoneNormalized: normalizedPhone || null,
+                    contactEmail,
+                    preferredChannel,
+                    businessSlug: business.slug,
+                },
+            },
+            select: {
+                id: true,
+                stage: true,
+                createdAt: true,
+            },
+        });
+
+        return {
+            id: createdLead.id,
+            status: createdLead.stage,
+            createdAt: createdLead.createdAt,
+            message: 'Solicitud enviada. El negocio te contactara pronto.',
+        };
+    }
 
     private readonly adminListSelect = {
         id: true,
@@ -993,6 +1064,19 @@ export class BusinessesService {
 
         if (query.cityId) {
             where.cityId = query.cityId;
+        }
+
+        if (query.feature?.trim()) {
+            where.features = {
+                some: {
+                    feature: {
+                        name: {
+                            contains: query.feature.trim(),
+                            mode: 'insensitive',
+                        },
+                    },
+                },
+            };
         }
 
         return where;

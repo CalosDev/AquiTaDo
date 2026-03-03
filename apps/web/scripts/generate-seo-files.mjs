@@ -56,6 +56,13 @@ const PROVINCE_SLUGS = [
     'santo-domingo',
     'valverde',
 ];
+const INTENT_SLUGS = [
+    'con-delivery',
+    'con-parqueo',
+    'pet-friendly',
+    'con-reservas',
+    'accesibles',
+];
 
 function normalizeBaseUrl(value) {
     const fallback = 'https://aquitado.vercel.app';
@@ -69,6 +76,7 @@ function buildSitemap(baseUrl) {
     const staticPaths = ['/', '/businesses', '/terms', '/privacy'];
     const categoryPaths = CATEGORY_SLUGS.map((slug) => `/negocios/categoria/${slug}`);
     const provincePaths = PROVINCE_SLUGS.map((slug) => `/negocios/provincia/${slug}`);
+    const intentPaths = INTENT_SLUGS.map((slug) => `/negocios/intencion/${slug}`);
     const combinationPaths = PROVINCE_SLUGS.flatMap((provinceSlug) =>
         CATEGORY_SLUGS.map((categorySlug) => `/negocios/${provinceSlug}/${categorySlug}`),
     );
@@ -77,6 +85,7 @@ function buildSitemap(baseUrl) {
         ...staticPaths,
         ...categoryPaths,
         ...provincePaths,
+        ...intentPaths,
         ...combinationPaths,
     ]));
 

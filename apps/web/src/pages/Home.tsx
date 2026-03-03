@@ -34,6 +34,14 @@ interface Province {
     _count?: { businesses: number };
 }
 
+const INTENT_LINKS = [
+    { slug: 'con-delivery', label: 'Con delivery', emoji: '🛵' },
+    { slug: 'con-parqueo', label: 'Con parqueo', emoji: '🅿️' },
+    { slug: 'pet-friendly', label: 'Pet friendly', emoji: '🐾' },
+    { slug: 'con-reservas', label: 'Con reservas', emoji: '📅' },
+    { slug: 'accesibles', label: 'Accesibles', emoji: '♿' },
+];
+
 export function Home() {
     const { isAuthenticated, user } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
@@ -251,6 +259,40 @@ export function Home() {
                             </Link>
                         ))}
                     </div>
+                </div>
+            </section>
+
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+                <div className="text-center mb-8">
+                    <h2 className="font-display text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+                        Explora por Intencion
+                    </h2>
+                    <p className="text-gray-500">
+                        Encuentra negocios segun lo que necesitas ahora mismo.
+                    </p>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {INTENT_LINKS.map((intent) => (
+                        <Link
+                            key={intent.slug}
+                            to={`/negocios/intencion/${intent.slug}`}
+                            onClick={() => {
+                                void analyticsApi.trackGrowthEvent({
+                                    eventType: 'SEARCH_QUERY',
+                                    visitorId: getOrCreateVisitorId(),
+                                    sessionId: getOrCreateSessionId(),
+                                    metadata: {
+                                        source: 'home-intent',
+                                        intent: intent.slug,
+                                    },
+                                }).catch(() => undefined);
+                            }}
+                            className="rounded-2xl border border-primary-100 bg-white px-4 py-3 text-center hover:border-primary-300 hover:shadow-md transition-all hover-lift"
+                        >
+                            <div className="text-xl mb-1">{intent.emoji}</div>
+                            <p className="text-sm font-semibold text-gray-800">{intent.label}</p>
+                        </Link>
+                    ))}
                 </div>
             </section>
 

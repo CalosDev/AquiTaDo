@@ -3,7 +3,13 @@ import {
 } from '@nestjs/common';
 import { isUUID } from 'class-validator';
 import { BusinessesService } from './businesses.service';
-import { CreateBusinessDto, UpdateBusinessDto, BusinessQueryDto, NearbyQueryDto } from './dto/business.dto';
+import {
+    CreateBusinessDto,
+    UpdateBusinessDto,
+    BusinessQueryDto,
+    NearbyQueryDto,
+    CreatePublicLeadDto,
+} from './dto/business.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
@@ -70,6 +76,14 @@ export class BusinessesController {
         }
 
         return this.businessesService.findBySlug(identifier, userId, userRole, organizationId);
+    }
+
+    @Post(':id/public-lead')
+    async createPublicLead(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: CreatePublicLeadDto,
+    ) {
+        return this.businessesService.createPublicLead(id, dto);
     }
 
     @Post()

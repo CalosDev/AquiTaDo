@@ -6,6 +6,7 @@ import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
+import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 
 interface Business {
@@ -21,6 +22,7 @@ interface Business {
     latitude?: number;
     longitude?: number;
     verified: boolean;
+    reputationScore?: number | string | null;
     province?: { name: string };
     city?: { name: string };
     images: { id: string; url: string }[];
@@ -62,11 +64,20 @@ export function BusinessDetails() {
     const [submittingReview, setSubmittingReview] = useState(false);
     const [messageForm, setMessageForm] = useState({ subject: '', content: '' });
     const [sendingMessage, setSendingMessage] = useState(false);
+    const [publicLeadForm, setPublicLeadForm] = useState({
+        contactName: '',
+        contactPhone: '',
+        contactEmail: '',
+        message: '',
+    });
+    const [submittingPublicLead, setSubmittingPublicLead] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [reviewErrorMessage, setReviewErrorMessage] = useState('');
     const [reviewSuccessMessage, setReviewSuccessMessage] = useState('');
     const [messageErrorMessage, setMessageErrorMessage] = useState('');
     const [messageSuccessMessage, setMessageSuccessMessage] = useState('');
+    const [publicLeadErrorMessage, setPublicLeadErrorMessage] = useState('');
+    const [publicLeadSuccessMessage, setPublicLeadSuccessMessage] = useState('');
     const [contactVariant, setContactVariant] = useState('control');
     const [isFavorite, setIsFavorite] = useState(false);
     const [favoriteLoading, setFavoriteLoading] = useState(false);
@@ -238,9 +249,9 @@ export function BusinessDetails() {
             });
             setReviewForm({ rating: 5, comment: '' });
             await loadBusiness();
-            setReviewSuccessMessage('Reseña publicada correctamente');
+            setReviewSuccessMessage('ReseÃ±a publicada correctamente');
         } catch (error) {
-            setReviewErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la reseña'));
+            setReviewErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la reseÃ±a'));
         } finally {
             setSubmittingReview(false);
         }
@@ -281,6 +292,18 @@ export function BusinessDetails() {
         business?.reviews && business.reviews.length > 0
             ? (business.reviews.reduce((acc, r) => acc + r.rating, 0) / business.reviews.length).toFixed(1)
             : null;
+    const averageRatingNumber = averageRating ? Number(averageRating) : null;
+    const trust = calculateBusinessTrustScore({
+        verified: business?.verified,
+        reputationScore: business?.reputationScore,
+        averageRating: averageRatingNumber,
+        reviewsCount: business?._count?.reviews ?? 0,
+        hasPhone: Boolean(business?.phone),
+        hasWhatsapp: Boolean(business?.whatsapp),
+        hasDescription: Boolean(business?.description?.trim()),
+        hasAddress: Boolean(business?.address?.trim()),
+        hasImages: Boolean(business?.images?.length),
+    });
     const updatedLabel = formatDaysAgo(business?.updatedAt);
     const memberSinceYear = business?.createdAt
         ? new Date(business.createdAt).getFullYear()
@@ -374,6 +397,52 @@ export function BusinessDetails() {
         }
     };
 
+    const handlePublicLeadSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!business?.id) {
+            return;
+        }
+
+        if (!publicLeadForm.contactName.trim() || !publicLeadForm.contactPhone.trim() || !publicLeadForm.message.trim()) {
+            setPublicLeadErrorMessage('Nombre, telefono y mensaje son obligatorios');
+            return;
+        }
+
+        setSubmittingPublicLead(true);
+        setPublicLeadErrorMessage('');
+        setPublicLeadSuccessMessage('');
+
+        try {
+            await businessApi.createPublicLead(business.id, {
+                contactName: publicLeadForm.contactName.trim(),
+                contactPhone: publicLeadForm.contactPhone.trim(),
+                contactEmail: publicLeadForm.contactEmail.trim() || undefined,
+                message: publicLeadForm.message.trim(),
+                preferredChannel: business.whatsapp ? 'WHATSAPP' : 'PHONE',
+            });
+            setPublicLeadForm({
+                contactName: '',
+                contactPhone: '',
+                contactEmail: '',
+                message: '',
+            });
+            setPublicLeadSuccessMessage('Solicitud enviada. Te contactaran pronto.');
+            void analyticsApi.trackGrowthEvent({
+                eventType: 'CONTACT_CLICK',
+                businessId: business.id,
+                visitorId: getOrCreateVisitorId(),
+                sessionId: getOrCreateSessionId(),
+                metadata: {
+                    source: 'public-lead-form',
+                },
+            }).catch(() => undefined);
+        } catch (error) {
+            setPublicLeadErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud'));
+        } finally {
+            setSubmittingPublicLead(false);
+        }
+    };
+
     const handleWhatsAppClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
         event.preventDefault();
         void openWhatsApp();
@@ -456,7 +525,7 @@ export function BusinessDetails() {
     if (!business) {
         return (
             <div className="max-w-7xl mx-auto px-4 py-20 text-center space-y-4">
-                <p className="text-5xl">😕</p>
+                <p className="text-5xl">ðŸ˜•</p>
                 <h2 className="text-2xl font-bold text-gray-900">Negocio no encontrado</h2>
                 {errorMessage && (
                     <p className="text-sm text-red-600">{errorMessage}</p>
@@ -485,7 +554,7 @@ export function BusinessDetails() {
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
-                                <span className="text-7xl">🏪</span>
+                                <span className="text-7xl">ðŸª</span>
                             )}
                         </div>
                         {business.images.length > 1 && (
@@ -517,7 +586,7 @@ export function BusinessDetails() {
                                 <div className="flex items-center gap-2 mb-2">
                                     {business.verified && (
                                         <span className="bg-primary-100 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium border border-primary-200">
-                                            ✓ Verificado
+                                            âœ“ Verificado
                                         </span>
                                     )}
                                     <div className="flex gap-1">
@@ -530,15 +599,15 @@ export function BusinessDetails() {
                                 </div>
                                 <h1 className="font-display text-3xl font-bold text-gray-900">{business.name}</h1>
                                 <p className="text-gray-500 mt-1 flex items-center gap-1">
-                                    📍 {business.address}
-                                    {business.province && ` — ${business.province.name}`}
+                                    ðŸ“ {business.address}
+                                    {business.province && ` â€” ${business.province.name}`}
                                     {business.city && `, ${business.city.name}`}
                                 </p>
                             </div>
                             {averageRating && (
                                 <div className="text-center bg-accent-50 border border-accent-100 px-4 py-2 rounded-xl">
-                                    <div className="text-2xl font-bold text-accent-600">⭐ {averageRating}</div>
-                                    <div className="text-xs text-gray-500">{business._count?.reviews} reseñas</div>
+                                    <div className="text-2xl font-bold text-accent-600">â­ {averageRating}</div>
+                                    <div className="text-xs text-gray-500">{business._count?.reviews} reseÃ±as</div>
                                 </div>
                             )}
                         </div>
@@ -620,11 +689,11 @@ export function BusinessDetails() {
                         {/* Features */}
                         {business.features && business.features.length > 0 && (
                             <div className="mt-6">
-                                <h3 className="font-display font-semibold text-gray-900 mb-3">Características</h3>
+                                <h3 className="font-display font-semibold text-gray-900 mb-3">CaracterÃ­sticas</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {business.features.map((bf, i) => (
                                         <span key={i} className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-700">
-                                            ✔️ {bf.feature.name}
+                                            âœ”ï¸ {bf.feature.name}
                                         </span>
                                     ))}
                                 </div>
@@ -635,7 +704,7 @@ export function BusinessDetails() {
                     {/* Map */}
                     {typeof business.latitude === 'number' && typeof business.longitude === 'number' && (
                         <div className="card p-6">
-                            <h3 className="font-display font-semibold text-gray-900 mb-3">Ubicación</h3>
+                            <h3 className="font-display font-semibold text-gray-900 mb-3">UbicaciÃ³n</h3>
                             <div className="h-64 bg-gray-100 rounded-xl flex items-center justify-center">
                                 <iframe
                                     width="100%"
@@ -652,20 +721,20 @@ export function BusinessDetails() {
                     {/* Reviews */}
                     <div className="card p-6">
                         <h3 className="font-display font-semibold text-gray-900 mb-4">
-                            Reseñas ({business.reviews?.length || 0})
+                            ReseÃ±as ({business.reviews?.length || 0})
                         </h3>
 
                         {/* Review Form */}
                         {!isAuthenticated && (
                             <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
-                                Inicia sesión para dejar tu reseña. <Link to="/login" className="underline font-medium">Ir a login</Link>
+                                Inicia sesiÃ³n para dejar tu reseÃ±a. <Link to="/login" className="underline font-medium">Ir a login</Link>
                             </div>
                         )}
 
                         {isAuthenticated && (
                             <form onSubmit={handleReviewSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <span className="text-sm font-medium text-gray-600">Tu calificación:</span>
+                                    <span className="text-sm font-medium text-gray-600">Tu calificaciÃ³n:</span>
                                     <div className="flex gap-1">
                                         {[1, 2, 3, 4, 5].map((star) => (
                                             <button
@@ -675,7 +744,7 @@ export function BusinessDetails() {
                                                 className={`text-2xl transition-transform hover:scale-110 ${star <= reviewForm.rating ? 'text-yellow-400' : 'text-gray-300'
                                                     }`}
                                             >
-                                                ★
+                                                â˜…
                                             </button>
                                         ))}
                                     </div>
@@ -692,7 +761,7 @@ export function BusinessDetails() {
                                     disabled={submittingReview}
                                     className="btn-primary text-sm"
                                 >
-                                    {submittingReview ? 'Enviando...' : 'Enviar Reseña'}
+                                    {submittingReview ? 'Enviando...' : 'Enviar ReseÃ±a'}
                                 </button>
                             </form>
                         )}
@@ -718,7 +787,7 @@ export function BusinessDetails() {
                                             <span className="font-semibold text-gray-900">{review.user.name}</span>
                                             <div className="flex gap-0.5 mt-0.5">
                                                 {Array.from({ length: 5 }, (_, i) => (
-                                                    <span key={i} className={`text-sm ${i < review.rating ? 'text-yellow-400' : 'text-gray-200'}`}>★</span>
+                                                    <span key={i} className={`text-sm ${i < review.rating ? 'text-yellow-400' : 'text-gray-200'}`}>â˜…</span>
                                                 ))}
                                             </div>
                                         </div>
@@ -731,7 +800,7 @@ export function BusinessDetails() {
                             ))}
                             {(!business.reviews || business.reviews.length === 0) && (
                                 <p className="text-gray-400 text-sm text-center py-4">
-                                    Aún no hay reseñas. ¡Sé el primero en opinar!
+                                    AÃºn no hay reseÃ±as. Â¡SÃ© el primero en opinar!
                                 </p>
                             )}
                         </div>
@@ -759,6 +828,32 @@ export function BusinessDetails() {
                                 </span>
                             )}
                         </div>
+                        <div className="mb-4 rounded-xl border border-primary-100 bg-primary-50/40 px-3 py-2">
+                            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                                <span className="font-semibold text-gray-700">Indice de confianza</span>
+                                <span className={`font-semibold ${
+                                    trust.level === 'ALTA'
+                                        ? 'text-green-700'
+                                        : trust.level === 'MEDIA'
+                                            ? 'text-amber-700'
+                                            : 'text-red-700'
+                                }`}>
+                                    {trust.score}/100
+                                </span>
+                            </div>
+                            <div className="h-2 rounded-full bg-white border border-primary-100 overflow-hidden">
+                                <div
+                                    className={`h-full ${
+                                        trust.level === 'ALTA'
+                                            ? 'bg-green-500'
+                                            : trust.level === 'MEDIA'
+                                                ? 'bg-amber-500'
+                                                : 'bg-red-500'
+                                    }`}
+                                    style={{ width: `${trust.score}%` }}
+                                />
+                            </div>
+                        </div>
                         <div className="space-y-3">
                             {business.phone && (
                                 <a
@@ -766,9 +861,9 @@ export function BusinessDetails() {
                                     onClick={handlePhoneClick}
                                     className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 hover:bg-primary-100 transition-colors hover-lift group"
                                 >
-                                    <span className="text-lg">📞</span>
+                                    <span className="text-lg">ðŸ“ž</span>
                                     <div>
-                                        <div className="text-xs text-gray-400">Teléfono</div>
+                                        <div className="text-xs text-gray-400">TelÃ©fono</div>
                                         <div className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{business.phone}</div>
                                     </div>
                                 </a>
@@ -784,7 +879,7 @@ export function BusinessDetails() {
                                         : 'bg-green-50 hover:bg-green-100'
                                         }`}
                                 >
-                                    <span className="text-lg">💬</span>
+                                    <span className="text-lg">ðŸ’¬</span>
                                     <div>
                                         <div className="text-xs text-gray-400">WhatsApp</div>
                                         <div className="text-sm font-medium text-green-700">
@@ -794,9 +889,9 @@ export function BusinessDetails() {
                                 </a>
                             )}
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
-                                <span className="text-lg">📍</span>
+                                <span className="text-lg">ðŸ“</span>
                                 <div>
-                                    <div className="text-xs text-gray-400">Dirección</div>
+                                    <div className="text-xs text-gray-400">DirecciÃ³n</div>
                                     <div className="text-sm text-gray-700">{business.address}</div>
                                 </div>
                             </div>
@@ -808,10 +903,63 @@ export function BusinessDetails() {
                             </h4>
 
                             {!isAuthenticated && (
-                                <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
-                                    Inicia sesión para enviar un mensaje.{' '}
-                                    <Link to="/login" className="underline font-medium">Ir a login</Link>
-                                </div>
+                                <form onSubmit={handlePublicLeadSubmit} className="space-y-3">
+                                    <input
+                                        className="input-field text-sm"
+                                        placeholder="Tu nombre"
+                                        value={publicLeadForm.contactName}
+                                        onChange={(event) =>
+                                            setPublicLeadForm((previous) => ({
+                                                ...previous,
+                                                contactName: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                    <input
+                                        className="input-field text-sm"
+                                        placeholder="Tu telefono"
+                                        value={publicLeadForm.contactPhone}
+                                        onChange={(event) =>
+                                            setPublicLeadForm((previous) => ({
+                                                ...previous,
+                                                contactPhone: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                    <input
+                                        className="input-field text-sm"
+                                        placeholder="Tu email (opcional)"
+                                        value={publicLeadForm.contactEmail}
+                                        onChange={(event) =>
+                                            setPublicLeadForm((previous) => ({
+                                                ...previous,
+                                                contactEmail: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                    <textarea
+                                        className="input-field text-sm"
+                                        rows={3}
+                                        placeholder="¿Que necesitas?"
+                                        value={publicLeadForm.message}
+                                        onChange={(event) =>
+                                            setPublicLeadForm((previous) => ({
+                                                ...previous,
+                                                message: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="btn-primary text-sm w-full"
+                                        disabled={submittingPublicLead}
+                                    >
+                                        {submittingPublicLead ? 'Enviando...' : 'Solicitar cotizacion sin cuenta'}
+                                    </button>
+                                    <p className="text-xs text-gray-500">
+                                        ¿Ya tienes cuenta? <Link to="/login" className="underline font-medium">Inicia sesion</Link>
+                                    </p>
+                                </form>
                             )}
 
                             {isAuthenticated && (
@@ -847,6 +995,18 @@ export function BusinessDetails() {
                                         {sendingMessage ? 'Enviando...' : 'Enviar mensaje'}
                                     </button>
                                 </form>
+                            )}
+
+                            {publicLeadErrorMessage && (
+                                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                    {publicLeadErrorMessage}
+                                </div>
+                            )}
+
+                            {publicLeadSuccessMessage && (
+                                <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                                    {publicLeadSuccessMessage}
+                                </div>
                             )}
 
                             {messageErrorMessage && (
@@ -892,3 +1052,4 @@ export function BusinessDetails() {
         </div>
     );
 }
+

@@ -6,6 +6,8 @@ import {
     IsArray,
     IsBoolean,
     IsUUID,
+    IsEmail,
+    Matches,
     MaxLength,
     Min,
     Max,
@@ -140,6 +142,11 @@ export class BusinessQueryDto {
     cityId?: string;
 
     @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    feature?: string;
+
+    @IsOptional()
     @IsBoolean()
     verified?: boolean;
 
@@ -153,6 +160,36 @@ export class BusinessQueryDto {
     @Min(1)
     @Max(100)
     limit?: number;
+}
+
+export class CreatePublicLeadDto {
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(120)
+    contactName!: string;
+
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(30)
+    @Matches(/^[0-9+\-\s()]{7,30}$/, {
+        message: 'El telefono debe contener solo numeros y simbolos validos',
+    })
+    contactPhone!: string;
+
+    @IsOptional()
+    @IsEmail()
+    @MaxLength(160)
+    contactEmail?: string;
+
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(1200)
+    message!: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(32)
+    preferredChannel?: 'WHATSAPP' | 'PHONE' | 'EMAIL';
 }
 
 export class NearbyQueryDto {

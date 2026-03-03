@@ -424,7 +424,17 @@ export class CrmService {
         const [data, groupedCounts, total] = await Promise.all([
             this.prisma.salesLead.findMany({
                 where,
-                include: {
+                select: {
+                    id: true,
+                    stage: true,
+                    title: true,
+                    notes: true,
+                    estimatedValue: true,
+                    expectedCloseAt: true,
+                    closedAt: true,
+                    lostReason: true,
+                    createdAt: true,
+                    metadata: true,
                     business: {
                         select: {
                             id: true,
