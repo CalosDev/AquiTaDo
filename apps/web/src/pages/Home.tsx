@@ -198,7 +198,7 @@ export function Home() {
                     {categories.slice(0, 15).map((cat) => (
                         <Link
                             key={cat.id}
-                            to={`/businesses?categoryId=${cat.id}`}
+                            to={cat.slug ? `/negocios/categoria/${cat.slug}` : `/businesses?categoryId=${cat.id}`}
                             onClick={() => {
                                 void analyticsApi.trackGrowthEvent({
                                     eventType: 'SEARCH_QUERY',
@@ -235,7 +235,7 @@ export function Home() {
                         {provinces.slice(0, 16).map((prov) => (
                             <Link
                                 key={prov.id}
-                                to={`/businesses?provinceId=${prov.id}`}
+                                to={prov.slug ? `/negocios/provincia/${prov.slug}` : `/businesses?provinceId=${prov.id}`}
                                 onClick={() => {
                                     void analyticsApi.trackGrowthEvent({
                                         eventType: 'SEARCH_QUERY',

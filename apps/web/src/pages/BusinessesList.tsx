@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationApi } from '../api/endpoints';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
+import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 
 interface Business {
     id: string;
@@ -76,6 +77,8 @@ function buildPagination(currentPage: number, totalPages: number): Array<number 
 
 export function BusinessesList() {
     const { isAuthenticated, user } = useAuth();
+    const { categorySlug, provinceSlug } = useParams<{ categorySlug?: string; provinceSlug?: string }>();
+    const navigate = useNavigate();
     const isCustomerRole = user?.role === 'USER';
     const [searchParams, setSearchParams] = useSearchParams();
     const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -99,6 +102,26 @@ export function BusinessesList() {
         () => buildPagination(currentPage, totalPages),
         [currentPage, totalPages],
     );
+    const activeCategory = useMemo(
+        () => categories.find((category) => category.slug === categorySlug || category.id === currentCategory) || null,
+        [categories, categorySlug, currentCategory],
+    );
+    const activeProvince = useMemo(
+        () => provinces.find((province) => province.slug === provinceSlug || province.id === currentProvince) || null,
+        [provinces, provinceSlug, currentProvince],
+    );
+    const seoCanonicalPath = useMemo(() => {
+        if (categorySlug && provinceSlug) {
+            return `/negocios/${provinceSlug}/${categorySlug}`;
+        }
+        if (categorySlug) {
+            return `/negocios/categoria/${categorySlug}`;
+        }
+        if (provinceSlug) {
+            return `/negocios/provincia/${provinceSlug}`;
+        }
+        return '/businesses';
+    }, [categorySlug, provinceSlug]);
 
     useEffect(() => {
         setSearchInput(currentSearch);
@@ -120,6 +143,45 @@ export function BusinessesList() {
     useEffect(() => {
         void loadFilters();
     }, [loadFilters]);
+
+    useEffect(() => {
+        if (!categorySlug && !provinceSlug) {
+            return;
+        }
+
+        if (categories.length === 0 || provinces.length === 0) {
+            return;
+        }
+
+        const nextCategoryId = categorySlug
+            ? (categories.find((category) => category.slug === categorySlug)?.id || '')
+            : '';
+        const nextProvinceId = provinceSlug
+            ? (provinces.find((province) => province.slug === provinceSlug)?.id || '')
+            : '';
+
+        setSearchParams((previous) => {
+            const params = new URLSearchParams(previous);
+
+            if (nextCategoryId) {
+                params.set('categoryId', nextCategoryId);
+            } else {
+                params.delete('categoryId');
+            }
+
+            if (nextProvinceId) {
+                params.set('provinceId', nextProvinceId);
+            } else {
+                params.delete('provinceId');
+            }
+
+            if (params.get('page') && params.get('page') !== '1') {
+                params.set('page', '1');
+            }
+
+            return params.toString() === previous.toString() ? previous : params;
+        }, { replace: true });
+    }, [categorySlug, provinceSlug, categories, provinces, setSearchParams]);
 
     const loadBusinesses = useCallback(async () => {
         setLoading(true);
@@ -268,6 +330,86 @@ export function BusinessesList() {
         return () => window.clearTimeout(debounceTimer);
     }, [searchInput, currentSearch, updateFilter]);
 
+    useEffect(() => {
+        const headingBase = activeCategory && activeProvince
+            ? `${activeCategory.name} en ${activeProvince.name}`
+            : activeCategory
+                ? `${activeCategory.name} en Republica Dominicana`
+                : activeProvince
+                    ? `Negocios en ${activeProvince.name}`
+                    : 'Directorio de negocios en Republica Dominicana';
+
+        const descriptionBase = activeCategory && activeProvince
+            ? `Descubre ${activeCategory.name.toLowerCase()} en ${activeProvince.name}. Compara opciones locales, contacta por WhatsApp y reserva en AquiTa.do.`
+            : activeCategory
+                ? `Explora ${activeCategory.name.toLowerCase()} en Republica Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
+                : activeProvince
+                    ? `Encuentra negocios locales en ${activeProvince.name}. Descubre perfiles verificados, reseñas y canales de contacto.`
+                    : 'Explora negocios locales en Republica Dominicana. Filtra por categoria y provincia para encontrar opciones verificadas.';
+
+        applySeoMeta({
+            title: `${headingBase} | AquiTa.do`,
+            description: descriptionBase,
+            canonicalPath: seoCanonicalPath,
+        });
+
+        const origin = window.location.origin;
+        const breadcrumbItems = [
+            { name: 'Inicio', url: `${origin}/` },
+            { name: 'Negocios', url: `${origin}/businesses` },
+        ];
+
+        if (activeProvince) {
+            breadcrumbItems.push({
+                name: activeProvince.name,
+                url: `${origin}/negocios/provincia/${activeProvince.slug}`,
+            });
+        }
+
+        if (activeCategory) {
+            breadcrumbItems.push({
+                name: activeCategory.name,
+                url: activeProvince
+                    ? `${origin}/negocios/${activeProvince.slug}/${activeCategory.slug}`
+                    : `${origin}/negocios/categoria/${activeCategory.slug}`,
+            });
+        }
+
+        upsertJsonLd('businesses-list-breadcrumb', {
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: breadcrumbItems.map((item, index) => ({
+                '@type': 'ListItem',
+                position: index + 1,
+                name: item.name,
+                item: item.url,
+            })),
+        });
+
+        if (businesses.length > 0) {
+            upsertJsonLd('businesses-list-itemlist', {
+                '@context': 'https://schema.org',
+                '@type': 'ItemList',
+                name: headingBase,
+                itemListElement: businesses.slice(0, 12).map((business, index) => ({
+                    '@type': 'ListItem',
+                    position: index + 1,
+                    name: business.name,
+                    url: `${origin}/businesses/${business.slug || business.id}`,
+                })),
+            });
+        } else {
+            removeJsonLd('businesses-list-itemlist');
+        }
+    }, [activeCategory, activeProvince, businesses, seoCanonicalPath]);
+
+    useEffect(() => {
+        return () => {
+            removeJsonLd('businesses-list-breadcrumb');
+            removeJsonLd('businesses-list-itemlist');
+        };
+    }, []);
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
             {loadError && (
@@ -334,6 +476,10 @@ export function BusinessesList() {
                         <button
                             onClick={() => {
                                 setSearchInput('');
+                                if (categorySlug || provinceSlug) {
+                                    navigate('/businesses');
+                                    return;
+                                }
                                 setSearchParams({});
                             }}
                             className="text-sm text-primary-600 hover:text-primary-700 font-medium"
@@ -347,7 +493,15 @@ export function BusinessesList() {
                 <div className="flex-1">
                     <div className="flex justify-between items-center mb-6">
                         <div>
-                            <h1 className="font-display text-2xl font-bold text-gray-900">Negocios</h1>
+                            <h1 className="font-display text-2xl font-bold text-gray-900">
+                                {activeCategory && activeProvince
+                                    ? `${activeCategory.name} en ${activeProvince.name}`
+                                    : activeCategory
+                                        ? activeCategory.name
+                                        : activeProvince
+                                            ? `Negocios en ${activeProvince.name}`
+                                            : 'Negocios'}
+                            </h1>
                             <p className="text-sm text-gray-500">{total} resultados encontrados</p>
                         </div>
                     </div>

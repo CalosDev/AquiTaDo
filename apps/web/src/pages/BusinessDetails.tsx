@@ -12,6 +12,8 @@ interface Business {
     id: string;
     name: string;
     slug: string;
+    createdAt?: string;
+    updatedAt?: string;
     description: string;
     phone?: string;
     whatsapp?: string;
@@ -27,6 +29,26 @@ interface Business {
     reviews?: { id: string; rating: number; comment?: string; user: { name: string }; createdAt: string }[];
     _count?: { reviews: number };
     owner?: { name: string };
+}
+
+function formatDaysAgo(value?: string): string | null {
+    if (!value) {
+        return null;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+
+    const days = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24)));
+    if (days === 0) {
+        return 'Actualizado hoy';
+    }
+    if (days === 1) {
+        return 'Actualizado hace 1 dia';
+    }
+    return `Actualizado hace ${days} dias`;
 }
 
 export function BusinessDetails() {
@@ -259,6 +281,10 @@ export function BusinessDetails() {
         business?.reviews && business.reviews.length > 0
             ? (business.reviews.reduce((acc, r) => acc + r.rating, 0) / business.reviews.length).toFixed(1)
             : null;
+    const updatedLabel = formatDaysAgo(business?.updatedAt);
+    const memberSinceYear = business?.createdAt
+        ? new Date(business.createdAt).getFullYear()
+        : null;
     const currentImage = business?.images?.[activeImage] ?? business?.images?.[0];
     const contactExperimentVariant = `business_contact_button:${contactVariant}`;
     const whatsappDirectUrl = business?.whatsapp
@@ -301,8 +327,7 @@ export function BusinessDetails() {
         });
     };
 
-    const handleWhatsAppClick = async (event: React.MouseEvent<HTMLAnchorElement>) => {
-        event.preventDefault();
+    const openWhatsApp = async () => {
         if (!business?.id || !business.whatsapp) {
             return;
         }
@@ -347,6 +372,11 @@ export function BusinessDetails() {
             }
             setErrorMessage('No se pudo abrir WhatsApp');
         }
+    };
+
+    const handleWhatsAppClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+        event.preventDefault();
+        void openWhatsApp();
     };
 
     const handleToggleFavorite = async () => {
@@ -436,7 +466,7 @@ export function BusinessDetails() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8 animate-fade-in">
             {errorMessage && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {errorMessage}
@@ -712,6 +742,23 @@ export function BusinessDetails() {
                 <div className="space-y-6">
                     <div className="card p-6 lg:sticky lg:top-24 border-t-4 border-accent-600">
                         <h3 className="font-display font-semibold text-gray-900 mb-4">Contacto</h3>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {business.verified && (
+                                <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
+                                    Verificado
+                                </span>
+                            )}
+                            {updatedLabel && (
+                                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                                    {updatedLabel}
+                                </span>
+                            )}
+                            {memberSinceYear && Number.isFinite(memberSinceYear) && (
+                                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                                    En AquiTa.do desde {memberSinceYear}
+                                </span>
+                            )}
+                        </div>
                         <div className="space-y-3">
                             {business.phone && (
                                 <a
@@ -817,6 +864,31 @@ export function BusinessDetails() {
                     </div>
                 </div>
             </div>
+
+            {(business.phone || business.whatsapp) && (
+                <div className="fixed inset-x-4 bottom-4 z-40 lg:hidden">
+                    <div className="rounded-2xl border border-primary-100 bg-white/95 backdrop-blur shadow-xl p-2 flex gap-2">
+                        {business.phone && (
+                            <a
+                                href={`tel:${business.phone}`}
+                                onClick={handlePhoneClick}
+                                className="flex-1 touch-target rounded-xl bg-primary-600 text-white text-sm font-semibold flex items-center justify-center"
+                            >
+                                Llamar
+                            </a>
+                        )}
+                        {business.whatsapp && (
+                            <button
+                                type="button"
+                                onClick={() => void openWhatsApp()}
+                                className="flex-1 touch-target rounded-xl bg-green-600 text-white text-sm font-semibold"
+                            >
+                                WhatsApp
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

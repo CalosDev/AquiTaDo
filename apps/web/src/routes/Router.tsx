@@ -45,6 +45,9 @@ export function AppRouter() {
                 <Route element={<MainLayout />}>
                     <Route path="/" element={<Home />} />
                     <Route path="/businesses" element={<BusinessesList />} />
+                    <Route path="/negocios/categoria/:categorySlug" element={<BusinessesList />} />
+                    <Route path="/negocios/provincia/:provinceSlug" element={<BusinessesList />} />
+                    <Route path="/negocios/:provinceSlug/:categorySlug" element={<BusinessesList />} />
                     <Route path="/businesses/:slug" element={<BusinessDetails />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
