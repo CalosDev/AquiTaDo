@@ -11,8 +11,10 @@ export function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const roleHomePath = resolveRoleHomePath(user?.role);
     const roleHomeLabel = resolveRoleHomeLabel(user?.role);
-    const canRegisterBusiness = user?.role === 'BUSINESS_OWNER';
-    const canAccessOrganization = user?.role === 'BUSINESS_OWNER';
+    const isAdmin = user?.role === 'ADMIN';
+    const isBusinessOwner = user?.role === 'BUSINESS_OWNER';
+    const canRegisterBusiness = isBusinessOwner;
+    const canAccessOrganization = isBusinessOwner;
 
     const handleLogout = () => {
         void logout().finally(() => {
@@ -56,6 +58,11 @@ export function Navbar() {
                                     </Link>
                                 )}
                                 <div className="flex items-center gap-3">
+                                    {isAdmin && (
+                                        <span className="text-xs px-2 py-1 rounded-full bg-accent-50 text-accent-700 font-medium">
+                                            Modo Plataforma
+                                        </span>
+                                    )}
                                     {activeOrganization && (
                                         <span className="text-xs px-2 py-1 rounded-full bg-primary-50 text-primary-700 font-medium">
                                             {activeOrganization.name}
@@ -107,6 +114,11 @@ export function Navbar() {
                             </Link>
                             {isAuthenticated ? (
                                 <>
+                                    {isAdmin && (
+                                        <p className="pt-1 text-xs uppercase tracking-wide text-gray-400 font-semibold">
+                                            Plataforma
+                                        </p>
+                                    )}
                                     {canRegisterBusiness && (
                                         <Link to="/register-business" className="py-2 text-accent-600 font-medium" onClick={() => setMenuOpen(false)}>
                                             + Registrar Negocio
@@ -120,6 +132,9 @@ export function Navbar() {
                                             Organizacion
                                         </Link>
                                     )}
+                                    <p className="pt-1 text-xs uppercase tracking-wide text-gray-400 font-semibold">
+                                        Cuenta
+                                    </p>
                                     <Link to="/profile" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
                                         Perfil
                                     </Link>
