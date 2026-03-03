@@ -18,7 +18,17 @@ function resolveApiBaseUrl(rawBaseUrl: string): string {
     return `${normalizedBaseUrl}/api`;
 }
 
+function resolveApiTimeoutMs(rawTimeoutMs: string | number | undefined): number {
+    const parsed = Number(rawTimeoutMs);
+    if (!Number.isFinite(parsed) || parsed < 1_000) {
+        return 30_000;
+    }
+
+    return Math.floor(parsed);
+}
+
 const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:3000');
+const API_TIMEOUT_MS = resolveApiTimeoutMs(import.meta.env.VITE_API_TIMEOUT_MS);
 const ACCESS_TOKEN_STORAGE_KEY = 'accessToken';
 const hasWindow = typeof window !== 'undefined';
 
@@ -71,7 +81,7 @@ export function clearAccessToken(): void {
 
 const api = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 15_000,
+    timeout: API_TIMEOUT_MS,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -121,6 +131,7 @@ async function requestAccessTokenRefresh(): Promise<string | null> {
             {
                 headers: { 'Content-Type': 'application/json' },
                 withCredentials: true,
+                timeout: API_TIMEOUT_MS,
             },
         )
         .then((response) => {

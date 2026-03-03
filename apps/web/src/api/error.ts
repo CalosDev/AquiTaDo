@@ -6,6 +6,17 @@ interface ApiErrorPayload {
 
 export function getApiErrorMessage(error: unknown, fallback = 'Ocurrio un error inesperado'): string {
     if (axios.isAxiosError<ApiErrorPayload>(error)) {
+        if (
+            error.code === 'ECONNABORTED'
+            || error.message.toLowerCase().includes('timeout')
+        ) {
+            return 'La solicitud supero el tiempo de espera. Intenta de nuevo.';
+        }
+
+        if (!error.response) {
+            return 'No se pudo conectar con el servidor. Verifica la conexion e intenta de nuevo.';
+        }
+
         const payloadMessage = error.response?.data?.message;
 
         if (Array.isArray(payloadMessage)) {

@@ -142,6 +142,7 @@ Servicios:
 `apps/web/.env`:
 
 - `VITE_API_URL=http://localhost:3000`
+- `VITE_API_TIMEOUT_MS=30000` (opcional, default 30000ms)
 
 ## Docker (stack completo)
 
