@@ -362,4 +362,58 @@ describe('BusinessesController (e2e)', () => {
             verified: true,
         });
     });
+
+    it('creates a public lead for verified businesses and blocks rapid duplicates', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
+        const admin = await createUser('ADMIN');
+        const ownerToken = signToken(owner.id, owner.role);
+        const adminToken = signToken(admin.id, admin.role);
+        const province = await createProvince();
+        const seed = makeSeed();
+
+        const created = await request(app.getHttpServer())
+            .post('/api/businesses')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .send(makeCreateBusinessPayload(seed, province.id))
+            .expect(201);
+
+        const businessId = String(created.body.id);
+
+        await request(app.getHttpServer())
+            .put(`/api/businesses/${businessId}/verify`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .expect(200);
+
+        const leadPayload = {
+            contactName: 'Cliente Publico',
+            contactPhone: '+1 (809) 555-0000',
+            contactEmail: 'cliente-publico@example.com',
+            message: 'Necesito una cotizacion para hoy',
+            preferredChannel: 'WHATSAPP',
+        };
+
+        const createdLead = await request(app.getHttpServer())
+            .post(`/api/businesses/${businessId}/public-lead`)
+            .send(leadPayload)
+            .expect(201);
+
+        expect(createdLead.body).toMatchObject({
+            status: 'LEAD',
+            message: 'Solicitud enviada. El negocio te contactara pronto.',
+        });
+        expect(typeof createdLead.body.id).toBe('string');
+
+        const duplicatedLead = await request(app.getHttpServer())
+            .post(`/api/businesses/${businessId}/public-lead`)
+            .send({
+                ...leadPayload,
+                message: 'Segundo intento inmediato',
+            })
+            .expect(400);
+
+        expect(duplicatedLead.body).toMatchObject({
+            statusCode: 400,
+            message: 'Ya existe una solicitud reciente con este telefono. Intenta nuevamente en unos minutos.',
+        });
+    });
 });

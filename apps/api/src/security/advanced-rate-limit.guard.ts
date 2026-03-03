@@ -196,6 +196,11 @@ export class AdvancedRateLimitGuard implements CanActivate {
                 ipLimit: 30,
                 apiKeyLimit: 180,
             },
+            lead: {
+                windowSeconds: 60,
+                ipLimit: 20,
+                apiKeyLimit: 120,
+            },
         };
 
         const fallback = defaults[policy];

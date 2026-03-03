@@ -249,9 +249,9 @@ export function BusinessDetails() {
             });
             setReviewForm({ rating: 5, comment: '' });
             await loadBusiness();
-            setReviewSuccessMessage('ReseÃ±a publicada correctamente');
+            setReviewSuccessMessage('Resena publicada correctamente');
         } catch (error) {
-            setReviewErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la reseÃ±a'));
+            setReviewErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la resena'));
         } finally {
             setSubmittingReview(false);
         }
@@ -525,7 +525,7 @@ export function BusinessDetails() {
     if (!business) {
         return (
             <div className="max-w-7xl mx-auto px-4 py-20 text-center space-y-4">
-                <p className="text-5xl">ðŸ˜•</p>
+                <p className="text-5xl">:(</p>
                 <h2 className="text-2xl font-bold text-gray-900">Negocio no encontrado</h2>
                 {errorMessage && (
                     <p className="text-sm text-red-600">{errorMessage}</p>
@@ -554,7 +554,7 @@ export function BusinessDetails() {
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
-                                <span className="text-7xl">ðŸª</span>
+                                <span className="text-7xl">NEG</span>
                             )}
                         </div>
                         {business.images.length > 1 && (
@@ -586,7 +586,7 @@ export function BusinessDetails() {
                                 <div className="flex items-center gap-2 mb-2">
                                     {business.verified && (
                                         <span className="bg-primary-100 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium border border-primary-200">
-                                            âœ“ Verificado
+                                            OK Verificado
                                         </span>
                                     )}
                                     <div className="flex gap-1">
@@ -599,15 +599,15 @@ export function BusinessDetails() {
                                 </div>
                                 <h1 className="font-display text-3xl font-bold text-gray-900">{business.name}</h1>
                                 <p className="text-gray-500 mt-1 flex items-center gap-1">
-                                    ðŸ“ {business.address}
-                                    {business.province && ` â€” ${business.province.name}`}
+                                    Direccion: {business.address}
+                                    {business.province && ` - ${business.province.name}`}
                                     {business.city && `, ${business.city.name}`}
                                 </p>
                             </div>
                             {averageRating && (
                                 <div className="text-center bg-accent-50 border border-accent-100 px-4 py-2 rounded-xl">
-                                    <div className="text-2xl font-bold text-accent-600">â­ {averageRating}</div>
-                                    <div className="text-xs text-gray-500">{business._count?.reviews} reseÃ±as</div>
+                                    <div className="text-2xl font-bold text-accent-600">* {averageRating}</div>
+                                    <div className="text-xs text-gray-500">{business._count?.reviews} resenas</div>
                                 </div>
                             )}
                         </div>
@@ -689,11 +689,11 @@ export function BusinessDetails() {
                         {/* Features */}
                         {business.features && business.features.length > 0 && (
                             <div className="mt-6">
-                                <h3 className="font-display font-semibold text-gray-900 mb-3">CaracterÃ­sticas</h3>
+                                <h3 className="font-display font-semibold text-gray-900 mb-3">Caracteristicas</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {business.features.map((bf, i) => (
                                         <span key={i} className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-700">
-                                            âœ”ï¸ {bf.feature.name}
+                                            + {bf.feature.name}
                                         </span>
                                     ))}
                                 </div>
@@ -704,7 +704,7 @@ export function BusinessDetails() {
                     {/* Map */}
                     {typeof business.latitude === 'number' && typeof business.longitude === 'number' && (
                         <div className="card p-6">
-                            <h3 className="font-display font-semibold text-gray-900 mb-3">UbicaciÃ³n</h3>
+                            <h3 className="font-display font-semibold text-gray-900 mb-3">Ubicacion</h3>
                             <div className="h-64 bg-gray-100 rounded-xl flex items-center justify-center">
                                 <iframe
                                     width="100%"
@@ -721,20 +721,20 @@ export function BusinessDetails() {
                     {/* Reviews */}
                     <div className="card p-6">
                         <h3 className="font-display font-semibold text-gray-900 mb-4">
-                            ReseÃ±as ({business.reviews?.length || 0})
+                            Resenas ({business.reviews?.length || 0})
                         </h3>
 
                         {/* Review Form */}
                         {!isAuthenticated && (
                             <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
-                                Inicia sesiÃ³n para dejar tu reseÃ±a. <Link to="/login" className="underline font-medium">Ir a login</Link>
+                                Inicia sesion para dejar tu resena. <Link to="/login" className="underline font-medium">Ir a login</Link>
                             </div>
                         )}
 
                         {isAuthenticated && (
                             <form onSubmit={handleReviewSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <span className="text-sm font-medium text-gray-600">Tu calificaciÃ³n:</span>
+                                    <span className="text-sm font-medium text-gray-600">Tu calificacion:</span>
                                     <div className="flex gap-1">
                                         {[1, 2, 3, 4, 5].map((star) => (
                                             <button
@@ -744,7 +744,7 @@ export function BusinessDetails() {
                                                 className={`text-2xl transition-transform hover:scale-110 ${star <= reviewForm.rating ? 'text-yellow-400' : 'text-gray-300'
                                                     }`}
                                             >
-                                                â˜…
+                                                *
                                             </button>
                                         ))}
                                     </div>
@@ -761,7 +761,7 @@ export function BusinessDetails() {
                                     disabled={submittingReview}
                                     className="btn-primary text-sm"
                                 >
-                                    {submittingReview ? 'Enviando...' : 'Enviar ReseÃ±a'}
+                                    {submittingReview ? 'Enviando...' : 'Enviar Resena'}
                                 </button>
                             </form>
                         )}
@@ -787,7 +787,7 @@ export function BusinessDetails() {
                                             <span className="font-semibold text-gray-900">{review.user.name}</span>
                                             <div className="flex gap-0.5 mt-0.5">
                                                 {Array.from({ length: 5 }, (_, i) => (
-                                                    <span key={i} className={`text-sm ${i < review.rating ? 'text-yellow-400' : 'text-gray-200'}`}>â˜…</span>
+                                                    <span key={i} className={`text-sm ${i < review.rating ? 'text-yellow-400' : 'text-gray-200'}`}>*</span>
                                                 ))}
                                             </div>
                                         </div>
@@ -800,7 +800,7 @@ export function BusinessDetails() {
                             ))}
                             {(!business.reviews || business.reviews.length === 0) && (
                                 <p className="text-gray-400 text-sm text-center py-4">
-                                    AÃºn no hay reseÃ±as. Â¡SÃ© el primero en opinar!
+                                    Aun no hay resenas. Se el primero en opinar!
                                 </p>
                             )}
                         </div>
@@ -861,9 +861,9 @@ export function BusinessDetails() {
                                     onClick={handlePhoneClick}
                                     className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 hover:bg-primary-100 transition-colors hover-lift group"
                                 >
-                                    <span className="text-lg">ðŸ“ž</span>
+                                    <span className="text-lg">Tel</span>
                                     <div>
-                                        <div className="text-xs text-gray-400">TelÃ©fono</div>
+                                        <div className="text-xs text-gray-400">Telefono</div>
                                         <div className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{business.phone}</div>
                                     </div>
                                 </a>
@@ -879,7 +879,7 @@ export function BusinessDetails() {
                                         : 'bg-green-50 hover:bg-green-100'
                                         }`}
                                 >
-                                    <span className="text-lg">ðŸ’¬</span>
+                                    <span className="text-lg">WA</span>
                                     <div>
                                         <div className="text-xs text-gray-400">WhatsApp</div>
                                         <div className="text-sm font-medium text-green-700">
@@ -889,9 +889,9 @@ export function BusinessDetails() {
                                 </a>
                             )}
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
-                                <span className="text-lg">ðŸ“</span>
+                                <span className="text-lg">Dir</span>
                                 <div>
-                                    <div className="text-xs text-gray-400">DirecciÃ³n</div>
+                                    <div className="text-xs text-gray-400">Direccion</div>
                                     <div className="text-sm text-gray-700">{business.address}</div>
                                 </div>
                             </div>
@@ -940,7 +940,7 @@ export function BusinessDetails() {
                                     <textarea
                                         className="input-field text-sm"
                                         rows={3}
-                                        placeholder="¿Que necesitas?"
+                                        placeholder="Que necesitas?"
                                         value={publicLeadForm.message}
                                         onChange={(event) =>
                                             setPublicLeadForm((previous) => ({
@@ -957,7 +957,7 @@ export function BusinessDetails() {
                                         {submittingPublicLead ? 'Enviando...' : 'Solicitar cotizacion sin cuenta'}
                                     </button>
                                     <p className="text-xs text-gray-500">
-                                        ¿Ya tienes cuenta? <Link to="/login" className="underline font-medium">Inicia sesion</Link>
+                                        Ya tienes cuenta? <Link to="/login" className="underline font-medium">Inicia sesion</Link>
                                     </p>
                                 </form>
                             )}

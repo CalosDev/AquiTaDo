@@ -48,16 +48,33 @@ export type NegativeReviewAlertPayload = {
     summary: string;
 };
 
+export type PublicLeadAlertPayload = {
+    organizationId: string;
+    businessId: string;
+    businessName: string;
+    businessWhatsapp: string | null;
+    ownerPhone: string | null;
+    leadId: string;
+    contactName: string;
+    contactPhone: string;
+    contactEmail?: string | null;
+    message: string;
+    preferredChannel?: string | null;
+    createdAt: string;
+};
+
 type NotificationPayload =
     | BookingReminderPayload
     | PromotionGeoAlertPayload
     | VerificationAlertPayload
-    | NegativeReviewAlertPayload;
+    | NegativeReviewAlertPayload
+    | PublicLeadAlertPayload;
 
 const JOB_NAME_BOOKING_REMINDER = 'whatsapp.booking.reminder';
 const JOB_NAME_PROMOTION_GEO = 'whatsapp.promotion.geo';
 const JOB_NAME_ACCOUNT_VERIFICATION = 'whatsapp.account.verification';
 const JOB_NAME_NEGATIVE_REVIEW = 'whatsapp.review.negative';
+const JOB_NAME_PUBLIC_LEAD = 'whatsapp.public.lead';
 
 /**
  * BullMQ orchestrator for asynchronous notification workflows.
@@ -160,6 +177,14 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
             organizationId: payload.organizationId,
             businessId: payload.businessId,
             topic: 'negative_review_alert',
+        });
+    }
+
+    async enqueuePublicLeadAlert(payload: PublicLeadAlertPayload): Promise<void> {
+        await this.enqueueJob(JOB_NAME_PUBLIC_LEAD, payload, {
+            organizationId: payload.organizationId,
+            businessId: payload.businessId,
+            topic: 'public_lead_alert',
         });
     }
 
@@ -307,6 +332,9 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
             case JOB_NAME_NEGATIVE_REVIEW:
                 await this.sendNegativeReviewAlert(payload as NegativeReviewAlertPayload);
                 return;
+            case JOB_NAME_PUBLIC_LEAD:
+                await this.sendPublicLeadAlert(payload as PublicLeadAlertPayload);
+                return;
             default:
                 this.logger.warn(`Unknown notification job "${jobName}" ignored`);
         }
@@ -391,6 +419,38 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
                 `Resumen IA: ${payload.summary}`,
                 `Resena: ${payload.reviewId}`,
             ].join('\n'),
+        });
+    }
+
+    private async sendPublicLeadAlert(payload: PublicLeadAlertPayload): Promise<void> {
+        const targetPhone = payload.businessWhatsapp || payload.ownerPhone;
+        if (!targetPhone) {
+            return;
+        }
+
+        const createdAt = new Date(payload.createdAt);
+        const readableDate = Number.isNaN(createdAt.getTime())
+            ? payload.createdAt
+            : createdAt.toLocaleString('es-DO', { hour12: false });
+
+        const messageLines = [
+            `Nuevo lead web para ${payload.businessName}.`,
+            `Contacto: ${payload.contactName} (${payload.contactPhone})`,
+            payload.contactEmail ? `Email: ${payload.contactEmail}` : null,
+            payload.preferredChannel ? `Canal preferido: ${payload.preferredChannel}` : null,
+            `Lead: ${payload.leadId}`,
+            `Hora: ${readableDate}`,
+            `Mensaje: ${payload.message}`,
+        ].filter((line): line is string => Boolean(line));
+
+        const appPublicWebUrl = this.configService.get<string>('APP_PUBLIC_WEB_URL')?.trim();
+        if (appPublicWebUrl) {
+            messageLines.push(`Gestionalo en AquiTa.do: ${appPublicWebUrl.replace(/\/+$/, '')}/dashboard`);
+        }
+
+        await this.whatsAppOutboundService.sendTextMessage({
+            to: targetPhone,
+            text: messageLines.join('\n'),
         });
     }
 }

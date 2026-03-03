@@ -96,7 +96,7 @@ export function DashboardBillingTab({
                 <div className="card p-4 text-center"><p className="text-xs text-gray-500">Total facturado</p><p className="text-xl font-bold text-primary-700">{formatCurrency(billingSummary?.invoices.total || 0)}</p></div>
                 <div className="card p-4 text-center"><p className="text-xs text-gray-500">Cobrado</p><p className="text-xl font-bold text-emerald-700">{formatCurrency(billingSummary?.payments.totalCollected || 0)}</p></div>
                 <div className="card p-4 text-center"><p className="text-xs text-gray-500">Fallido</p><p className="text-xl font-bold text-red-700">{formatCurrency(billingSummary?.payments.totalFailed || 0)}</p></div>
-                <div className="card p-4 text-center"><p className="text-xs text-gray-500">ComisiÃ³n plataforma</p><p className="text-xl font-bold text-amber-700">{formatCurrency(billingSummary?.marketplace.platformFeeAmount || 0)}</p></div>
+                <div className="card p-4 text-center"><p className="text-xs text-gray-500">Comision plataforma</p><p className="text-xl font-bold text-amber-700">{formatCurrency(billingSummary?.marketplace.platformFeeAmount || 0)}</p></div>
                 <div className="card p-4 text-center"><p className="text-xs text-gray-500">ITBIS acumulado</p><p className="text-xl font-bold text-indigo-700">{formatCurrency(fiscalSummary?.totals.tax || 0)}</p></div>
                 <div className="card p-4 text-center"><p className="text-xs text-gray-500">Facturas pagadas</p><p className="text-xl font-bold text-teal-700">{fiscalSummary?.totals.invoicesPaid || 0}</p></div>
             </div>
@@ -108,7 +108,7 @@ export function DashboardBillingTab({
                         {invoiceStatuses.length > 0 ? invoiceStatuses.map(([status, row]) => (
                             <div key={status} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
                                 <span className="text-sm text-gray-700">{status}</span>
-                                <span className="text-sm text-gray-900">{row.count} Â· {formatCurrency(row.total)}</span>
+                                <span className="text-sm text-gray-900">{row.count} - {formatCurrency(row.total)}</span>
                             </div>
                         )) : <p className="text-sm text-gray-500">Sin datos de facturas.</p>}
                     </div>
@@ -119,7 +119,7 @@ export function DashboardBillingTab({
                         {paymentStatuses.length > 0 ? paymentStatuses.map(([status, row]) => (
                             <div key={status} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
                                 <span className="text-sm text-gray-700">{status}</span>
-                                <span className="text-sm text-gray-900">{row.count} Â· {formatCurrency(row.total)}</span>
+                                <span className="text-sm text-gray-900">{row.count} - {formatCurrency(row.total)}</span>
                             </div>
                         )) : <p className="text-sm text-gray-500">Sin datos de pagos.</p>}
                     </div>

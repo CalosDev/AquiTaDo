@@ -24,6 +24,8 @@ import { OrganizationRole } from '../generated/prisma/client';
 import { Policy } from '../core/authorization/policy.decorator';
 import { PolicyGuard } from '../core/authorization/policy.guard';
 import { PublicCache } from '../core/interceptors/public-cache.decorator';
+import { AdvancedRateLimitGuard } from '../security/advanced-rate-limit.guard';
+import { RateLimitPolicy } from '../security/rate-limit-policy.decorator';
 
 @Controller('businesses')
 export class BusinessesController {
@@ -79,6 +81,8 @@ export class BusinessesController {
     }
 
     @Post(':id/public-lead')
+    @UseGuards(AdvancedRateLimitGuard)
+    @RateLimitPolicy('lead')
     async createPublicLead(
         @Param('id', new ParseUUIDPipe()) id: string,
         @Body() dto: CreatePublicLeadDto,

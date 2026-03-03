@@ -8,6 +8,7 @@ import {
     IsUUID,
     IsEmail,
     Matches,
+    IsIn,
     MaxLength,
     Min,
     Max,
@@ -188,6 +189,7 @@ export class CreatePublicLeadDto {
 
     @IsOptional()
     @IsString()
+    @IsIn(['WHATSAPP', 'PHONE', 'EMAIL'])
     @MaxLength(32)
     preferredChannel?: 'WHATSAPP' | 'PHONE' | 'EMAIL';
 }

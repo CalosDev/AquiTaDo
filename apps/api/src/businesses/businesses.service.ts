@@ -24,6 +24,7 @@ import { ReputationService } from '../reputation/reputation.service';
 import { RedisService } from '../cache/redis.service';
 import { hashedCacheKey } from '../cache/cache-key';
 import { DomainEventsService } from '../core/events/domain-events.service';
+import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 
 @Injectable()
 export class BusinessesService {
@@ -42,6 +43,8 @@ export class BusinessesService {
         private readonly redisService: RedisService,
         @Inject(DomainEventsService)
         private readonly domainEventsService: DomainEventsService,
+        @Inject(NotificationsQueueService)
+        private readonly notificationsQueueService: NotificationsQueueService,
     ) { }
     private readonly uploadsRoot = path.resolve(process.cwd(), 'uploads');
 
@@ -128,6 +131,12 @@ export class BusinessesService {
                 slug: true,
                 ownerId: true,
                 organizationId: true,
+                whatsapp: true,
+                owner: {
+                    select: {
+                        phone: true,
+                    },
+                },
             },
         });
 
@@ -141,6 +150,35 @@ export class BusinessesService {
         const normalizedPhone = contactPhone.replace(/\D+/g, '');
         const preferredChannel = dto.preferredChannel?.trim().toUpperCase() || null;
         const message = dto.message.trim();
+
+        if (normalizedPhone.length < 7) {
+            throw new BadRequestException('El telefono ingresado no es valido');
+        }
+
+        const duplicateWindowStart = new Date(Date.now() - 10 * 60 * 1000);
+        const recentDuplicate = await this.prisma.salesLead.findFirst({
+            where: {
+                businessId: business.id,
+                stage: 'LEAD',
+                deletedAt: null,
+                createdAt: {
+                    gte: duplicateWindowStart,
+                },
+                metadata: {
+                    path: ['contactPhoneNormalized'],
+                    equals: normalizedPhone,
+                },
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (recentDuplicate) {
+            throw new BadRequestException(
+                'Ya existe una solicitud reciente con este telefono. Intenta nuevamente en unos minutos.',
+            );
+        }
 
         const stage: SalesLeadStage = 'LEAD';
         const createdLead = await this.prisma.salesLead.create({
@@ -167,6 +205,29 @@ export class BusinessesService {
                 createdAt: true,
             },
         });
+
+        try {
+            await this.notificationsQueueService.enqueuePublicLeadAlert({
+                organizationId: business.organizationId,
+                businessId: business.id,
+                businessName: business.name,
+                businessWhatsapp: business.whatsapp,
+                ownerPhone: business.owner.phone,
+                leadId: createdLead.id,
+                contactName,
+                contactPhone,
+                contactEmail,
+                message,
+                preferredChannel,
+                createdAt: createdLead.createdAt.toISOString(),
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to enqueue public lead alert for business ${business.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
 
         return {
             id: createdLead.id,

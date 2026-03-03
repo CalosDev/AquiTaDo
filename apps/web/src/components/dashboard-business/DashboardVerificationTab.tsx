@@ -99,11 +99,11 @@ export function DashboardVerificationTab({
                             }))
                         }
                     >
-                        <option value="ID_CARD">CÃ©dula/ID</option>
+                        <option value="ID_CARD">Cedula/ID</option>
                         <option value="TAX_CERTIFICATE">RNC/Certificado fiscal</option>
                         <option value="BUSINESS_LICENSE">Licencia comercial</option>
-                        <option value="ADDRESS_PROOF">Comprobante direcciÃ³n</option>
-                        <option value="SELFIE">Selfie validaciÃ³n</option>
+                        <option value="ADDRESS_PROOF">Comprobante direccion</option>
+                        <option value="SELFIE">Selfie validacion</option>
                         <option value="OTHER">Otro</option>
                     </select>
 
@@ -128,7 +128,7 @@ export function DashboardVerificationTab({
                     <textarea
                         className="input-field text-sm"
                         rows={3}
-                        placeholder="Notas de revisiÃ³n (opcional)"
+                        placeholder="Notas de revision (opcional)"
                         value={verificationForm.notes}
                         onChange={(event) =>
                             setVerificationForm((previous) => ({
@@ -143,7 +143,7 @@ export function DashboardVerificationTab({
                         disabled={submittingBusinessVerification || !selectedVerificationBusinessId}
                         onClick={() => void handleSubmitBusinessVerification()}
                     >
-                        {submittingBusinessVerification ? 'Enviando...' : 'Enviar a revisiÃ³n'}
+                        {submittingBusinessVerification ? 'Enviando...' : 'Enviar a revision'}
                     </button>
                 </div>
             </div>
@@ -151,7 +151,7 @@ export function DashboardVerificationTab({
             <div className="card p-5 xl:col-span-2">
                 <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Estado y documentos</h3>
                 {verificationLoading ? (
-                    <p className="text-sm text-gray-500">Cargando informaciÃ³n de verificaciÃ³n...</p>
+                    <p className="text-sm text-gray-500">Cargando informacion de verificacion...</p>
                 ) : (
                     <div className="space-y-4">
                         {verificationStatus ? (
@@ -160,7 +160,7 @@ export function DashboardVerificationTab({
                                     Estado: <strong>{verificationStatus.verificationStatus}</strong>
                                 </p>
                                 <p>
-                                    Verificado: <strong>{verificationStatus.verified ? 'SÃ­' : 'No'}</strong>
+                                    Verificado: <strong>{verificationStatus.verified ? 'Si' : 'No'}</strong>
                                 </p>
                                 <p>
                                     Riesgo: <strong>{verificationStatus.riskScore}/100</strong>
@@ -186,7 +186,7 @@ export function DashboardVerificationTab({
                                             </span>
                                         </div>
                                         <p className="text-xs text-gray-500">
-                                            {document.business.name} Â· {formatDateTime(document.submittedAt)}
+                                            {document.business.name} - {formatDateTime(document.submittedAt)}
                                         </p>
                                         <a
                                             href={document.fileUrl}

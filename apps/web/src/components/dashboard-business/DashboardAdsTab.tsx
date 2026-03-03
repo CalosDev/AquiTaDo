@@ -128,11 +128,11 @@ export function DashboardAdsTab({
                             {creatingAdsWalletTopup ? 'Conectando...' : 'Recargar'}
                         </button>
                     </form>
-                    <p className="text-xs text-gray-500">Cada clic vÃ¡lido descuenta el CPC de la campaÃ±a desde este saldo.</p>
+                    <p className="text-xs text-gray-500">Cada clic valido descuenta el CPC de la campana desde este saldo.</p>
                 </div>
 
                 <div className="mb-5">
-                    <p className="text-xs text-gray-500 mb-2">Ãšltimas recargas</p>
+                    <p className="text-xs text-gray-500 mb-2">Ultimas recargas</p>
                     <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                         {adsWalletTopups.length > 0 ? adsWalletTopups.slice(0, 8).map((topup) => {
                             const status = resolveAdsWalletTopupStatus(topup.status);
@@ -156,7 +156,7 @@ export function DashboardAdsTab({
                     </div>
                 </div>
 
-                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Nueva campaÃ±a</h3>
+                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Nueva campana</h3>
                 <form onSubmit={(event) => void handleCreateCampaign(event)} className="space-y-3">
                     <select
                         className="input-field text-sm"
@@ -175,7 +175,7 @@ export function DashboardAdsTab({
                     </select>
                     <input
                         className="input-field text-sm"
-                        placeholder="Nombre campaÃ±a"
+                        placeholder="Nombre campana"
                         value={campaignForm.name}
                         onChange={(event) =>
                             setCampaignForm((previous) => ({
@@ -266,16 +266,16 @@ export function DashboardAdsTab({
                         <option value="ACTIVE">Activa</option>
                     </select>
                     <button type="submit" className="btn-primary text-sm" disabled={creatingCampaign}>
-                        {creatingCampaign ? 'Creando...' : 'Crear campaÃ±a'}
+                        {creatingCampaign ? 'Creando...' : 'Crear campana'}
                     </button>
                 </form>
             </div>
 
             <div className="card p-5 xl:col-span-2">
-                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">CampaÃ±as actuales</h3>
+                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Campanas actuales</h3>
                 <div className="space-y-2 max-h-[34rem] overflow-y-auto pr-1">
                     {adsLoading ? (
-                        <p className="text-sm text-gray-500">Cargando campaÃ±as ads...</p>
+                        <p className="text-sm text-gray-500">Cargando campanas ads...</p>
                     ) : campaigns.length > 0 ? (
                         campaigns.map((campaign) => (
                             <div key={campaign.id} className="rounded-xl border border-gray-100 p-3">
@@ -289,8 +289,8 @@ export function DashboardAdsTab({
                                     </span>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">
-                                    CPC {formatCurrency(campaign.bidAmount)} Â·
-                                    Presupuesto {formatCurrency(campaign.spentAmount)} / {formatCurrency(campaign.totalBudget)} Â·
+                                    CPC {formatCurrency(campaign.bidAmount)} -
+                                    Presupuesto {formatCurrency(campaign.spentAmount)} / {formatCurrency(campaign.totalBudget)} -
                                     CTR {campaign.ctr}%
                                 </p>
                                 <div className="flex gap-2 mt-2">
@@ -328,7 +328,7 @@ export function DashboardAdsTab({
                             </div>
                         ))
                     ) : (
-                        <p className="text-sm text-gray-500">No hay campaÃ±as creadas.</p>
+                        <p className="text-sm text-gray-500">No hay campanas creadas.</p>
                     )}
                 </div>
             </div>
