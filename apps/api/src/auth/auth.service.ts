@@ -1,5 +1,4 @@
 import {
-    BadRequestException,
     ConflictException,
     Inject,
     Injectable,
@@ -39,11 +38,8 @@ export class AuthService {
             throw new ConflictException('El correo electronico ya esta registrado');
         }
 
-        if (dto.role === 'ADMIN') {
-            throw new BadRequestException('No puedes registrarte con rol ADMIN');
-        }
-
         const requestedRole: Role = dto.role === 'BUSINESS_OWNER' ? 'BUSINESS_OWNER' : 'USER';
+        const normalizedPhone = dto.phone?.trim();
 
         const hashedPassword = await bcrypt.hash(dto.password, 12);
 
@@ -52,7 +48,7 @@ export class AuthService {
                 name: dto.name.trim(),
                 email: dto.email.trim().toLowerCase(),
                 password: hashedPassword,
-                phone: dto.phone?.trim(),
+                phone: normalizedPhone && normalizedPhone.length > 0 ? normalizedPhone : null,
                 role: requestedRole,
             },
         });

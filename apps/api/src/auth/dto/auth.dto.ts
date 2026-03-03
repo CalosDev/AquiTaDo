@@ -1,25 +1,48 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
-import { Role } from '../../generated/prisma/client';
+import { Transform } from 'class-transformer';
+import {
+    IsEmail,
+    IsIn,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    Matches,
+    MaxLength,
+    MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     @IsString()
     @IsNotEmpty()
+    @MinLength(2)
+    @MaxLength(100)
     name!: string;
 
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     @IsEmail()
+    @MaxLength(120)
     email!: string;
 
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     @IsString()
     @MinLength(8)
+    @MaxLength(128)
+    @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
+        message: 'La contrasena debe incluir letras y numeros',
+    })
     password!: string;
 
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     @IsOptional()
     @IsString()
+    @Matches(/^[0-9+()\-\s]{7,20}$/, {
+        message: 'El telefono no tiene un formato valido',
+    })
     phone?: string;
 
     @IsOptional()
-    @IsEnum(Role)
-    role?: Role;
+    @IsIn(['USER', 'BUSINESS_OWNER'])
+    role?: 'USER' | 'BUSINESS_OWNER';
 }
 
 export class LoginDto {

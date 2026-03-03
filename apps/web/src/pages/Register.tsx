@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 
+const PHONE_REGEX = /^[0-9+()\-\s]{7,20}$/;
+
 export function Register() {
     const { register } = useAuth();
     const navigate = useNavigate();
@@ -9,8 +11,10 @@ export function Register() {
         name: '',
         email: '',
         password: '',
+        confirmPassword: '',
         phone: '',
-        accountType: 'USER' as 'USER' | 'BUSINESS_OWNER',
+        accountType: '' as '' | 'USER' | 'BUSINESS_OWNER',
+        acceptTerms: false,
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -19,18 +23,48 @@ export function Register() {
         e.preventDefault();
         setError('');
 
+        if (formData.name.trim().length < 2) {
+            setError('El nombre completo es obligatorio');
+            return;
+        }
+
+        if (!formData.accountType) {
+            setError('Selecciona el tipo de cuenta');
+            return;
+        }
+
         if (formData.password.length < 8) {
             setError('La contrasena debe tener al menos 8 caracteres');
+            return;
+        }
+
+        if (!/[A-Za-z]/.test(formData.password) || !/\d/.test(formData.password)) {
+            setError('La contrasena debe incluir letras y numeros');
+            return;
+        }
+
+        if (formData.password !== formData.confirmPassword) {
+            setError('La confirmacion de contrasena no coincide');
+            return;
+        }
+
+        if (formData.phone.trim() && !PHONE_REGEX.test(formData.phone.trim())) {
+            setError('El telefono no tiene un formato valido');
+            return;
+        }
+
+        if (!formData.acceptTerms) {
+            setError('Debes aceptar los terminos y la politica de privacidad');
             return;
         }
 
         setLoading(true);
         try {
             await register(
-                formData.name,
-                formData.email,
+                formData.name.trim(),
+                formData.email.trim(),
                 formData.password,
-                formData.phone || undefined,
+                formData.phone.trim() || undefined,
                 formData.accountType,
             );
             navigate('/app');
@@ -63,7 +97,7 @@ export function Register() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label htmlFor="register-name" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Nombre completo
+                                Nombre completo *
                             </label>
                             <input
                                 id="register-name"
@@ -77,7 +111,7 @@ export function Register() {
                         </div>
                         <div>
                             <label htmlFor="register-email" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Correo electronico
+                                Correo electronico *
                             </label>
                             <input
                                 id="register-email"
@@ -91,17 +125,19 @@ export function Register() {
                         </div>
                         <div>
                             <label htmlFor="register-account-type" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Tipo de cuenta
+                                Tipo de cuenta *
                             </label>
                             <select
                                 id="register-account-type"
+                                required
                                 value={formData.accountType}
                                 onChange={(e) => setFormData({
                                     ...formData,
-                                    accountType: e.target.value as 'USER' | 'BUSINESS_OWNER',
+                                    accountType: e.target.value as '' | 'USER' | 'BUSINESS_OWNER',
                                 })}
                                 className="input-field"
                             >
+                                <option value="">Selecciona una opcion...</option>
                                 <option value="USER">Cliente (descubrir y reservar)</option>
                                 <option value="BUSINESS_OWNER">Negocio (vender y gestionar)</option>
                             </select>
@@ -121,18 +157,46 @@ export function Register() {
                         </div>
                         <div>
                             <label htmlFor="register-password" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Contrasena
+                                Contrasena *
                             </label>
                             <input
                                 id="register-password"
                                 type="password"
                                 required
+                                minLength={8}
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 className="input-field"
-                                placeholder="Minimo 8 caracteres"
+                                placeholder="Minimo 8 caracteres, con letras y numeros"
                             />
                         </div>
+                        <div>
+                            <label htmlFor="register-confirm-password" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Confirmar contrasena *
+                            </label>
+                            <input
+                                id="register-confirm-password"
+                                type="password"
+                                required
+                                minLength={8}
+                                value={formData.confirmPassword}
+                                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                className="input-field"
+                                placeholder="Repite tu contrasena"
+                            />
+                        </div>
+                        <label className="flex items-start gap-2 text-sm text-gray-600">
+                            <input
+                                type="checkbox"
+                                checked={formData.acceptTerms}
+                                onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
+                                className="mt-1"
+                                required
+                            />
+                            <span>
+                                Acepto los <Link to="/terms" className="text-primary-600 hover:text-primary-700">terminos</Link> y la <Link to="/privacy" className="text-primary-600 hover:text-primary-700">politica de privacidad</Link>.
+                            </span>
+                        </label>
                         <button type="submit" disabled={loading} className="btn-primary w-full">
                             {loading ? 'Creando cuenta...' : 'Registrarse'}
                         </button>
