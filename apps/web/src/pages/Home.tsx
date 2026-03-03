@@ -57,6 +57,40 @@ const OPERATING_POINTS = [
     },
 ];
 
+type DominicanCategoryPreset = {
+    key: string;
+    label: string;
+    queries: string[];
+    slugHints: string[];
+};
+
+type HomeTopCategoryCard = {
+    key: string;
+    label: string;
+    href: string;
+    businessCount: number | null;
+    categoryId?: string;
+    source: string;
+};
+
+const DOMINICAN_CATEGORY_PRESETS: DominicanCategoryPreset[] = [
+    { key: 'colmados', label: 'Colmados y mini markets', queries: ['colmado', 'minimarket'], slugHints: ['colmados', 'supermercados'] },
+    { key: 'food', label: 'Restaurantes y pica pollo', queries: ['restaurante', 'pica pollo'], slugHints: ['restaurantes'] },
+    { key: 'pharmacy', label: 'Farmacias y salud', queries: ['farmacia', 'salud'], slugHints: ['farmacias', 'salud'] },
+    { key: 'beauty', label: 'Salones y barberias', queries: ['salon', 'barberia'], slugHints: ['salones-barberias', 'belleza', 'salones'] },
+    { key: 'hardware', label: 'Ferreterias y construccion', queries: ['ferreteria', 'construccion'], slugHints: ['ferreterias', 'construccion'] },
+    { key: 'tech', label: 'Tecnologia y servicios', queries: ['tecnologia', 'reparacion'], slugHints: ['tecnologia'] },
+    { key: 'retail', label: 'Tiendas y moda', queries: ['tienda', 'moda'], slugHints: ['tiendas'] },
+    { key: 'auto', label: 'Automotriz y talleres', queries: ['taller', 'mecanica'], slugHints: ['automotriz'] },
+];
+
+function normalizeText(value: string): string {
+    return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
 function trackGrowthEvent(payload: {
     eventType: 'SEARCH_QUERY' | 'SEARCH_RESULT_CLICK';
     categoryId?: string;
@@ -101,8 +135,69 @@ export function Home() {
                 ? 'Registrar mi negocio'
                 : 'Explorar negocios';
 
-    const topCategories = useMemo(() => categories.slice(0, 10), [categories]);
-    const topProvinces = useMemo(() => provinces.slice(0, 10), [provinces]);
+    const topCategories = useMemo(
+        () => [...categories].sort((a, b) => (b._count?.businesses ?? 0) - (a._count?.businesses ?? 0)),
+        [categories],
+    );
+    const topProvinces = useMemo(
+        () => [...provinces].sort((a, b) => (b._count?.businesses ?? 0) - (a._count?.businesses ?? 0)).slice(0, 10),
+        [provinces],
+    );
+    const topCategoryCards = useMemo<HomeTopCategoryCard[]>(() => {
+        const cards: HomeTopCategoryCard[] = [];
+        const usedCategoryIds = new Set<string>();
+        const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
+
+        for (const preset of DOMINICAN_CATEGORY_PRESETS) {
+            const matchBySlug = preset.slugHints
+                .map((slug) => categoryBySlug.get(slug))
+                .find((entry): entry is Category => Boolean(entry));
+
+            const matchByName = matchBySlug
+                ? null
+                : categories.find((category) => {
+                    const normalizedName = normalizeText(category.name);
+                    return preset.queries.some((query) => normalizedName.includes(normalizeText(query)));
+                });
+
+            const matchedCategory = matchBySlug || matchByName;
+            if (matchedCategory) {
+                usedCategoryIds.add(matchedCategory.id);
+                cards.push({
+                    key: preset.key,
+                    label: preset.label,
+                    href: `/negocios/categoria/${matchedCategory.slug}`,
+                    businessCount: matchedCategory._count?.businesses ?? 0,
+                    categoryId: matchedCategory.id,
+                    source: 'home-category-grid-curated',
+                });
+                continue;
+            }
+
+            cards.push({
+                key: preset.key,
+                label: preset.label,
+                href: `/businesses?search=${encodeURIComponent(preset.queries[0])}`,
+                businessCount: null,
+                source: 'home-category-grid-curated-fallback',
+            });
+        }
+
+        const remaining = topCategories
+            .filter((category) => !usedCategoryIds.has(category.id))
+            .map<HomeTopCategoryCard>((category) => ({
+                key: category.id,
+                label: category.name,
+                href: category.slug
+                    ? `/negocios/categoria/${category.slug}`
+                    : `/businesses?categoryId=${category.id}`,
+                businessCount: category._count?.businesses ?? 0,
+                categoryId: category.id,
+                source: 'home-category-grid-top',
+            }));
+
+        return [...cards, ...remaining].slice(0, 8);
+    }, [categories, topCategories]);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -290,30 +385,32 @@ export function Home() {
                     <div className="section-shell p-6">
                         <div className="flex items-end justify-between gap-4">
                             <div>
-                                <h3 className="font-display text-2xl font-bold text-slate-900">Categorias top</h3>
-                                <p className="mt-1 text-sm text-slate-600">Directorio organizado para conversion real.</p>
+                                <h3 className="font-display text-2xl font-bold text-slate-900">Categorias top en RD</h3>
+                                <p className="mt-1 text-sm text-slate-600">Taxonomia local para descubrir negocios dominicanos sin friccion.</p>
                             </div>
                             <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
                                 Ver todo
                             </Link>
                         </div>
                         <div className="mt-5 grid grid-cols-2 gap-3">
-                            {topCategories.slice(0, 8).map((category) => (
+                            {topCategoryCards.map((category) => (
                                 <Link
-                                    key={category.id}
-                                    to={category.slug ? `/negocios/categoria/${category.slug}` : `/businesses?categoryId=${category.id}`}
+                                    key={category.key}
+                                    to={category.href}
                                     onClick={() => {
                                         void trackGrowthEvent({
                                             eventType: 'SEARCH_QUERY',
-                                            categoryId: category.id,
-                                            metadata: { source: 'home-category-grid' },
+                                            categoryId: category.categoryId,
+                                            metadata: { source: category.source, categoryKey: category.key },
                                         });
                                     }}
                                     className="surface-panel p-3 text-sm font-semibold text-slate-700 transition-colors hover:border-primary-300 hover:text-primary-700"
                                 >
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="truncate">{category.name}</span>
-                                        <span className="text-xs text-slate-400">{category._count?.businesses ?? 0}</span>
+                                        <span className="truncate">{category.label}</span>
+                                        <span className="text-xs text-slate-500">
+                                            {category.businessCount !== null ? category.businessCount : 'Explorar'}
+                                        </span>
                                     </div>
                                 </Link>
                             ))}

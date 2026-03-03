@@ -20,7 +20,7 @@ export function About() {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
             <section className="card p-7 md:p-10">
-                <span className="chip mb-4">Sobre AquiTa.do</span>
+                <span className="chip mb-4">Conoce AquiTa.do</span>
                 <h1 className="font-display text-3xl md:text-4xl font-bold text-slate-900">
                     Un ecosistema local para negocios y clientes en Republica Dominicana
                 </h1>
@@ -75,4 +75,3 @@ export function About() {
         </div>
     );
 }
-

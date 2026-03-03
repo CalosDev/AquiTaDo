@@ -135,8 +135,24 @@ export class BusinessQueryDto {
     categoryId?: string;
 
     @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+        message: 'categorySlug debe ser un slug valido',
+    })
+    categorySlug?: string;
+
+    @IsOptional()
     @IsUUID()
     provinceId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+        message: 'provinceSlug debe ser un slug valido',
+    })
+    provinceSlug?: string;
 
     @IsOptional()
     @IsUUID()

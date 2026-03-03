@@ -1145,10 +1145,22 @@ export class BusinessesService {
             where.categories = {
                 some: { categoryId: query.categoryId },
             };
+        } else if (query.categorySlug) {
+            where.categories = {
+                some: {
+                    category: {
+                        slug: query.categorySlug,
+                    },
+                },
+            };
         }
 
         if (query.provinceId) {
             where.provinceId = query.provinceId;
+        } else if (query.provinceSlug) {
+            where.province = {
+                slug: query.provinceSlug,
+            };
         }
 
         if (query.cityId) {

@@ -256,8 +256,16 @@ export function BusinessesList() {
         try {
             const params: Record<string, string | number> = { page: currentPage, limit: 12 };
             if (currentSearch) params.search = currentSearch;
-            if (currentCategory) params.categoryId = currentCategory;
-            if (currentProvince) params.provinceId = currentProvince;
+            if (currentCategory) {
+                params.categoryId = currentCategory;
+            } else if (categorySlug) {
+                params.categorySlug = categorySlug;
+            }
+            if (currentProvince) {
+                params.provinceId = currentProvince;
+            } else if (provinceSlug) {
+                params.provinceSlug = provinceSlug;
+            }
             if (currentFeature) params.feature = currentFeature;
 
             const [businessesRes, sponsoredRes] = await Promise.all([
@@ -278,7 +286,7 @@ export function BusinessesList() {
         } finally {
             setLoading(false);
         }
-    }, [currentCategory, currentFeature, currentPage, currentProvince, currentSearch]);
+    }, [categorySlug, currentCategory, currentFeature, currentPage, currentProvince, currentSearch, provinceSlug]);
 
     useEffect(() => {
         void loadBusinesses();
@@ -513,18 +521,18 @@ export function BusinessesList() {
     }, []);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 animate-fade-in">
             {loadError && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {loadError}
                 </div>
             )}
 
-            <div className="flex flex-col lg:flex-row gap-8">
+            <div className="flex flex-col lg:flex-row gap-6 xl:gap-8">
                 {/* Filters Sidebar */}
                 <aside className="lg:w-72 shrink-0">
                     <div className="card p-6 lg:sticky lg:top-24">
-                        <h3 className="font-display font-bold text-lg mb-4">Filtros</h3>
+                        <p className="font-display font-bold text-lg mb-4">Filtros</p>
 
                         {/* Search */}
                         <div className="mb-5">
@@ -604,7 +612,7 @@ export function BusinessesList() {
                 </aside>
 
                 {/* Results */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-6">
                         <div>
                             <h1 className="font-display text-2xl font-bold text-gray-900">
@@ -723,9 +731,9 @@ export function BusinessesList() {
                                                     </button>
                                                 )}
                                             </div>
-                                            <h3 className="font-display font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                                            <h2 className="font-display font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
                                                 {biz.name}
-                                            </h3>
+                                            </h2>
                                             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                                 📍 {biz.province?.name || biz.address}
                                             </p>
@@ -763,7 +771,7 @@ export function BusinessesList() {
                                         page === 'ellipsis' ? (
                                             <span
                                                 key={`ellipsis-${index}`}
-                                                className="w-10 h-10 inline-flex items-center justify-center text-gray-400"
+                                                className="w-10 h-10 inline-flex items-center justify-center text-gray-500"
                                             >
                                                 ...
                                             </span>
@@ -786,7 +794,7 @@ export function BusinessesList() {
                             )}
                         </>
                     ) : (
-                        <div className="text-center py-20 text-gray-400">
+                        <div className="text-center py-20 text-slate-500">
                             <p className="text-5xl mb-4">🔍</p>
                             <p className="text-lg">No se encontraron negocios con estos filtros</p>
                         </div>

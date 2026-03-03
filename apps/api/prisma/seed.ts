@@ -135,6 +135,25 @@ async function main() {
     }
     console.log(`✅ ${categories.length} categories created`);
 
+    const dominicanLocalCategories = [
+        { name: 'Colmados', slug: 'colmados', icon: '🏪' },
+        { name: 'Farmacias', slug: 'farmacias', icon: '💊' },
+        { name: 'Salones y Barberias', slug: 'salones-barberias', icon: '💈' },
+        { name: 'Ferreterias', slug: 'ferreterias', icon: '🔧' },
+    ];
+
+    for (const localCategory of dominicanLocalCategories) {
+        await prisma.category.upsert({
+            where: { slug: localCategory.slug },
+            update: {
+                name: localCategory.name,
+                icon: localCategory.icon,
+            },
+            create: localCategory,
+        });
+    }
+    console.log(`✅ ${dominicanLocalCategories.length} Dominican local categories ensured`);
+
     // Create provinces
     const provinces = [
         'Azua', 'Bahoruco', 'Barahona', 'Dajabón', 'Distrito Nacional',

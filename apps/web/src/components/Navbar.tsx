@@ -76,12 +76,12 @@ export function Navbar() {
                                     )}
                                     <Link to="/profile" className="nav-link">Perfil</Link>
                                     {canRegisterBusiness && (
-                                        <Link to="/register-business" className="btn-accent text-sm whitespace-nowrap">+ Registrar Negocio</Link>
+                                        <Link to="/register-business" className="btn-accent text-sm whitespace-nowrap shrink-0">+ Registrar Negocio</Link>
                                     )}
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="chip !py-1 whitespace-nowrap">{roleBadgeLabel(user?.role)}</span>
                                         {activeOrganization && (
-                                            <span className="chip-danger !py-1 max-w-[140px] xl:max-w-[170px] truncate">{activeOrganization.name}</span>
+                                            <span className="chip-danger !py-1 max-w-[120px] xl:max-w-[170px] truncate hidden lg:inline-flex">{activeOrganization.name}</span>
                                         )}
                                         <span className="text-sm text-slate-500 whitespace-nowrap">Hola, {user?.name?.split(' ')[0]}</span>
                                         <button
