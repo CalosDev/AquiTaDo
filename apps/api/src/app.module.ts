@@ -27,6 +27,7 @@ import { CrmModule } from './crm/crm.module';
 import { ReputationModule } from './reputation/reputation.module';
 import { AdsModule } from './ads/ads.module';
 import { VerificationModule } from './verification/verification.module';
+import { FavoritesModule } from './favorites/favorites.module';
 import { ResilienceModule } from './resilience/resilience.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { AiModule } from './ai/ai.module';
@@ -92,6 +93,7 @@ import { SecurityModule } from './security/security.module';
         ReputationModule,
         AdsModule,
         VerificationModule,
+        FavoritesModule,
         AiModule,
         WhatsAppModule,
         NotificationsModule,

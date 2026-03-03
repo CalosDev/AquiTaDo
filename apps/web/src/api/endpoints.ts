@@ -373,6 +373,46 @@ export const crmApi = {
     }) => api.get('/crm/customers/my', { params }),
     getCustomerHistory: (customerUserId: string, params?: { businessId?: string }) =>
         api.get(`/crm/customers/${customerUserId}/history`, { params }),
+    getPipeline: (params?: {
+        businessId?: string;
+        stage?: 'LEAD' | 'QUOTED' | 'BOOKED' | 'PAID' | 'LOST';
+        limit?: number;
+    }) => api.get('/crm/pipeline/my', { params }),
+    createLead: (data: {
+        businessId: string;
+        customerUserId?: string;
+        conversationId?: string;
+        bookingId?: string;
+        title: string;
+        notes?: string;
+        estimatedValue?: number;
+        expectedCloseAt?: string;
+    }) => api.post('/crm/pipeline/my/leads', data),
+    updateLeadStage: (
+        leadId: string,
+        data: {
+            stage: 'LEAD' | 'QUOTED' | 'BOOKED' | 'PAID' | 'LOST';
+            lostReason?: string;
+        },
+    ) => api.patch(`/crm/pipeline/my/leads/${leadId}/stage`, data),
+};
+
+// ---- Favorites ----
+export const favoritesApi = {
+    getFavoriteBusinesses: (params?: { page?: number; limit?: number; businessId?: string }) =>
+        api.get('/favorites/businesses/my', { params }),
+    toggleFavoriteBusiness: (data: { businessId: string }) =>
+        api.post('/favorites/businesses/toggle', data),
+    getMyLists: (params?: { page?: number; limit?: number }) =>
+        api.get('/favorites/lists/my', { params }),
+    createList: (data: { name: string; description?: string; isPublic?: boolean }) =>
+        api.post('/favorites/lists', data),
+    deleteList: (listId: string) =>
+        api.delete(`/favorites/lists/${listId}`),
+    addBusinessToList: (listId: string, data: { businessId: string }) =>
+        api.post(`/favorites/lists/${listId}/items`, data),
+    removeBusinessFromList: (listId: string, businessId: string) =>
+        api.delete(`/favorites/lists/${listId}/items/${businessId}`),
 };
 
 // ---- Reputation ----
@@ -433,6 +473,8 @@ export const verificationApi = {
         api.get(`/verification/businesses/${businessId}/status`),
     getPendingBusinessesAdmin: (params?: { limit?: number }) =>
         api.get('/verification/admin/pending-businesses', { params }),
+    getModerationQueueAdmin: (params?: { limit?: number }) =>
+        api.get('/verification/admin/moderation-queue', { params }),
     reviewBusinessAdmin: (
         businessId: string,
         data: { status: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED'; notes?: string },

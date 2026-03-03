@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, messagingApi, reviewApi, whatsappApi } from '../api/endpoints';
+import { analyticsApi, businessApi, favoritesApi, messagingApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
@@ -31,7 +31,8 @@ interface Business {
 
 export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
+    const isCustomerRole = user?.role === 'USER';
     const [business, setBusiness] = useState<Business | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeImage, setActiveImage] = useState(0);
@@ -45,6 +46,15 @@ export function BusinessDetails() {
     const [messageErrorMessage, setMessageErrorMessage] = useState('');
     const [messageSuccessMessage, setMessageSuccessMessage] = useState('');
     const [contactVariant, setContactVariant] = useState('control');
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [favoriteLoading, setFavoriteLoading] = useState(false);
+    const [favoriteProcessing, setFavoriteProcessing] = useState(false);
+    const [favoriteLists, setFavoriteLists] = useState<Array<{ id: string; name: string }>>([]);
+    const [selectedListId, setSelectedListId] = useState('');
+    const [newListName, setNewListName] = useState('');
+    const [listProcessing, setListProcessing] = useState(false);
+    const [favoriteInfoMessage, setFavoriteInfoMessage] = useState('');
+    const [favoriteErrorMessage, setFavoriteErrorMessage] = useState('');
 
     const loadBusiness = useCallback(async () => {
         if (!slug) {
@@ -88,6 +98,54 @@ export function BusinessDetails() {
             visitorId,
         }).catch(() => undefined);
     }, [business?.id]);
+
+    useEffect(() => {
+        if (!business?.id || !isAuthenticated || !isCustomerRole) {
+            setIsFavorite(false);
+            setFavoriteLists([]);
+            setSelectedListId('');
+            return;
+        }
+
+        let active = true;
+        setFavoriteLoading(true);
+        setFavoriteErrorMessage('');
+
+        void Promise.all([
+            favoritesApi.getFavoriteBusinesses({
+                businessId: business.id,
+                limit: 1,
+            }),
+            favoritesApi.getMyLists({ limit: 30 }),
+        ])
+            .then(([favoritesResponse, listsResponse]) => {
+                if (!active) {
+                    return;
+                }
+
+                const hasFavorite = ((favoritesResponse.data?.data ?? []) as Array<unknown>).length > 0;
+                const loadedLists = ((listsResponse.data?.data ?? []) as Array<{ id: string; name: string }>);
+
+                setIsFavorite(hasFavorite);
+                setFavoriteLists(loadedLists);
+                setSelectedListId((previous) => previous || loadedLists[0]?.id || '');
+            })
+            .catch((error) => {
+                if (!active) {
+                    return;
+                }
+                setFavoriteErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar tus favoritos'));
+            })
+            .finally(() => {
+                if (active) {
+                    setFavoriteLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [business?.id, isAuthenticated, isCustomerRole]);
 
     useEffect(() => {
         if (!business) {
@@ -291,6 +349,72 @@ export function BusinessDetails() {
         }
     };
 
+    const handleToggleFavorite = async () => {
+        if (!business?.id || !isAuthenticated || !isCustomerRole) {
+            return;
+        }
+
+        setFavoriteProcessing(true);
+        setFavoriteErrorMessage('');
+        setFavoriteInfoMessage('');
+
+        try {
+            const response = await favoritesApi.toggleFavoriteBusiness({ businessId: business.id });
+            const nextFavoriteState = Boolean(response.data?.favorite);
+            setIsFavorite(nextFavoriteState);
+            setFavoriteInfoMessage(nextFavoriteState ? 'Negocio guardado en favoritos' : 'Negocio removido de favoritos');
+        } catch (error) {
+            setFavoriteErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar favoritos'));
+        } finally {
+            setFavoriteProcessing(false);
+        }
+    };
+
+    const handleCreateList = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!newListName.trim()) {
+            setFavoriteErrorMessage('Escribe el nombre de la lista');
+            return;
+        }
+
+        setListProcessing(true);
+        setFavoriteErrorMessage('');
+        setFavoriteInfoMessage('');
+
+        try {
+            const response = await favoritesApi.createList({ name: newListName.trim() });
+            const createdList = response.data as { id: string; name: string };
+            setFavoriteLists((previous) => [createdList, ...previous]);
+            setSelectedListId(createdList.id);
+            setNewListName('');
+            setFavoriteInfoMessage('Lista creada correctamente');
+        } catch (error) {
+            setFavoriteErrorMessage(getApiErrorMessage(error, 'No se pudo crear la lista'));
+        } finally {
+            setListProcessing(false);
+        }
+    };
+
+    const handleAddToList = async () => {
+        if (!business?.id || !selectedListId) {
+            setFavoriteErrorMessage('Selecciona una lista');
+            return;
+        }
+
+        setListProcessing(true);
+        setFavoriteErrorMessage('');
+        setFavoriteInfoMessage('');
+
+        try {
+            await favoritesApi.addBusinessToList(selectedListId, { businessId: business.id });
+            setFavoriteInfoMessage('Negocio agregado a la lista');
+        } catch (error) {
+            setFavoriteErrorMessage(getApiErrorMessage(error, 'No se pudo agregar a la lista'));
+        } finally {
+            setListProcessing(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center py-32">
@@ -390,6 +514,78 @@ export function BusinessDetails() {
                         </div>
 
                         <p className="text-gray-700 leading-relaxed whitespace-pre-line">{business.description}</p>
+
+                        {isAuthenticated && isCustomerRole && (
+                            <div className="mt-5 rounded-xl border border-gray-100 p-4 bg-gray-50 space-y-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleToggleFavorite()}
+                                        disabled={favoriteProcessing || favoriteLoading}
+                                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                                            isFavorite
+                                                ? 'bg-primary-600 text-white'
+                                                : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+                                        }`}
+                                    >
+                                        {favoriteProcessing
+                                            ? 'Guardando...'
+                                            : isFavorite
+                                                ? 'Guardado en favoritos'
+                                                : 'Guardar en favoritos'}
+                                    </button>
+                                    {favoriteInfoMessage && (
+                                        <span className="text-xs text-green-700">{favoriteInfoMessage}</span>
+                                    )}
+                                    {favoriteErrorMessage && (
+                                        <span className="text-xs text-red-700">{favoriteErrorMessage}</span>
+                                    )}
+                                </div>
+
+                                {favoriteLists.length > 0 ? (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <select
+                                            className="input-field text-sm max-w-xs"
+                                            value={selectedListId}
+                                            onChange={(event) => setSelectedListId(event.target.value)}
+                                        >
+                                            <option value="">Selecciona lista</option>
+                                            {favoriteLists.map((list) => (
+                                                <option key={list.id} value={list.id}>
+                                                    {list.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-sm"
+                                            onClick={() => void handleAddToList()}
+                                            disabled={listProcessing || !selectedListId}
+                                        >
+                                            {listProcessing ? 'Procesando...' : 'Agregar a lista'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-500">Crea una lista para organizar tus negocios favoritos.</p>
+                                )}
+
+                                <form onSubmit={handleCreateList} className="flex flex-wrap items-center gap-2">
+                                    <input
+                                        className="input-field text-sm max-w-xs"
+                                        placeholder="Nueva lista"
+                                        value={newListName}
+                                        onChange={(event) => setNewListName(event.target.value)}
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="btn-primary text-sm"
+                                        disabled={listProcessing}
+                                    >
+                                        {listProcessing ? 'Creando...' : 'Crear lista'}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
 
                         {/* Features */}
                         {business.features && business.features.length > 0 && (

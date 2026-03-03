@@ -277,6 +277,154 @@ export class VerificationService {
         }));
     }
 
+    async listModerationQueue(limit = 100) {
+        const take = Math.min(Math.max(limit, 1), 200);
+
+        const [pendingBusinesses, pendingDocuments, flaggedReviews] = await Promise.all([
+            this.listPendingBusinesses(take),
+            this.prisma.businessVerificationDocument.findMany({
+                where: {
+                    status: 'PENDING',
+                },
+                select: {
+                    id: true,
+                    documentType: true,
+                    status: true,
+                    submittedAt: true,
+                    business: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                            riskScore: true,
+                            verificationStatus: true,
+                            organization: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    slug: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: { submittedAt: 'asc' },
+                take,
+            }),
+            this.prisma.review.findMany({
+                where: {
+                    moderationStatus: 'FLAGGED',
+                },
+                select: {
+                    id: true,
+                    rating: true,
+                    comment: true,
+                    moderationReason: true,
+                    flaggedAt: true,
+                    createdAt: true,
+                    isSpam: true,
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                    business: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                            riskScore: true,
+                            organization: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    slug: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: [{ flaggedAt: 'asc' }, { createdAt: 'asc' }],
+                take,
+            }),
+        ]);
+
+        const queueItems = [
+            ...pendingBusinesses.map((business) => ({
+                id: `business-${business.id}`,
+                queueType: 'BUSINESS_VERIFICATION' as const,
+                entityId: business.id,
+                status: business.verificationStatus,
+                priority: business.riskScore >= 70 ? 'HIGH' as const : 'MEDIUM' as const,
+                createdAt: business.verificationSubmittedAt ?? new Date(0).toISOString(),
+                organization: business.organization,
+                business: {
+                    id: business.id,
+                    name: business.name,
+                    slug: business.slug,
+                    riskScore: business.riskScore,
+                },
+                payload: {
+                    verificationNotes: business.verificationNotes,
+                    documents: business.documents,
+                },
+            })),
+            ...pendingDocuments.map((document) => ({
+                id: `document-${document.id}`,
+                queueType: 'DOCUMENT_REVIEW' as const,
+                entityId: document.id,
+                status: document.status,
+                priority: document.business.riskScore >= 70 ? 'HIGH' as const : 'MEDIUM' as const,
+                createdAt: document.submittedAt.toISOString(),
+                organization: document.business.organization,
+                business: {
+                    id: document.business.id,
+                    name: document.business.name,
+                    slug: document.business.slug,
+                    riskScore: document.business.riskScore,
+                },
+                payload: {
+                    documentType: document.documentType,
+                    verificationStatus: document.business.verificationStatus,
+                },
+            })),
+            ...flaggedReviews.map((review) => ({
+                id: `review-${review.id}`,
+                queueType: 'REVIEW_MODERATION' as const,
+                entityId: review.id,
+                status: 'FLAGGED',
+                priority: review.isSpam || review.rating <= 2 ? 'HIGH' as const : 'MEDIUM' as const,
+                createdAt: (review.flaggedAt ?? review.createdAt).toISOString(),
+                organization: review.business.organization,
+                business: {
+                    id: review.business.id,
+                    name: review.business.name,
+                    slug: review.business.slug,
+                    riskScore: review.business.riskScore,
+                },
+                payload: {
+                    rating: review.rating,
+                    comment: review.comment,
+                    moderationReason: review.moderationReason,
+                    user: review.user,
+                },
+            })),
+        ]
+            .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
+            .slice(0, take);
+
+        return {
+            summary: {
+                total: queueItems.length,
+                businessVerifications: pendingBusinesses.length,
+                documentReviews: pendingDocuments.length,
+                flaggedReviews: flaggedReviews.length,
+            },
+            items: queueItems,
+        };
+    }
+
     async reviewBusiness(
         businessId: string,
         reviewerUserId: string,

@@ -135,6 +135,18 @@ export class VerificationController {
         );
     }
 
+    @Get('admin/moderation-queue')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async listModerationQueue(
+        @Query('limit') limitRaw?: string,
+    ) {
+        const parsedLimit = limitRaw ? Number(limitRaw) : 100;
+        return this.verificationService.listModerationQueue(
+            Number.isFinite(parsedLimit) ? parsedLimit : 100,
+        );
+    }
+
     @Patch('admin/businesses/:businessId/review')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')

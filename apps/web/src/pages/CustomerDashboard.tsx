@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiErrorMessage } from '../api/error';
-import { bookingsApi, messagingApi } from '../api/endpoints';
+import { bookingsApi, favoritesApi, messagingApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 
 type BookingStatus = 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW';
@@ -34,8 +34,49 @@ interface ConversationItem {
     }>;
 }
 
+interface FavoriteBusinessItem {
+    businessId: string;
+    createdAt: string;
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+        address: string;
+        province?: {
+            id: string;
+            name: string;
+            slug: string;
+        } | null;
+        images: Array<{
+            id: string;
+            url: string;
+        }>;
+    };
+}
+
+interface UserBusinessList {
+    id: string;
+    name: string;
+    slug: string;
+    description?: string | null;
+    _count?: {
+        items: number;
+    };
+    items: Array<{
+        businessId: string;
+        addedAt: string;
+        business: {
+            id: string;
+            name: string;
+            slug: string;
+        };
+    }>;
+}
+
 const EMPTY_BOOKINGS: BookingItem[] = [];
 const EMPTY_CONVERSATIONS: ConversationItem[] = [];
+const EMPTY_FAVORITES: FavoriteBusinessItem[] = [];
+const EMPTY_LISTS: UserBusinessList[] = [];
 
 function formatDateTime(value: string): string {
     return new Date(value).toLocaleString('es-DO', {
@@ -79,9 +120,11 @@ export function CustomerDashboard() {
     const dashboardQuery = useQuery({
         queryKey: ['customer-dashboard'],
         queryFn: async () => {
-            const [bookingsResponse, conversationsResponse] = await Promise.all([
+            const [bookingsResponse, conversationsResponse, favoritesResponse, listsResponse] = await Promise.all([
                 bookingsApi.getMineAsUser({ limit: 6 }),
                 messagingApi.getMyConversations({ limit: 6 }),
+                favoritesApi.getFavoriteBusinesses({ limit: 6 }),
+                favoritesApi.getMyLists({ limit: 6 }),
             ]);
 
             const bookings = ((bookingsResponse.data?.data ?? []) as BookingItem[])
@@ -91,6 +134,8 @@ export function CustomerDashboard() {
             return {
                 bookings,
                 conversations,
+                favorites: (favoritesResponse.data?.data ?? []) as FavoriteBusinessItem[],
+                lists: (listsResponse.data?.data ?? []) as UserBusinessList[],
             };
         },
     });
@@ -101,6 +146,8 @@ export function CustomerDashboard() {
         : '';
     const bookings = dashboardQuery.data?.bookings ?? EMPTY_BOOKINGS;
     const conversations = dashboardQuery.data?.conversations ?? EMPTY_CONVERSATIONS;
+    const favorites = dashboardQuery.data?.favorites ?? EMPTY_FAVORITES;
+    const lists = dashboardQuery.data?.lists ?? EMPTY_LISTS;
 
     const nextBooking = useMemo(() => {
         const now = Date.now();
@@ -150,7 +197,7 @@ export function CustomerDashboard() {
                 </section>
             )}
 
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <article className="card p-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Reservas</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{bookings.length}</p>
@@ -169,6 +216,11 @@ export function CustomerDashboard() {
                     <p className="text-sm text-gray-500 mt-1">
                         {nextBooking ? formatDateTime(nextBooking.scheduledFor) : 'Agenda cuando quieras'}
                     </p>
+                </article>
+                <article className="card p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Favoritos</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{favorites.length}</p>
+                    <p className="text-sm text-gray-500 mt-1">Guardados para comparar</p>
                 </article>
             </section>
 
@@ -225,6 +277,63 @@ export function CustomerDashboard() {
                                     </p>
                                     <p className="text-xs text-gray-500 mt-2">
                                         Actualizado: {formatDateTime(conversation.updatedAt)}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </article>
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <article className="card p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="font-display text-xl font-bold text-gray-900">Mis favoritos</h2>
+                        <Link to="/businesses" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                            Explorar
+                        </Link>
+                    </div>
+                    {favorites.length === 0 ? (
+                        <p className="text-sm text-gray-500">Aun no has guardado negocios.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {favorites.map((favorite) => (
+                                <div key={favorite.businessId} className="rounded-xl border border-gray-100 p-4">
+                                    <p className="font-semibold text-gray-900">{favorite.business.name}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {favorite.business.province?.name || favorite.business.address}
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-2">
+                                        Guardado: {formatDateTime(favorite.createdAt)}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </article>
+
+                <article className="card p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="font-display text-xl font-bold text-gray-900">Mis listas</h2>
+                        <span className="text-xs text-gray-500">{lists.length} listas</span>
+                    </div>
+                    {lists.length === 0 ? (
+                        <p className="text-sm text-gray-500">Crea listas guardando negocios en detalle.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {lists.map((list) => (
+                                <div key={list.id} className="rounded-xl border border-gray-100 p-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="font-semibold text-gray-900">{list.name}</p>
+                                        <span className="text-xs rounded-full bg-gray-100 text-gray-600 px-2 py-0.5">
+                                            {list._count?.items ?? list.items.length} items
+                                        </span>
+                                    </div>
+                                    {list.description ? (
+                                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{list.description}</p>
+                                    ) : null}
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        {list.items.slice(0, 2).map((item) => item.business.name).join(' · ') || 'Sin negocios aun'}
                                     </p>
                                 </div>
                             ))}

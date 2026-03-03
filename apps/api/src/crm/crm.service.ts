@@ -1,11 +1,17 @@
 import {
+    BadRequestException,
     Inject,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma, SalesLeadStage } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { ListCustomersQueryDto } from './dto/crm.dto';
+import {
+    CreateSalesLeadDto,
+    ListCustomersQueryDto,
+    ListSalesPipelineQueryDto,
+    UpdateSalesLeadStageDto,
+} from './dto/crm.dto';
 
 type CustomerSegment = 'NUEVO' | 'FRECUENTE' | 'VIP';
 
@@ -394,6 +400,291 @@ export class CrmService {
             transactions,
             conversations,
         };
+    }
+
+    async listSalesPipeline(
+        organizationId: string,
+        query: ListSalesPipelineQueryDto,
+    ) {
+        const limit = query.limit ?? 40;
+
+        const where: Prisma.SalesLeadWhereInput = {
+            organizationId,
+            deletedAt: null,
+        };
+
+        if (query.businessId) {
+            where.businessId = query.businessId;
+        }
+
+        if (query.stage) {
+            where.stage = query.stage;
+        }
+
+        const [data, groupedCounts, total] = await Promise.all([
+            this.prisma.salesLead.findMany({
+                where,
+                include: {
+                    business: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                        },
+                    },
+                    customerUser: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
+                    },
+                    conversation: {
+                        select: {
+                            id: true,
+                            status: true,
+                            lastMessageAt: true,
+                        },
+                    },
+                    booking: {
+                        select: {
+                            id: true,
+                            status: true,
+                            scheduledFor: true,
+                        },
+                    },
+                    createdByUser: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
+                    },
+                },
+                orderBy: [{ createdAt: 'desc' }],
+                take: limit,
+            }),
+            this.prisma.salesLead.groupBy({
+                by: ['stage'],
+                where: {
+                    organizationId,
+                    deletedAt: null,
+                },
+                _count: {
+                    _all: true,
+                },
+            }),
+            this.prisma.salesLead.count({ where }),
+        ]);
+
+        const summary = {
+            total,
+            byStage: {
+                LEAD: 0,
+                QUOTED: 0,
+                BOOKED: 0,
+                PAID: 0,
+                LOST: 0,
+            } as Record<SalesLeadStage, number>,
+        };
+
+        for (const row of groupedCounts) {
+            summary.byStage[row.stage] = row._count._all;
+        }
+
+        return {
+            data,
+            summary,
+        };
+    }
+
+    async createSalesLead(
+        organizationId: string,
+        actorUserId: string,
+        dto: CreateSalesLeadDto,
+    ) {
+        const business = await this.prisma.business.findFirst({
+            where: {
+                id: dto.businessId,
+                organizationId,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (!business) {
+            throw new NotFoundException('Negocio no encontrado en la organizacion activa');
+        }
+
+        if (dto.customerUserId) {
+            const customer = await this.prisma.user.findUnique({
+                where: { id: dto.customerUserId },
+                select: { id: true },
+            });
+            if (!customer) {
+                throw new NotFoundException('Cliente no encontrado');
+            }
+        }
+
+        if (dto.conversationId) {
+            const conversation = await this.prisma.conversation.findFirst({
+                where: {
+                    id: dto.conversationId,
+                    organizationId,
+                    businessId: dto.businessId,
+                    deletedAt: null,
+                },
+                select: { id: true },
+            });
+
+            if (!conversation) {
+                throw new NotFoundException('Conversacion no encontrada para la organizacion activa');
+            }
+        }
+
+        if (dto.bookingId) {
+            const booking = await this.prisma.booking.findFirst({
+                where: {
+                    id: dto.bookingId,
+                    organizationId,
+                    businessId: dto.businessId,
+                    deletedAt: null,
+                },
+                select: { id: true },
+            });
+
+            if (!booking) {
+                throw new NotFoundException('Reserva no encontrada para la organizacion activa');
+            }
+        }
+
+        return this.prisma.salesLead.create({
+            data: {
+                organizationId,
+                businessId: dto.businessId,
+                customerUserId: dto.customerUserId ?? null,
+                createdByUserId: actorUserId,
+                conversationId: dto.conversationId ?? null,
+                bookingId: dto.bookingId ?? null,
+                title: dto.title.trim(),
+                notes: dto.notes?.trim() || null,
+                estimatedValue: dto.estimatedValue,
+                expectedCloseAt: dto.expectedCloseAt ? new Date(dto.expectedCloseAt) : null,
+            },
+            include: {
+                business: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
+                customerUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+                createdByUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+                conversation: {
+                    select: {
+                        id: true,
+                        status: true,
+                        lastMessageAt: true,
+                    },
+                },
+                booking: {
+                    select: {
+                        id: true,
+                        status: true,
+                        scheduledFor: true,
+                    },
+                },
+            },
+        });
+    }
+
+    async updateSalesLeadStage(
+        organizationId: string,
+        leadId: string,
+        dto: UpdateSalesLeadStageDto,
+    ) {
+        const lead = await this.prisma.salesLead.findFirst({
+            where: {
+                id: leadId,
+                organizationId,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                stage: true,
+            },
+        });
+
+        if (!lead) {
+            throw new NotFoundException('Lead no encontrado');
+        }
+
+        if (dto.stage === 'LOST' && !dto.lostReason?.trim()) {
+            throw new BadRequestException('Debes indicar la razon cuando el lead se marca como perdido');
+        }
+
+        const isClosedStage = dto.stage === 'PAID' || dto.stage === 'LOST';
+
+        return this.prisma.salesLead.update({
+            where: { id: lead.id },
+            data: {
+                stage: dto.stage,
+                closedAt: isClosedStage ? new Date() : null,
+                lostReason: dto.stage === 'LOST' ? dto.lostReason?.trim() || null : null,
+            },
+            include: {
+                business: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
+                customerUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+                createdByUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+                conversation: {
+                    select: {
+                        id: true,
+                        status: true,
+                        lastMessageAt: true,
+                    },
+                },
+                booking: {
+                    select: {
+                        id: true,
+                        status: true,
+                        scheduledFor: true,
+                    },
+                },
+            },
+        });
     }
 
     private resolveSegment(

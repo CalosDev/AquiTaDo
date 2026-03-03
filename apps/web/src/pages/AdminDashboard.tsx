@@ -67,6 +67,26 @@ interface FlaggedReview {
     };
 }
 
+interface ModerationQueueItem {
+    id: string;
+    queueType: 'BUSINESS_VERIFICATION' | 'DOCUMENT_REVIEW' | 'REVIEW_MODERATION';
+    entityId: string;
+    status: string;
+    priority: 'HIGH' | 'MEDIUM' | 'LOW';
+    createdAt: string;
+    organization: {
+        id: string;
+        name: string;
+        slug: string;
+    };
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+        riskScore: number;
+    };
+}
+
 type CategoryForm = {
     name: string;
     slug: string;
@@ -102,6 +122,7 @@ export function AdminDashboard() {
     const [pendingVerifications, setPendingVerifications] = useState<PendingVerificationBusiness[]>([]);
     const [marketReports, setMarketReports] = useState<MarketReport[]>([]);
     const [flaggedReviews, setFlaggedReviews] = useState<FlaggedReview[]>([]);
+    const [moderationQueue, setModerationQueue] = useState<ModerationQueueItem[]>([]);
     const [generatingReport, setGeneratingReport] = useState(false);
 
     const [newCategoryForm, setNewCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
@@ -132,14 +153,16 @@ export function AdminDashboard() {
     const loadVerificationData = useCallback(async () => {
         setVerificationLoading(true);
         try {
-            const [pendingRes, reportsRes, flaggedReviewsRes] = await Promise.all([
+            const [pendingRes, reportsRes, flaggedReviewsRes, moderationQueueRes] = await Promise.all([
                 verificationApi.getPendingBusinessesAdmin({ limit: 50 }),
                 analyticsApi.listMarketReports({ limit: 20 }),
                 reviewApi.getFlagged({ limit: 50 }),
+                verificationApi.getModerationQueueAdmin({ limit: 80 }),
             ]);
             setPendingVerifications((pendingRes.data || []) as PendingVerificationBusiness[]);
             setMarketReports((reportsRes.data || []) as MarketReport[]);
             setFlaggedReviews((flaggedReviewsRes.data || []) as FlaggedReview[]);
+            setModerationQueue((moderationQueueRes.data?.items || []) as ModerationQueueItem[]);
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificación y data layer'));
         } finally {
@@ -664,6 +687,46 @@ export function AdminDashboard() {
 
                     {activeTab === 'verification' && (
                         <div className="space-y-4">
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <h3 className="font-display font-semibold">Cola unificada de moderacion</h3>
+                                    <span className="text-xs rounded-full px-2 py-0.5 bg-primary-50 text-primary-700">
+                                        {moderationQueue.length} items
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                    {moderationQueue.length > 0 ? moderationQueue.map((item) => (
+                                        <div key={item.id} className="rounded-xl border border-gray-100 p-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div>
+                                                    <p className="font-medium text-gray-900">
+                                                        {item.business.name} · {item.organization.name}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {item.queueType} · {new Date(item.createdAt).toLocaleString('es-DO')}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs rounded-full px-2 py-0.5 ${
+                                                        item.priority === 'HIGH'
+                                                            ? 'bg-red-100 text-red-700'
+                                                            : 'bg-yellow-100 text-yellow-700'
+                                                    }`}>
+                                                        {item.priority}
+                                                    </span>
+                                                    <span className="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700">
+                                                        {item.status}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <p className="text-sm text-gray-500">No hay items en la cola unificada.</p>
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                     <h3 className="font-display font-semibold">Verificación KYC pendiente</h3>

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { adsApi, analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationApi } from '../api/endpoints';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 
 interface Business {
@@ -74,6 +75,8 @@ function buildPagination(currentPage: number, totalPages: number): Array<number 
 }
 
 export function BusinessesList() {
+    const { isAuthenticated, user } = useAuth();
+    const isCustomerRole = user?.role === 'USER';
     const [searchParams, setSearchParams] = useSearchParams();
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -81,6 +84,8 @@ export function BusinessesList() {
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [sponsoredPlacements, setSponsoredPlacements] = useState<SponsoredPlacement[]>([]);
+    const [favoriteBusinessIds, setFavoriteBusinessIds] = useState<Set<string>>(new Set());
+    const [favoriteProcessingId, setFavoriteProcessingId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
 
@@ -150,6 +155,30 @@ export function BusinessesList() {
     }, [loadBusinesses]);
 
     useEffect(() => {
+        if (!isAuthenticated || !isCustomerRole) {
+            setFavoriteBusinessIds(new Set());
+            return;
+        }
+
+        let active = true;
+        void favoritesApi.getFavoriteBusinesses({ limit: 200 })
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+                const ids = new Set<string>(
+                    ((response.data?.data ?? []) as Array<{ businessId: string }>).map((item) => item.businessId),
+                );
+                setFavoriteBusinessIds(ids);
+            })
+            .catch(() => undefined);
+
+        return () => {
+            active = false;
+        };
+    }, [isAuthenticated, isCustomerRole]);
+
+    useEffect(() => {
         if (sponsoredPlacements.length === 0) {
             return;
         }
@@ -199,6 +228,35 @@ export function BusinessesList() {
             return params;
         });
     }, [setSearchParams]);
+
+    const handleToggleFavorite = async (event: React.MouseEvent<HTMLButtonElement>, businessId: string) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!isAuthenticated || !isCustomerRole) {
+            return;
+        }
+
+        setFavoriteProcessingId(businessId);
+        try {
+            const response = await favoritesApi.toggleFavoriteBusiness({ businessId });
+            const nextFavorite = Boolean(response.data?.favorite);
+
+            setFavoriteBusinessIds((previous) => {
+                const next = new Set(previous);
+                if (nextFavorite) {
+                    next.add(businessId);
+                } else {
+                    next.delete(businessId);
+                }
+                return next;
+            });
+        } catch {
+            // Keep list flow stable even if favorites call fails.
+        } finally {
+            setFavoriteProcessingId(null);
+        }
+    };
 
     useEffect(() => {
         const debounceTimer = window.setTimeout(() => {
@@ -363,12 +421,37 @@ export function BusinessesList() {
                                             )}
                                         </div>
                                         <div className="p-4">
-                                            <div className="flex gap-1.5 mb-2">
-                                                {biz.categories?.slice(0, 2).map((bc, i) => (
-                                                    <span key={i} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full font-medium">
-                                                        {bc.category.icon} {bc.category.name}
-                                                    </span>
-                                                ))}
+                                            <div className="flex items-start justify-between gap-2 mb-2">
+                                                <div className="flex gap-1.5">
+                                                    {biz.categories?.slice(0, 2).map((bc, i) => (
+                                                        <span key={i} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full font-medium">
+                                                            {bc.category.icon} {bc.category.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                {isAuthenticated && isCustomerRole && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => void handleToggleFavorite(event, biz.id)}
+                                                        disabled={favoriteProcessingId === biz.id}
+                                                        aria-label={
+                                                            favoriteBusinessIds.has(biz.id)
+                                                                ? `Quitar ${biz.name} de favoritos`
+                                                                : `Guardar ${biz.name} en favoritos`
+                                                        }
+                                                        className={`text-xs px-2 py-1 rounded-lg border transition-colors ${
+                                                            favoriteBusinessIds.has(biz.id)
+                                                                ? 'bg-primary-600 text-white border-primary-600'
+                                                                : 'bg-white text-gray-500 border-gray-200 hover:border-primary-300'
+                                                        }`}
+                                                    >
+                                                        {favoriteProcessingId === biz.id
+                                                            ? '...'
+                                                            : favoriteBusinessIds.has(biz.id)
+                                                                ? 'Guardado'
+                                                                : 'Guardar'}
+                                                    </button>
+                                                )}
                                             </div>
                                             <h3 className="font-display font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
                                                 {biz.name}

@@ -124,6 +124,20 @@ interface CrmCustomerHistory {
     }>;
 }
 
+interface SalesLead {
+    id: string;
+    stage: 'LEAD' | 'QUOTED' | 'BOOKED' | 'PAID' | 'LOST';
+    title: string;
+    notes?: string | null;
+    estimatedValue?: number | string | null;
+    expectedCloseAt?: string | null;
+    closedAt?: string | null;
+    lostReason?: string | null;
+    createdAt: string;
+    business: { id: string; name: string; slug: string };
+    customerUser?: { id: string; name: string; email: string } | null;
+}
+
 interface BillingSummary {
     invoices: {
         byStatus: Record<string, { count: number; total: number }>;
@@ -349,6 +363,17 @@ export function DashboardBusiness() {
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
     const [customerHistory, setCustomerHistory] = useState<CrmCustomerHistory | null>(null);
+    const [pipelineLeads, setPipelineLeads] = useState<SalesLead[]>([]);
+    const [pipelineLoading, setPipelineLoading] = useState(false);
+    const [creatingLead, setCreatingLead] = useState(false);
+    const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
+    const [leadForm, setLeadForm] = useState({
+        businessId: '',
+        title: '',
+        notes: '',
+        estimatedValue: '',
+        expectedCloseAt: '',
+    });
 
     const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
     const [fiscalSummary, setFiscalSummary] = useState<FiscalSummary | null>(null);
@@ -422,6 +447,10 @@ export function DashboardBusiness() {
                 businessId: previous.businessId || loadedBusinesses[0]?.id || '',
             }));
             setCampaignForm((previous) => ({
+                ...previous,
+                businessId: previous.businessId || loadedBusinesses[0]?.id || '',
+            }));
+            setLeadForm((previous) => ({
                 ...previous,
                 businessId: previous.businessId || loadedBusinesses[0]?.id || '',
             }));
@@ -519,6 +548,82 @@ export function DashboardBusiness() {
         }
     }, []);
 
+    const loadPipeline = useCallback(async () => {
+        if (!activeOrganizationId) {
+            setPipelineLeads([]);
+            return;
+        }
+
+        setPipelineLoading(true);
+        try {
+            const response = await crmApi.getPipeline({ limit: 50 });
+            setPipelineLeads((response.data?.data || []) as SalesLead[]);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el pipeline'));
+        } finally {
+            setPipelineLoading(false);
+        }
+    }, [activeOrganizationId]);
+
+    const handleCreateLead = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!leadForm.businessId || !leadForm.title.trim()) {
+            setErrorMessage('Selecciona negocio y titulo para crear un lead');
+            return;
+        }
+
+        setCreatingLead(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await crmApi.createLead({
+                businessId: leadForm.businessId,
+                title: leadForm.title.trim(),
+                notes: leadForm.notes.trim() || undefined,
+                estimatedValue: leadForm.estimatedValue ? Number(leadForm.estimatedValue) : undefined,
+                expectedCloseAt: leadForm.expectedCloseAt
+                    ? new Date(leadForm.expectedCloseAt).toISOString()
+                    : undefined,
+            });
+            setLeadForm((previous) => ({
+                ...previous,
+                title: '',
+                notes: '',
+                estimatedValue: '',
+                expectedCloseAt: '',
+            }));
+            await loadPipeline();
+            setSuccessMessage('Lead agregado al pipeline');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear el lead'));
+        } finally {
+            setCreatingLead(false);
+        }
+    };
+
+    const handleLeadStageChange = async (
+        leadId: string,
+        stage: 'LEAD' | 'QUOTED' | 'BOOKED' | 'PAID' | 'LOST',
+    ) => {
+        setUpdatingLeadId(leadId);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await crmApi.updateLeadStage(leadId, {
+                stage,
+                lostReason: stage === 'LOST' ? 'Marcado manualmente desde dashboard' : undefined,
+            });
+            await loadPipeline();
+            setSuccessMessage('Etapa de lead actualizada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar el lead'));
+        } finally {
+            setUpdatingLeadId(null);
+        }
+    };
+
     const loadBillingSummary = useCallback(async () => {
         if (!activeOrganizationId) {
             setBillingSummary(null);
@@ -614,8 +719,9 @@ export function DashboardBusiness() {
     useEffect(() => {
         if (activeTab === 'crm') {
             void loadCustomers();
+            void loadPipeline();
         }
-    }, [activeTab, loadCustomers]);
+    }, [activeTab, loadCustomers, loadPipeline]);
 
     useEffect(() => {
         if (activeTab === 'crm' && selectedCustomerId) {
@@ -1298,6 +1404,137 @@ export function DashboardBusiness() {
                         </div>
                     </div>
                 ) : <p className="text-sm text-gray-500">Selecciona un cliente.</p>}
+            </div>
+
+            <div className="card p-5 xl:col-span-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h3 className="font-display text-lg font-semibold text-gray-900">Pipeline de ventas</h3>
+                    <span className="text-xs rounded-full bg-primary-50 text-primary-700 px-2 py-1">
+                        {pipelineLeads.length} leads
+                    </span>
+                </div>
+
+                <form onSubmit={handleCreateLead} className="rounded-xl border border-gray-100 p-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        <select
+                            className="input-field text-sm"
+                            value={leadForm.businessId}
+                            onChange={(event) =>
+                                setLeadForm((previous) => ({ ...previous, businessId: event.target.value }))
+                            }
+                        >
+                            <option value="">Selecciona negocio</option>
+                            {businesses.map((business) => (
+                                <option key={business.id} value={business.id}>
+                                    {business.name}
+                                </option>
+                            ))}
+                        </select>
+                        <input
+                            className="input-field text-sm"
+                            placeholder="Titulo del lead"
+                            value={leadForm.title}
+                            onChange={(event) =>
+                                setLeadForm((previous) => ({ ...previous, title: event.target.value }))
+                            }
+                        />
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className="input-field text-sm"
+                            placeholder="Valor estimado"
+                            value={leadForm.estimatedValue}
+                            onChange={(event) =>
+                                setLeadForm((previous) => ({ ...previous, estimatedValue: event.target.value }))
+                            }
+                        />
+                        <input
+                            type="datetime-local"
+                            className="input-field text-sm"
+                            value={leadForm.expectedCloseAt}
+                            onChange={(event) =>
+                                setLeadForm((previous) => ({ ...previous, expectedCloseAt: event.target.value }))
+                            }
+                        />
+                        <button
+                            type="submit"
+                            className="btn-primary text-sm"
+                            disabled={creatingLead}
+                        >
+                            {creatingLead ? 'Creando...' : 'Crear lead'}
+                        </button>
+                    </div>
+                    <textarea
+                        className="input-field text-sm mt-3"
+                        rows={2}
+                        placeholder="Notas del lead (opcional)"
+                        value={leadForm.notes}
+                        onChange={(event) =>
+                            setLeadForm((previous) => ({ ...previous, notes: event.target.value }))
+                        }
+                    />
+                </form>
+
+                {pipelineLoading ? (
+                    <p className="text-sm text-gray-500">Cargando pipeline...</p>
+                ) : pipelineLeads.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="border-b border-gray-100 text-gray-500">
+                                <tr>
+                                    <th className="text-left py-2">Lead</th>
+                                    <th className="text-left py-2">Negocio</th>
+                                    <th className="text-left py-2">Cliente</th>
+                                    <th className="text-left py-2">Valor</th>
+                                    <th className="text-left py-2">Etapa</th>
+                                    <th className="text-left py-2">Cierre</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pipelineLeads.map((lead) => (
+                                    <tr key={lead.id} className="border-b border-gray-50">
+                                        <td className="py-2">
+                                            <p className="font-medium text-gray-900">{lead.title}</p>
+                                            {lead.notes ? (
+                                                <p className="text-xs text-gray-500 line-clamp-2">{lead.notes}</p>
+                                            ) : null}
+                                        </td>
+                                        <td className="py-2">{lead.business.name}</td>
+                                        <td className="py-2 text-xs text-gray-600">
+                                            {lead.customerUser?.name || 'Sin cliente'}
+                                        </td>
+                                        <td className="py-2">{formatCurrency(lead.estimatedValue)}</td>
+                                        <td className="py-2">
+                                            <select
+                                                className="input-field text-xs py-1"
+                                                value={lead.stage}
+                                                disabled={updatingLeadId === lead.id}
+                                                onChange={(event) =>
+                                                    void handleLeadStageChange(
+                                                        lead.id,
+                                                        event.target.value as 'LEAD' | 'QUOTED' | 'BOOKED' | 'PAID' | 'LOST',
+                                                    )
+                                                }
+                                            >
+                                                <option value="LEAD">LEAD</option>
+                                                <option value="QUOTED">QUOTED</option>
+                                                <option value="BOOKED">BOOKED</option>
+                                                <option value="PAID">PAID</option>
+                                                <option value="LOST">LOST</option>
+                                            </select>
+                                        </td>
+                                        <td className="py-2 text-xs text-gray-500">
+                                            {formatDateTime(lead.expectedCloseAt)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <p className="text-sm text-gray-500">Aun no hay leads en el pipeline.</p>
+                )}
             </div>
         </div>
     );
