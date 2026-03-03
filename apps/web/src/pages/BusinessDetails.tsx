@@ -486,7 +486,7 @@ export function BusinessDetails() {
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
                                     {business.verified && (
-                                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                                        <span className="bg-primary-100 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium border border-primary-200">
                                             ✓ Verificado
                                         </span>
                                     )}
@@ -506,7 +506,7 @@ export function BusinessDetails() {
                                 </p>
                             </div>
                             {averageRating && (
-                                <div className="text-center bg-accent-50 px-4 py-2 rounded-xl">
+                                <div className="text-center bg-accent-50 border border-accent-100 px-4 py-2 rounded-xl">
                                     <div className="text-2xl font-bold text-accent-600">⭐ {averageRating}</div>
                                     <div className="text-xs text-gray-500">{business._count?.reviews} reseñas</div>
                                 </div>
@@ -516,7 +516,7 @@ export function BusinessDetails() {
                         <p className="text-gray-700 leading-relaxed whitespace-pre-line">{business.description}</p>
 
                         {isAuthenticated && isCustomerRole && (
-                            <div className="mt-5 rounded-xl border border-gray-100 p-4 bg-gray-50 space-y-3">
+                            <div className="mt-5 rounded-xl border border-primary-100 p-4 bg-primary-50/30 space-y-3">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <button
                                         type="button"
@@ -627,7 +627,7 @@ export function BusinessDetails() {
 
                         {/* Review Form */}
                         {!isAuthenticated && (
-                            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                            <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
                                 Inicia sesión para dejar tu reseña. <Link to="/login" className="underline font-medium">Ir a login</Link>
                             </div>
                         )}
@@ -710,14 +710,14 @@ export function BusinessDetails() {
 
                 {/* Sidebar - Contact */}
                 <div className="space-y-6">
-                    <div className="card p-6 sticky top-20">
+                    <div className="card p-6 lg:sticky lg:top-24 border-t-4 border-accent-600">
                         <h3 className="font-display font-semibold text-gray-900 mb-4">Contacto</h3>
                         <div className="space-y-3">
                             {business.phone && (
                                 <a
                                     href={`tel:${business.phone}`}
                                     onClick={handlePhoneClick}
-                                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-primary-50 transition-colors group"
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 hover:bg-primary-100 transition-colors hover-lift group"
                                 >
                                     <span className="text-lg">📞</span>
                                     <div>
@@ -732,7 +732,7 @@ export function BusinessDetails() {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={handleWhatsAppClick}
-                                    className={`flex items-center gap-3 p-3 rounded-xl transition-colors group ${contactVariant === 'emphasis'
+                                    className={`flex items-center gap-3 p-3 rounded-xl transition-colors hover-lift group ${contactVariant === 'emphasis'
                                         ? 'bg-green-100 hover:bg-green-200 border border-green-300 shadow-sm'
                                         : 'bg-green-50 hover:bg-green-100'
                                         }`}
@@ -746,7 +746,7 @@ export function BusinessDetails() {
                                     </div>
                                 </a>
                             )}
-                            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
                                 <span className="text-lg">📍</span>
                                 <div>
                                     <div className="text-xs text-gray-400">Dirección</div>
@@ -761,7 +761,7 @@ export function BusinessDetails() {
                             </h4>
 
                             {!isAuthenticated && (
-                                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                                <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
                                     Inicia sesión para enviar un mensaje.{' '}
                                     <Link to="/login" className="underline font-medium">Ir a login</Link>
                                 </div>

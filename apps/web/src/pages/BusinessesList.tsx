@@ -279,7 +279,7 @@ export function BusinessesList() {
             <div className="flex flex-col lg:flex-row gap-8">
                 {/* Filters Sidebar */}
                 <aside className="lg:w-72 shrink-0">
-                    <div className="card p-6 sticky top-20">
+                    <div className="card p-6 lg:sticky lg:top-24">
                         <h3 className="font-display font-bold text-lg mb-4">Filtros</h3>
 
                         {/* Search */}
@@ -378,7 +378,7 @@ export function BusinessesList() {
                                                 }).catch(() => undefined);
                                                 trackBusinessClick(placement.business.id, 'sponsored-placement');
                                             }}
-                                            className="rounded-xl border border-amber-200 bg-amber-50 p-3 hover:border-amber-300 transition-colors"
+                                            className="rounded-xl border border-amber-200 bg-amber-50 p-3 hover:border-amber-300 transition-colors hover-lift"
                                         >
                                             <p className="text-[10px] uppercase tracking-wide font-semibold text-amber-700 mb-1">
                                                 Patrocinado #{placement.placementRank}
@@ -405,7 +405,7 @@ export function BusinessesList() {
                                         onClick={() => {
                                             trackBusinessClick(biz.id, 'businesses-list');
                                         }}
-                                        className="card group"
+                                        className="card hover-lift group"
                                     >
                                         <div className="h-40 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
                                             {biz.images?.[0] ? (
@@ -482,7 +482,7 @@ export function BusinessesList() {
                                                 onClick={() =>
                                                     updateFilter('page', String(page), { resetPage: false })
                                                 }
-                                                className={`w-10 h-10 rounded-xl text-sm font-medium transition-all ${page === currentPage
+                                                className={`w-10 h-10 touch-target rounded-xl text-sm font-medium transition-all ${page === currentPage
                                                     ? 'bg-primary-600 text-white shadow-lg'
                                                     : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-500'
                                                     }`}

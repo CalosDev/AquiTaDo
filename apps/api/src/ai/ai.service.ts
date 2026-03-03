@@ -12,6 +12,7 @@ import { AskConciergeDto } from './dto/ask-concierge.dto';
 import { BusinessAssistantConfigDto } from './dto/business-assistant-config.dto';
 import { AiProviderService } from './ai-provider.service';
 import { AiEmbeddingsService } from './ai-embeddings.service';
+import { buildDominicanProfessionalPrompt } from './ai-system-prompts';
 
 type ConciergeMatch = {
     id: string;
@@ -100,12 +101,12 @@ export class AiService {
             .join('\n\n');
 
         const answer = await this.aiProviderService.generateChatCompletion({
-            systemPrompt: [
-                'Eres el asistente de AquiTaDo para Republica Dominicana.',
+            systemPrompt: buildDominicanProfessionalPrompt([
+                'Eres el asistente de AquiTaDo para descubrimiento local.',
                 'Responde de forma profesional, cercana y breve.',
                 'Entiendes contexto local como colmado, concho, pica pollo y geografia de RD.',
                 'Cuando recomiendes negocios, cita solo los negocios del contexto recuperado.',
-            ].join(' '),
+            ]),
             userPrompt: [
                 `Consulta del usuario: ${normalizedQuery}`,
                 '',
@@ -186,15 +187,13 @@ export class AiService {
         const features = business.features.map((entry) => entry.feature.name).join(', ');
         const customPrompt = business.aiAutoResponderPrompt?.trim();
 
-        const systemPrompt = [
-            'Eres un asistente comercial de AquiTaDo para responder por un negocio local en RD.',
+        const systemPrompt = buildDominicanProfessionalPrompt([
+            'Eres un asistente comercial de AquiTaDo para responder por un negocio local.',
             'Responde en tono cordial, concreto y orientado a cerrar reserva o compra.',
             'Si no tienes un dato, dilo de forma transparente y sugiere contacto directo.',
             customPrompt ? `Instrucciones del negocio: ${customPrompt}` : '',
             `Datos del negocio: nombre=${business.name}; direccion=${business.address}; descripcion=${business.description}; telefono=${business.phone ?? 'n/a'}; whatsapp=${business.whatsapp ?? 'n/a'}; categorias=${categories || 'n/a'}; facilidades=${features || 'n/a'}.`,
-        ]
-            .filter((entry) => entry.length > 0)
-            .join(' ');
+        ]);
 
         const reply = await this.aiProviderService.generateChatCompletion({
             systemPrompt,
@@ -334,12 +333,12 @@ export class AiService {
 
         if (review.comment?.trim()) {
             const rawAnalysis = await this.aiProviderService.generateChatCompletion({
-                systemPrompt: [
+                systemPrompt: buildDominicanProfessionalPrompt([
                     'Analiza sentimiento de resenas para negocios locales.',
                     'Devuelve JSON estricto con keys: sentiment, score, summary.',
                     'sentiment debe ser POSITIVE, NEUTRAL o NEGATIVE.',
                     'score entre -1 y 1.',
-                ].join(' '),
+                ]),
                 userPrompt: [
                     `Rating: ${review.rating}/5`,
                     `Comentario: ${review.comment}`,

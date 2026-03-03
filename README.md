@@ -24,6 +24,7 @@ La propuesta de escalado B2B2C (Discovery + SaaS + Marketplace) esta documentada
 - `docs/MONOLITH_MODULAR_STRUCTURE.md`
 - `docs/PRODUCTION_BLINDAJE_PROMPT4.md`
 - `docs/ROLE_ACCESS_MATRIX.md`
+- `docs/DOMINICAN_PRODUCT_GUARDRAILS.md`
 
 ## Estructura
 

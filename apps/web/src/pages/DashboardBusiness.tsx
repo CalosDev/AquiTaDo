@@ -13,6 +13,7 @@ import {
 } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { useOrganization } from '../context/useOrganization';
+import { formatCurrencyDo, formatDateDo, formatDateTimeDo, MARKET_CONFIG } from '../lib/market';
 
 interface Business {
     id: string;
@@ -276,18 +277,14 @@ function asNumber(value: string | number | null | undefined): number {
 }
 
 function formatCurrency(value: string | number | null | undefined): string {
-    return new Intl.NumberFormat('es-DO', {
-        style: 'currency',
-        currency: 'DOP',
-        maximumFractionDigits: 2,
-    }).format(asNumber(value));
+    return formatCurrencyDo(asNumber(value), MARKET_CONFIG.currency);
 }
 
 function formatDateTime(value?: string | null): string {
     if (!value) {
         return 'N/D';
     }
-    return new Date(value).toLocaleString('es-DO');
+    return formatDateTimeDo(value);
 }
 
 function resolveAdsWalletTopupStatus(status: AdWalletTopup['status']) {
@@ -802,7 +799,7 @@ export function DashboardBusiness() {
         try {
             let quotedAmount = asNumber(booking.quotedAmount);
             if ((status === 'CONFIRMED' || status === 'COMPLETED') && quotedAmount <= 0) {
-                const rawValue = window.prompt('Monto cotizado en DOP', '1000');
+                const rawValue = window.prompt(`Monto cotizado en ${MARKET_CONFIG.currency}`, '1000');
                 if (!rawValue) {
                     setUpdatingBookingId(null);
                     return;
@@ -836,7 +833,7 @@ export function DashboardBusiness() {
         try {
             let quotedAmount = asNumber(booking.quotedAmount);
             if (quotedAmount <= 0) {
-                const rawValue = window.prompt('Monto a cobrar en DOP', '1000');
+                const rawValue = window.prompt(`Monto a cobrar en ${MARKET_CONFIG.currency}`, '1000');
                 if (!rawValue) {
                     return;
                 }
@@ -1151,9 +1148,9 @@ export function DashboardBusiness() {
                         <div className="text-sm text-gray-600 space-y-1">
                             <p>Plan: <span className="font-semibold text-gray-900">{metrics.subscription.plan.name}</span></p>
                             <p>Estado: <span className="font-semibold text-gray-900">{metrics.subscription.status}</span></p>
-                            <p>Mensualidad: <span className="font-semibold text-gray-900">{new Intl.NumberFormat('es-DO', { style: 'currency', currency: metrics.subscription.plan.currency }).format(Number(metrics.subscription.plan.priceMonthly))}</span></p>
+                            <p>Mensualidad: <span className="font-semibold text-gray-900">{formatCurrencyDo(Number(metrics.subscription.plan.priceMonthly), metrics.subscription.plan.currency)}</span></p>
                             <p>Fee marketplace: <span className="font-semibold text-gray-900">{(metrics.subscription.plan.transactionFeeBps / 100).toFixed(2)}%</span></p>
-                            <p>Próximo pago: <span className="font-semibold text-gray-900">{metrics.subscription.currentPeriodEnd ? new Date(metrics.subscription.currentPeriodEnd).toLocaleDateString('es-DO') : 'No definido'}</span></p>
+                            <p>Próximo pago: <span className="font-semibold text-gray-900">{metrics.subscription.currentPeriodEnd ? formatDateDo(metrics.subscription.currentPeriodEnd) : 'No definido'}</span></p>
                         </div>
                     ) : <p className="text-sm text-gray-500">Sin datos de suscripción.</p>}
                 </div>
@@ -1223,7 +1220,7 @@ export function DashboardBusiness() {
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div>
                                         <p className="font-medium text-gray-900">{booking.business.name}</p>
-                                        <p className="text-xs text-gray-500">{new Date(booking.scheduledFor).toLocaleString('es-DO')} · {booking.user?.name || 'Cliente plataforma'}</p>
+                                        <p className="text-xs text-gray-500">{formatDateTimeDo(booking.scheduledFor)} · {booking.user?.name || 'Cliente plataforma'}</p>
                                         <p className="text-xs text-gray-500">{asNumber(booking.quotedAmount) > 0 ? formatCurrency(booking.quotedAmount) : 'Monto pendiente de cotizar'}</p>
                                     </div>
                                     <div className="flex flex-col items-end gap-1">

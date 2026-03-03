@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../api/error';
 import { analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
+import { formatNumberDo } from '../lib/market';
 import { useAuth } from '../context/useAuth';
 import { getRoleCapabilities } from '../auth/capabilities';
 
@@ -126,6 +127,10 @@ export function Home() {
                 <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
                     <div className="text-center max-w-3xl mx-auto">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-white/35 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-blue-100 mb-6">
+                            <span className="inline-flex h-2 w-2 rounded-full bg-accent-300"></span>
+                            Hecho para Republica Dominicana
+                        </div>
                         <h1 className="font-display text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight">
                             Descubre lo mejor de{' '}
                             <span className="text-accent-400">República Dominicana</span>
@@ -153,7 +158,7 @@ export function Home() {
                                 </div>
                                 <button
                                     type="submit"
-                                    className="bg-accent-500 hover:bg-accent-600 text-white font-semibold px-8 py-4 transition-colors"
+                                    className="bg-accent-600 hover:bg-accent-700 text-white font-semibold px-8 py-4 transition-colors"
                                 >
                                     Buscar
                                 </button>
@@ -164,13 +169,13 @@ export function Home() {
                         <div className="flex justify-center gap-8 mt-10">
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-white">
-                                    {loading ? '...' : totalBusinesses.toLocaleString('es-DO')}
+                                    {loading ? '...' : formatNumberDo(totalBusinesses)}
                                 </div>
-                                <div className="text-sm text-blue-200">Negocios</div>
+                                <div className="text-sm text-blue-100">Negocios</div>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-white">{loading ? '...' : provinces.length}</div>
-                                <div className="text-sm text-blue-200">Provincias</div>
+                                <div className="text-sm text-blue-100">Provincias</div>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-white">{loading ? '...' : categories.length}</div>
@@ -203,7 +208,7 @@ export function Home() {
                                     metadata: { source: 'home-category' },
                                 }).catch(() => undefined);
                             }}
-                            className="card p-5 text-center group cursor-pointer"
+                            className="card hover-lift p-5 text-center group cursor-pointer"
                         >
                             <div className="text-3xl mb-2">{cat.icon || '📁'}</div>
                             <h3 className="font-semibold text-gray-800 text-sm group-hover:text-primary-600 transition-colors">
@@ -218,7 +223,7 @@ export function Home() {
             </section>
 
             {/* Provinces */}
-            <section className="bg-gray-50 py-16">
+            <section className="bg-gradient-to-b from-primary-50/70 to-white border-y border-primary-100/70 py-16">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-10">
                         <h2 className="font-display text-3xl font-bold text-gray-900 mb-3">
@@ -240,7 +245,7 @@ export function Home() {
                                         metadata: { source: 'home-province' },
                                     }).catch(() => undefined);
                                 }}
-                                className="px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-600 border border-gray-200 hover:border-primary-500 hover:text-primary-600 hover:shadow-md transition-all"
+                                className="px-4 py-2 bg-white rounded-full text-sm font-medium text-gray-600 border border-gray-200 hover:border-primary-500 hover:text-primary-600 hover:shadow-md transition-all hover-lift"
                             >
                                 📍 {prov.name}
                             </Link>
@@ -268,7 +273,7 @@ export function Home() {
                             key={biz.id}
                             to={`/businesses/${biz.slug || biz.id}`}
                             onClick={() => trackBusinessClick(biz.id, 'home-recent')}
-                            className="card group"
+                            className="card hover-lift group"
                         >
                             <div className="h-48 bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center">
                                 {biz.images?.[0] ? (
@@ -317,7 +322,7 @@ export function Home() {
                     <p className="text-blue-100 text-lg mb-8">
                         Regístrate gratis y llega a miles de clientes potenciales
                     </p>
-                    <Link to={registerBusinessPath} className="btn-accent text-lg px-10 py-3.5">
+                    <Link to={registerBusinessPath} className="btn-accent text-lg px-10 py-3.5 hover-lift">
                         {registerBusinessLabel}
                     </Link>
                 </div>

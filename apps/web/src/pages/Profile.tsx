@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usersApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { useAuth } from '../context/useAuth';
+import { formatCurrencyDo, formatDateTimeDo } from '../lib/market';
 
 type ProfileType = 'USER' | 'BUSINESS_OWNER' | 'ADMIN';
 
@@ -128,16 +129,11 @@ interface ProfilePayload {
 }
 
 function formatDateTime(value: string) {
-    return new Date(value).toLocaleString('es-DO');
+    return formatDateTimeDo(value);
 }
 
 function formatMoney(value: string | number | null | undefined, currency = 'DOP') {
-    const amount = Number(value ?? 0);
-    return new Intl.NumberFormat('es-DO', {
-        style: 'currency',
-        currency,
-        maximumFractionDigits: 2,
-    }).format(Number.isFinite(amount) ? amount : 0);
+    return formatCurrencyDo(value, currency);
 }
 
 function getRoleBadge(profileType: ProfileType) {

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getApiErrorMessage } from '../api/error';
 import { bookingsApi, favoritesApi, messagingApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
+import { formatDateTimeDo } from '../lib/market';
 
 type BookingStatus = 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW';
 type ConversationStatus = 'OPEN' | 'CLOSED' | 'CONVERTED';
@@ -79,7 +80,7 @@ const EMPTY_FAVORITES: FavoriteBusinessItem[] = [];
 const EMPTY_LISTS: UserBusinessList[] = [];
 
 function formatDateTime(value: string): string {
-    return new Date(value).toLocaleString('es-DO', {
+    return formatDateTimeDo(value, {
         dateStyle: 'medium',
         timeStyle: 'short',
     });

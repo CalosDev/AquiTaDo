@@ -23,7 +23,8 @@ export function Navbar() {
     };
 
     return (
-        <nav className="glass sticky top-0 z-50 shadow-sm">
+        <nav className="glass sticky top-0 z-50 shadow-sm border-b border-primary-100/70">
+            <div className="flag-ribbon" aria-hidden="true"></div>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     <Link to="/" className="flex items-center gap-2 group">
@@ -36,20 +37,20 @@ export function Navbar() {
                     </Link>
 
                     <div className="hidden md:flex items-center gap-6">
-                        <Link to="/businesses" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                        <Link to="/businesses" className="nav-link">
                             Negocios
                         </Link>
                         {isAuthenticated ? (
                             <>
-                                <Link to={roleHomePath} className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                <Link to={roleHomePath} className="nav-link">
                                     {roleHomeLabel}
                                 </Link>
                                 {canAccessOrganization && (
-                                    <Link to="/organization" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                    <Link to="/organization" className="nav-link">
                                         Organizacion
                                     </Link>
                                 )}
-                                <Link to="/profile" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
+                                <Link to="/profile" className="nav-link">
                                     Perfil
                                 </Link>
                                 {canRegisterBusiness && (
@@ -90,7 +91,7 @@ export function Navbar() {
                     </div>
 
                     <button
-                        className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+                        className="md:hidden p-2 rounded-lg hover:bg-gray-100 touch-target"
                         onClick={() => setMenuOpen(!menuOpen)}
                         aria-label={menuOpen ? 'Cerrar menu principal' : 'Abrir menu principal'}
                         aria-expanded={menuOpen}
@@ -107,9 +108,9 @@ export function Navbar() {
                 </div>
 
                 {menuOpen && (
-                    <div id="mobile-main-menu" className="md:hidden py-4 border-t border-gray-100 animate-slide-down">
-                        <div className="flex flex-col gap-3">
-                            <Link to="/businesses" className="py-2 text-gray-600 hover:text-primary-600 font-medium" onClick={() => setMenuOpen(false)}>
+                    <div id="mobile-main-menu" className="md:hidden py-4 border-t border-primary-100/70 animate-slide-down">
+                        <div className="flex flex-col gap-3 rounded-xl bg-white/75 backdrop-blur-sm p-2">
+                            <Link to="/businesses" className="py-2 px-2 rounded-lg touch-target text-gray-600 hover:text-primary-600 hover:bg-primary-50 font-medium" onClick={() => setMenuOpen(false)}>
                                 Negocios
                             </Link>
                             {isAuthenticated ? (
@@ -120,34 +121,34 @@ export function Navbar() {
                                         </p>
                                     )}
                                     {canRegisterBusiness && (
-                                        <Link to="/register-business" className="py-2 text-accent-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                        <Link to="/register-business" className="py-2 px-2 rounded-lg touch-target text-accent-600 hover:bg-accent-50 font-medium" onClick={() => setMenuOpen(false)}>
                                             + Registrar Negocio
                                         </Link>
                                     )}
-                                    <Link to={roleHomePath} className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                    <Link to={roleHomePath} className="py-2 px-2 rounded-lg touch-target text-gray-600 hover:bg-primary-50 font-medium" onClick={() => setMenuOpen(false)}>
                                         {roleHomeLabel}
                                     </Link>
                                     {canAccessOrganization && (
-                                        <Link to="/organization" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                        <Link to="/organization" className="py-2 px-2 rounded-lg touch-target text-gray-600 hover:bg-primary-50 font-medium" onClick={() => setMenuOpen(false)}>
                                             Organizacion
                                         </Link>
                                     )}
                                     <p className="pt-1 text-xs uppercase tracking-wide text-gray-400 font-semibold">
                                         Cuenta
                                     </p>
-                                    <Link to="/profile" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                    <Link to="/profile" className="py-2 px-2 rounded-lg touch-target text-gray-600 hover:bg-primary-50 font-medium" onClick={() => setMenuOpen(false)}>
                                         Perfil
                                     </Link>
-                                    <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="py-2 text-left text-red-500 font-medium">
+                                    <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="py-2 px-2 rounded-lg touch-target text-left text-red-500 hover:bg-red-50 font-medium">
                                         Salir
                                     </button>
                                 </>
                             ) : (
                                 <>
-                                    <Link to="/login" className="py-2 text-gray-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                    <Link to="/login" className="py-2 px-2 rounded-lg touch-target text-gray-600 hover:bg-primary-50 font-medium" onClick={() => setMenuOpen(false)}>
                                         Iniciar Sesion
                                     </Link>
-                                    <Link to="/register" className="py-2 text-primary-600 font-medium" onClick={() => setMenuOpen(false)}>
+                                    <Link to="/register" className="py-2 px-2 rounded-lg touch-target text-primary-600 hover:bg-primary-50 font-medium" onClick={() => setMenuOpen(false)}>
                                         Registrarse
                                     </Link>
                                 </>
