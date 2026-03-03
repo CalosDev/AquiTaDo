@@ -29,6 +29,8 @@ interface AuthContextType {
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const SESSION_HINT_STORAGE_KEY = 'aquita_has_session';
+const canUseWindow = typeof window !== 'undefined';
 
 function isTokenExpiredOrNearExpiry(token: string): boolean {
     try {
@@ -56,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearAccessToken();
         localStorage.removeItem('user');
         localStorage.removeItem('activeOrganizationId');
+        localStorage.removeItem(SESSION_HINT_STORAGE_KEY);
     }, []);
 
     const applySession = useCallback((payload: {
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(normalizedUser);
         setAccessToken(payload.accessToken);
         localStorage.setItem('user', JSON.stringify(normalizedUser));
+        localStorage.setItem(SESSION_HINT_STORAGE_KEY, '1');
     }, []);
 
     const refreshProfile = useCallback(async () => {
@@ -88,6 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const bootstrapAuth = async () => {
             const savedToken = getAccessToken();
+            const hasSessionHint = canUseWindow
+                ? localStorage.getItem(SESSION_HINT_STORAGE_KEY) === '1'
+                : false;
 
             if (savedToken && !isTokenExpiredOrNearExpiry(savedToken)) {
                 try {
@@ -98,6 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 } finally {
                     setLoading(false);
                 }
+                return;
+            }
+
+            if (!hasSessionHint) {
+                setLoading(false);
                 return;
             }
 
