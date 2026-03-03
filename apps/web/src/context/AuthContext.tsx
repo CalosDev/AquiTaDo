@@ -11,6 +11,7 @@ interface User {
     phone?: string;
     avatarUrl?: string | null;
     role: UserRole;
+    twoFactorEnabled?: boolean;
 }
 
 interface AuthContextType {
@@ -18,7 +19,7 @@ interface AuthContextType {
     token: string | null;
     refreshToken: string | null;
     loading: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string, twoFactorCode?: string) => Promise<void>;
     register: (
         name: string,
         email: string,
@@ -152,8 +153,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
     }, [clearSession]);
 
-    const login = async (email: string, password: string) => {
-        const response = await authApi.login({ email, password });
+    const login = async (email: string, password: string, twoFactorCode?: string) => {
+        const response = await authApi.login({ email, password, twoFactorCode });
         const { accessToken, user: userData } = response.data;
         applySession({
             accessToken,

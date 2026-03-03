@@ -5,8 +5,9 @@ import { useAuth } from '../context/useAuth';
 export function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();
-    const [formData, setFormData] = useState({ email: '', password: '' });
+    const [formData, setFormData] = useState({ email: '', password: '', twoFactorCode: '' });
     const [error, setError] = useState('');
+    const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -14,11 +15,19 @@ export function Login() {
         setError('');
         setLoading(true);
         try {
-            await login(formData.email, formData.password);
+            await login(
+                formData.email,
+                formData.password,
+                formData.twoFactorCode.trim() || undefined,
+            );
             navigate('/app');
         } catch (err: unknown) {
             const requestError = err as { response?: { data?: { message?: string } } };
-            setError(requestError.response?.data?.message || 'Error al iniciar sesion');
+            const message = requestError.response?.data?.message || 'Error al iniciar sesion';
+            if (String(message).toLowerCase().includes('2fa')) {
+                setRequiresTwoFactor(true);
+            }
+            setError(message);
         } finally {
             setLoading(false);
         }
@@ -71,6 +80,28 @@ export function Login() {
                                 placeholder="********"
                             />
                         </div>
+                        {requiresTwoFactor && (
+                            <div>
+                                <label htmlFor="login-2fa" className="text-sm font-medium text-gray-700 mb-1 block">
+                                    Codigo 2FA (6 digitos)
+                                </label>
+                                <input
+                                    id="login-2fa"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="\d{6}"
+                                    maxLength={6}
+                                    required
+                                    value={formData.twoFactorCode}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        twoFactorCode: e.target.value.replace(/\D/g, '').slice(0, 6),
+                                    })}
+                                    className="input-field"
+                                    placeholder="123456"
+                                />
+                            </div>
+                        )}
                         <button type="submit" disabled={loading} className="btn-primary w-full">
                             {loading ? 'Ingresando...' : 'Iniciar sesion'}
                         </button>

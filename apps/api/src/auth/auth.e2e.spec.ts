@@ -112,6 +112,23 @@ describe('AuthController (e2e)', () => {
         expect(String(response.body.message).toLowerCase()).toContain('registr');
     });
 
+    it('rejects ADMIN role assignment from public registration', async () => {
+        const payload = {
+            ...makeRegisterPayload('role-admin'),
+            role: 'ADMIN',
+        };
+
+        const response = await request(app.getHttpServer())
+            .post('/api/auth/register')
+            .send(payload)
+            .expect(400);
+
+        expect(response.body).toMatchObject({
+            statusCode: 400,
+            error: 'Bad Request',
+        });
+    });
+
     it('logs in with valid credentials', async () => {
         const payload = makeRegisterPayload('login-success');
 

@@ -98,6 +98,7 @@ const EMPTY_CATEGORY_FORM: CategoryForm = {
     slug: '',
     icon: '',
 };
+const DELETE_CONFIRMATION_TEXT = 'ELIMINAR';
 
 function toSlug(value: string): string {
     return value
@@ -117,6 +118,8 @@ export function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [confirmDeleteBusinessId, setConfirmDeleteBusinessId] = useState<string | null>(null);
+    const [deleteBusinessReason, setDeleteBusinessReason] = useState('');
+    const [deleteBusinessConfirmationText, setDeleteBusinessConfirmationText] = useState('');
     const [confirmDeleteCategoryId, setConfirmDeleteCategoryId] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
@@ -194,13 +197,15 @@ export function AdminDashboard() {
         }
     };
 
-    const handleDeleteBusiness = async (businessId: string) => {
+    const handleDeleteBusiness = async (businessId: string, reason: string) => {
         setProcessingId(businessId);
         setErrorMessage('');
         setSuccessMessage('');
 
         try {
-            await businessApi.delete(businessId);
+            await businessApi.delete(businessId, {
+                reason: reason.trim(),
+            });
             setBusinesses((current) => current.filter((business) => business.id !== businessId));
             setSuccessMessage('Negocio eliminado correctamente');
         } catch (error) {
@@ -208,16 +213,21 @@ export function AdminDashboard() {
         } finally {
             setProcessingId(null);
             setConfirmDeleteBusinessId(null);
+            setDeleteBusinessReason('');
+            setDeleteBusinessConfirmationText('');
         }
     };
 
     const requestBusinessDelete = (businessId: string) => {
-        if (confirmDeleteBusinessId === businessId) {
-            void handleDeleteBusiness(businessId);
-            return;
-        }
-
+        setDeleteBusinessReason('');
+        setDeleteBusinessConfirmationText('');
         setConfirmDeleteBusinessId(businessId);
+    };
+
+    const cancelBusinessDelete = () => {
+        setConfirmDeleteBusinessId(null);
+        setDeleteBusinessReason('');
+        setDeleteBusinessConfirmationText('');
     };
 
     const handleCreateCategory = async (event: React.FormEvent) => {
@@ -518,26 +528,51 @@ export function AdminDashboard() {
                                                             </button>
                                                         )}
                                                         {confirmDeleteBusinessId === business.id ? (
-                                                            <>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        void handleDeleteBusiness(business.id)
-                                                                    }
-                                                                    disabled={processingId === business.id}
-                                                                    className="text-xs bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
-                                                                >
-                                                                    {processingId === business.id
-                                                                        ? 'Procesando...'
-                                                                        : 'Confirmar'}
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setConfirmDeleteBusinessId(null)}
-                                                                    disabled={processingId === business.id}
-                                                                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50"
-                                                                >
-                                                                    Cancelar
-                                                                </button>
-                                                            </>
+                                                            <div className="flex w-[320px] flex-col items-end gap-2 rounded-xl border border-red-200 bg-red-50/70 p-3">
+                                                                <p className="text-[11px] text-right text-red-700">
+                                                                    Accion irreversible. Escribe un motivo (min. 15 caracteres) y confirma con <strong>{DELETE_CONFIRMATION_TEXT}</strong>.
+                                                                </p>
+                                                                <textarea
+                                                                    value={deleteBusinessReason}
+                                                                    onChange={(event) => setDeleteBusinessReason(event.target.value)}
+                                                                    className="input-field h-20 w-full resize-none text-xs"
+                                                                    placeholder="Motivo de eliminacion"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={deleteBusinessConfirmationText}
+                                                                    onChange={(event) => setDeleteBusinessConfirmationText(event.target.value)}
+                                                                    className="input-field w-full text-xs"
+                                                                    placeholder={`Escribe ${DELETE_CONFIRMATION_TEXT}`}
+                                                                />
+                                                                <div className="flex justify-end gap-2">
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            void handleDeleteBusiness(
+                                                                                business.id,
+                                                                                deleteBusinessReason,
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            processingId === business.id
+                                                                            || deleteBusinessReason.trim().length < 15
+                                                                            || deleteBusinessConfirmationText.trim().toUpperCase() !== DELETE_CONFIRMATION_TEXT
+                                                                        }
+                                                                        className="text-xs bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+                                                                    >
+                                                                        {processingId === business.id
+                                                                            ? 'Procesando...'
+                                                                            : 'Eliminar ahora'}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={cancelBusinessDelete}
+                                                                        disabled={processingId === business.id}
+                                                                        className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50"
+                                                                    >
+                                                                        Cancelar
+                                                                    </button>
+                                                                </div>
+                                                            </div>
                                                         ) : (
                                                             <button
                                                                 onClick={() =>

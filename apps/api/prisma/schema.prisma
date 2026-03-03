@@ -239,6 +239,10 @@ model User {
   phone     String?  @db.VarChar(20)
   avatarUrl String?  @db.VarChar(500)
   role      Role     @default(USER)
+  twoFactorEnabled       Boolean   @default(false)
+  twoFactorSecret        String?   @db.VarChar(128)
+  twoFactorPendingSecret String?   @db.VarChar(128)
+  twoFactorEnabledAt     DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -267,6 +271,7 @@ model User {
   salesLeadsCreated        SalesLead[]                    @relation("SalesLeadCreator")
 
   @@index([email])
+  @@index([twoFactorEnabled])
   @@map("users")
 }
 

@@ -625,7 +625,8 @@ export class BusinessesService {
 
     async delete(
         id: string,
-        _userId: string,
+        deleteReason: string,
+        userId: string,
         userRole: string,
         organizationId?: string,
         organizationRole?: OrganizationRole,
@@ -659,6 +660,7 @@ export class BusinessesService {
 
         const imageUrls = business.images.map((image) => image.url);
         const now = new Date();
+        const normalizedReason = deleteReason.trim();
 
         try {
             await this.prisma.$transaction(async (tx) => {
@@ -707,6 +709,21 @@ export class BusinessesService {
                 });
 
                 await this.syncBusinessLocation(tx, id, undefined, undefined);
+
+                await tx.auditLog.create({
+                    data: {
+                        organizationId: business.organizationId,
+                        actorUserId: userId,
+                        action: 'business.deleted',
+                        targetType: 'business',
+                        targetId: id,
+                        metadata: {
+                            reason: normalizedReason,
+                            actorRole: userRole,
+                            deletedAt: now.toISOString(),
+                        } as Prisma.InputJsonValue,
+                    },
+                });
             });
             this.publishBusinessChangedEvent(id, business.slug, 'deleted');
         } catch (error) {

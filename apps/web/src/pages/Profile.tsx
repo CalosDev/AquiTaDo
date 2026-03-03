@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { usersApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { useAuth } from '../context/useAuth';
@@ -383,6 +384,16 @@ export function Profile() {
 
                     {payload.profileType === 'ADMIN' && payload.adminProfile && (
                         <div className="space-y-6">
+                            <div className="card p-5">
+                                <h3 className="font-display text-lg font-semibold text-gray-900 mb-2">Seguridad de administrador</h3>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    La configuracion de 2FA y controles de sesion admin se gestiona en una pantalla dedicada.
+                                </p>
+                                <Link to="/security" className="btn-secondary text-sm">
+                                    Ir a Seguridad
+                                </Link>
+                            </div>
+
                             <div className="card p-5">
                                 <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Perfil admin</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">

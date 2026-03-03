@@ -36,11 +36,15 @@ function resolveCachedRequest<T>(
 export const authApi = {
     register: (data: { name: string; email: string; password: string; phone?: string; role?: 'USER' | 'BUSINESS_OWNER' }) =>
         api.post('/auth/register', data),
-    login: (data: { email: string; password: string }) =>
+    login: (data: { email: string; password: string; twoFactorCode?: string }) =>
         api.post('/auth/login', data),
     refresh: () => api.post('/auth/refresh', {}),
     logout: () => api.post('/auth/logout', {}),
     getProfile: () => api.get('/users/me'),
+    getTwoFactorStatus: () => api.get('/auth/2fa/status'),
+    setupTwoFactor: () => api.post('/auth/2fa/setup', {}),
+    enableTwoFactor: (data: { code: string }) => api.post('/auth/2fa/enable', data),
+    disableTwoFactor: (data: { code: string }) => api.post('/auth/2fa/disable', data),
 };
 
 // ---- Users ----
@@ -72,7 +76,7 @@ export const businessApi = {
     ) => api.post(`/businesses/${businessId}/public-lead`, data),
     create: (data: Record<string, unknown>) => api.post('/businesses', data),
     update: (id: string, data: Record<string, unknown>) => api.put(`/businesses/${id}`, data),
-    delete: (id: string) => api.delete(`/businesses/${id}`),
+    delete: (id: string, data: { reason: string }) => api.delete(`/businesses/${id}`, { data }),
     getNearby: (params: { lat: number; lng: number; radius?: number }) =>
         api.get('/businesses/nearby', { params }),
     verify: (id: string) => api.put(`/businesses/${id}/verify`),

@@ -9,6 +9,7 @@ import {
     BusinessQueryDto,
     NearbyQueryDto,
     CreatePublicLeadDto,
+    DeleteBusinessDto,
 } from './dto/business.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -126,12 +127,20 @@ export class BusinessesController {
     @Policy({ resource: 'business', action: 'delete', resourceIdParam: 'id' })
     async delete(
         @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: DeleteBusinessDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('role') userRole: string,
         @CurrentOrganization('organizationId') organizationId?: string,
         @CurrentOrganization('organizationRole') organizationRole?: OrganizationRole,
     ) {
-        return this.businessesService.delete(id, userId, userRole, organizationId, organizationRole);
+        return this.businessesService.delete(
+            id,
+            dto.reason,
+            userId,
+            userRole,
+            organizationId,
+            organizationRole,
+        );
     }
 
     @Put(':id/verify')

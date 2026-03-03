@@ -306,6 +306,9 @@ describe('BusinessesController (e2e)', () => {
             .delete(`/api/businesses/${businessId}`)
             .set('Authorization', `Bearer ${ownerToken}`)
             .set('x-organization-id', organizationId)
+            .send({
+                reason: 'Negocio cerrado definitivamente por decision operativa.',
+            })
             .expect(200);
 
         expect(deleted.body).toMatchObject({
@@ -315,6 +318,36 @@ describe('BusinessesController (e2e)', () => {
         await request(app.getHttpServer())
             .get(`/api/businesses/${businessId}`)
             .expect(404);
+    });
+
+    it('requires deletion reason when deleting a business', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
+        const ownerToken = signToken(owner.id, owner.role);
+        const province = await createProvince();
+        const seed = makeSeed();
+
+        const created = await request(app.getHttpServer())
+            .post('/api/businesses')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .send(makeCreateBusinessPayload(seed, province.id))
+            .expect(201);
+
+        const businessId = String(created.body.id);
+        const organizationId = String(created.body.organization.id);
+
+        const response = await request(app.getHttpServer())
+            .delete(`/api/businesses/${businessId}`)
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .send({
+                reason: 'corta',
+            })
+            .expect(400);
+
+        expect(response.body).toMatchObject({
+            statusCode: 400,
+            error: 'Bad Request',
+        });
     });
 
     it('allows admins to soft-delete businesses without organization context', async () => {
@@ -336,6 +369,9 @@ describe('BusinessesController (e2e)', () => {
         const deleted = await request(app.getHttpServer())
             .delete(`/api/businesses/${businessId}`)
             .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                reason: 'Incumplimiento de politicas de la plataforma.',
+            })
             .expect(200);
 
         expect(deleted.body).toMatchObject({

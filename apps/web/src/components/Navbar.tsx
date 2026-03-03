@@ -74,6 +74,9 @@ export function Navbar() {
                                     {canAccessOrganization && (
                                         <Link to="/organization" className="nav-link">Organizacion</Link>
                                     )}
+                                    {user?.role === 'ADMIN' && (
+                                        <Link to="/security" className="nav-link">Seguridad</Link>
+                                    )}
                                     <Link to="/profile" className="nav-link">Perfil</Link>
                                     {canRegisterBusiness && (
                                         <Link to="/register-business" className="btn-accent text-sm whitespace-nowrap shrink-0">+ Registrar Negocio</Link>
@@ -162,6 +165,15 @@ export function Navbar() {
                                                 onClick={() => setMenuOpen(false)}
                                             >
                                                 Organizacion
+                                            </Link>
+                                        )}
+                                        {user?.role === 'ADMIN' && (
+                                            <Link
+                                                to="/security"
+                                                className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                                onClick={() => setMenuOpen(false)}
+                                            >
+                                                Seguridad
                                             </Link>
                                         )}
                                         <Link

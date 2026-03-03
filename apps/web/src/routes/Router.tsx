@@ -20,6 +20,7 @@ const NotFound = lazy(async () => ({ default: (await import('../pages/NotFound')
 const OrganizationSettings = lazy(async () => ({ default: (await import('../pages/OrganizationSettings')).OrganizationSettings }));
 const AcceptInvite = lazy(async () => ({ default: (await import('../pages/AcceptInvite')).AcceptInvite }));
 const Profile = lazy(async () => ({ default: (await import('../pages/Profile')).Profile }));
+const AdminSecurity = lazy(async () => ({ default: (await import('../pages/AdminSecurity')).AdminSecurity }));
 
 function RouteFallback() {
     return (
@@ -117,6 +118,14 @@ export function AppRouter() {
                         element={
                             <ProtectedRoute roles={['ADMIN']}>
                                 <AdminDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/security"
+                        element={
+                            <ProtectedRoute roles={['ADMIN']}>
+                                <AdminSecurity />
                             </ProtectedRoute>
                         }
                     />

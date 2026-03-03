@@ -1,8 +1,10 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Inject, Req, Res } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Inject, Req, Res, UseGuards, Get } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, TwoFactorCodeDto } from './dto/auth.dto';
 import { Request, Response } from 'express';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -52,5 +54,35 @@ export class AuthController {
         @Res({ passthrough: true }) response: Response,
     ) {
         return this.authService.logout(dto.refreshToken, request, response);
+    }
+
+    @Get('2fa/status')
+    @UseGuards(JwtAuthGuard)
+    async getTwoFactorStatus(@CurrentUser('id') userId: string) {
+        return this.authService.getTwoFactorStatus(userId);
+    }
+
+    @Post('2fa/setup')
+    @UseGuards(JwtAuthGuard)
+    async setupTwoFactor(@CurrentUser('id') userId: string) {
+        return this.authService.setupTwoFactor(userId);
+    }
+
+    @Post('2fa/enable')
+    @UseGuards(JwtAuthGuard)
+    async enableTwoFactor(
+        @CurrentUser('id') userId: string,
+        @Body() dto: TwoFactorCodeDto,
+    ) {
+        return this.authService.enableTwoFactor(userId, dto.code);
+    }
+
+    @Post('2fa/disable')
+    @UseGuards(JwtAuthGuard)
+    async disableTwoFactor(
+        @CurrentUser('id') userId: string,
+        @Body() dto: TwoFactorCodeDto,
+    ) {
+        return this.authService.disableTwoFactor(userId, dto.code);
     }
 }

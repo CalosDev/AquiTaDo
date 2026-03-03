@@ -10,6 +10,7 @@ import {
     Matches,
     IsIn,
     MaxLength,
+    MinLength,
     Min,
     Max,
 } from 'class-validator';
@@ -226,4 +227,15 @@ export class NearbyQueryDto {
     @Min(1)
     @Max(50)
     radius?: number;
+}
+
+export class DeleteBusinessDto {
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(15)
+    @MaxLength(500)
+    @Matches(/\S+/, {
+        message: 'El motivo de eliminacion es obligatorio',
+    })
+    reason!: string;
 }

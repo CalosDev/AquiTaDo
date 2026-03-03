@@ -52,6 +52,13 @@ export class LoginDto {
     @IsString()
     @IsNotEmpty()
     password!: string;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{6}$/, {
+        message: 'El codigo 2FA debe tener 6 digitos',
+    })
+    twoFactorCode?: string;
 }
 
 export class RefreshTokenDto {
@@ -59,4 +66,13 @@ export class RefreshTokenDto {
     @IsString()
     @IsNotEmpty()
     refreshToken!: string;
+}
+
+export class TwoFactorCodeDto {
+    @IsString()
+    @IsNotEmpty()
+    @Matches(/^\d{6}$/, {
+        message: 'El codigo 2FA debe tener 6 digitos',
+    })
+    code!: string;
 }

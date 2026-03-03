@@ -111,7 +111,12 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     if (config.JWT_REFRESH_TTL_DAYS !== undefined) {
         assertPositiveInteger(config, 'JWT_REFRESH_TTL_DAYS');
     }
+    if (config.JWT_REFRESH_TTL_ADMIN_DAYS !== undefined) {
+        assertPositiveInteger(config, 'JWT_REFRESH_TTL_ADMIN_DAYS');
+    }
 
+    assertNonEmptyString(config, 'JWT_ACCESS_TTL_ADMIN');
+    assertNonEmptyString(config, 'TOTP_ISSUER');
     assertNonEmptyString(config, 'AUTH_REFRESH_COOKIE_NAME');
     assertNonEmptyString(config, 'AUTH_REFRESH_COOKIE_PATH');
     assertBooleanLike(config, 'AUTH_REFRESH_COOKIE_SECURE');

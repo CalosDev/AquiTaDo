@@ -1,4 +1,6 @@
 import {
+    BadRequestException,
+    ForbiddenException,
     ConflictException,
     Inject,
     Injectable,
@@ -12,11 +14,27 @@ import { CookieOptions, Request, Response } from 'express';
 import { Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+import {
+    buildTotpOtpauthUrl,
+    generateTotpSecret,
+    verifyTotpCode,
+} from './totp.util';
 
 interface AuthTokenPayload {
     sub: string;
     role: Role;
 }
+
+type AuthSessionUser = {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    role: Role;
+    createdAt: Date;
+    updatedAt: Date;
+    twoFactorEnabled: boolean;
+};
 
 @Injectable()
 export class AuthService {
@@ -62,6 +80,7 @@ export class AuthService {
                 role: user.role,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
+                twoFactorEnabled: user.twoFactorEnabled,
             },
             request,
             response,
@@ -82,7 +101,9 @@ export class AuthService {
             throw new UnauthorizedException('Credenciales invalidas');
         }
 
-        return this.issueAuthSession(
+        this.assertAdminSecondFactor(user.role, user.twoFactorEnabled, user.twoFactorSecret, dto.twoFactorCode);
+
+        const session = await this.issueAuthSession(
             {
                 id: user.id,
                 name: user.name,
@@ -91,10 +112,20 @@ export class AuthService {
                 role: user.role,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
+                twoFactorEnabled: user.twoFactorEnabled,
             },
             request,
             response,
         );
+
+        if (user.role === 'ADMIN' && !user.twoFactorEnabled) {
+            return {
+                ...session,
+                securityWarnings: ['ADMIN_2FA_NOT_ENABLED'],
+            };
+        }
+
+        return session;
     }
 
     async refresh(
@@ -126,6 +157,7 @@ export class AuthService {
                         role: true,
                         createdAt: true,
                         updatedAt: true,
+                        twoFactorEnabled: true,
                     },
                 },
             },
@@ -171,29 +203,209 @@ export class AuthService {
         return { message: 'Sesion cerrada' };
     }
 
+    async getTwoFactorStatus(userId: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                role: true,
+                twoFactorEnabled: true,
+                twoFactorEnabledAt: true,
+                twoFactorPendingSecret: true,
+            },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('Usuario no autenticado');
+        }
+
+        const required = user.role === 'ADMIN';
+        return {
+            enabled: user.twoFactorEnabled,
+            pending: Boolean(user.twoFactorPendingSecret),
+            required,
+            enabledAt: user.twoFactorEnabledAt?.toISOString() ?? null,
+        };
+    }
+
+    async setupTwoFactor(userId: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                role: true,
+            },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('Usuario no autenticado');
+        }
+
+        if (user.role !== 'ADMIN') {
+            throw new ForbiddenException('Solo las cuentas ADMIN pueden configurar 2FA');
+        }
+
+        const secret = generateTotpSecret();
+        const issuer = this.resolveTotpIssuer();
+        const otpauthUrl = buildTotpOtpauthUrl({
+            secret,
+            issuer,
+            accountLabel: user.email,
+        });
+
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                twoFactorPendingSecret: secret,
+            },
+        });
+
+        return {
+            secret,
+            otpauthUrl,
+            issuer,
+            accountLabel: user.email,
+            digits: 6,
+            periodSeconds: 30,
+        };
+    }
+
+    async enableTwoFactor(userId: string, code: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                role: true,
+                twoFactorPendingSecret: true,
+            },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('Usuario no autenticado');
+        }
+
+        if (user.role !== 'ADMIN') {
+            throw new ForbiddenException('Solo las cuentas ADMIN pueden habilitar 2FA');
+        }
+
+        if (!user.twoFactorPendingSecret) {
+            throw new BadRequestException('No hay configuracion 2FA pendiente');
+        }
+
+        if (!verifyTotpCode(user.twoFactorPendingSecret, code)) {
+            throw new UnauthorizedException('Codigo 2FA invalido');
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: user.id },
+                data: {
+                    twoFactorEnabled: true,
+                    twoFactorSecret: user.twoFactorPendingSecret,
+                    twoFactorPendingSecret: null,
+                    twoFactorEnabledAt: new Date(),
+                },
+            });
+
+            await tx.refreshToken.updateMany({
+                where: {
+                    userId: user.id,
+                    revokedAt: null,
+                },
+                data: {
+                    revokedAt: new Date(),
+                },
+            });
+        });
+
+        return {
+            enabled: true,
+            message: '2FA habilitado correctamente. Inicia sesion nuevamente.',
+        };
+    }
+
+    async disableTwoFactor(userId: string, code: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                role: true,
+                twoFactorEnabled: true,
+                twoFactorSecret: true,
+            },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('Usuario no autenticado');
+        }
+
+        if (user.role !== 'ADMIN') {
+            throw new ForbiddenException('Solo las cuentas ADMIN pueden deshabilitar 2FA');
+        }
+
+        if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+            throw new BadRequestException('2FA no esta habilitado');
+        }
+
+        if (!verifyTotpCode(user.twoFactorSecret, code)) {
+            throw new UnauthorizedException('Codigo 2FA invalido');
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: user.id },
+                data: {
+                    twoFactorEnabled: false,
+                    twoFactorSecret: null,
+                    twoFactorPendingSecret: null,
+                    twoFactorEnabledAt: null,
+                },
+            });
+
+            await tx.refreshToken.updateMany({
+                where: {
+                    userId: user.id,
+                    revokedAt: null,
+                },
+                data: {
+                    revokedAt: new Date(),
+                },
+            });
+        });
+
+        return {
+            enabled: false,
+            message: '2FA deshabilitado. Inicia sesion nuevamente.',
+        };
+    }
+
     private async issueAuthSession(
-        user: {
-            id: string;
-            name: string;
-            email: string;
-            phone: string | null;
-            role: Role;
-            createdAt: Date;
-            updatedAt: Date;
-        },
+        user: AuthSessionUser,
         request: Request,
         response: Response,
         replacingTokenHash?: string,
     ) {
+        const refreshTtlDays = this.resolveRefreshTokenTtlDays(user.role);
         const accessToken = this.generateAccessToken(user.id, user.role);
-        const refreshToken = this.generateRefreshToken(user.id, user.role);
+        const refreshToken = this.generateRefreshToken(user.id, user.role, refreshTtlDays);
         const refreshTokenHash = this.hashToken(refreshToken);
-
-        const refreshTtlDays = this.resolveRefreshTokenTtlDays();
         const expiresAt = new Date(Date.now() + refreshTtlDays * 24 * 60 * 60 * 1000);
         const { userAgent, ipAddress } = this.resolveClientMetadata(request);
 
         await this.prisma.$transaction(async (tx) => {
+            if (user.role === 'ADMIN') {
+                await tx.refreshToken.updateMany({
+                    where: {
+                        userId: user.id,
+                        revokedAt: null,
+                    },
+                    data: {
+                        revokedAt: new Date(),
+                    },
+                });
+            }
+
             if (replacingTokenHash) {
                 await tx.refreshToken.updateMany({
                     where: {
@@ -221,7 +433,7 @@ export class AuthService {
         response.cookie(
             this.resolveRefreshCookieName(),
             refreshToken,
-            this.resolveRefreshCookieOptions(),
+            this.resolveRefreshCookieOptions(refreshTtlDays),
         );
 
         return {
@@ -232,6 +444,7 @@ export class AuthService {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
+                twoFactorEnabled: user.twoFactorEnabled,
                 createdAt: user.createdAt.toISOString(),
                 updatedAt: user.updatedAt.toISOString(),
             },
@@ -239,16 +452,24 @@ export class AuthService {
     }
 
     private generateAccessToken(userId: string, role: Role): string {
+        if (role === 'ADMIN') {
+            const adminAccessTtl = this.configService.get<string>('JWT_ACCESS_TTL_ADMIN')?.trim() || '10m';
+            return this.jwtService.sign(
+                { sub: userId, role },
+                { expiresIn: adminAccessTtl as never },
+            );
+        }
+
         return this.jwtService.sign({ sub: userId, role });
     }
 
-    private generateRefreshToken(userId: string, role: Role): string {
+    private generateRefreshToken(userId: string, role: Role, refreshTtlDays: number): string {
         const refreshSecret = this.resolveRefreshSecret();
         return this.jwtService.sign(
             { sub: userId, role, jti: randomUUID() },
             {
                 secret: refreshSecret,
-                expiresIn: `${this.resolveRefreshTokenTtlDays()}d`,
+                expiresIn: `${refreshTtlDays}d`,
             },
         );
     }
@@ -268,7 +489,15 @@ export class AuthService {
             ?? '';
     }
 
-    private resolveRefreshTokenTtlDays(): number {
+    private resolveRefreshTokenTtlDays(role: Role): number {
+        if (role === 'ADMIN') {
+            const configuredAdminDays = Number(this.configService.get<string>('JWT_REFRESH_TTL_ADMIN_DAYS') ?? 7);
+            if (!Number.isFinite(configuredAdminDays) || configuredAdminDays <= 0) {
+                return 7;
+            }
+            return Math.floor(configuredAdminDays);
+        }
+
         const configuredDays = Number(this.configService.get<string>('JWT_REFRESH_TTL_DAYS') ?? 30);
         if (!Number.isFinite(configuredDays) || configuredDays <= 0) {
             return 30;
@@ -284,7 +513,7 @@ export class AuthService {
             : 'aquita_refresh_token';
     }
 
-    private resolveRefreshCookieOptions(): CookieOptions {
+    private resolveRefreshCookieOptions(refreshTtlDays: number): CookieOptions {
         const isProduction = (process.env.NODE_ENV ?? '').trim().toLowerCase() === 'production';
         const configuredSameSite = (this.configService.get<string>('AUTH_REFRESH_COOKIE_SAMESITE') ?? '')
             .trim()
@@ -312,13 +541,13 @@ export class AuthService {
             secure,
             sameSite,
             path,
-            maxAge: this.resolveRefreshTokenTtlDays() * 24 * 60 * 60 * 1000,
+            maxAge: refreshTtlDays * 24 * 60 * 60 * 1000,
             ...(domain ? { domain } : {}),
         };
     }
 
     private clearRefreshCookie(response: Response): void {
-        const cookieOptions = this.resolveRefreshCookieOptions();
+        const cookieOptions = this.resolveRefreshCookieOptions(1);
         response.clearCookie(this.resolveRefreshCookieName(), {
             httpOnly: true,
             secure: cookieOptions.secure,
@@ -376,6 +605,37 @@ export class AuthService {
 
     private hashToken(token: string): string {
         return createHash('sha256').update(token).digest('hex');
+    }
+
+    private resolveTotpIssuer(): string {
+        const configuredIssuer = this.configService.get<string>('TOTP_ISSUER')?.trim();
+        return configuredIssuer && configuredIssuer.length > 0
+            ? configuredIssuer
+            : 'AquiTa.do';
+    }
+
+    private assertAdminSecondFactor(
+        role: Role,
+        twoFactorEnabled: boolean,
+        twoFactorSecret: string | null,
+        twoFactorCode?: string,
+    ): void {
+        if (role !== 'ADMIN') {
+            return;
+        }
+
+        if (!twoFactorEnabled || !twoFactorSecret) {
+            return;
+        }
+
+        const normalizedCode = twoFactorCode?.trim();
+        if (!normalizedCode) {
+            throw new UnauthorizedException('Se requiere codigo 2FA para cuentas admin');
+        }
+
+        if (!verifyTotpCode(twoFactorSecret, normalizedCode)) {
+            throw new UnauthorizedException('Codigo 2FA invalido');
+        }
     }
 
     private resolveClientMetadata(request: Request): {

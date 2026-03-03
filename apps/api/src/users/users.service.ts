@@ -17,6 +17,8 @@ export class UsersService {
         phone: true,
         avatarUrl: true,
         role: true,
+        twoFactorEnabled: true,
+        twoFactorEnabledAt: true,
         createdAt: true,
         updatedAt: true,
     };
