@@ -84,7 +84,7 @@ Cada contexto con:
 
 ## 4.3 Observabilidad
 - Logs estructurados JSON con `requestId/tenantId/userId`.
-- Trazas distribuidas (OpenTelemetry).
+- Trazabilidad distribuida basada en `traceparent` + `requestId`.
 - Metrics + alertas SLO:
   - API p95 < 300ms en rutas publicas cacheables.
   - error rate < 1%.

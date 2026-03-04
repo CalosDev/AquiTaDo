@@ -4,7 +4,6 @@ Este documento resume la capa SRE/Growth implementada para AquiTa.do y como oper
 
 ## 1) Observabilidad 360
 
-- `OpenTelemetry` inicializado en `apps/api/src/observability/telemetry.bootstrap.ts`.
 - Trazas de entrada via `traceparent` y `x-trace-id` en `apps/api/src/main.ts`.
 - Frontend envia contexto distribuido (`x-visitor-id`, `x-session-id`, `x-request-id`, `traceparent`) en `apps/web/src/api/client.ts`.
 - Metricas Prometheus en `GET /api/observability/metrics`.
@@ -60,9 +59,7 @@ Este documento resume la capa SRE/Growth implementada para AquiTa.do y como oper
 ## 5) Stack sugerido de Produccion
 
 - Telemetria:
-  - OpenTelemetry Collector
   - Prometheus + Grafana
-  - Sentry (errores + traces)
 - Logs:
   - Loki/Promtail o Datadog Logs
 - Producto/Growth:
@@ -107,12 +104,6 @@ Este documento resume la capa SRE/Growth implementada para AquiTa.do y como oper
 
 Definir al menos:
 
-- Observabilidad:
-  - `OTEL_ENABLED`
-  - `OTEL_SERVICE_NAME`
-  - `OTEL_EXPORTER_OTLP_ENDPOINT`
-  - `SENTRY_DSN`
-  - `SENTRY_TRACES_SAMPLE_RATE`
 - Seguridad:
   - `SECURITY_TRUST_PROXY`
   - `RATE_LIMIT_*`

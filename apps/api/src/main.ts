@@ -8,8 +8,6 @@ import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { ObservabilityService } from './observability/observability.service';
-import { getSentryClient } from './core/observability/sentry.client';
-import { initializeOpenTelemetry, shutdownOpenTelemetry } from './observability/telemetry.bootstrap';
 
 type CorsSettings = {
     origin: string | string[] | boolean;
@@ -18,8 +16,6 @@ type CorsSettings = {
     allowedHeaders: string[];
     exposedHeaders: string[];
 };
-
-initializeOpenTelemetry();
 
 function parseCsvConfig(value: string | undefined, fallback: string[]): string[] {
     const parsed = (value ?? '')
@@ -208,22 +204,6 @@ async function bootstrap() {
 
     const observabilityService = app.get(ObservabilityService);
     const corsSettings = resolveCorsSettings();
-    const sentryDsn = process.env.SENTRY_DSN?.trim();
-    const sentryClient = getSentryClient();
-
-    if (sentryDsn && sentryClient) {
-        const tracesSampleRate = Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? '0');
-        const normalizedSampleRate = Number.isFinite(tracesSampleRate) && tracesSampleRate >= 0 && tracesSampleRate <= 1
-            ? tracesSampleRate
-            : 0;
-
-        sentryClient.init({
-            dsn: sentryDsn,
-            environment: process.env.SENTRY_ENVIRONMENT?.trim() || process.env.NODE_ENV || 'development',
-            tracesSampleRate: normalizedSampleRate,
-        });
-        logger.log('Sentry initialized');
-    }
 
     const httpAdapter = app.getHttpAdapter().getInstance();
     if (typeof httpAdapter?.disable === 'function') {
@@ -345,12 +325,6 @@ async function bootstrap() {
     const port = Number(process.env.PORT) || 3000;
     await app.listen(port);
     logger.log(`AquiTa.do API running on http://localhost:${port}`);
-
-    const shutdown = async () => {
-        await shutdownOpenTelemetry();
-    };
-    process.once('SIGINT', () => void shutdown());
-    process.once('SIGTERM', () => void shutdown());
 }
 
 bootstrap();

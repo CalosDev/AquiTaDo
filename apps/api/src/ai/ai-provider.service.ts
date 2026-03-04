@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SpanStatusCode, trace } from '@opentelemetry/api';
 import OpenAI from 'openai';
 import { ObservabilityService } from '../observability/observability.service';
 
@@ -22,7 +21,6 @@ type ProviderName = ExternalProvider | 'local-fallback';
 @Injectable()
 export class AiProviderService {
     private readonly logger = new Logger(AiProviderService.name);
-    private readonly tracer = trace.getTracer('aquita-api');
     private readonly primaryClient: OpenAI | null;
     private readonly groqClient: OpenAI | null;
     private readonly embeddingModel: string;
@@ -117,155 +115,122 @@ export class AiProviderService {
      * Generates an embedding vector for semantic retrieval.
      */
     async createEmbedding(text: string): Promise<number[]> {
-        return this.tracer.startActiveSpan('ai.create_embedding', async (span) => {
-            const startedAt = Date.now();
-            const normalizedText = text.trim();
-            const provider = this.providerName;
-            let success = true;
-            span.setAttribute('ai.provider', provider);
-            span.setAttribute('ai.embedding_model', this.embeddingModel);
-            span.setAttribute('ai.input_length', normalizedText.length);
+        const startedAt = Date.now();
+        const normalizedText = text.trim();
+        let success = true;
 
+        try {
             if (!normalizedText) {
-                span.setStatus({ code: SpanStatusCode.OK });
-                span.end();
                 return this.createDeterministicEmbedding('empty');
             }
 
             if (!this.primaryClient) {
-                span.setStatus({ code: SpanStatusCode.OK });
-                span.end();
                 return this.createDeterministicEmbedding(normalizedText);
             }
 
-            try {
-                const response = await this.primaryClient.embeddings.create({
-                    model: this.embeddingModel,
-                    input: normalizedText,
-                });
+            const response = await this.primaryClient.embeddings.create({
+                model: this.embeddingModel,
+                input: normalizedText,
+            });
 
-                const vector = response.data[0]?.embedding;
-                if (!Array.isArray(vector) || vector.length === 0) {
-                    span.setStatus({ code: SpanStatusCode.ERROR, message: 'empty_embedding_vector' });
-                    return this.createDeterministicEmbedding(normalizedText);
-                }
-
-                span.setStatus({ code: SpanStatusCode.OK });
-                return this.coerceEmbeddingDimensions(vector.map((entry) => Number(entry)));
-            } catch (error) {
-                success = false;
-                span.recordException(error as Error);
-                span.setStatus({ code: SpanStatusCode.ERROR });
-                this.logger.warn(
-                    `Embedding request failed; using fallback (${error instanceof Error ? error.message : String(error)})`,
-                );
+            const vector = response.data[0]?.embedding;
+            if (!Array.isArray(vector) || vector.length === 0) {
                 return this.createDeterministicEmbedding(normalizedText);
-            } finally {
-                this.observabilityService.trackExternalDependencyCall(
-                    'ai',
-                    'embedding',
-                    Date.now() - startedAt,
-                    success,
-                );
-                span.end();
             }
-        });
+
+            return this.coerceEmbeddingDimensions(vector.map((entry) => Number(entry)));
+        } catch (error) {
+            success = false;
+            this.logger.warn(
+                `Embedding request failed; using fallback (${error instanceof Error ? error.message : String(error)})`,
+            );
+            return this.createDeterministicEmbedding(normalizedText);
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'ai',
+                'embedding',
+                Date.now() - startedAt,
+                success,
+            );
+        }
     }
 
     /**
      * Generates a conversational answer from the chosen model provider.
      */
     async generateChatCompletion(request: ChatRequest): Promise<string> {
-        return this.tracer.startActiveSpan('ai.generate_chat_completion', async (span) => {
-            const startedAt = Date.now();
-            const systemPrompt = request.systemPrompt.trim();
-            const userPrompt = request.userPrompt.trim();
-            const provider = this.providerName;
-            const primaryChatProvider = this.providerName === 'local-fallback'
-                ? null
-                : this.providerName;
-            let success = true;
+        const startedAt = Date.now();
+        const systemPrompt = request.systemPrompt.trim();
+        const userPrompt = request.userPrompt.trim();
+        const primaryChatProvider = this.providerName === 'local-fallback'
+            ? null
+            : this.providerName;
+        let success = true;
+        const failureReasons: string[] = [];
 
-            span.setAttribute('ai.provider', provider);
-            span.setAttribute('ai.chat_model', this.primaryChatModel);
-            span.setAttribute('ai.user_prompt_length', userPrompt.length);
-            span.setAttribute('ai.system_prompt_length', systemPrompt.length);
-
-            const failureReasons: string[] = [];
-
-            try {
-                if (this.primaryClient && primaryChatProvider) {
-                    try {
-                        const primaryResponse = await this.requestChatWithProvider(
-                            this.primaryClient,
-                            this.primaryChatModel,
-                            request,
-                            primaryChatProvider,
-                        );
-                        span.setStatus({ code: SpanStatusCode.OK });
-                        return primaryResponse;
-                    } catch (error) {
-                        const reason = error instanceof Error ? error.message : String(error);
-                        failureReasons.push(`primary:${this.providerName}:${reason}`);
-                        this.logger.warn(
-                            `Primary chat provider failed (${this.providerName}); attempting fallback when available (${reason})`,
-                        );
-                    }
+        try {
+            if (this.primaryClient && primaryChatProvider) {
+                try {
+                    return await this.requestChatWithProvider(
+                        this.primaryClient,
+                        this.primaryChatModel,
+                        request,
+                        primaryChatProvider,
+                    );
+                } catch (error) {
+                    const reason = error instanceof Error ? error.message : String(error);
+                    failureReasons.push(`primary:${this.providerName}:${reason}`);
+                    this.logger.warn(
+                        `Primary chat provider failed (${this.providerName}); attempting fallback when available (${reason})`,
+                    );
                 }
-
-                if (this.groqClient) {
-                    try {
-                        const fallbackResponse = await this.requestChatWithProvider(
-                            this.groqClient,
-                            this.groqChatModel,
-                            request,
-                            'groq',
-                        );
-                        span.setAttribute('ai.chat_fallback_provider', 'groq');
-                        span.setStatus({ code: SpanStatusCode.OK });
-                        return fallbackResponse;
-                    } catch (error) {
-                        const reason = error instanceof Error ? error.message : String(error);
-                        failureReasons.push(`fallback:groq:${reason}`);
-                        this.logger.warn(
-                            `Groq fallback chat provider failed (${reason})`,
-                        );
-                    }
-                }
-
-                success = false;
-                span.setStatus({ code: SpanStatusCode.ERROR });
-                const mode = this.primaryClient
-                    ? 'provider-temporary-unavailable'
-                    : 'provider-not-configured';
-
-                return this.generateFallbackCompletion(systemPrompt, userPrompt, {
-                    mode,
-                    provider: this.providerName,
-                    reason: failureReasons.join(' | ') || 'no_available_chat_provider',
-                });
-            } catch (error) {
-                success = false;
-                span.recordException(error as Error);
-                span.setStatus({ code: SpanStatusCode.ERROR });
-                this.logger.warn(
-                    `Chat completion failed; using fallback (${error instanceof Error ? error.message : String(error)})`,
-                );
-                return this.generateFallbackCompletion(systemPrompt, userPrompt, {
-                    mode: 'provider-temporary-unavailable',
-                    provider: this.providerName,
-                    reason: error instanceof Error ? error.message : String(error),
-                });
-            } finally {
-                this.observabilityService.trackExternalDependencyCall(
-                    'ai',
-                    'chat_completion',
-                    Date.now() - startedAt,
-                    success,
-                );
-                span.end();
             }
-        });
+
+            if (this.groqClient) {
+                try {
+                    return await this.requestChatWithProvider(
+                        this.groqClient,
+                        this.groqChatModel,
+                        request,
+                        'groq',
+                    );
+                } catch (error) {
+                    const reason = error instanceof Error ? error.message : String(error);
+                    failureReasons.push(`fallback:groq:${reason}`);
+                    this.logger.warn(
+                        `Groq fallback chat provider failed (${reason})`,
+                    );
+                }
+            }
+
+            success = false;
+            const mode = this.primaryClient
+                ? 'provider-temporary-unavailable'
+                : 'provider-not-configured';
+
+            return this.generateFallbackCompletion(systemPrompt, userPrompt, {
+                mode,
+                provider: this.providerName,
+                reason: failureReasons.join(' | ') || 'no_available_chat_provider',
+            });
+        } catch (error) {
+            success = false;
+            this.logger.warn(
+                `Chat completion failed; using fallback (${error instanceof Error ? error.message : String(error)})`,
+            );
+            return this.generateFallbackCompletion(systemPrompt, userPrompt, {
+                mode: 'provider-temporary-unavailable',
+                provider: this.providerName,
+                reason: error instanceof Error ? error.message : String(error),
+            });
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'ai',
+                'chat_completion',
+                Date.now() - startedAt,
+                success,
+            );
+        }
     }
 
     private resolveEmbeddingDimensions(): number {

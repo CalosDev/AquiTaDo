@@ -80,7 +80,7 @@ Este documento consolida el estado de ejecución del plan P0-P2, la evidencia t�
 ### Día 8 (P1) - Higiene de errores y observabilidad
 - Estado: completado
 - Implementación:
-  - Sentry sólo captura `>=500`.
+  - Logging estructurado para errores `>=500` con `requestId/traceId`.
   - 4xx esperados no generan ruido crítico en observabilidad.
   - Archivo: `apps/api/src/core/filters/global-exception.filter.ts`.
 

@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { ObservabilityService } from '../observability/observability.service';
 
 type SendTextRequest = {
@@ -29,7 +28,6 @@ type SendResult = {
 @Injectable()
 export class WhatsAppOutboundService {
     private readonly logger = new Logger(WhatsAppOutboundService.name);
-    private readonly tracer = trace.getTracer('aquita-api');
     private readonly apiVersion: string;
     private readonly graphBaseUrl: string;
     private readonly phoneNumberId: string | null;
@@ -61,182 +59,147 @@ export class WhatsAppOutboundService {
      * Sends a text message via WhatsApp Cloud API.
      */
     async sendTextMessage(request: SendTextRequest): Promise<SendResult> {
-        return this.tracer.startActiveSpan('whatsapp.send_text', async (span) => {
-            const startedAt = Date.now();
-            let success = false;
-            const phone = this.normalizePhone(request.to);
-            const text = request.text.trim();
-            span.setAttribute('channel', 'whatsapp');
-            span.setAttribute('message.type', 'text');
-            span.setAttribute('message.length', text.length);
+        const startedAt = Date.now();
+        let success = false;
+        const phone = this.normalizePhone(request.to);
+        const text = request.text.trim();
 
-            if (!phone || !text) {
-                span.setStatus({ code: SpanStatusCode.ERROR, message: 'invalid_phone_or_text' });
-                span.end();
+        if (!phone || !text) {
+            return {
+                sent: false,
+                providerMessageId: null,
+                rawResponse: { reason: 'invalid_phone_or_text' },
+            };
+        }
+
+        if (!this.enabled || !this.phoneNumberId || !this.accessToken) {
+            return {
+                sent: false,
+                providerMessageId: `simulated-${Date.now()}`,
+                rawResponse: { reason: 'whatsapp_disabled' },
+            };
+        }
+
+        const url = `${this.graphBaseUrl}/${this.apiVersion}/${this.phoneNumberId}/messages`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${this.accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    to: phone,
+                    type: 'text',
+                    text: {
+                        body: text.slice(0, 4096),
+                        preview_url: request.previewUrl ?? false,
+                    },
+                }),
+            });
+
+            const rawResponse = await this.parseJson(response);
+            if (!response.ok) {
+                this.logger.warn(
+                    `Failed to send WhatsApp message (${response.status}): ${JSON.stringify(rawResponse)}`,
+                );
                 return {
                     sent: false,
                     providerMessageId: null,
-                    rawResponse: { reason: 'invalid_phone_or_text' },
-                };
-            }
-
-            if (!this.enabled || !this.phoneNumberId || !this.accessToken) {
-                span.setStatus({ code: SpanStatusCode.OK });
-                span.end();
-                return {
-                    sent: false,
-                    providerMessageId: `simulated-${Date.now()}`,
-                    rawResponse: { reason: 'whatsapp_disabled' },
-                };
-            }
-
-            const url = `${this.graphBaseUrl}/${this.apiVersion}/${this.phoneNumberId}/messages`;
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${this.accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        messaging_product: 'whatsapp',
-                        to: phone,
-                        type: 'text',
-                        text: {
-                            body: text.slice(0, 4096),
-                            preview_url: request.previewUrl ?? false,
-                        },
-                    }),
-                });
-
-                const rawResponse = await this.parseJson(response);
-                if (!response.ok) {
-                    span.setAttribute('http.status_code', response.status);
-                    span.setStatus({ code: SpanStatusCode.ERROR });
-                    this.logger.warn(
-                        `Failed to send WhatsApp message (${response.status}): ${JSON.stringify(rawResponse)}`,
-                    );
-                    return {
-                        sent: false,
-                        providerMessageId: null,
-                        rawResponse,
-                    };
-                }
-
-                success = true;
-                span.setAttribute('http.status_code', response.status);
-                span.setStatus({ code: SpanStatusCode.OK });
-                const providerMessageId = this.extractProviderMessageId(rawResponse);
-                return {
-                    sent: true,
-                    providerMessageId,
                     rawResponse,
                 };
-            } catch (error) {
-                span.recordException(error as Error);
-                span.setStatus({ code: SpanStatusCode.ERROR });
-                throw error;
-            } finally {
-                this.observabilityService.trackExternalDependencyCall(
-                    'whatsapp',
-                    'send_text',
-                    Date.now() - startedAt,
-                    success,
-                );
-                span.end();
             }
-        });
+
+            success = true;
+            const providerMessageId = this.extractProviderMessageId(rawResponse);
+            return {
+                sent: true,
+                providerMessageId,
+                rawResponse,
+            };
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'whatsapp',
+                'send_text',
+                Date.now() - startedAt,
+                success,
+            );
+        }
     }
 
     /**
      * Sends a location payload via WhatsApp Cloud API.
      */
     async sendLocationMessage(request: SendLocationRequest): Promise<SendResult> {
-        return this.tracer.startActiveSpan('whatsapp.send_location', async (span) => {
-            const startedAt = Date.now();
-            let success = false;
-            const phone = this.normalizePhone(request.to);
-            span.setAttribute('channel', 'whatsapp');
-            span.setAttribute('message.type', 'location');
+        const startedAt = Date.now();
+        let success = false;
+        const phone = this.normalizePhone(request.to);
 
-            if (!phone) {
-                span.setStatus({ code: SpanStatusCode.ERROR, message: 'invalid_phone' });
-                span.end();
+        if (!phone) {
+            return {
+                sent: false,
+                providerMessageId: null,
+                rawResponse: { reason: 'invalid_phone' },
+            };
+        }
+
+        if (!this.enabled || !this.phoneNumberId || !this.accessToken) {
+            return {
+                sent: false,
+                providerMessageId: `simulated-location-${Date.now()}`,
+                rawResponse: { reason: 'whatsapp_disabled' },
+            };
+        }
+
+        const url = `${this.graphBaseUrl}/${this.apiVersion}/${this.phoneNumberId}/messages`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${this.accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    to: phone,
+                    type: 'location',
+                    location: {
+                        latitude: request.latitude,
+                        longitude: request.longitude,
+                        name: request.name.slice(0, 100),
+                        address: request.address?.slice(0, 300) || undefined,
+                    },
+                }),
+            });
+
+            const rawResponse = await this.parseJson(response);
+            if (!response.ok) {
+                this.logger.warn(
+                    `Failed to send WhatsApp location (${response.status}): ${JSON.stringify(rawResponse)}`,
+                );
                 return {
                     sent: false,
                     providerMessageId: null,
-                    rawResponse: { reason: 'invalid_phone' },
-                };
-            }
-
-            if (!this.enabled || !this.phoneNumberId || !this.accessToken) {
-                span.setStatus({ code: SpanStatusCode.OK });
-                span.end();
-                return {
-                    sent: false,
-                    providerMessageId: `simulated-location-${Date.now()}`,
-                    rawResponse: { reason: 'whatsapp_disabled' },
-                };
-            }
-
-            const url = `${this.graphBaseUrl}/${this.apiVersion}/${this.phoneNumberId}/messages`;
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${this.accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        messaging_product: 'whatsapp',
-                        to: phone,
-                        type: 'location',
-                        location: {
-                            latitude: request.latitude,
-                            longitude: request.longitude,
-                            name: request.name.slice(0, 100),
-                            address: request.address?.slice(0, 300) || undefined,
-                        },
-                    }),
-                });
-
-                const rawResponse = await this.parseJson(response);
-                if (!response.ok) {
-                    span.setAttribute('http.status_code', response.status);
-                    span.setStatus({ code: SpanStatusCode.ERROR });
-                    this.logger.warn(
-                        `Failed to send WhatsApp location (${response.status}): ${JSON.stringify(rawResponse)}`,
-                    );
-                    return {
-                        sent: false,
-                        providerMessageId: null,
-                        rawResponse,
-                    };
-                }
-
-                success = true;
-                span.setAttribute('http.status_code', response.status);
-                span.setStatus({ code: SpanStatusCode.OK });
-                const providerMessageId = this.extractProviderMessageId(rawResponse);
-                return {
-                    sent: true,
-                    providerMessageId,
                     rawResponse,
                 };
-            } catch (error) {
-                span.recordException(error as Error);
-                span.setStatus({ code: SpanStatusCode.ERROR });
-                throw error;
-            } finally {
-                this.observabilityService.trackExternalDependencyCall(
-                    'whatsapp',
-                    'send_location',
-                    Date.now() - startedAt,
-                    success,
-                );
-                span.end();
             }
-        });
+
+            success = true;
+            const providerMessageId = this.extractProviderMessageId(rawResponse);
+            return {
+                sent: true,
+                providerMessageId,
+                rawResponse,
+            };
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'whatsapp',
+                'send_location',
+                Date.now() - startedAt,
+                success,
+            );
+        }
     }
 
     private normalizePhone(rawPhone: string): string | null {

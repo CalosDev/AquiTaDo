@@ -7,16 +7,10 @@ import {
     Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { getSentryClient } from '../observability/sentry.client';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
     private readonly logger = new Logger(GlobalExceptionFilter.name);
-    private readonly sentryEnabled: boolean;
-    private readonly sentryClient = getSentryClient();
-    constructor() {
-        this.sentryEnabled = Boolean(process.env.SENTRY_DSN?.trim());
-    }
 
     catch(exception: unknown, host: ArgumentsHost): void {
         const httpContext = host.switchToHttp();
@@ -46,22 +40,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
                 statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
                 message: 'Internal server error',
             };
-
-        if (status >= 500 && this.sentryEnabled && this.sentryClient) {
-            this.sentryClient.captureException(exception, {
-                tags: {
-                    module: 'api',
-                },
-                extra: {
-                    requestId,
-                    traceId,
-                    method: request.method,
-                    path: request.originalUrl || request.url,
-                    status,
-                    userId: (request.user as { id?: string } | undefined)?.id ?? null,
-                },
-            });
-        }
 
         this.logger.error(
             JSON.stringify({
