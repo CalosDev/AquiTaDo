@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, Queue, Worker } from 'bullmq';
+import Redis from 'ioredis';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsAppOutboundService } from '../whatsapp/whatsapp-outbound.service';
@@ -113,6 +114,11 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
             this.logger.warn('BullMQ disabled: REDIS_URL is invalid');
             return;
         }
+        const redisReachable = await this.canReachRedis(redisUrl);
+        if (!redisReachable) {
+            this.logger.warn('BullMQ disabled: Redis authentication/connectivity failed');
+            return;
+        }
 
         const connection = {
             url: redisUrl,
@@ -138,6 +144,12 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
         this.worker.on('failed', (job, error) => {
             const jobId = job?.id ? String(job.id) : 'unknown';
             this.logger.warn(`Notification job failed (${jobId}): ${error.message}`);
+        });
+        this.worker.on('error', (error) => {
+            this.logger.warn(`BullMQ worker error: ${error.message}`);
+        });
+        this.queue.on('error', (error) => {
+            this.logger.warn(`BullMQ queue error: ${error.message}`);
         });
 
         this.logger.log(`BullMQ notification worker online (queue="${this.queueName}")`);
@@ -464,6 +476,35 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
             return parsed.protocol === 'redis:' || parsed.protocol === 'rediss:';
         } catch {
             return false;
+        }
+    }
+
+    private async canReachRedis(redisUrl: string): Promise<boolean> {
+        const probe = new Redis(redisUrl, {
+            lazyConnect: true,
+            maxRetriesPerRequest: 1,
+            enableReadyCheck: true,
+        });
+
+        try {
+            await probe.connect();
+            const pong = await probe.ping();
+            return pong === 'PONG';
+        } catch (error) {
+            this.logger.warn(
+                `BullMQ Redis probe failed (${error instanceof Error ? error.message : String(error)})`,
+            );
+            return false;
+        } finally {
+            try {
+                if (probe.status === 'ready' || probe.status === 'connect' || probe.status === 'connecting') {
+                    await probe.quit();
+                } else {
+                    probe.disconnect();
+                }
+            } catch {
+                probe.disconnect();
+            }
         }
     }
 }
