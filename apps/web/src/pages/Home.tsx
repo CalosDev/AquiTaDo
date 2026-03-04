@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { getApiErrorMessage } from '../api/error';
-import { aiApi, analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { aiApi, analyticsApi, businessApi, categoryApi, locationApi, reputationApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { formatNumberDo } from '../lib/market';
@@ -42,6 +42,22 @@ interface AiConciergeMatch {
     score: number;
     link: string;
     whatsapp?: string | null;
+}
+
+interface ReputationRankingItem {
+    rank: number;
+    id: string;
+    name: string;
+    slug: string;
+    verified: boolean;
+    province?: { id: string; name: string } | null;
+    city?: { id: string; name: string } | null;
+    reputation: {
+        score: number;
+        tier: 'BRONZE' | 'SILVER' | 'GOLD';
+        averageRating: number;
+        reviewCount: number;
+    };
 }
 
 const INTENT_LINKS = [
@@ -101,6 +117,26 @@ function normalizeText(value: string): string {
         .replace(/[\u0300-\u036f]/g, '');
 }
 
+function reputationTierLabel(tier: 'BRONZE' | 'SILVER' | 'GOLD'): string {
+    if (tier === 'GOLD') {
+        return 'Oro';
+    }
+    if (tier === 'SILVER') {
+        return 'Plata';
+    }
+    return 'Bronce';
+}
+
+function reputationTierClass(tier: 'BRONZE' | 'SILVER' | 'GOLD'): string {
+    if (tier === 'GOLD') {
+        return 'bg-amber-100 text-amber-800 border border-amber-200';
+    }
+    if (tier === 'SILVER') {
+        return 'bg-slate-100 text-slate-700 border border-slate-200';
+    }
+    return 'bg-orange-100 text-orange-800 border border-orange-200';
+}
+
 function trackGrowthEvent(payload: {
     eventType: 'SEARCH_QUERY' | 'SEARCH_RESULT_CLICK';
     categoryId?: string;
@@ -134,6 +170,10 @@ export function Home() {
     const [aiError, setAiError] = useState('');
     const [aiAnswer, setAiAnswer] = useState('');
     const [aiMatches, setAiMatches] = useState<AiConciergeMatch[]>([]);
+    const [rankingProvinceId, setRankingProvinceId] = useState('');
+    const [rankingsLoading, setRankingsLoading] = useState(false);
+    const [rankingsError, setRankingsError] = useState('');
+    const [rankings, setRankings] = useState<ReputationRankingItem[]>([]);
 
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
@@ -239,6 +279,39 @@ export function Home() {
     useEffect(() => {
         void loadData();
     }, [loadData]);
+
+    useEffect(() => {
+        let active = true;
+        setRankingsLoading(true);
+        setRankingsError('');
+
+        void reputationApi.getRankings({
+            provinceId: rankingProvinceId || undefined,
+            limit: 6,
+        })
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+                setRankings((response.data ?? []) as ReputationRankingItem[]);
+            })
+            .catch((error) => {
+                if (!active) {
+                    return;
+                }
+                setRankings([]);
+                setRankingsError(getApiErrorMessage(error, 'No se pudo cargar el ranking de reputacion'));
+            })
+            .finally(() => {
+                if (active) {
+                    setRankingsLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [rankingProvinceId]);
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
@@ -587,6 +660,82 @@ export function Home() {
                             ))}
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+                <div className="section-shell p-6">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <h3 className="font-display text-2xl font-bold text-slate-900">Ranking de reputacion</h3>
+                            <p className="mt-1 text-sm text-slate-600">
+                                Negocios verificados con mejor desempeno por provincia.
+                            </p>
+                        </div>
+                        <select
+                            value={rankingProvinceId}
+                            onChange={(event) => setRankingProvinceId(event.target.value)}
+                            className="input-field text-sm max-w-xs"
+                            aria-label="Filtrar ranking por provincia"
+                        >
+                            <option value="">Toda Republica Dominicana</option>
+                            {provinces.map((province) => (
+                                <option key={province.id} value={province.id}>
+                                    {province.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {rankingsError ? (
+                        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {rankingsError}
+                        </div>
+                    ) : null}
+
+                    {rankingsLoading ? (
+                        <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            {Array.from({ length: 4 }).map((_, index) => (
+                                <div key={index} className="surface-panel p-4">
+                                    <div className="h-4 w-32 rounded bg-gray-100 animate-pulse"></div>
+                                    <div className="mt-2 h-3 w-56 rounded bg-gray-100 animate-pulse"></div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : rankings.length === 0 ? (
+                        <p className="mt-5 text-sm text-slate-500">Aun no hay ranking disponible para ese filtro.</p>
+                    ) : (
+                        <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            {rankings.map((item) => (
+                                <Link
+                                    key={item.id}
+                                    to={`/businesses/${item.slug || item.id}`}
+                                    onClick={() => handleBusinessClick(item.id)}
+                                    className="surface-panel p-4 hover:border-primary-300 transition-colors"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-primary-700">#{item.rank}</p>
+                                            <p className="font-display text-lg font-semibold text-slate-900">{item.name}</p>
+                                            <p className="text-xs text-slate-500">
+                                                {item.city?.name || item.province?.name || 'Republica Dominicana'}
+                                            </p>
+                                        </div>
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${reputationTierClass(item.reputation.tier)}`}>
+                                            {reputationTierLabel(item.reputation.tier)}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-4 text-xs text-slate-600">
+                                        <span className="font-semibold text-slate-800">Score {item.reputation.score.toFixed(1)}</span>
+                                        <span>
+                                            Rating {item.reputation.averageRating > 0 ? item.reputation.averageRating.toFixed(1) : '0.0'}
+                                        </span>
+                                        <span>{item.reputation.reviewCount} resenas</span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </section>
 

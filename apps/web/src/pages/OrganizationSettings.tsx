@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { organizationApi } from '../api/endpoints';
+import { organizationApi, plansApi, subscriptionsApi } from '../api/endpoints';
 import { useOrganization } from '../context/useOrganization';
 
 type OrgRole = 'OWNER' | 'MANAGER' | 'STAFF';
@@ -111,6 +111,42 @@ interface OrganizationAuditLog {
     } | null;
 }
 
+type BillingSubscriptionStatus =
+    | 'ACTIVE'
+    | 'PAST_DUE'
+    | 'CANCELED'
+    | 'INCOMPLETE'
+    | 'UNPAID';
+
+interface PublicPlan {
+    id: string;
+    code: OrgPlan;
+    name: string;
+    description: string | null;
+    priceMonthly: string | number;
+    currency: string;
+    transactionFeeBps: number;
+    maxBusinesses: number | null;
+    maxMembers: number | null;
+    maxImagesPerBusiness: number | null;
+    maxPromotions: number | null;
+}
+
+interface CurrentBillingSubscription {
+    id: string;
+    status: BillingSubscriptionStatus;
+    cancelAtPeriodEnd: boolean;
+    currentPeriodEnd: string | null;
+    providerSubscriptionId: string | null;
+    plan: {
+        code: OrgPlan;
+        name: string;
+        priceMonthly: string | number;
+        currency: string;
+        transactionFeeBps: number;
+    };
+}
+
 export function OrganizationSettings() {
     const {
         organizations,
@@ -127,6 +163,8 @@ export function OrganizationSettings() {
     const [members, setMembers] = useState<OrganizationMember[]>([]);
     const [invites, setInvites] = useState<OrganizationInvite[]>([]);
     const [subscription, setSubscription] = useState<OrganizationSubscription | null>(null);
+    const [billingSubscription, setBillingSubscription] = useState<CurrentBillingSubscription | null>(null);
+    const [publicPlans, setPublicPlans] = useState<PublicPlan[]>([]);
     const [usage, setUsage] = useState<OrganizationUsage | null>(null);
     const [auditLogs, setAuditLogs] = useState<OrganizationAuditLog[]>([]);
     const [subscriptionForm, setSubscriptionForm] = useState<{
@@ -146,6 +184,7 @@ export function OrganizationSettings() {
     });
     const [organizationDetail, setOrganizationDetail] = useState<OrganizationDetail | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
+    const [billingLoading, setBillingLoading] = useState(false);
     const [processing, setProcessing] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
@@ -180,6 +219,8 @@ export function OrganizationSettings() {
             setMembers([]);
             setInvites([]);
             setSubscription(null);
+            setBillingSubscription(null);
+            setPublicPlans([]);
             setUsage(null);
             setAuditLogs([]);
             setEditingName('');
@@ -195,6 +236,8 @@ export function OrganizationSettings() {
                 membersResponse,
                 invitesResponse,
                 subscriptionResponse,
+                billingSubscriptionResponse,
+                plansResponse,
                 usageResponse,
                 auditLogsResponse,
             ] = await Promise.all([
@@ -202,6 +245,8 @@ export function OrganizationSettings() {
                 organizationApi.getMembers(activeOrganizationId),
                 organizationApi.getInvites(activeOrganizationId),
                 organizationApi.getSubscription(activeOrganizationId),
+                subscriptionsApi.getCurrent(),
+                plansApi.getAll(),
                 organizationApi.getUsage(activeOrganizationId),
                 organizationApi.getAuditLogs(activeOrganizationId, { limit: 40 }),
             ]);
@@ -210,6 +255,8 @@ export function OrganizationSettings() {
             setMembers(membersResponse.data || []);
             setInvites(invitesResponse.data || []);
             setSubscription(subscriptionResponse.data || null);
+            setBillingSubscription(billingSubscriptionResponse.data || null);
+            setPublicPlans(plansResponse.data || []);
             setUsage(usageResponse.data || null);
             setAuditLogs(auditLogsResponse.data || []);
             setSubscriptionForm({
@@ -228,6 +275,24 @@ export function OrganizationSettings() {
     useEffect(() => {
         void loadOrganizationDetail();
     }, [loadOrganizationDetail]);
+
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        const billingParam = url.searchParams.get('billing');
+        if (!billingParam) {
+            return;
+        }
+
+        if (billingParam === 'success') {
+            setSuccessMessage('Pago recibido. Estamos actualizando tu suscripción.');
+        }
+        if (billingParam === 'cancel') {
+            setErrorMessage('El checkout fue cancelado. No se aplicaron cambios.');
+        }
+
+        url.searchParams.delete('billing');
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }, []);
 
     useEffect(() => {
         if (inviteRoleOptions.length > 0 && !inviteRoleOptions.includes(inviteForm.role)) {
@@ -395,6 +460,70 @@ export function OrganizationSettings() {
     };
 
     const formatCapacity = (value: number | null) => (value === null ? 'Ilimitado' : String(value));
+    const formatPrice = (value: string | number, currency: string) =>
+        new Intl.NumberFormat('es-DO', {
+            style: 'currency',
+            currency,
+            maximumFractionDigits: 0,
+        }).format(Number(value || 0));
+
+    const handleStartPlanCheckout = async (planCode: OrgPlan) => {
+        if (!canManageSubscription) {
+            return;
+        }
+
+        setBillingLoading(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            const successUrl = `${window.location.origin}/organization?billing=success`;
+            const cancelUrl = `${window.location.origin}/organization?billing=cancel`;
+            const response = await subscriptionsApi.createCheckoutSession({
+                planCode,
+                successUrl,
+                cancelUrl,
+            });
+            const checkoutUrl = response.data?.checkoutUrl as string | undefined;
+            if (checkoutUrl) {
+                window.location.assign(checkoutUrl);
+                return;
+            }
+            setSuccessMessage('Sesión de pago creada. Revisa la respuesta del proveedor de pagos.');
+            await loadOrganizationDetail();
+        } catch (requestError) {
+            setErrorMessage(getApiErrorMessage(requestError, 'No se pudo iniciar el checkout de suscripción'));
+        } finally {
+            setBillingLoading(false);
+        }
+    };
+
+    const handleCancelAtPeriodEnd = async () => {
+        if (!canManageSubscription) {
+            return;
+        }
+
+        const confirmCancel = window.confirm(
+            'Tu plan seguirá activo hasta el fin del periodo actual. ¿Deseas continuar?',
+        );
+        if (!confirmCancel) {
+            return;
+        }
+
+        setBillingLoading(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await subscriptionsApi.cancelAtPeriodEnd();
+            await loadOrganizationDetail();
+            setSuccessMessage('La suscripción quedará cancelada al final del periodo.');
+        } catch (requestError) {
+            setErrorMessage(getApiErrorMessage(requestError, 'No se pudo programar la cancelación'));
+        } finally {
+            setBillingLoading(false);
+        }
+    };
 
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
@@ -646,6 +775,81 @@ export function OrganizationSettings() {
                                 </form>
                             ) : (
                                 <p className="text-sm text-gray-500">No se pudo cargar la suscripción.</p>
+                            )}
+                        </div>
+
+                        <div className="card p-6">
+                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-4">Facturación y upgrade</h2>
+                            {billingSubscription ? (
+                                <div className="space-y-3">
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Suscripción activa</p>
+                                        <p className="text-sm font-semibold text-gray-900">
+                                            {billingSubscription.plan.name} ({billingSubscription.plan.code})
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Estado: {billingSubscription.status}
+                                            {billingSubscription.cancelAtPeriodEnd ? ' - termina al cierre del periodo' : ''}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Renovación: {billingSubscription.currentPeriodEnd
+                                                ? new Date(billingSubscription.currentPeriodEnd).toLocaleDateString('es-DO')
+                                                : 'N/D'}
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {publicPlans.map((plan) => {
+                                            const isCurrentPlan = plan.code === billingSubscription.plan.code;
+                                            return (
+                                                <div key={plan.id} className="rounded-xl border border-gray-100 p-3">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-gray-900">{plan.name}</p>
+                                                            <p className="text-xs text-gray-500">{plan.description || PLAN_DESCRIPTIONS[plan.code]}</p>
+                                                            <p className="text-xs text-gray-700 mt-1">
+                                                                {formatPrice(plan.priceMonthly, plan.currency)} / mes
+                                                            </p>
+                                                        </div>
+                                                        {isCurrentPlan ? (
+                                                            <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                                                                Plan actual
+                                                            </span>
+                                                        ) : canManageSubscription ? (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-secondary text-xs"
+                                                                disabled={billingLoading}
+                                                                onClick={() => void handleStartPlanCheckout(plan.code)}
+                                                            >
+                                                                Elegir plan
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {canManageSubscription ? (
+                                        <button
+                                            type="button"
+                                            className="w-full text-sm px-4 py-2 rounded-xl border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-60"
+                                            disabled={billingLoading || billingSubscription.cancelAtPeriodEnd || !billingSubscription.providerSubscriptionId}
+                                            onClick={() => void handleCancelAtPeriodEnd()}
+                                        >
+                                            {billingLoading ? 'Procesando...' : 'Cancelar al final del periodo'}
+                                        </button>
+                                    ) : (
+                                        <p className="text-xs text-gray-500">
+                                            Solo el owner puede gestionar checkout y cancelaciones.
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500">
+                                    No hay datos de facturación disponibles para esta organización.
+                                </p>
                             )}
                         </div>
 

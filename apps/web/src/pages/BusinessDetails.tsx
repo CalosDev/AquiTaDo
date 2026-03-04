@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, checkinsApi, favoritesApi, messagingApi, reviewApi, whatsappApi } from '../api/endpoints';
+import { analyticsApi, businessApi, checkinsApi, favoritesApi, messagingApi, reputationApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
@@ -39,6 +39,29 @@ interface CheckInStats {
     last24HoursCheckIns: number;
     verifiedCheckIns: number;
     uniqueUsers: number;
+}
+
+interface ReputationProfile {
+    business: {
+        id: string;
+        reputationScore: number;
+        reputationTier: 'BRONZE' | 'SILVER' | 'GOLD';
+        verified: boolean;
+        verifiedAt?: string | null;
+    };
+    metrics: {
+        averageRating: number;
+        reviewCount: number;
+        bookings: {
+            completed: number;
+            confirmed: number;
+            pending: number;
+            canceled: number;
+            noShow: number;
+        };
+        successfulTransactions: number;
+        grossRevenue: number;
+    };
 }
 
 async function getCurrentLocation() {
@@ -83,6 +106,24 @@ function formatDaysAgo(value?: string): string | null {
     return `Actualizado hace ${days} dias`;
 }
 
+function tierLabel(tier: 'BRONZE' | 'SILVER' | 'GOLD'): string {
+    if (tier === 'GOLD') {
+        return 'Oro';
+    }
+    if (tier === 'SILVER') {
+        return 'Plata';
+    }
+    return 'Bronce';
+}
+
+function formatCurrencyDop(value: number): string {
+    return new Intl.NumberFormat('es-DO', {
+        style: 'currency',
+        currency: 'DOP',
+        maximumFractionDigits: 0,
+    }).format(value);
+}
+
 export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
     const { isAuthenticated, user } = useAuth();
@@ -123,6 +164,8 @@ export function BusinessDetails() {
     const [checkInProcessing, setCheckInProcessing] = useState(false);
     const [checkInInfoMessage, setCheckInInfoMessage] = useState('');
     const [checkInErrorMessage, setCheckInErrorMessage] = useState('');
+    const [reputationProfile, setReputationProfile] = useState<ReputationProfile | null>(null);
+    const [reputationLoading, setReputationLoading] = useState(false);
 
     const loadBusiness = useCallback(async () => {
         if (!slug) {
@@ -290,6 +333,39 @@ export function BusinessDetails() {
                 : undefined,
         });
     }, [business]);
+
+    useEffect(() => {
+        if (!business?.id) {
+            setReputationProfile(null);
+            return;
+        }
+
+        let active = true;
+        setReputationLoading(true);
+
+        void reputationApi.getBusinessProfile(business.id)
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+                setReputationProfile(response.data as ReputationProfile);
+            })
+            .catch(() => {
+                if (!active) {
+                    return;
+                }
+                setReputationProfile(null);
+            })
+            .finally(() => {
+                if (active) {
+                    setReputationLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [business?.id]);
 
     const handleReviewSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1036,6 +1112,58 @@ export function BusinessDetails() {
                                     style={{ width: `${trust.score}%` }}
                                 />
                             </div>
+                        </div>
+                        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-slate-700">Reputacion oficial</span>
+                                {reputationLoading ? (
+                                    <span className="text-[11px] text-slate-500">Cargando...</span>
+                                ) : reputationProfile ? (
+                                    <span className="text-[11px] rounded-full bg-white border border-slate-200 px-2 py-0.5 font-semibold text-slate-700">
+                                        Tier {tierLabel(reputationProfile.business.reputationTier)}
+                                    </span>
+                                ) : null}
+                            </div>
+                            {reputationProfile ? (
+                                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Score</p>
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {reputationProfile.business.reputationScore.toFixed(1)}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Rating</p>
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {reputationProfile.metrics.averageRating > 0
+                                                ? reputationProfile.metrics.averageRating.toFixed(1)
+                                                : '0.0'}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Resenas</p>
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {reputationProfile.metrics.reviewCount}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Reservas completadas</p>
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {reputationProfile.metrics.bookings.completed}
+                                        </p>
+                                    </div>
+                                    <div className="col-span-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Volumen transaccional</p>
+                                        <p className="text-sm font-semibold text-slate-900">
+                                            {formatCurrencyDop(reputationProfile.metrics.grossRevenue)}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500">
+                                    Perfil de reputacion aun no disponible para este negocio.
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-3">
                             {business.phone && (

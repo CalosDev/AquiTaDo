@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { businessApi, categoryApi, locationApi } from '../api/endpoints';
+import { businessApi, categoryApi, locationApi, uploadApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
+import { useOrganization } from '../context/useOrganization';
 
 interface Category {
     id: string;
@@ -34,10 +35,12 @@ const TOTAL_STEPS = STEP_TITLES.length;
 export function RegisterBusiness() {
     const navigate = useNavigate();
     const { refreshProfile } = useAuth();
+    const { refreshOrganizations, setActiveOrganizationId } = useOrganization();
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [cities, setCities] = useState<City[]>([]);
+    const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadingData, setLoadingData] = useState(true);
     const [locating, setLocating] = useState(false);
@@ -184,6 +187,31 @@ export function RegisterBusiness() {
         );
     };
 
+    const handleSelectImages = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files ?? []);
+        if (files.length === 0) {
+            setSelectedImages([]);
+            return;
+        }
+
+        const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+        const maxBytes = 5 * 1024 * 1024;
+        const nextImages: File[] = [];
+
+        for (const file of files.slice(0, 5)) {
+            if (!allowedMimeTypes.has(file.type)) {
+                continue;
+            }
+            if (file.size > maxBytes) {
+                continue;
+            }
+            nextImages.push(file);
+        }
+
+        setSelectedImages(nextImages);
+        event.target.value = '';
+    };
+
     const submitBusiness = async () => {
         setLoading(true);
         setError('');
@@ -222,8 +250,35 @@ export function RegisterBusiness() {
             }
 
             const response = await businessApi.create(payload);
+            const createdBusinessId = response.data.id as string;
+            const createdBusinessSlug = (response.data.slug || response.data.id) as string;
+            const createdOrganizationId = (response.data.organization?.id ||
+                response.data.organizationId ||
+                null) as string | null;
+
             await refreshProfile();
-            navigate(`/businesses/${response.data.slug || response.data.id}`);
+            if (createdOrganizationId) {
+                setActiveOrganizationId(createdOrganizationId);
+                await refreshOrganizations(createdOrganizationId);
+            } else {
+                await refreshOrganizations();
+            }
+
+            if (selectedImages.length > 0) {
+                const uploadResults = await Promise.allSettled(
+                    selectedImages.map((file) =>
+                        uploadApi.uploadBusinessImage(createdBusinessId, file),
+                    ),
+                );
+                const failedUploads = uploadResults.filter((result) => result.status === 'rejected');
+                if (failedUploads.length > 0) {
+                    window.alert(
+                        `Negocio publicado. ${failedUploads.length} imagen(es) no se pudieron subir; puedes intentarlo luego desde el panel.`,
+                    );
+                }
+            }
+
+            navigate(`/businesses/${createdBusinessSlug}`);
         } catch (err: unknown) {
             setError(getApiErrorMessage(err, 'Error al registrar negocio'));
         } finally {
@@ -482,6 +537,29 @@ export function RegisterBusiness() {
                         <li><strong>Ciudad:</strong> {cities.find((city) => city.id === formData.cityId)?.name || 'Sin definir'}</li>
                         <li><strong>Contacto:</strong> {formData.whatsapp || formData.phone || 'Sin definir'}</li>
                     </ul>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-white p-4">
+                    <h3 className="font-medium text-gray-900 mb-2">Imagenes del negocio (opcional)</h3>
+                    <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        onChange={handleSelectImages}
+                        className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-primary-700 hover:file:bg-primary-100"
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                        Hasta 5 imagenes. Formatos permitidos: JPG, PNG o WEBP (max. 5MB c/u).
+                    </p>
+                    {selectedImages.length > 0 && (
+                        <ul className="mt-3 space-y-1 text-xs text-gray-600">
+                            {selectedImages.map((imageFile) => (
+                                <li key={`${imageFile.name}-${imageFile.lastModified}`}>
+                                    {imageFile.name} ({Math.round(imageFile.size / 1024)} KB)
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             </div>
         );
