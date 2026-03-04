@@ -11,6 +11,10 @@ type ChatRequest = {
     maxTokens?: number;
 };
 
+type ProviderPreference = 'auto' | 'openai' | 'gemini' | 'local';
+type ExternalProvider = 'openai' | 'gemini';
+type ProviderName = ExternalProvider | 'local-fallback';
+
 /**
  * Wraps model access and provides deterministic fallbacks when an API key is unavailable.
  */
@@ -22,6 +26,7 @@ export class AiProviderService {
     private readonly embeddingModel: string;
     private readonly chatModel: string;
     private readonly embeddingDimensions: number;
+    private readonly providerName: ProviderName;
 
     constructor(
         @Inject(ConfigService)
@@ -29,19 +34,45 @@ export class AiProviderService {
         @Inject(ObservabilityService)
         private readonly observabilityService: ObservabilityService,
     ) {
-        const apiKey = this.configService.get<string>('OPENAI_API_KEY')?.trim();
-        this.embeddingModel = this.configService.get<string>('OPENAI_MODEL_EMBEDDING')?.trim()
-            || 'text-embedding-3-small';
-        this.chatModel = this.configService.get<string>('OPENAI_MODEL_CHAT')?.trim()
-            || 'gpt-4o-mini';
         this.embeddingDimensions = this.resolveEmbeddingDimensions();
-        this.openAiClient = apiKey
-            ? new OpenAI({ apiKey })
-            : null;
+        const providerPreference = this.resolveProviderPreference();
+        const openAiApiKey = this.configService.get<string>('OPENAI_API_KEY')?.trim() || null;
+        const openAiBaseUrl = this.configService.get<string>('OPENAI_BASE_URL')?.trim() || undefined;
+        const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY')?.trim() || null;
+        const geminiBaseUrl = this.configService.get<string>('GEMINI_BASE_URL')?.trim()
+            || 'https://generativelanguage.googleapis.com/v1beta/openai';
 
-        if (!this.openAiClient) {
-            this.logger.warn('OpenAI API key not configured; using deterministic local fallbacks');
+        const externalProvider = this.resolveExternalProvider(
+            providerPreference,
+            openAiApiKey,
+            geminiApiKey,
+        );
+
+        if (!externalProvider) {
+            this.providerName = 'local-fallback';
+            this.openAiClient = null;
+            this.chatModel = 'local-fallback';
+            this.embeddingModel = 'local-fallback';
+            this.logger.warn(
+                'No external AI provider configured (OPENAI_API_KEY/GEMINI_API_KEY); using deterministic local fallbacks',
+            );
+            return;
         }
+
+        this.providerName = externalProvider;
+        this.chatModel = this.resolveChatModel(externalProvider);
+        this.embeddingModel = this.resolveEmbeddingModel(externalProvider);
+
+        this.openAiClient = new OpenAI({
+            apiKey: externalProvider === 'openai'
+                ? openAiApiKey as string
+                : geminiApiKey as string,
+            baseURL: externalProvider === 'openai' ? openAiBaseUrl : geminiBaseUrl,
+        });
+
+        this.logger.log(
+            `AI provider configured: ${this.providerName} (chat=${this.chatModel}, embedding=${this.embeddingModel})`,
+        );
     }
 
     isOpenAiEnabled(): boolean {
@@ -53,7 +84,7 @@ export class AiProviderService {
     }
 
     getProviderName(): string {
-        return this.openAiClient ? 'openai' : 'local-fallback';
+        return this.providerName;
     }
 
     /**
@@ -63,7 +94,7 @@ export class AiProviderService {
         return this.tracer.startActiveSpan('ai.create_embedding', async (span) => {
             const startedAt = Date.now();
             const normalizedText = text.trim();
-            const provider = this.openAiClient ? 'openai' : 'local-fallback';
+            const provider = this.providerName;
             let success = true;
             span.setAttribute('ai.provider', provider);
             span.setAttribute('ai.embedding_model', this.embeddingModel);
@@ -94,7 +125,7 @@ export class AiProviderService {
                 }
 
                 span.setStatus({ code: SpanStatusCode.OK });
-                return vector.map((entry) => Number(entry));
+                return this.coerceEmbeddingDimensions(vector.map((entry) => Number(entry)));
             } catch (error) {
                 success = false;
                 span.recordException(error as Error);
@@ -123,7 +154,7 @@ export class AiProviderService {
             const startedAt = Date.now();
             const systemPrompt = request.systemPrompt.trim();
             const userPrompt = request.userPrompt.trim();
-            const provider = this.openAiClient ? 'openai' : 'local-fallback';
+            const provider = this.providerName;
             let success = true;
 
             span.setAttribute('ai.provider', provider);
@@ -177,7 +208,8 @@ export class AiProviderService {
     }
 
     private resolveEmbeddingDimensions(): number {
-        const raw = this.configService.get<string>('OPENAI_EMBEDDING_DIMENSIONS')?.trim();
+        const raw = this.configService.get<string>('AI_EMBEDDING_DIMENSIONS')?.trim()
+            || this.configService.get<string>('OPENAI_EMBEDDING_DIMENSIONS')?.trim();
         if (!raw) {
             return 1536;
         }
@@ -188,6 +220,63 @@ export class AiProviderService {
         }
 
         return parsed;
+    }
+
+    private resolveProviderPreference(): ProviderPreference {
+        const raw = this.configService.get<string>('AI_PROVIDER')?.trim().toLowerCase();
+        if (raw === 'openai' || raw === 'gemini' || raw === 'local' || raw === 'auto') {
+            return raw;
+        }
+
+        return 'auto';
+    }
+
+    private resolveExternalProvider(
+        preference: ProviderPreference,
+        openAiApiKey: string | null,
+        geminiApiKey: string | null,
+    ): ExternalProvider | null {
+        if (preference === 'local') {
+            return null;
+        }
+
+        if (preference === 'openai') {
+            return openAiApiKey ? 'openai' : null;
+        }
+
+        if (preference === 'gemini') {
+            return geminiApiKey ? 'gemini' : null;
+        }
+
+        if (openAiApiKey) {
+            return 'openai';
+        }
+
+        if (geminiApiKey) {
+            return 'gemini';
+        }
+
+        return null;
+    }
+
+    private resolveChatModel(provider: ExternalProvider): string {
+        if (provider === 'gemini') {
+            return this.configService.get<string>('GEMINI_MODEL_CHAT')?.trim()
+                || 'gemini-2.0-flash';
+        }
+
+        return this.configService.get<string>('OPENAI_MODEL_CHAT')?.trim()
+            || 'gpt-4o-mini';
+    }
+
+    private resolveEmbeddingModel(provider: ExternalProvider): string {
+        if (provider === 'gemini') {
+            return this.configService.get<string>('GEMINI_MODEL_EMBEDDING')?.trim()
+                || 'text-embedding-004';
+        }
+
+        return this.configService.get<string>('OPENAI_MODEL_EMBEDDING')?.trim()
+            || 'text-embedding-3-small';
     }
 
     private extractMessageContent(raw: unknown): string | null {
@@ -238,6 +327,43 @@ export class AiProviderService {
         return values.map((value) => value / magnitude);
     }
 
+    private coerceEmbeddingDimensions(rawVector: number[]): number[] {
+        const vector = rawVector.filter((entry) => Number.isFinite(entry));
+        if (vector.length === 0) {
+            return this.createDeterministicEmbedding('empty');
+        }
+
+        if (vector.length === this.embeddingDimensions) {
+            return this.normalizeVector(vector);
+        }
+
+        // Resample vectors to keep pgvector dimensions stable regardless of provider model defaults.
+        const resized = Array.from({ length: this.embeddingDimensions }, (_, targetIndex) => {
+            if (this.embeddingDimensions === 1) {
+                return vector[0] ?? 0;
+            }
+
+            const sourcePosition = (targetIndex * (vector.length - 1)) / (this.embeddingDimensions - 1);
+            const leftIndex = Math.floor(sourcePosition);
+            const rightIndex = Math.min(leftIndex + 1, vector.length - 1);
+            const mix = sourcePosition - leftIndex;
+            const leftValue = vector[leftIndex] ?? 0;
+            const rightValue = vector[rightIndex] ?? leftValue;
+            return leftValue + ((rightValue - leftValue) * mix);
+        });
+
+        return this.normalizeVector(resized);
+    }
+
+    private normalizeVector(vector: number[]): number[] {
+        const magnitude = Math.sqrt(vector.reduce((acc, value) => acc + (value * value), 0));
+        if (magnitude === 0) {
+            return vector;
+        }
+
+        return vector.map((value) => value / magnitude);
+    }
+
     private generateFallbackCompletion(systemPrompt: string, userPrompt: string): string {
         const firstSentence = userPrompt.split('\n').find((entry) => entry.trim().length > 0)
             ?? 'No se recibio una consulta valida.';
@@ -245,7 +371,7 @@ export class AiProviderService {
             'Asistente AquiTaDo (modo fallback):',
             firstSentence.trim(),
             '',
-            'Estoy operando sin proveedor externo de IA. Revisa la configuracion OPENAI_API_KEY para respuestas enriquecidas.',
+            'Estoy operando sin proveedor externo de IA. Revisa AI_PROVIDER y OPENAI_API_KEY/GEMINI_API_KEY para respuestas enriquecidas.',
             '',
             `Contexto aplicado: ${systemPrompt.slice(0, 140)}...`,
         ].join('\n');

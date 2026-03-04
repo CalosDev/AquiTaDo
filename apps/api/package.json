@@ -11,6 +11,7 @@
         "test": "vitest run --exclude \"src/**/*.e2e.spec.ts\"",
         "test:unit": "vitest run --exclude \"src/**/*.e2e.spec.ts\"",
         "test:e2e": "node ./scripts/run-e2e.mjs",
+        "ai:reindex:embeddings": "pnpm exec ts-node scripts/reindex-ai-embeddings.ts",
         "prisma:migrate": "pnpm exec prisma migrate dev",
         "prisma:migrate:deploy": "pnpm exec prisma migrate deploy",
         "prisma:generate": "pnpm exec prisma generate",
