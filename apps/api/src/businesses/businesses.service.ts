@@ -304,10 +304,16 @@ export class BusinessesService {
     };
 
     async findAll(query: BusinessQueryDto) {
-        const cacheKey = hashedCacheKey(BusinessesService.PUBLIC_LIST_CACHE_PREFIX, query);
+        const normalizedQuery = this.normalizePublicListQuery(query);
+        const cacheKey = hashedCacheKey(BusinessesService.PUBLIC_LIST_CACHE_PREFIX, normalizedQuery);
         return this.redisService.rememberJsonStaleWhileRevalidate(cacheKey, 45, 300, async () => {
-            const { page, limit, skip } = this.resolvePagination(query.page, query.limit, 12, 24);
-            const where = this.buildWhere(query, false);
+            const { page, limit, skip } = this.resolvePagination(
+                normalizedQuery.page,
+                normalizedQuery.limit,
+                12,
+                24,
+            );
+            const where = await this.buildWhere(normalizedQuery, false);
 
             const [data, total] = await Promise.all([
                 this.prisma.business.findMany({
@@ -331,8 +337,9 @@ export class BusinessesService {
     }
 
     async findAllAdmin(query: BusinessQueryDto) {
-        const { page, limit, skip } = this.resolvePagination(query.page, query.limit, 12, 100);
-        const where = this.buildWhere(query, true);
+        const normalizedQuery = this.normalizePublicListQuery(query);
+        const { page, limit, skip } = this.resolvePagination(normalizedQuery.page, normalizedQuery.limit, 12, 100);
+        const where = await this.buildWhere(normalizedQuery, true);
 
         const [data, total] = await Promise.all([
             this.prisma.business.findMany({
@@ -1140,8 +1147,11 @@ export class BusinessesService {
         }
     }
 
-    private buildWhere(query: BusinessQueryDto, includeUnverified: boolean): Record<string, unknown> {
-        const where: Record<string, unknown> = {
+    private async buildWhere(
+        query: BusinessQueryDto,
+        includeUnverified: boolean,
+    ): Promise<Prisma.BusinessWhereInput> {
+        const where: Prisma.BusinessWhereInput = {
             deletedAt: null,
         };
 
@@ -1151,10 +1161,11 @@ export class BusinessesService {
             where.verified = query.verified;
         }
 
-        if (query.search) {
+        const normalizedSearch = query.search?.trim();
+        if (normalizedSearch) {
             where.OR = [
-                { name: { contains: query.search, mode: 'insensitive' } },
-                { description: { contains: query.search, mode: 'insensitive' } },
+                { name: { contains: normalizedSearch, mode: 'insensitive' } },
+                { description: { contains: normalizedSearch, mode: 'insensitive' } },
             ];
         }
 
@@ -1184,20 +1195,48 @@ export class BusinessesService {
             where.cityId = query.cityId;
         }
 
-        if (query.feature?.trim()) {
+        const normalizedFeature = query.feature?.trim();
+        if (normalizedFeature) {
+            const featureIds = await this.resolveFeatureIds(normalizedFeature);
+            if (featureIds.length === 0) {
+                where.id = '__no_feature_match__';
+                return where;
+            }
+
             where.features = {
                 some: {
-                    feature: {
-                        name: {
-                            contains: query.feature.trim(),
-                            mode: 'insensitive',
-                        },
+                    featureId: {
+                        in: featureIds,
                     },
                 },
             };
         }
 
         return where;
+    }
+
+    private normalizePublicListQuery(query: BusinessQueryDto): BusinessQueryDto {
+        return {
+            ...query,
+            search: query.search?.trim() || undefined,
+            categorySlug: query.categorySlug?.trim() || undefined,
+            provinceSlug: query.provinceSlug?.trim() || undefined,
+            feature: query.feature?.trim() || undefined,
+        };
+    }
+
+    private async resolveFeatureIds(featureQuery: string): Promise<string[]> {
+        const rows = await this.prisma.feature.findMany({
+            where: {
+                name: {
+                    contains: featureQuery,
+                    mode: 'insensitive',
+                },
+            },
+            select: { id: true },
+            take: 25,
+        });
+        return rows.map((row) => row.id);
     }
 
     private resolvePagination(

@@ -59,6 +59,16 @@ Top JS/CSS chunks from `apps/web/dist/assets`:
    - Track INP/LCP/CLS from real sessions (web-vitals beacon endpoint).
    - Success target: INP p75 < 200 ms, LCP p75 < 2.5 s.
 
+## Status Update (Implemented in Code)
+
+- Added production keep-warm probe script: `scripts/keep-warm-prod.mjs`.
+- Added scheduled keep-warm workflow: `.github/workflows/keep-warm.yml` (every 10 minutes).
+- Optimized public business filtering query normalization and feature filtering path in:
+  - `apps/api/src/businesses/businesses.service.ts`
+- Added DB performance migration:
+  - `apps/api/prisma/migrations/20260304021500_optimize_public_search_performance/migration.sql`
+  - Includes partial indexes for public listing, trigram indexes for text search and relation indexes for category/feature filters.
+
 ## How to re-run
 
 ```bash

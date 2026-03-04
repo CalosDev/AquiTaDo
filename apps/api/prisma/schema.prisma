@@ -594,6 +594,7 @@ model BusinessCategory {
 
   @@id([businessId, categoryId])
   @@index([categoryId])
+  @@index([categoryId, businessId])
   @@map("business_categories")
 }
 
@@ -701,6 +702,8 @@ model BusinessFeature {
   feature    Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
 
   @@id([businessId, featureId])
+  @@index([featureId])
+  @@index([featureId, businessId])
   @@map("business_features")
 }
 

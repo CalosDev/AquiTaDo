@@ -198,6 +198,13 @@ docker compose down
 - `pnpm test:unit`: alias explicito de pruebas unitarias.
 - `pnpm test:e2e:api`: ejecuta E2E del backend (`apps/api`) y requiere PostgreSQL accesible + migraciones aplicadas.
 - `pnpm perf:prod`: benchmark de latencia (Web + API) con reporte en consola y JSON opcional.
+- `pnpm keepwarm:prod`: ejecuta pings livianos para evitar cold starts prolongados en produccion.
+
+Mitigacion de cold start en produccion:
+- Se incluye workflow programado `.github/workflows/keep-warm.yml` (cada 10 minutos).
+- Variables opcionales del repo:
+  - `KEEPWARM_API_BASE_URL` (default `https://aquitado.onrender.com`)
+  - `KEEPWARM_WEB_BASE_URL` (default `https://aquitado.vercel.app`)
 
 Para E2E de API:
 

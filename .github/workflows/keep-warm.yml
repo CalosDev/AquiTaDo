@@ -1,0 +1,30 @@
+name: Keep Warm Production
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keep-warm-production
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      KEEPWARM_API_BASE_URL: ${{ vars.KEEPWARM_API_BASE_URL || 'https://aquitado.onrender.com' }}
+      KEEPWARM_WEB_BASE_URL: ${{ vars.KEEPWARM_WEB_BASE_URL || 'https://aquitado.vercel.app' }}
+      KEEPWARM_TIMEOUT_MS: 15000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Keep warm probes
+        run: node scripts/keep-warm-prod.mjs
