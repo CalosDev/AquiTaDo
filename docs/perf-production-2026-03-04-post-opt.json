@@ -1,0 +1,153 @@
+{
+  "generatedAt": "2026-03-04T02:01:59.195Z",
+  "webBaseUrl": "https://aquitado.vercel.app",
+  "apiBaseUrl": "https://aquitado.onrender.com",
+  "runs": 7,
+  "timeoutMs": 30000,
+  "rows": [
+    {
+      "name": "WEB /",
+      "url": "https://aquitado.vercel.app/",
+      "warmup": {
+        "status": 200,
+        "elapsedMs": 288.1486
+      },
+      "runCount": 7,
+      "okCount": 7,
+      "errorCount": 0,
+      "statusSummary": "200x7",
+      "minMs": 56.71239999999989,
+      "p50Ms": 79.53899999999999,
+      "p95Ms": 130.43256999999997,
+      "maxMs": 144.08590000000004,
+      "avgMs": 83.71217142857142,
+      "errors": []
+    },
+    {
+      "name": "WEB /businesses",
+      "url": "https://aquitado.vercel.app/businesses",
+      "warmup": {
+        "status": 200,
+        "elapsedMs": 59.2818000000002
+      },
+      "runCount": 7,
+      "okCount": 7,
+      "errorCount": 0,
+      "statusSummary": "200x7",
+      "minMs": 54.94160000000011,
+      "p50Ms": 57.100200000000086,
+      "p95Ms": 67.20190000000001,
+      "maxMs": 70.09870000000001,
+      "avgMs": 58.73581428571434,
+      "errors": []
+    },
+    {
+      "name": "API /api/health",
+      "url": "https://aquitado.onrender.com/api/health",
+      "warmup": {
+        "status": 200,
+        "elapsedMs": 400.7374
+      },
+      "runCount": 7,
+      "okCount": 7,
+      "errorCount": 0,
+      "statusSummary": "200x7",
+      "minMs": 134.03049999999985,
+      "p50Ms": 136.9953000000005,
+      "p95Ms": 144.82198000000034,
+      "maxMs": 145.63960000000043,
+      "avgMs": 138.61102857142865,
+      "errors": []
+    },
+    {
+      "name": "API /api/health/ready",
+      "url": "https://aquitado.onrender.com/api/health/ready",
+      "warmup": {
+        "status": 200,
+        "elapsedMs": 196.1893
+      },
+      "runCount": 7,
+      "okCount": 7,
+      "errorCount": 0,
+      "statusSummary": "200x7",
+      "minMs": 190.0668999999998,
+      "p50Ms": 192.82670000000053,
+      "p95Ms": 238.87539999999996,
+      "maxMs": 256.7563,
+      "avgMs": 202.36048571428572,
+      "errors": []
+    },
+    {
+      "name": "API /api/categories",
+      "url": "https://aquitado.onrender.com/api/categories",
+      "warmup": {
+        "status": 200,
+        "elapsedMs": 194.58289999999943
+      },
+      "runCount": 7,
+      "okCount": 7,
+      "errorCount": 0,
+      "statusSummary": "200x7",
+      "minMs": 193.8779999999988,
+      "p50Ms": 197.54510000000118,
+      "p95Ms": 242.4671899999997,
+      "maxMs": 260.6761999999999,
+      "avgMs": 206.10460000000006,
+      "errors": []
+    },
+    {
+      "name": "API /api/provinces",
+      "url": "https://aquitado.onrender.com/api/provinces",
+      "warmup": {
+        "status": 200,
+        "elapsedMs": 196.15889999999854
+      },
+      "runCount": 7,
+      "okCount": 7,
+      "errorCount": 0,
+      "statusSummary": "200x7",
+      "minMs": 192.58590000000004,
+      "p50Ms": 197.6224000000002,
+      "p95Ms": 244.83730000000028,
+      "maxMs": 258.6712000000007,
+      "avgMs": 207.14511428571444,
+      "errors": []
+    },
+    {
+      "name": "API /api/businesses?limit=12",
+      "url": "https://aquitado.onrender.com/api/businesses?limit=12",
+      "warmup": {
+        "status": 200,
+        "elapsedMs": 587.9608000000007
+      },
+      "runCount": 7,
+      "okCount": 7,
+      "errorCount": 0,
+      "statusSummary": "200x7",
+      "minMs": 308.45650000000023,
+      "p50Ms": 310.34469999999965,
+      "p95Ms": 855.0657100000001,
+      "maxMs": 1062.4966000000004,
+      "avgMs": 426.09170000000006,
+      "errors": []
+    },
+    {
+      "name": "API /api/search/businesses?q=tecnologia&limit=6",
+      "url": "https://aquitado.onrender.com/api/search/businesses?q=tecnologia&limit=6",
+      "warmup": {
+        "status": 200,
+        "elapsedMs": 349.6768000000011
+      },
+      "runCount": 7,
+      "okCount": 7,
+      "errorCount": 0,
+      "statusSummary": "200x7",
+      "minMs": 311.28440000000046,
+      "p50Ms": 321.5475000000006,
+      "p95Ms": 325.6139199999998,
+      "maxMs": 325.9876000000004,
+      "avgMs": 319.83384285714266,
+      "errors": []
+    }
+  ]
+}

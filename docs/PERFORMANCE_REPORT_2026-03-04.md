@@ -69,6 +69,26 @@ Top JS/CSS chunks from `apps/web/dist/assets`:
   - `apps/api/prisma/migrations/20260304021500_optimize_public_search_performance/migration.sql`
   - Includes partial indexes for public listing, trigram indexes for text search and relation indexes for category/feature filters.
 
+## Post-Deployment Verification (Production)
+
+Benchmark rerun after optimization rollout (`2026-03-04`, 12 measured hits per endpoint):
+
+| Endpoint | Warmup | p50 | p95 | Avg | Max | Status |
+|---|---:|---:|---:|---:|---:|---|
+| WEB `/` | 317 ms | 54 ms | 64 ms | 55 ms | 68 ms | 200x12 |
+| WEB `/businesses` | 52 ms | 52 ms | 60 ms | 54 ms | 60 ms | 200x12 |
+| API `/api/health` | 340 ms | 151 ms | 269 ms | 171 ms | 356 ms | 200x12 |
+| API `/api/health/ready` | 216 ms | 211 ms | 260 ms | 219 ms | 274 ms | 200x12 |
+| API `/api/categories` | 217 ms | 201 ms | 218 ms | 202 ms | 227 ms | 200x12 |
+| API `/api/provinces` | 209 ms | 210 ms | 222 ms | 212 ms | 224 ms | 200x12 |
+| API `/api/businesses?limit=12` | 574 ms | 325 ms | 376 ms | 337 ms | 401 ms | 200x12 |
+| API `/api/search/businesses?q=tecnologia&limit=6` | 324 ms | 333 ms | 346 ms | 333 ms | 346 ms | 200x12 |
+
+Notes:
+- Web navigation latency is now consistently low.
+- API list/search endpoints are still the main bottleneck.
+- To unlock bigger gains, ensure the latest DB migration is also applied on the production database (not only local), then rerun benchmark.
+
 ## How to re-run
 
 ```bash
