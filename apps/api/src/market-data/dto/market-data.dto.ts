@@ -10,6 +10,7 @@ import {
     Matches,
     Min,
     IsInt,
+    IsUUID,
 } from 'class-validator';
 
 export class CurrentWeatherQueryDto {
@@ -75,4 +76,28 @@ export class CommercialAgendaQueryDto {
     @Min(7)
     @Max(180)
     horizonDays?: number;
+}
+
+export class CommercialCalendarQueryDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(12)
+    limit?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(7)
+    @Max(180)
+    horizonDays?: number;
+
+    @IsOptional()
+    @IsUUID()
+    provinceId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    categoryId?: string;
 }

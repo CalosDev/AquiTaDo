@@ -93,6 +93,20 @@ interface CommercialAgendaSnapshot {
     items: CommercialAgendaItemSnapshot[];
 }
 
+interface CommercialCalendarSnapshot extends CommercialAgendaSnapshot {
+    appliedFilters?: {
+        province?: { id: string; name: string } | null;
+        category?: { id: string; name: string } | null;
+    };
+    demandSignals?: Array<{
+        categoryId: string;
+        categoryName: string;
+        eventCount: number;
+        eventScore: number;
+        sharePct: number;
+    }>;
+}
+
 const INTENT_LINKS = [
     { slug: 'con-delivery', label: 'Con delivery', subtitle: 'Entrega rapida', icon: 'MOTO' },
     { slug: 'con-parqueo', label: 'Con parqueo', subtitle: 'Llega sin estres', icon: 'PARK' },
@@ -252,7 +266,13 @@ export function Home() {
     const [marketDataLoading, setMarketDataLoading] = useState(true);
     const [marketWeather, setMarketWeather] = useState<MarketWeatherSnapshot | null>(null);
     const [marketExchangeRate, setMarketExchangeRate] = useState<MarketExchangeSnapshot | null>(null);
+    const [agendaLoading, setAgendaLoading] = useState(true);
     const [commercialAgenda, setCommercialAgenda] = useState<CommercialAgendaItemSnapshot[]>([]);
+    const [agendaDemandSignals, setAgendaDemandSignals] = useState<Array<{
+        categoryId: string;
+        categoryName: string;
+        sharePct: number;
+    }>>([]);
 
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
@@ -366,9 +386,8 @@ export function Home() {
         void Promise.allSettled([
             marketDataApi.getCurrentWeather({ lat: 18.4861, lng: -69.9312 }),
             marketDataApi.getExchangeRate({ base: 'USD', target: 'DOP', amount: 1 }),
-            marketDataApi.getDominicanCommercialAgenda({ limit: 3, horizonDays: 75 }),
         ])
-            .then(([weatherResult, exchangeResult, agendaResult]) => {
+            .then(([weatherResult, exchangeResult]) => {
                 if (!active) {
                     return;
                 }
@@ -386,13 +405,6 @@ export function Home() {
                         setMarketExchangeRate(payload);
                     }
                 }
-
-                if (agendaResult.status === 'fulfilled') {
-                    const payload = agendaResult.value.data as CommercialAgendaSnapshot;
-                    if (payload && Array.isArray(payload.items)) {
-                        setCommercialAgenda(payload.items);
-                    }
-                }
             })
             .catch(() => undefined)
             .finally(() => {
@@ -405,6 +417,50 @@ export function Home() {
             active = false;
         };
     }, []);
+
+    useEffect(() => {
+        let active = true;
+        setAgendaLoading(true);
+
+        void marketDataApi.getDominicanCommercialCalendar({
+            limit: 3,
+            horizonDays: 75,
+            provinceId: aiProvinceId || undefined,
+            categoryId: aiCategoryId || undefined,
+        })
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+                const payload = response.data as CommercialCalendarSnapshot;
+                setCommercialAgenda(Array.isArray(payload?.items) ? payload.items : []);
+                setAgendaDemandSignals(
+                    Array.isArray(payload?.demandSignals)
+                        ? payload.demandSignals.slice(0, 3).map((item) => ({
+                            categoryId: item.categoryId,
+                            categoryName: item.categoryName,
+                            sharePct: item.sharePct,
+                        }))
+                        : [],
+                );
+            })
+            .catch(() => {
+                if (!active) {
+                    return;
+                }
+                setCommercialAgenda([]);
+                setAgendaDemandSignals([]);
+            })
+            .finally(() => {
+                if (active) {
+                    setAgendaLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [aiCategoryId, aiProvinceId]);
 
     useEffect(() => {
         let active = true;
@@ -657,7 +713,7 @@ export function Home() {
 
                                 <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4">
                                     <p className="text-xs uppercase tracking-wide text-blue-100">Agenda comercial RD</p>
-                                    {marketDataLoading ? (
+                                    {agendaLoading ? (
                                         <div className="mt-3 space-y-2">
                                             <div className="h-14 rounded-xl bg-white/10 animate-pulse"></div>
                                             <div className="h-14 rounded-xl bg-white/10 animate-pulse"></div>
@@ -677,6 +733,16 @@ export function Home() {
                                     ) : (
                                         <p className="mt-3 text-xs text-blue-100">No hay eventos comerciales proximos en el horizonte actual.</p>
                                     )}
+
+                                    {agendaDemandSignals.length > 0 ? (
+                                        <div className="mt-3 flex flex-wrap gap-1.5">
+                                            {agendaDemandSignals.map((signal) => (
+                                                <span key={signal.categoryId} className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[11px] text-blue-100">
+                                                    {signal.categoryName} {signal.sharePct}%
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
                         </div>

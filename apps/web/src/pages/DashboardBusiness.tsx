@@ -372,6 +372,15 @@ interface CommercialAgendaItem {
     urgency: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
+interface CommercialCalendarPayload {
+    items: CommercialAgendaItem[];
+    demandSignals?: Array<{
+        categoryId: string;
+        categoryName: string;
+        sharePct: number;
+    }>;
+}
+
 type PromotionForm = {
     businessId: string;
     title: string;
@@ -479,6 +488,11 @@ export function DashboardBusiness() {
     const [metrics, setMetrics] = useState<DashboardPayload | null>(null);
     const [commercialAgenda, setCommercialAgenda] = useState<CommercialAgendaItem[]>([]);
     const [commercialAgendaLoading, setCommercialAgendaLoading] = useState(false);
+    const [commercialDemandSignals, setCommercialDemandSignals] = useState<Array<{
+        categoryId: string;
+        categoryName: string;
+        sharePct: number;
+    }>>([]);
 
     const [promotionForm, setPromotionForm] = useState<PromotionForm>(EMPTY_PROMOTION_FORM);
     const [creatingPromotion, setCreatingPromotion] = useState(false);
@@ -633,6 +647,7 @@ export function DashboardBusiness() {
             setBookings([]);
             setMetrics(null);
             setCommercialAgenda([]);
+            setCommercialDemandSignals([]);
             setCommercialAgendaLoading(false);
             setSelectedAiBusinessId('');
             setSelectedManagedBusinessId('');
@@ -653,7 +668,7 @@ export function DashboardBusiness() {
                 promotionsApi.getMine({ limit: 10 }),
                 bookingsApi.getMineAsOrganization({ limit: 10 }),
                 analyticsApi.getMyDashboard({ days: 30 }),
-                marketDataApi.getDominicanCommercialAgenda({ limit: 4, horizonDays: 90 }),
+                marketDataApi.getDominicanCommercialCalendar({ limit: 4, horizonDays: 90 }),
             ]);
 
             const loadedBusinesses = businessesRes.data || [];
@@ -661,7 +676,17 @@ export function DashboardBusiness() {
             setPromotions(promotionsRes.data?.data || []);
             setBookings(bookingsRes.data?.data || []);
             setMetrics(metricsRes.data || null);
-            setCommercialAgenda(agendaRes.data?.items || []);
+            const agendaPayload = (agendaRes.data || {}) as CommercialCalendarPayload;
+            setCommercialAgenda(Array.isArray(agendaPayload.items) ? agendaPayload.items : []);
+            setCommercialDemandSignals(
+                Array.isArray(agendaPayload.demandSignals)
+                    ? agendaPayload.demandSignals.slice(0, 3).map((item) => ({
+                        categoryId: item.categoryId,
+                        categoryName: item.categoryName,
+                        sharePct: item.sharePct,
+                    }))
+                    : [],
+            );
             setPromotionForm((previous) => ({
                 ...previous,
                 businessId: previous.businessId || loadedBusinesses[0]?.id || '',
@@ -1837,6 +1862,16 @@ export function DashboardBusiness() {
                         ))}
                     </div>
                 )}
+
+                {commercialDemandSignals.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                        {commercialDemandSignals.map((signal) => (
+                            <span key={signal.categoryId} className="rounded-full border border-primary-200 bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700">
+                                {signal.categoryName} {signal.sharePct}%
+                            </span>
+                        ))}
+                    </div>
+                ) : null}
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

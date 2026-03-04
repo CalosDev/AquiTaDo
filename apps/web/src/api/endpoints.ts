@@ -430,6 +430,12 @@ export const marketDataApi = {
         }),
     getDominicanCommercialAgenda: (params?: { limit?: number; horizonDays?: number }) =>
         api.get('/market-data/commercial-agenda/rd', { params }),
+    getDominicanCommercialCalendar: (params?: {
+        limit?: number;
+        horizonDays?: number;
+        provinceId?: string;
+        categoryId?: string;
+    }) => api.get('/market-data/commercial-calendar/rd', { params }),
 };
 
 // ---- Favorites ----

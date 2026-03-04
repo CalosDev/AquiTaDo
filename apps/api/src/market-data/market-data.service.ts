@@ -1,5 +1,13 @@
-import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+    BadRequestException,
+    Inject,
+    Injectable,
+    Logger,
+    ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '../generated/prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
 import { ObservabilityService } from '../observability/observability.service';
 
@@ -67,6 +75,27 @@ type CommercialAgendaResponse = {
     items: CommercialAgendaItem[];
 };
 
+type CategoryDemandSignal = {
+    categoryId: string;
+    categoryName: string;
+    eventCount: number;
+    eventScore: number;
+    sharePct: number;
+};
+
+type CommercialCalendarResponse = {
+    generatedAt: string;
+    horizonDays: number;
+    appliedFilters: {
+        province: { id: string; name: string } | null;
+        category: { id: string; name: string } | null;
+    };
+    demandSignals: CategoryDemandSignal[];
+    items: Array<CommercialAgendaItem & {
+        dataSource: 'holiday-only' | 'holiday+market-signals' | 'holiday+filters';
+    }>;
+};
+
 @Injectable()
 export class MarketDataService {
     private readonly logger = new Logger(MarketDataService.name);
@@ -82,6 +111,8 @@ export class MarketDataService {
     constructor(
         @Inject(ConfigService)
         private readonly configService: ConfigService,
+        @Inject(PrismaService)
+        private readonly prismaService: PrismaService,
         @Inject(CircuitBreakerService)
         private readonly circuitBreakerService: CircuitBreakerService,
         @Inject(ObservabilityService)
@@ -236,6 +267,87 @@ export class MarketDataService {
         return {
             generatedAt: new Date().toISOString(),
             horizonDays,
+            items,
+        };
+    }
+
+    async getDominicanCommercialCalendar(options?: {
+        limit?: number;
+        horizonDays?: number;
+        provinceId?: string;
+        categoryId?: string;
+    }): Promise<CommercialCalendarResponse> {
+        const provinceId = options?.provinceId;
+        const categoryId = options?.categoryId;
+
+        const [province, category] = await Promise.all([
+            provinceId
+                ? this.prismaService.province.findUnique({
+                    where: { id: provinceId },
+                    select: { id: true, name: true },
+                })
+                : Promise.resolve(null),
+            categoryId
+                ? this.prismaService.category.findUnique({
+                    where: { id: categoryId },
+                    select: { id: true, name: true },
+                })
+                : Promise.resolve(null),
+        ]);
+
+        if (provinceId && !province) {
+            throw new BadRequestException('provinceId no corresponde a una provincia valida');
+        }
+        if (categoryId && !category) {
+            throw new BadRequestException('categoryId no corresponde a una categoria valida');
+        }
+
+        const baseAgenda = await this.getDominicanCommercialAgenda({
+            limit: options?.limit,
+            horizonDays: options?.horizonDays,
+        });
+        const demandSignals = await this.getCategoryDemandSignals({
+            provinceId,
+            categoryId,
+        });
+
+        const topDemandNames = demandSignals.slice(0, 3).map((signal) => signal.categoryName);
+        const items = baseAgenda.items.map((item) => {
+            const mergedCategories = this.mergeCategorySuggestions(
+                item.suggestedCategories,
+                topDemandNames,
+                category?.name,
+            );
+
+            const enrichedRecommendation = this.enrichRecommendationWithContext(
+                item.recommendation,
+                province?.name ?? null,
+                category?.name ?? null,
+            );
+
+            let dataSource: 'holiday-only' | 'holiday+market-signals' | 'holiday+filters' = 'holiday-only';
+            if (province || category) {
+                dataSource = 'holiday+filters';
+            } else if (topDemandNames.length > 0) {
+                dataSource = 'holiday+market-signals';
+            }
+
+            return {
+                ...item,
+                suggestedCategories: mergedCategories,
+                recommendation: enrichedRecommendation,
+                dataSource,
+            };
+        });
+
+        return {
+            generatedAt: baseAgenda.generatedAt,
+            horizonDays: baseAgenda.horizonDays,
+            appliedFilters: {
+                province: province ?? null,
+                category: category ?? null,
+            },
+            demandSignals,
             items,
         };
     }
@@ -493,6 +605,172 @@ export class MarketDataService {
             categories: ['Restaurantes', 'Colmados y mini markets', 'Farmacias y salud'],
             recommendation: 'Lanza una campaña local por barrio, prioriza conversion por WhatsApp y promo corta.',
         };
+    }
+
+    private async getCategoryDemandSignals(filters?: {
+        provinceId?: string;
+        categoryId?: string;
+    }): Promise<CategoryDemandSignal[]> {
+        const startedAt = Date.now();
+        let success = true;
+
+        try {
+            const fromDate = new Date();
+            fromDate.setUTCDate(fromDate.getUTCDate() - 60);
+
+            const whereConditions: Prisma.Sql[] = [
+                Prisma.sql`"occurredAt" >= ${fromDate}`,
+                Prisma.sql`"categoryId" IS NOT NULL`,
+            ];
+            if (filters?.provinceId) {
+                whereConditions.push(Prisma.sql`"provinceId" = ${filters.provinceId}`);
+            }
+            if (filters?.categoryId) {
+                whereConditions.push(Prisma.sql`"categoryId" = ${filters.categoryId}`);
+            }
+
+            const rows = await this.prismaService.$queryRaw<Array<{
+                categoryId: string;
+                eventType: string;
+                count: number | bigint | string;
+            }>>(Prisma.sql`
+                SELECT
+                    "categoryId" AS "categoryId",
+                    "eventType" AS "eventType",
+                    COUNT(*) AS "count"
+                FROM "growth_events"
+                WHERE ${Prisma.join(whereConditions, ' AND ')}
+                GROUP BY "categoryId", "eventType"
+            `);
+
+            if (!rows.length) {
+                return [];
+            }
+
+            const weights: Record<string, number> = {
+                SEARCH_QUERY: 1,
+                SEARCH_RESULT_CLICK: 1.5,
+                CONTACT_CLICK: 2.5,
+                WHATSAPP_CLICK: 2.2,
+                BOOKING_INTENT: 3,
+            };
+
+            const summaryByCategory = new Map<string, { eventCount: number; eventScore: number }>();
+            for (const row of rows) {
+                const eventCount = this.coerceNumber(row.count) ?? 0;
+                if (!row.categoryId || eventCount <= 0) {
+                    continue;
+                }
+
+                const weight = weights[row.eventType] ?? 1;
+                const current = summaryByCategory.get(row.categoryId) ?? {
+                    eventCount: 0,
+                    eventScore: 0,
+                };
+                current.eventCount += eventCount;
+                current.eventScore += eventCount * weight;
+                summaryByCategory.set(row.categoryId, current);
+            }
+
+            if (!summaryByCategory.size) {
+                return [];
+            }
+
+            const categoryIds = [...summaryByCategory.keys()];
+            const categories = await this.prismaService.category.findMany({
+                where: { id: { in: categoryIds } },
+                select: { id: true, name: true },
+            });
+            const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
+            const totalScore = [...summaryByCategory.values()].reduce(
+                (accumulator, current) => accumulator + current.eventScore,
+                0,
+            ) || 1;
+
+            const signals = categoryIds
+                .map((categoryId) => {
+                    const metrics = summaryByCategory.get(categoryId);
+                    if (!metrics) {
+                        return null;
+                    }
+                    return {
+                        categoryId,
+                        categoryName: categoryNameById.get(categoryId) || 'Categoria',
+                        eventCount: metrics.eventCount,
+                        eventScore: Number(metrics.eventScore.toFixed(2)),
+                        sharePct: Number(((metrics.eventScore / totalScore) * 100).toFixed(1)),
+                    } satisfies CategoryDemandSignal;
+                })
+                .filter((signal): signal is CategoryDemandSignal => signal !== null)
+                .sort((left, right) => right.eventScore - left.eventScore);
+
+            return signals.slice(0, 6);
+        } catch (error) {
+            success = false;
+            this.logger.warn(
+                `Demand signal calculation failed (${error instanceof Error ? error.message : String(error)})`,
+            );
+            return [];
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'internal-analytics',
+                'category-demand-signals',
+                Date.now() - startedAt,
+                success,
+            );
+        }
+    }
+
+    private mergeCategorySuggestions(
+        baseCategories: string[],
+        demandCategories: string[],
+        forcedCategory: string | null | undefined,
+    ): string[] {
+        const merged = new Set<string>();
+
+        if (forcedCategory && forcedCategory.trim().length > 0) {
+            merged.add(forcedCategory.trim());
+        }
+        for (const category of demandCategories) {
+            const normalized = category.trim();
+            if (normalized.length > 0) {
+                merged.add(normalized);
+            }
+            if (merged.size >= 3) {
+                break;
+            }
+        }
+        for (const category of baseCategories) {
+            const normalized = category.trim();
+            if (normalized.length > 0) {
+                merged.add(normalized);
+            }
+            if (merged.size >= 3) {
+                break;
+            }
+        }
+
+        return [...merged].slice(0, 3);
+    }
+
+    private enrichRecommendationWithContext(
+        baseRecommendation: string,
+        provinceName: string | null,
+        categoryName: string | null,
+    ): string {
+        const contextParts: string[] = [];
+        if (provinceName) {
+            contextParts.push(`en ${provinceName}`);
+        }
+        if (categoryName) {
+            contextParts.push(`para ${categoryName}`);
+        }
+
+        if (contextParts.length === 0) {
+            return baseRecommendation;
+        }
+
+        return `${baseRecommendation} Ajuste recomendado ${contextParts.join(' ')}.`;
     }
 
     private parseIsoDate(value: string): Date {

@@ -235,6 +235,7 @@ Para E2E de API:
 | GET | /api/market-data/exchange-rate?base=USD&target=DOP&amount=1 | No | Tasa de cambio (Frankfurter) |
 | GET | /api/market-data/holidays/rd?year=2026&upcomingOnly=true | No | Feriados de Republica Dominicana |
 | GET | /api/market-data/commercial-agenda/rd?limit=4&horizonDays=60 | No | Agenda comercial sugerida para feriados RD |
+| GET | /api/market-data/commercial-calendar/rd?provinceId=...&categoryId=... | No | Calendario comercial contextual por provincia/categoria |
 | PUT | /api/businesses/:id/verify | Admin | Aprobar negocio |
 | GET | /api/categories | No | Listar categorias |
 | GET | /api/categories/:id | No | Ver categoria |

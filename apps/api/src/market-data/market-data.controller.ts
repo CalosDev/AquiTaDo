@@ -3,6 +3,7 @@ import { PublicCache } from '../core/interceptors/public-cache.decorator';
 import { AdvancedRateLimitGuard } from '../security/advanced-rate-limit.guard';
 import { RateLimitPolicy } from '../security/rate-limit-policy.decorator';
 import {
+    CommercialCalendarQueryDto,
     CommercialAgendaQueryDto,
     DominicanHolidaysQueryDto,
     ExchangeRateQueryDto,
@@ -60,6 +61,19 @@ export class MarketDataController {
         return this.marketDataService.getDominicanCommercialAgenda({
             limit: query.limit,
             horizonDays: query.horizonDays,
+        });
+    }
+
+    @Get('commercial-calendar/rd')
+    @UseGuards(AdvancedRateLimitGuard)
+    @RateLimitPolicy('search')
+    @PublicCache({ maxAgeSeconds: 600, staleWhileRevalidateSeconds: 1800 })
+    async getDominicanCommercialCalendar(@Query() query: CommercialCalendarQueryDto) {
+        return this.marketDataService.getDominicanCommercialCalendar({
+            limit: query.limit,
+            horizonDays: query.horizonDays,
+            provinceId: query.provinceId,
+            categoryId: query.categoryId,
         });
     }
 }
