@@ -12,7 +12,7 @@ Incluye frontend web, backend API y base de datos PostgreSQL en un monorepo con 
 - Backend: NestJS + TypeScript
 - Base de datos: PostgreSQL + Prisma ORM + PostGIS
 - Auth: JWT (Passport)
-- Cache/Busqueda: Redis + Meilisearch (fallback a PostgreSQL)
+- Cache/Busqueda: Redis + PostgreSQL
 - Observabilidad: Prometheus (`/api/observability/metrics`, solo Admin)
 - Monorepo: pnpm workspaces
 - Contenedores: Docker + Docker Compose
@@ -118,9 +118,6 @@ Servicios:
 - `REDIS_CACHE_TTL_SECONDS=120`
 - `BULLMQ_PREFIX=aquita`
 - `BULLMQ_DEFAULT_ATTEMPTS=3`
-- `MEILISEARCH_HOST=http://localhost:7700`
-- `MEILISEARCH_API_KEY=masterKeyChangeMe`
-- `MEILISEARCH_INDEX_BUSINESSES=businesses`
 - `AI_PROVIDER=auto` (`auto|gemini|local`)
 - `AI_EMBEDDING_DIMENSIONS=1536` (mantener en 1536 por compatibilidad pgvector actual)
 - `GEMINI_API_KEY=...` (opcional, recomendado para plan gratis inicial)
@@ -163,7 +160,7 @@ Nota:
 - El servicio `migrate` ejecuta `prisma migrate deploy` automaticamente antes de levantar la API.
 - El servicio `seed` ejecuta `prisma seed` para cargar datos base (planes/categorias/provincias/features).
 - La salud de la API ahora se valida con `/api/health/ready` (DB + esquema).
-- Se incluyen `redis` (cache distribuido) y `meilisearch` (busqueda full-text).
+- Se incluye `redis` (cache distribuido).
 - La base de datos usa imagen PostGIS para consultas geoespaciales nativas.
 
 Servicios en Docker:
@@ -171,7 +168,6 @@ Servicios en Docker:
 - Web (nginx): http://localhost:8080 (default)
 - API: http://localhost:3000 (default)
 - PostgreSQL: localhost:5432 (default)
-- Meilisearch: http://localhost:7700 (default)
 
 Si tienes puertos ocupados, puedes sobrescribirlos:
 
@@ -182,7 +178,7 @@ DB_PORT=55432 API_PORT=3100 WEB_PORT=8081 docker compose up -d --build
 Para ver logs:
 
 ```bash
-docker compose logs -f api web db redis meilisearch
+docker compose logs -f api web db redis
 ```
 
 Para apagar servicios:

@@ -151,11 +151,8 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertValidUrl(config, 'REDIS_URL', ['redis:', 'rediss:']);
     assertValidUrl(config, 'GEMINI_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GROQ_BASE_URL', ['http:', 'https:']);
-    assertValidUrl(config, 'MEILISEARCH_HOST', ['http:', 'https:']);
     assertValidUrl(config, 'WHATSAPP_GRAPH_BASE_URL', ['http:', 'https:']);
 
-    assertNonEmptyString(config, 'MEILISEARCH_API_KEY');
-    assertNonEmptyString(config, 'MEILISEARCH_INDEX_BUSINESSES');
     assertNonEmptyString(config, 'BULLMQ_PREFIX');
     assertBooleanLike(config, 'SECURITY_TRUST_PROXY');
     assertBooleanLike(config, 'JSON_API_RESPONSE_ENABLED');

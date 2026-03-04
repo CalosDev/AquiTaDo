@@ -18,7 +18,7 @@ AquiTaDo evoluciona de directorio a ecosistema local:
 ### Objetivo de arquitectura
 - Frontend SEO-first para dominio publico (Next.js App Router o Remix).
 - Monolito modular DDD en backend (preparado para extraccion a microservicios).
-- Capa de busqueda y cache dedicada (Meilisearch/Elasticsearch + Redis).
+- Capa de busqueda y cache dedicada (PostgreSQL full-text/Elasticsearch + Redis).
 - Observabilidad, seguridad y resiliencia de nivel SaaS.
 
 ## 3) Arquitectura Objetivo (12-18 meses)
@@ -60,7 +60,7 @@ Cada contexto con:
   - cache de queries publicas (TTL corto, invalidacion por eventos).
   - rate limiting distribuido.
   - locks y deduplicacion de jobs.
-- Meilisearch/Elasticsearch:
+- PostgreSQL full-text/Elasticsearch:
   - index de `businesses`, `promotions`, `reviews_stats`.
   - typo tolerance, facetas, geofiltros, boosting por reputacion/conversion.
 
@@ -114,7 +114,7 @@ Regla de UX:
 - Cola async para notificaciones y indexing.
 
 ### Fase 2 (mes 4-6)
-- Search service (Meilisearch/Elasticsearch).
+- Search service (PostgreSQL full-text/Elasticsearch).
 - WhatsApp Business API (notificaciones + plantillas).
 - Check-ins y reputacion gamificada.
 

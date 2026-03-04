@@ -76,7 +76,7 @@ Este documento resume la capa SRE/Growth implementada para AquiTa.do y como oper
 - Datos:
   - RDS PostgreSQL (con extension PostGIS y pgvector)
   - ElastiCache Redis
-  - Meilisearch gestionado en ECS o OpenSearch si se requiere escalado mayor
+  - OpenSearch si se requiere escalado mayor
 - Assets:
   - S3 + CloudFront (imagenes y estaticos)
 - Operacion:
@@ -92,7 +92,7 @@ Este documento resume la capa SRE/Growth implementada para AquiTa.do y como oper
 - Datos:
   - Cloud SQL PostgreSQL (PostGIS + pgvector)
   - Memorystore Redis
-  - Meilisearch en GKE o Elasticsearch/OpenSearch administrado
+  - Elasticsearch/OpenSearch administrado
 - Assets:
   - Cloud Storage + Cloud CDN
 - Operacion:

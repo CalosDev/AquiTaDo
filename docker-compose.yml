@@ -30,24 +30,6 @@ services:
       timeout: 5s
       retries: 5
 
-  meilisearch:
-    image: getmeili/meilisearch:v1.13
-    container_name: aquita_meilisearch
-    restart: unless-stopped
-    init: true
-    environment:
-      MEILI_NO_ANALYTICS: 'true'
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-masterKeyChangeMe}
-    ports:
-      - '${MEILI_PORT:-7700}:7700'
-    volumes:
-      - meili_data:/meili_data
-    healthcheck:
-      test: ['CMD-SHELL', 'wget -q -O - http://127.0.0.1:7700/health >/dev/null 2>&1 || exit 1']
-      interval: 15s
-      timeout: 5s
-      retries: 5
-
   migrate:
     build:
       context: .
@@ -92,8 +74,6 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      meilisearch:
-        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://aquita:aquita123@db:5432/aquita_db
       JWT_SECRET: change-this-secret-minimum-16-chars
@@ -104,9 +84,6 @@ services:
       THROTTLE_LIMIT: 120
       REDIS_URL: redis://redis:6379
       REDIS_CACHE_TTL_SECONDS: 120
-      MEILISEARCH_HOST: http://meilisearch:7700
-      MEILISEARCH_API_KEY: ${MEILI_MASTER_KEY:-masterKeyChangeMe}
-      MEILISEARCH_INDEX_BUSINESSES: businesses
       CIRCUIT_BREAKER_FAILURE_THRESHOLD: 5
       CIRCUIT_BREAKER_COOLDOWN_MS: 60000
     ports:
@@ -153,5 +130,4 @@ services:
 
 volumes:
   postgres_data:
-  meili_data:
   uploads_data:

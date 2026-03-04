@@ -17,7 +17,7 @@ apps/api/src
 |-- payments/                    # billing and marketplace transactions
 |-- messaging/                   # mini-CRM conversation workflows
 |-- analytics/                   # metrics and reporting
-|-- search/                      # Meilisearch integration
+|-- search/                      # Search domain (PostgreSQL + cache)
 |-- cache/                       # Redis cache-aside helpers
 |-- auth/                        # JWT access/refresh auth
 |-- ...                          # remaining bounded contexts
@@ -29,4 +29,3 @@ apps/api/src
 - Cada dominio expone `module + controller + service + dto` y opcionalmente `repository`.
 - Lecturas intensivas (search/discovery) se separan de escrituras transaccionales.
 - Cualquier evento de cambio de negocio se publica en `core/events` para invalidar cache/sync de proyecciones.
-

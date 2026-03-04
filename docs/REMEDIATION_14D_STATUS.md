@@ -170,5 +170,5 @@ Este documento consolida el estado de ejecución del plan P0-P2, la evidencia t�
 
 - Si se despliega con `STORAGE_PROVIDER=local`, los uploads siguen siendo efímeros según proveedor.
   - Mitigación: producción con S3/R2 + `STORAGE_PUBLIC_BASE_URL`.
-- Si Redis/Meilisearch no están configurados, funciones avanzadas quedan en modo degradado controlado.
-  - Mitigación: provisionar `REDIS_URL`, `MEILISEARCH_HOST` y llave correspondiente.
+- Si Redis no está configurado, funciones avanzadas quedan en modo degradado controlado.
+  - Mitigación: provisionar `REDIS_URL`.
