@@ -99,7 +99,7 @@ describe('HealthService', () => {
         await expect(service.getReadiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
-    it('throws ServiceUnavailableException when redis is configured but unavailable', async () => {
+    it('returns readiness payload when redis is configured but unavailable', async () => {
         const queryRaw = vi.fn().mockResolvedValue([
             {
                 ping: 1,
@@ -116,6 +116,13 @@ describe('HealthService', () => {
             { ping: vi.fn().mockResolvedValue(null) },
         );
 
-        await expect(service.getReadiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
+        const result = await service.getReadiness();
+        expect(result.status).toBe('ok');
+        expect(result.checks).toEqual({
+            database: 'up',
+            schema: 'up',
+            redis: 'down',
+            search: 'disabled',
+        });
     });
 });

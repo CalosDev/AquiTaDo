@@ -77,20 +77,6 @@ export class HealthService {
             const redis = redisState === null ? 'disabled' : redisState ? 'up' : 'down';
             const search = searchState === null ? 'disabled' : searchState ? 'up' : 'down';
 
-            if (redis === 'down' || search === 'down') {
-                throw new ServiceUnavailableException({
-                    service: 'aquita-api',
-                    status: 'error',
-                    timestamp: new Date().toISOString(),
-                    checks: {
-                        database: 'up',
-                        schema: 'up',
-                        redis,
-                        search,
-                    },
-                });
-            }
-
             return {
                 service: 'aquita-api',
                 status: 'ok',
