@@ -143,14 +143,12 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertPositiveInteger(config, 'HEALTH_AI_P95_MAX_MS');
     assertPositiveInteger(config, 'HEALTH_WHATSAPP_P95_MAX_MS');
     assertPositiveInteger(config, 'AI_EMBEDDING_DIMENSIONS');
-    assertPositiveInteger(config, 'OPENAI_EMBEDDING_DIMENSIONS');
     assertPositiveInteger(config, 'CIRCUIT_BREAKER_FAILURE_THRESHOLD');
     assertPositiveInteger(config, 'CIRCUIT_BREAKER_COOLDOWN_MS');
 
-    assertInSet(config, 'AI_PROVIDER', ['auto', 'openai', 'gemini', 'local']);
+    assertInSet(config, 'AI_PROVIDER', ['auto', 'gemini', 'local']);
     assertValidUrl(config, 'APP_PUBLIC_WEB_URL', ['http:', 'https:']);
     assertValidUrl(config, 'REDIS_URL', ['redis:', 'rediss:']);
-    assertValidUrl(config, 'OPENAI_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GEMINI_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GROQ_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'MEILISEARCH_HOST', ['http:', 'https:']);
@@ -180,13 +178,6 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     }
 
     const aiProvider = String(config.AI_PROVIDER ?? 'auto').trim().toLowerCase();
-    if (aiProvider === 'openai') {
-        const openAiApiKey = String(config.OPENAI_API_KEY ?? '').trim();
-        if (openAiApiKey.length === 0) {
-            throw new Error('OPENAI_API_KEY is required when AI_PROVIDER=openai');
-        }
-    }
-
     if (aiProvider === 'gemini') {
         const geminiApiKey = String(config.GEMINI_API_KEY ?? '').trim();
         if (geminiApiKey.length === 0) {

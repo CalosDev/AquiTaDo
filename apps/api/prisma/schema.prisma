@@ -1138,7 +1138,7 @@ model BusinessEmbedding {
   content        String          @db.Text
   embedding      Json
   dimensions     Int             @default(1536)
-  provider       String          @default("openai") @db.VarChar(40)
+  provider       String          @default("gemini") @db.VarChar(40)
   status         EmbeddingStatus @default(PENDING)
   errorMessage   String?         @db.VarChar(500)
   sourceChecksum String?         @db.VarChar(128)

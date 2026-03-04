@@ -11,9 +11,9 @@ type ChatRequest = {
     maxTokens?: number;
 };
 
-type ProviderPreference = 'auto' | 'openai' | 'gemini' | 'local';
-type ExternalProvider = 'openai' | 'gemini';
-type ChatProvider = ExternalProvider | 'groq';
+type ProviderPreference = 'auto' | 'gemini' | 'local';
+type ExternalProvider = 'gemini';
+type ChatProvider = 'gemini' | 'groq';
 type ProviderName = ExternalProvider | 'local-fallback';
 
 /**
@@ -39,8 +39,6 @@ export class AiProviderService {
     ) {
         this.embeddingDimensions = this.resolveEmbeddingDimensions();
         const providerPreference = this.resolveProviderPreference();
-        const openAiApiKey = this.configService.get<string>('OPENAI_API_KEY')?.trim() || null;
-        const openAiBaseUrl = this.configService.get<string>('OPENAI_BASE_URL')?.trim() || undefined;
         const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY')?.trim() || null;
         const geminiBaseUrl = this.configService.get<string>('GEMINI_BASE_URL')?.trim()
             || 'https://generativelanguage.googleapis.com/v1beta/openai';
@@ -50,7 +48,6 @@ export class AiProviderService {
 
         const externalProvider = this.resolveExternalProvider(
             providerPreference,
-            openAiApiKey,
             geminiApiKey,
         );
 
@@ -73,7 +70,7 @@ export class AiProviderService {
                 );
             }
             this.logger.warn(
-                'No external AI provider configured (OPENAI_API_KEY/GEMINI_API_KEY); using deterministic local fallbacks',
+                'No external AI provider configured (GEMINI_API_KEY); using deterministic local fallbacks',
             );
             return;
         }
@@ -83,10 +80,8 @@ export class AiProviderService {
         this.embeddingModel = this.resolveEmbeddingModel(externalProvider);
 
         this.primaryClient = new OpenAI({
-            apiKey: externalProvider === 'openai'
-                ? openAiApiKey as string
-                : geminiApiKey as string,
-            baseURL: externalProvider === 'openai' ? openAiBaseUrl : geminiBaseUrl,
+            apiKey: geminiApiKey as string,
+            baseURL: geminiBaseUrl,
         });
         this.groqClient = groqApiKey
             ? new OpenAI({
@@ -106,7 +101,7 @@ export class AiProviderService {
         }
     }
 
-    isOpenAiEnabled(): boolean {
+    isExternalAiEnabled(): boolean {
         return this.primaryClient !== null;
     }
 
@@ -274,8 +269,7 @@ export class AiProviderService {
     }
 
     private resolveEmbeddingDimensions(): number {
-        const raw = this.configService.get<string>('AI_EMBEDDING_DIMENSIONS')?.trim()
-            || this.configService.get<string>('OPENAI_EMBEDDING_DIMENSIONS')?.trim();
+        const raw = this.configService.get<string>('AI_EMBEDDING_DIMENSIONS')?.trim();
         if (!raw) {
             return 1536;
         }
@@ -290,7 +284,7 @@ export class AiProviderService {
 
     private resolveProviderPreference(): ProviderPreference {
         const raw = this.configService.get<string>('AI_PROVIDER')?.trim().toLowerCase();
-        if (raw === 'openai' || raw === 'gemini' || raw === 'local' || raw === 'auto') {
+        if (raw === 'gemini' || raw === 'local' || raw === 'auto') {
             return raw;
         }
 
@@ -299,23 +293,14 @@ export class AiProviderService {
 
     private resolveExternalProvider(
         preference: ProviderPreference,
-        openAiApiKey: string | null,
         geminiApiKey: string | null,
     ): ExternalProvider | null {
         if (preference === 'local') {
             return null;
         }
 
-        if (preference === 'openai') {
-            return openAiApiKey ? 'openai' : null;
-        }
-
         if (preference === 'gemini') {
             return geminiApiKey ? 'gemini' : null;
-        }
-
-        if (openAiApiKey) {
-            return 'openai';
         }
 
         if (geminiApiKey) {
@@ -326,23 +311,21 @@ export class AiProviderService {
     }
 
     private resolveChatModel(provider: ExternalProvider): string {
-        if (provider === 'gemini') {
-            return this.configService.get<string>('GEMINI_MODEL_CHAT')?.trim()
-                || 'gemini-2.0-flash';
+        if (provider !== 'gemini') {
+            return 'gemini-2.0-flash';
         }
 
-        return this.configService.get<string>('OPENAI_MODEL_CHAT')?.trim()
-            || 'gpt-4o-mini';
+        return this.configService.get<string>('GEMINI_MODEL_CHAT')?.trim()
+            || 'gemini-2.0-flash';
     }
 
     private resolveEmbeddingModel(provider: ExternalProvider): string {
-        if (provider === 'gemini') {
-            return this.configService.get<string>('GEMINI_MODEL_EMBEDDING')?.trim()
-                || 'text-embedding-004';
+        if (provider !== 'gemini') {
+            return 'gemini-embedding-001';
         }
 
-        return this.configService.get<string>('OPENAI_MODEL_EMBEDDING')?.trim()
-            || 'text-embedding-3-small';
+        return this.configService.get<string>('GEMINI_MODEL_EMBEDDING')?.trim()
+            || 'gemini-embedding-001';
     }
 
     private resolveGroqChatModel(): string {
@@ -497,7 +480,7 @@ export class AiProviderService {
             : 'Estoy operando en modo local por una indisponibilidad temporal del proveedor IA (ejemplo: cuota o limite de peticiones).';
 
         const actionLine = options.mode === 'provider-not-configured'
-            ? 'Configura AI_PROVIDER y OPENAI_API_KEY/GEMINI_API_KEY (o GROQ_API_KEY como fallback de chat) para respuestas enriquecidas.'
+            ? 'Configura AI_PROVIDER y GEMINI_API_KEY (o GROQ_API_KEY como fallback de chat) para respuestas enriquecidas.'
             : 'Intenta nuevamente en unos minutos o revisa cuota/rate-limits del proveedor.';
 
         return [

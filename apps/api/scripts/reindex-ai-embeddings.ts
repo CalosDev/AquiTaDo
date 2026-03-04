@@ -37,7 +37,7 @@ async function main(): Promise<void> {
         const provider = aiProviderService.getProviderName();
         if (provider === 'local-fallback') {
             throw new Error(
-                'AI provider is local-fallback. Configure AI_PROVIDER with GEMINI_API_KEY or OPENAI_API_KEY before reindexing.',
+                'AI provider is local-fallback. Configure AI_PROVIDER=gemini with GEMINI_API_KEY before reindexing.',
             );
         }
 

@@ -121,20 +121,15 @@ Servicios:
 - `MEILISEARCH_HOST=http://localhost:7700`
 - `MEILISEARCH_API_KEY=masterKeyChangeMe`
 - `MEILISEARCH_INDEX_BUSINESSES=businesses`
-- `AI_PROVIDER=auto` (`auto|openai|gemini|local`)
+- `AI_PROVIDER=auto` (`auto|gemini|local`)
 - `AI_EMBEDDING_DIMENSIONS=1536` (mantener en 1536 por compatibilidad pgvector actual)
-- `OPENAI_API_KEY=...` (opcional, habilita embeddings y respuestas IA enriquecidas)
-- `OPENAI_BASE_URL=...` (opcional, para proveedor OpenAI-compatible custom)
-- `OPENAI_MODEL_EMBEDDING=text-embedding-3-small`
-- `OPENAI_MODEL_CHAT=gpt-4o-mini`
 - `GEMINI_API_KEY=...` (opcional, recomendado para plan gratis inicial)
 - `GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`
 - `GEMINI_MODEL_EMBEDDING=gemini-embedding-001`
 - `GEMINI_MODEL_CHAT=gemini-2.0-flash`
-- `GROQ_API_KEY=...` (opcional, fallback automatico de chat cuando Gemini/OpenAI fallen por cuota)
+- `GROQ_API_KEY=...` (opcional, fallback automatico de chat cuando Gemini falle por cuota)
 - `GROQ_BASE_URL=https://api.groq.com/openai/v1`
 - `GROQ_MODEL_CHAT=llama-3.3-70b-versatile`
-- `OPENAI_EMBEDDING_DIMENSIONS=1536` (legacy alias)
 - `WHATSAPP_ENABLED=false`
 - `WHATSAPP_VERIFY_TOKEN=...` (requerido si `WHATSAPP_ENABLED=true`)
 - `WHATSAPP_GRAPH_BASE_URL=https://graph.facebook.com`
@@ -329,7 +324,7 @@ Separacion aplicada:
 - `pnpm db:migrate:deploy`: Prisma migrate deploy
 - `pnpm db:seed`: Seed inicial
 
-Reindex IA (Gemini/OpenAI) con filtros opcionales:
+Reindex IA (Gemini) con filtros opcionales:
 
 ```bash
 # Reindex de todos los negocios verificados (requiere AI_PROVIDER activo y API key)
