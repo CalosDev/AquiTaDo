@@ -69,6 +69,24 @@ export class BookingsService {
         },
     };
 
+    private normalizeText(value: string): string {
+        return value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+    }
+
+    private supportsBookingFeature(featureName: string): boolean {
+        const normalized = this.normalizeText(featureName);
+        return (
+            normalized.includes('reservacion')
+            || normalized.includes('reserva')
+            || normalized.includes('cita')
+            || normalized.includes('appointment')
+        );
+    }
+
     async createForUser(userId: string, dto: CreateBookingDto) {
         const scheduledFor = new Date(dto.scheduledFor);
         if (Number.isNaN(scheduledFor.getTime())) {
@@ -93,11 +111,29 @@ export class BookingsService {
                 id: true,
                 organizationId: true,
                 verified: true,
+                features: {
+                    select: {
+                        feature: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                },
             },
         });
 
         if (!business || !business.verified) {
             throw new NotFoundException('Negocio no disponible para reservas');
+        }
+
+        const canAcceptBookings = business.features.some((entry) =>
+            this.supportsBookingFeature(entry.feature.name),
+        );
+        if (!canAcceptBookings) {
+            throw new BadRequestException(
+                'Este negocio no gestiona reservas en linea. Contactalo por WhatsApp o mensaje directo.',
+            );
         }
 
         const booking = await this.prisma.$transaction(async (tx) => {

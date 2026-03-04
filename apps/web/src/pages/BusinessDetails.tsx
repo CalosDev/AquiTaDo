@@ -154,6 +154,30 @@ function formatCurrencyDop(value: number): string {
     }).format(value);
 }
 
+function normalizeText(value: string): string {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function businessSupportsBooking(features?: { feature: { name: string } }[]): boolean {
+    if (!features || features.length === 0) {
+        return false;
+    }
+
+    return features.some((entry) => {
+        const normalized = normalizeText(entry.feature.name);
+        return (
+            normalized.includes('reservacion')
+            || normalized.includes('reserva')
+            || normalized.includes('cita')
+            || normalized.includes('appointment')
+        );
+    });
+}
+
 export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
     const { isAuthenticated, user } = useAuth();
@@ -625,6 +649,7 @@ export function BusinessDetails() {
     const whatsappDirectUrl = business?.whatsapp
         ? `https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`
         : null;
+    const canBookThisBusiness = businessSupportsBooking(business?.features);
 
     const trackContactGrowthEvent = (
         eventType: 'CONTACT_CLICK' | 'WHATSAPP_CLICK' | 'BOOKING_INTENT',
@@ -1500,7 +1525,7 @@ export function BusinessDetails() {
                         </div>
 
                         <div className="mt-6 border-t border-gray-100 pt-6">
-                            {isAuthenticated && (
+                            {isAuthenticated && isCustomerRole && canBookThisBusiness && (
                                 <div className="mb-6">
                                     <h3 className="font-display font-semibold text-gray-900 mb-3">
                                         Reservar ahora
@@ -1562,6 +1587,11 @@ export function BusinessDetails() {
                                             {bookingSuccessMessage}
                                         </div>
                                     )}
+                                </div>
+                            )}
+                            {isAuthenticated && isCustomerRole && !canBookThisBusiness && (
+                                <div className="mb-6 rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm text-slate-700">
+                                    Este negocio no gestiona reservas en linea. Usa WhatsApp o mensaje directo para coordinar.
                                 </div>
                             )}
 
