@@ -148,7 +148,6 @@ export function validateEnv(config: EnvRecord): EnvRecord {
 
     assertInSet(config, 'AI_PROVIDER', ['auto', 'gemini', 'local']);
     assertValidUrl(config, 'APP_PUBLIC_WEB_URL', ['http:', 'https:']);
-    assertValidUrl(config, 'REDIS_URL', ['redis:', 'rediss:']);
     assertValidUrl(config, 'GEMINI_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GROQ_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'WHATSAPP_GRAPH_BASE_URL', ['http:', 'https:']);

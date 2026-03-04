@@ -109,6 +109,10 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
             this.logger.warn('BullMQ disabled: REDIS_URL not configured');
             return;
         }
+        if (!this.isRedisUrlValid(redisUrl)) {
+            this.logger.warn('BullMQ disabled: REDIS_URL is invalid');
+            return;
+        }
 
         const connection = {
             url: redisUrl,
@@ -452,5 +456,14 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
             to: targetPhone,
             text: messageLines.join('\n'),
         });
+    }
+
+    private isRedisUrlValid(value: string): boolean {
+        try {
+            const parsed = new URL(value);
+            return parsed.protocol === 'redis:' || parsed.protocol === 'rediss:';
+        } catch {
+            return false;
+        }
     }
 }

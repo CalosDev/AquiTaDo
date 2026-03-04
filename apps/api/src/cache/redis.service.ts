@@ -36,6 +36,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
             this.logger.log('Redis disabled: REDIS_URL not configured');
             return;
         }
+        if (!this.isRedisUrlValid(this.redisUrl)) {
+            this.logger.warn('Redis disabled: REDIS_URL is invalid');
+            return;
+        }
 
         const client = new Redis(this.redisUrl, {
             lazyConnect: true,
@@ -74,7 +78,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
 
     isConfigured(): boolean {
-        return Boolean(this.redisUrl);
+        return typeof this.redisUrl === 'string' && this.isRedisUrlValid(this.redisUrl);
     }
 
     async ping(): Promise<boolean | null> {
@@ -248,6 +252,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         }
 
         return parsed;
+    }
+
+    private isRedisUrlValid(value: string): boolean {
+        try {
+            const parsed = new URL(value);
+            return parsed.protocol === 'redis:' || parsed.protocol === 'rediss:';
+        } catch {
+            return false;
+        }
     }
 
     private async refreshSwrSynchronously<T>(
