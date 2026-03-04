@@ -165,7 +165,10 @@ export class AiProviderService {
             if (!this.openAiClient) {
                 span.setStatus({ code: SpanStatusCode.OK });
                 span.end();
-                return this.generateFallbackCompletion(systemPrompt, userPrompt);
+                return this.generateFallbackCompletion(systemPrompt, userPrompt, {
+                    mode: 'provider-not-configured',
+                    provider: this.providerName,
+                });
             }
 
             try {
@@ -186,7 +189,11 @@ export class AiProviderService {
                     return parsed;
                 }
 
-                return this.generateFallbackCompletion(systemPrompt, userPrompt);
+                return this.generateFallbackCompletion(systemPrompt, userPrompt, {
+                    mode: 'provider-temporary-unavailable',
+                    provider: this.providerName,
+                    reason: 'empty_model_response',
+                });
             } catch (error) {
                 success = false;
                 span.recordException(error as Error);
@@ -194,7 +201,11 @@ export class AiProviderService {
                 this.logger.warn(
                     `Chat completion failed; using fallback (${error instanceof Error ? error.message : String(error)})`,
                 );
-                return this.generateFallbackCompletion(systemPrompt, userPrompt);
+                return this.generateFallbackCompletion(systemPrompt, userPrompt, {
+                    mode: 'provider-temporary-unavailable',
+                    provider: this.providerName,
+                    reason: error instanceof Error ? error.message : String(error),
+                });
             } finally {
                 this.observabilityService.trackExternalDependencyCall(
                     'ai',
@@ -364,16 +375,41 @@ export class AiProviderService {
         return vector.map((value) => value / magnitude);
     }
 
-    private generateFallbackCompletion(systemPrompt: string, userPrompt: string): string {
+    private generateFallbackCompletion(
+        systemPrompt: string,
+        userPrompt: string,
+        options: {
+            mode: 'provider-not-configured' | 'provider-temporary-unavailable';
+            provider: ProviderName;
+            reason?: string;
+        },
+    ): string {
         const firstSentence = userPrompt.split('\n').find((entry) => entry.trim().length > 0)
             ?? 'No se recibio una consulta valida.';
+        const reason = options.reason?.trim();
+
+        const providerLine = options.provider === 'local-fallback'
+            ? 'Proveedor IA: local-fallback'
+            : `Proveedor IA: ${options.provider}`;
+
+        const statusLine = options.mode === 'provider-not-configured'
+            ? 'Estoy operando en modo local porque no hay proveedor externo configurado.'
+            : 'Estoy operando en modo local por una indisponibilidad temporal del proveedor IA (ejemplo: cuota o limite de peticiones).';
+
+        const actionLine = options.mode === 'provider-not-configured'
+            ? 'Configura AI_PROVIDER y OPENAI_API_KEY/GEMINI_API_KEY para respuestas enriquecidas.'
+            : 'Intenta nuevamente en unos minutos o revisa cuota/rate-limits del proveedor.';
+
         return [
             'Asistente AquiTaDo (modo fallback):',
             firstSentence.trim(),
             '',
-            'Estoy operando sin proveedor externo de IA. Revisa AI_PROVIDER y OPENAI_API_KEY/GEMINI_API_KEY para respuestas enriquecidas.',
+            providerLine,
+            statusLine,
+            actionLine,
+            reason ? `Detalle tecnico: ${reason}` : '',
             '',
             `Contexto aplicado: ${systemPrompt.slice(0, 140)}...`,
-        ].join('\n');
+        ].filter((line) => line.length > 0).join('\n');
     }
 }
