@@ -484,6 +484,9 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
             lazyConnect: true,
             maxRetriesPerRequest: 1,
             enableReadyCheck: true,
+            connectTimeout: 10_000,
+            retryStrategy: () => null,
+            reconnectOnError: () => false,
         });
 
         try {

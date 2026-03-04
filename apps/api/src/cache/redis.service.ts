@@ -45,6 +45,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
             lazyConnect: true,
             maxRetriesPerRequest: 1,
             enableReadyCheck: true,
+            connectTimeout: 10_000,
+            retryStrategy: () => null,
+            reconnectOnError: () => false,
         });
 
         client.on('error', (error) => {
