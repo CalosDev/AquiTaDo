@@ -197,6 +197,7 @@ docker compose down
 - `pnpm test`: ejecuta pruebas unitarias/funcionales estables del monorepo (sin E2E que dependen de DB real).
 - `pnpm test:unit`: alias explicito de pruebas unitarias.
 - `pnpm test:e2e:api`: ejecuta E2E del backend (`apps/api`) y requiere PostgreSQL accesible + migraciones aplicadas.
+- `pnpm perf:prod`: benchmark de latencia (Web + API) con reporte en consola y JSON opcional.
 
 Para E2E de API:
 
