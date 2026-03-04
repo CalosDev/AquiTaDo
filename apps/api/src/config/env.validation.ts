@@ -143,6 +143,8 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertPositiveInteger(config, 'HEALTH_AI_P95_MAX_MS');
     assertPositiveInteger(config, 'HEALTH_WHATSAPP_P95_MAX_MS');
     assertPositiveInteger(config, 'AI_EMBEDDING_DIMENSIONS');
+    assertPositiveInteger(config, 'EXTERNAL_DATA_CACHE_TTL_SECONDS');
+    assertPositiveInteger(config, 'EXTERNAL_DATA_TIMEOUT_MS');
     assertPositiveInteger(config, 'CIRCUIT_BREAKER_FAILURE_THRESHOLD');
     assertPositiveInteger(config, 'CIRCUIT_BREAKER_COOLDOWN_MS');
 
@@ -150,6 +152,8 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertValidUrl(config, 'APP_PUBLIC_WEB_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GEMINI_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GROQ_BASE_URL', ['http:', 'https:']);
+    assertValidUrl(config, 'OPEN_METEO_BASE_URL', ['http:', 'https:']);
+    assertValidUrl(config, 'FRANKFURTER_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'WHATSAPP_GRAPH_BASE_URL', ['http:', 'https:']);
 
     assertNonEmptyString(config, 'BULLMQ_PREFIX');

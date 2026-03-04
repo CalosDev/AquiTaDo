@@ -118,6 +118,10 @@ Servicios:
 - `REDIS_CACHE_TTL_SECONDS=120`
 - `BULLMQ_PREFIX=aquita`
 - `BULLMQ_DEFAULT_ATTEMPTS=3`
+- `EXTERNAL_DATA_CACHE_TTL_SECONDS=600`
+- `EXTERNAL_DATA_TIMEOUT_MS=3500`
+- `OPEN_METEO_BASE_URL=https://api.open-meteo.com`
+- `FRANKFURTER_BASE_URL=https://api.frankfurter.app`
 - `AI_PROVIDER=auto` (`auto|gemini|local`)
 - `AI_EMBEDDING_DIMENSIONS=1536` (mantener en 1536 por compatibilidad pgvector actual)
 - `GEMINI_API_KEY=...` (opcional, recomendado para plan gratis inicial)
@@ -226,6 +230,8 @@ Para E2E de API:
 | GET | /api/discovery/businesses/nearby | No | Discovery geoespacial con PostGIS |
 | GET | /api/search/businesses | No | Busqueda full-text con filtros |
 | POST | /api/search/businesses/reindex | Admin | Reindexar documentos de negocios |
+| GET | /api/market-data/weather/current?lat=18.48&lng=-69.93 | No | Clima actual (Open-Meteo) |
+| GET | /api/market-data/exchange-rate?base=USD&target=DOP&amount=1 | No | Tasa de cambio (Frankfurter) |
 | PUT | /api/businesses/:id/verify | Admin | Aprobar negocio |
 | GET | /api/categories | No | Listar categorias |
 | GET | /api/categories/:id | No | Ver categoria |

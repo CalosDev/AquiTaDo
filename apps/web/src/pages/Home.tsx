@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { getApiErrorMessage } from '../api/error';
-import { aiApi, analyticsApi, businessApi, categoryApi, locationApi, reputationApi } from '../api/endpoints';
+import { aiApi, analyticsApi, businessApi, categoryApi, locationApi, marketDataApi, reputationApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { formatNumberDo } from '../lib/market';
@@ -58,6 +58,19 @@ interface ReputationRankingItem {
         averageRating: number;
         reviewCount: number;
     };
+}
+
+interface MarketWeatherSnapshot {
+    observedAt: string;
+    temperatureC: number;
+    weatherLabel: string;
+}
+
+interface MarketExchangeSnapshot {
+    observedOn: string;
+    base: string;
+    target: string;
+    rate: number;
 }
 
 const INTENT_LINKS = [
@@ -160,6 +173,30 @@ function toAffinityPercent(score: number): number {
     return Math.max(0, Math.min(100, Math.round(score * 100)));
 }
 
+function formatDominicanDate(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return 'Hoy';
+    }
+
+    return date.toLocaleDateString('es-DO', {
+        day: '2-digit',
+        month: 'short',
+    });
+}
+
+function formatDominicanTime(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '--:--';
+    }
+
+    return date.toLocaleTimeString('es-DO', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
 export function Home() {
     const { isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
@@ -182,6 +219,9 @@ export function Home() {
     const [rankingsLoading, setRankingsLoading] = useState(false);
     const [rankingsError, setRankingsError] = useState('');
     const [rankings, setRankings] = useState<ReputationRankingItem[]>([]);
+    const [marketDataLoading, setMarketDataLoading] = useState(true);
+    const [marketWeather, setMarketWeather] = useState<MarketWeatherSnapshot | null>(null);
+    const [marketExchangeRate, setMarketExchangeRate] = useState<MarketExchangeSnapshot | null>(null);
 
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
@@ -287,6 +327,45 @@ export function Home() {
     useEffect(() => {
         void loadData();
     }, [loadData]);
+
+    useEffect(() => {
+        let active = true;
+        setMarketDataLoading(true);
+
+        void Promise.allSettled([
+            marketDataApi.getCurrentWeather({ lat: 18.4861, lng: -69.9312 }),
+            marketDataApi.getExchangeRate({ base: 'USD', target: 'DOP', amount: 1 }),
+        ])
+            .then(([weatherResult, exchangeResult]) => {
+                if (!active) {
+                    return;
+                }
+
+                if (weatherResult.status === 'fulfilled') {
+                    const payload = weatherResult.value.data as MarketWeatherSnapshot;
+                    if (payload && Number.isFinite(payload.temperatureC)) {
+                        setMarketWeather(payload);
+                    }
+                }
+
+                if (exchangeResult.status === 'fulfilled') {
+                    const payload = exchangeResult.value.data as MarketExchangeSnapshot;
+                    if (payload && Number.isFinite(payload.rate)) {
+                        setMarketExchangeRate(payload);
+                    }
+                }
+            })
+            .catch(() => undefined)
+            .finally(() => {
+                if (active) {
+                    setMarketDataLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, []);
 
     useEffect(() => {
         let active = true;
@@ -439,6 +518,16 @@ export function Home() {
                                 <span className="chip !bg-white/10 !text-white !border-white/30">
                                     {loading ? '...' : categories.length} categorias
                                 </span>
+                                {marketExchangeRate ? (
+                                    <span className="chip !bg-white/10 !text-white !border-white/30">
+                                        USD/DOP {marketExchangeRate.rate.toFixed(2)}
+                                    </span>
+                                ) : null}
+                                {marketWeather ? (
+                                    <span className="chip !bg-white/10 !text-white !border-white/30">
+                                        Santo Domingo {Math.round(marketWeather.temperatureC)} C
+                                    </span>
+                                ) : null}
                             </div>
                         </div>
 
@@ -479,6 +568,52 @@ export function Home() {
                                     <p className="mt-1 text-sm text-blue-100">
                                         Pensado para el contexto local dominicano y preparado para escalar.
                                     </p>
+                                </div>
+
+                                <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4">
+                                    <p className="text-xs uppercase tracking-wide text-blue-100">Contexto RD en vivo</p>
+                                    {marketDataLoading ? (
+                                        <div className="mt-3 grid grid-cols-2 gap-3">
+                                            <div className="rounded-xl border border-white/15 bg-white/10 p-3">
+                                                <div className="h-3 w-16 rounded bg-white/30 animate-pulse"></div>
+                                                <div className="mt-2 h-5 w-24 rounded bg-white/25 animate-pulse"></div>
+                                            </div>
+                                            <div className="rounded-xl border border-white/15 bg-white/10 p-3">
+                                                <div className="h-3 w-16 rounded bg-white/30 animate-pulse"></div>
+                                                <div className="mt-2 h-5 w-20 rounded bg-white/25 animate-pulse"></div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div className="rounded-xl border border-white/15 bg-white/10 p-3">
+                                                <p className="text-[11px] uppercase tracking-wide text-blue-200">Clima SD</p>
+                                                <p className="mt-1 text-lg font-semibold text-white">
+                                                    {marketWeather ? `${Math.round(marketWeather.temperatureC)} C` : 'No disponible'}
+                                                </p>
+                                                <p className="text-xs text-blue-100">
+                                                    {marketWeather ? marketWeather.weatherLabel : 'Sin datos del proveedor'}
+                                                </p>
+                                                {marketWeather ? (
+                                                    <p className="mt-1 text-[11px] text-blue-200">
+                                                        Actualizado {formatDominicanTime(marketWeather.observedAt)}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+
+                                            <div className="rounded-xl border border-white/15 bg-white/10 p-3">
+                                                <p className="text-[11px] uppercase tracking-wide text-blue-200">USD / DOP</p>
+                                                <p className="mt-1 text-lg font-semibold text-white">
+                                                    {marketExchangeRate ? marketExchangeRate.rate.toFixed(2) : 'No disponible'}
+                                                </p>
+                                                <p className="text-xs text-blue-100">Referencia de mercado</p>
+                                                {marketExchangeRate ? (
+                                                    <p className="mt-1 text-[11px] text-blue-200">
+                                                        Fecha {formatDominicanDate(marketExchangeRate.observedOn)}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

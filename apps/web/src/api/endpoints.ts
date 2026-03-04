@@ -411,6 +411,14 @@ export const crmApi = {
     ) => api.patch(`/crm/pipeline/my/leads/${leadId}/stage`, data),
 };
 
+// ---- Market data (public external APIs proxied by backend) ----
+export const marketDataApi = {
+    getCurrentWeather: (params: { lat: number; lng: number }) =>
+        api.get('/market-data/weather/current', { params }),
+    getExchangeRate: (params?: { base?: string; target?: string; amount?: number }) =>
+        api.get('/market-data/exchange-rate', { params }),
+};
+
 // ---- Favorites ----
 export const favoritesApi = {
     getFavoriteBusinesses: (params?: { page?: number; limit?: number; businessId?: string }) =>
