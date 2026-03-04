@@ -13,6 +13,7 @@ type ChatRequest = {
 
 type ProviderPreference = 'auto' | 'openai' | 'gemini' | 'local';
 type ExternalProvider = 'openai' | 'gemini';
+type ChatProvider = ExternalProvider | 'groq';
 type ProviderName = ExternalProvider | 'local-fallback';
 
 /**
@@ -22,9 +23,11 @@ type ProviderName = ExternalProvider | 'local-fallback';
 export class AiProviderService {
     private readonly logger = new Logger(AiProviderService.name);
     private readonly tracer = trace.getTracer('aquita-api');
-    private readonly openAiClient: OpenAI | null;
+    private readonly primaryClient: OpenAI | null;
+    private readonly groqClient: OpenAI | null;
     private readonly embeddingModel: string;
-    private readonly chatModel: string;
+    private readonly primaryChatModel: string;
+    private readonly groqChatModel: string;
     private readonly embeddingDimensions: number;
     private readonly providerName: ProviderName;
 
@@ -41,6 +44,9 @@ export class AiProviderService {
         const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY')?.trim() || null;
         const geminiBaseUrl = this.configService.get<string>('GEMINI_BASE_URL')?.trim()
             || 'https://generativelanguage.googleapis.com/v1beta/openai';
+        const groqApiKey = this.configService.get<string>('GROQ_API_KEY')?.trim() || null;
+        const groqBaseUrl = this.configService.get<string>('GROQ_BASE_URL')?.trim()
+            || 'https://api.groq.com/openai/v1';
 
         const externalProvider = this.resolveExternalProvider(
             providerPreference,
@@ -50,9 +56,22 @@ export class AiProviderService {
 
         if (!externalProvider) {
             this.providerName = 'local-fallback';
-            this.openAiClient = null;
-            this.chatModel = 'local-fallback';
+            this.primaryClient = null;
+            this.primaryChatModel = 'local-fallback';
             this.embeddingModel = 'local-fallback';
+            this.groqClient = groqApiKey
+                ? new OpenAI({
+                    apiKey: groqApiKey,
+                    baseURL: groqBaseUrl,
+                })
+                : null;
+            this.groqChatModel = this.resolveGroqChatModel();
+
+            if (this.groqClient) {
+                this.logger.log(
+                    `AI fallback configured: groq (chat=${this.groqChatModel})`,
+                );
+            }
             this.logger.warn(
                 'No external AI provider configured (OPENAI_API_KEY/GEMINI_API_KEY); using deterministic local fallbacks',
             );
@@ -60,23 +79,35 @@ export class AiProviderService {
         }
 
         this.providerName = externalProvider;
-        this.chatModel = this.resolveChatModel(externalProvider);
+        this.primaryChatModel = this.resolveChatModel(externalProvider);
         this.embeddingModel = this.resolveEmbeddingModel(externalProvider);
 
-        this.openAiClient = new OpenAI({
+        this.primaryClient = new OpenAI({
             apiKey: externalProvider === 'openai'
                 ? openAiApiKey as string
                 : geminiApiKey as string,
             baseURL: externalProvider === 'openai' ? openAiBaseUrl : geminiBaseUrl,
         });
+        this.groqClient = groqApiKey
+            ? new OpenAI({
+                apiKey: groqApiKey,
+                baseURL: groqBaseUrl,
+            })
+            : null;
+        this.groqChatModel = this.resolveGroqChatModel();
 
         this.logger.log(
-            `AI provider configured: ${this.providerName} (chat=${this.chatModel}, embedding=${this.embeddingModel})`,
+            `AI provider configured: ${this.providerName} (chat=${this.primaryChatModel}, embedding=${this.embeddingModel})`,
         );
+        if (this.groqClient) {
+            this.logger.log(
+                `AI chat fallback enabled: groq (chat=${this.groqChatModel})`,
+            );
+        }
     }
 
     isOpenAiEnabled(): boolean {
-        return this.openAiClient !== null;
+        return this.primaryClient !== null;
     }
 
     getEmbeddingDimensions(): number {
@@ -106,14 +137,14 @@ export class AiProviderService {
                 return this.createDeterministicEmbedding('empty');
             }
 
-            if (!this.openAiClient) {
+            if (!this.primaryClient) {
                 span.setStatus({ code: SpanStatusCode.OK });
                 span.end();
                 return this.createDeterministicEmbedding(normalizedText);
             }
 
             try {
-                const response = await this.openAiClient.embeddings.create({
+                const response = await this.primaryClient.embeddings.create({
                     model: this.embeddingModel,
                     input: normalizedText,
                 });
@@ -155,44 +186,68 @@ export class AiProviderService {
             const systemPrompt = request.systemPrompt.trim();
             const userPrompt = request.userPrompt.trim();
             const provider = this.providerName;
+            const primaryChatProvider = this.providerName === 'local-fallback'
+                ? null
+                : this.providerName;
             let success = true;
 
             span.setAttribute('ai.provider', provider);
-            span.setAttribute('ai.chat_model', this.chatModel);
+            span.setAttribute('ai.chat_model', this.primaryChatModel);
             span.setAttribute('ai.user_prompt_length', userPrompt.length);
             span.setAttribute('ai.system_prompt_length', systemPrompt.length);
 
-            if (!this.openAiClient) {
-                span.setStatus({ code: SpanStatusCode.OK });
-                span.end();
-                return this.generateFallbackCompletion(systemPrompt, userPrompt, {
-                    mode: 'provider-not-configured',
-                    provider: this.providerName,
-                });
-            }
+            const failureReasons: string[] = [];
 
             try {
-                const completion = await this.openAiClient.chat.completions.create({
-                    model: this.chatModel,
-                    temperature: request.temperature ?? 0.2,
-                    max_tokens: request.maxTokens ?? 600,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt },
-                    ],
-                });
-
-                const content = completion.choices[0]?.message?.content;
-                const parsed = this.extractMessageContent(content);
-                span.setStatus({ code: SpanStatusCode.OK });
-                if (parsed) {
-                    return parsed;
+                if (this.primaryClient && primaryChatProvider) {
+                    try {
+                        const primaryResponse = await this.requestChatWithProvider(
+                            this.primaryClient,
+                            this.primaryChatModel,
+                            request,
+                            primaryChatProvider,
+                        );
+                        span.setStatus({ code: SpanStatusCode.OK });
+                        return primaryResponse;
+                    } catch (error) {
+                        const reason = error instanceof Error ? error.message : String(error);
+                        failureReasons.push(`primary:${this.providerName}:${reason}`);
+                        this.logger.warn(
+                            `Primary chat provider failed (${this.providerName}); attempting fallback when available (${reason})`,
+                        );
+                    }
                 }
 
+                if (this.groqClient) {
+                    try {
+                        const fallbackResponse = await this.requestChatWithProvider(
+                            this.groqClient,
+                            this.groqChatModel,
+                            request,
+                            'groq',
+                        );
+                        span.setAttribute('ai.chat_fallback_provider', 'groq');
+                        span.setStatus({ code: SpanStatusCode.OK });
+                        return fallbackResponse;
+                    } catch (error) {
+                        const reason = error instanceof Error ? error.message : String(error);
+                        failureReasons.push(`fallback:groq:${reason}`);
+                        this.logger.warn(
+                            `Groq fallback chat provider failed (${reason})`,
+                        );
+                    }
+                }
+
+                success = false;
+                span.setStatus({ code: SpanStatusCode.ERROR });
+                const mode = this.primaryClient
+                    ? 'provider-temporary-unavailable'
+                    : 'provider-not-configured';
+
                 return this.generateFallbackCompletion(systemPrompt, userPrompt, {
-                    mode: 'provider-temporary-unavailable',
+                    mode,
                     provider: this.providerName,
-                    reason: 'empty_model_response',
+                    reason: failureReasons.join(' | ') || 'no_available_chat_provider',
                 });
             } catch (error) {
                 success = false;
@@ -288,6 +343,51 @@ export class AiProviderService {
 
         return this.configService.get<string>('OPENAI_MODEL_EMBEDDING')?.trim()
             || 'text-embedding-3-small';
+    }
+
+    private resolveGroqChatModel(): string {
+        return this.configService.get<string>('GROQ_MODEL_CHAT')?.trim()
+            || 'llama-3.3-70b-versatile';
+    }
+
+    private async requestChatWithProvider(
+        client: OpenAI,
+        model: string,
+        request: ChatRequest,
+        provider: ChatProvider,
+    ): Promise<string> {
+        const startedAt = Date.now();
+        let success = true;
+
+        try {
+            const completion = await client.chat.completions.create({
+                model,
+                temperature: request.temperature ?? 0.2,
+                max_tokens: request.maxTokens ?? 600,
+                messages: [
+                    { role: 'system', content: request.systemPrompt.trim() },
+                    { role: 'user', content: request.userPrompt.trim() },
+                ],
+            });
+
+            const content = completion.choices[0]?.message?.content;
+            const parsed = this.extractMessageContent(content);
+            if (!parsed) {
+                throw new Error(`empty_model_response:${provider}`);
+            }
+
+            return parsed;
+        } catch (error) {
+            success = false;
+            throw error;
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'ai',
+                `chat_completion_${provider}`,
+                Date.now() - startedAt,
+                success,
+            );
+        }
     }
 
     private extractMessageContent(raw: unknown): string | null {
@@ -397,7 +497,7 @@ export class AiProviderService {
             : 'Estoy operando en modo local por una indisponibilidad temporal del proveedor IA (ejemplo: cuota o limite de peticiones).';
 
         const actionLine = options.mode === 'provider-not-configured'
-            ? 'Configura AI_PROVIDER y OPENAI_API_KEY/GEMINI_API_KEY para respuestas enriquecidas.'
+            ? 'Configura AI_PROVIDER y OPENAI_API_KEY/GEMINI_API_KEY (o GROQ_API_KEY como fallback de chat) para respuestas enriquecidas.'
             : 'Intenta nuevamente en unos minutos o revisa cuota/rate-limits del proveedor.';
 
         return [

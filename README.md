@@ -129,8 +129,11 @@ Servicios:
 - `OPENAI_MODEL_CHAT=gpt-4o-mini`
 - `GEMINI_API_KEY=...` (opcional, recomendado para plan gratis inicial)
 - `GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`
-- `GEMINI_MODEL_EMBEDDING=text-embedding-004`
+- `GEMINI_MODEL_EMBEDDING=gemini-embedding-001`
 - `GEMINI_MODEL_CHAT=gemini-2.0-flash`
+- `GROQ_API_KEY=...` (opcional, fallback automatico de chat cuando Gemini/OpenAI fallen por cuota)
+- `GROQ_BASE_URL=https://api.groq.com/openai/v1`
+- `GROQ_MODEL_CHAT=llama-3.3-70b-versatile`
 - `OPENAI_EMBEDDING_DIMENSIONS=1536` (legacy alias)
 - `WHATSAPP_ENABLED=false`
 - `WHATSAPP_VERIFY_TOKEN=...` (requerido si `WHATSAPP_ENABLED=true`)

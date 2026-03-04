@@ -152,6 +152,7 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertValidUrl(config, 'REDIS_URL', ['redis:', 'rediss:']);
     assertValidUrl(config, 'OPENAI_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GEMINI_BASE_URL', ['http:', 'https:']);
+    assertValidUrl(config, 'GROQ_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'MEILISEARCH_HOST', ['http:', 'https:']);
     assertValidUrl(config, 'WHATSAPP_GRAPH_BASE_URL', ['http:', 'https:']);
 
