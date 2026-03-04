@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Get,
     Inject,
     Param,
     ParseUUIDPipe,
@@ -35,6 +36,23 @@ export class AiController {
     @RateLimitPolicy('ai')
     async askConcierge(@Body() dto: AskConciergeDto) {
         return this.aiService.askConcierge(dto);
+    }
+
+    @Get('businesses/:businessId/assistant-config')
+    @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+    @OrgRoles('OWNER', 'MANAGER', 'STAFF')
+    async getAssistantConfig(
+        @Param('businessId', new ParseUUIDPipe()) businessId: string,
+        @CurrentOrganization('organizationId') organizationId: string,
+        @CurrentOrganization('organizationRole') organizationRole: 'OWNER' | 'MANAGER' | 'STAFF' | null,
+        @CurrentUser('role') actorGlobalRole: string,
+    ) {
+        return this.aiService.getBusinessAssistantConfig(
+            businessId,
+            organizationId,
+            actorGlobalRole,
+            organizationRole,
+        );
     }
 
     @Patch('businesses/:businessId/assistant-config')

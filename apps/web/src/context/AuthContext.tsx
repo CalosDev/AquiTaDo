@@ -178,12 +178,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = async () => {
+        clearSession();
         try {
             await authApi.logout();
         } catch {
             // Ignore network/logout errors and clear client state anyway.
         }
-        clearSession();
     };
 
     return (

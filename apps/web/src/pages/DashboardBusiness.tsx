@@ -1,7 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     adsApi,
+    aiApi,
     analyticsApi,
     bookingsApi,
     businessApi,
@@ -9,11 +10,14 @@ import {
     messagingApi,
     paymentsApi,
     promotionsApi,
+    uploadApi,
     verificationApi,
+    whatsappApi,
 } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { useOrganization } from '../context/useOrganization';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo, MARKET_CONFIG } from '../lib/market';
+import { pageLoaders } from '../routes/preload';
 
 interface Business {
     id: string;
@@ -28,6 +32,9 @@ interface Promotion {
     couponCode?: string;
     discountType: 'PERCENTAGE' | 'FIXED';
     discountValue: string | number;
+    isActive?: boolean;
+    startsAt?: string;
+    endsAt?: string;
     business: { id: string; name: string };
 }
 
@@ -259,6 +266,97 @@ interface BusinessVerificationStatusPayload {
     verificationDocuments: VerificationDocument[];
 }
 
+interface BusinessAssistantConfig {
+    id: string;
+    aiAutoResponderEnabled: boolean;
+    aiAutoResponderPrompt?: string | null;
+    aiLastEmbeddedAt?: string | null;
+}
+
+interface BusinessAutoReplyResponse {
+    reply: string;
+    businessName: string;
+    organizationId: string;
+}
+
+interface BusinessAnalyticsSnapshot {
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+    };
+    totals: {
+        views: number;
+        clicks: number;
+        conversions: number;
+        reservationRequests: number;
+        grossRevenue: number;
+        conversionRate: number;
+        clickThroughRate: number;
+    };
+}
+
+interface PaymentRow {
+    id: string;
+    provider: string;
+    amount: string | number;
+    currency: string;
+    status: string;
+    paidAt?: string | null;
+    createdAt: string;
+}
+
+interface InvoiceRow {
+    id: string;
+    number?: string | null;
+    amountTotal: string | number;
+    currency: string;
+    status: string;
+    issuedAt: string;
+    dueAt?: string | null;
+    paidAt?: string | null;
+}
+
+interface TransactionRow {
+    id: string;
+    status: string;
+    grossAmount: string | number;
+    platformFeeAmount: string | number;
+    netAmount: string | number;
+    currency: string;
+    createdAt: string;
+    paidAt?: string | null;
+    business: { id: string; name: string; slug: string };
+    booking?: { id: string; scheduledFor: string; status: string } | null;
+    buyerUser?: { id: string; name: string; email: string } | null;
+}
+
+interface WhatsAppConversationSummary {
+    id: string;
+    status: 'OPEN' | 'CLOSED' | 'ESCALATED';
+    customerPhone: string;
+    customerName?: string | null;
+    autoResponderActive?: boolean;
+    lastMessageAt: string;
+    business: { id: string; name: string; slug: string };
+    messages?: Array<{
+        id: string;
+        content?: string | null;
+        createdAt: string;
+    }>;
+}
+
+interface ManagedBusinessDetail {
+    id: string;
+    name: string;
+    slug: string;
+    description: string;
+    phone?: string | null;
+    whatsapp?: string | null;
+    address: string;
+    images?: Array<{ id: string; url: string }>;
+}
+
 type PromotionForm = {
     businessId: string;
     title: string;
@@ -280,21 +378,21 @@ const EMPTY_PROMOTION_FORM: PromotionForm = {
 };
 
 const TABS: Array<{ key: DashboardTab; label: string }> = [
-    { key: 'overview', label: 'Operación' },
+    { key: 'overview', label: 'OperaciÃ³n' },
     { key: 'inbox', label: 'Inbox' },
     { key: 'crm', label: 'CRM' },
-    { key: 'billing', label: 'Facturación' },
+    { key: 'billing', label: 'FacturaciÃ³n' },
     { key: 'ads', label: 'Ads' },
-    { key: 'verification', label: 'Verificación' },
+    { key: 'verification', label: 'VerificaciÃ³n' },
 ];
 const DashboardBillingTab = lazy(async () => ({
-    default: (await import('../components/dashboard-business/DashboardBillingTab')).DashboardBillingTab,
+    default: (await pageLoaders.dashboardBillingTab()).DashboardBillingTab,
 }));
 const DashboardAdsTab = lazy(async () => ({
-    default: (await import('../components/dashboard-business/DashboardAdsTab')).DashboardAdsTab,
+    default: (await pageLoaders.dashboardAdsTab()).DashboardAdsTab,
 }));
 const DashboardVerificationTab = lazy(async () => ({
-    default: (await import('../components/dashboard-business/DashboardVerificationTab')).DashboardVerificationTab,
+    default: (await pageLoaders.dashboardVerificationTab()).DashboardVerificationTab,
 }));
 
 function asNumber(value: string | number | null | undefined): number {
@@ -361,6 +459,7 @@ export function DashboardBusiness() {
 
     const [promotionForm, setPromotionForm] = useState<PromotionForm>(EMPTY_PROMOTION_FORM);
     const [creatingPromotion, setCreatingPromotion] = useState(false);
+    const [processingId, setProcessingId] = useState<string | null>(null);
     const [updatingBookingId, setUpdatingBookingId] = useState<string | null>(null);
     const [chargingBookingId, setChargingBookingId] = useState<string | null>(null);
 
@@ -401,9 +500,27 @@ export function DashboardBusiness() {
 
     const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
     const [fiscalSummary, setFiscalSummary] = useState<FiscalSummary | null>(null);
+    const [recentPayments, setRecentPayments] = useState<PaymentRow[]>([]);
+    const [recentInvoices, setRecentInvoices] = useState<InvoiceRow[]>([]);
+    const [recentTransactions, setRecentTransactions] = useState<TransactionRow[]>([]);
     const [billingLoading, setBillingLoading] = useState(false);
     const [billingRange, setBillingRange] = useState({ from: '', to: '' });
     const [exportingCsv, setExportingCsv] = useState<'invoices' | 'payments' | 'fiscal' | null>(null);
+
+    const [businessAnalytics, setBusinessAnalytics] = useState<BusinessAnalyticsSnapshot | null>(null);
+    const [businessAnalyticsLoading, setBusinessAnalyticsLoading] = useState(false);
+    const [selectedManagedBusinessId, setSelectedManagedBusinessId] = useState<string>('');
+    const [managedBusinessDetail, setManagedBusinessDetail] = useState<ManagedBusinessDetail | null>(null);
+    const [managedBusinessLoading, setManagedBusinessLoading] = useState(false);
+    const [managedBusinessSaving, setManagedBusinessSaving] = useState(false);
+    const [managedBusinessDeletingImageId, setManagedBusinessDeletingImageId] = useState<string | null>(null);
+    const [managedBusinessForm, setManagedBusinessForm] = useState({
+        name: '',
+        description: '',
+        phone: '',
+        whatsapp: '',
+        address: '',
+    });
 
     const [adsLoading, setAdsLoading] = useState(false);
     const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
@@ -436,8 +553,54 @@ export function DashboardBusiness() {
     });
     const [selectedDocumentFile, setSelectedDocumentFile] = useState<File | null>(null);
 
+    const [selectedAiBusinessId, setSelectedAiBusinessId] = useState<string>('');
+    const [assistantConfigLoading, setAssistantConfigLoading] = useState(false);
+    const [assistantConfigSaving, setAssistantConfigSaving] = useState(false);
+    const [assistantReindexing, setAssistantReindexing] = useState(false);
+    const [assistantConfigForm, setAssistantConfigForm] = useState({
+        enabled: false,
+        customPrompt: '',
+    });
+    const [assistantLastEmbeddedAt, setAssistantLastEmbeddedAt] = useState<string | null>(null);
+    const [assistantPreviewMessage, setAssistantPreviewMessage] = useState('');
+    const [assistantPreviewCustomerName, setAssistantPreviewCustomerName] = useState('');
+    const [assistantPreviewReply, setAssistantPreviewReply] = useState('');
+    const [assistantPreviewLoading, setAssistantPreviewLoading] = useState(false);
+
+    const [whatsAppConversations, setWhatsAppConversations] = useState<WhatsAppConversationSummary[]>([]);
+    const [whatsAppLoading, setWhatsAppLoading] = useState(false);
+    const [updatingWhatsAppConversationId, setUpdatingWhatsAppConversationId] = useState<string | null>(null);
+
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const hydratedTabsRef = useRef<Record<DashboardTab, boolean>>({
+        overview: true,
+        inbox: false,
+        crm: false,
+        billing: false,
+        ads: false,
+        verification: false,
+    });
+    const lastConversationFilterRef = useRef<ConversationStatus | 'ALL' | null>(null);
+    const lastCrmSearchRef = useRef('');
+    const billingRangeRef = useRef(billingRange);
+
+    useEffect(() => {
+        billingRangeRef.current = billingRange;
+    }, [billingRange]);
+
+    useEffect(() => {
+        hydratedTabsRef.current = {
+            overview: true,
+            inbox: false,
+            crm: false,
+            billing: false,
+            ads: false,
+            verification: false,
+        };
+        lastConversationFilterRef.current = null;
+        lastCrmSearchRef.current = '';
+    }, [activeOrganizationId]);
 
     const loadDashboard = useCallback(async () => {
         if (!activeOrganizationId) {
@@ -446,7 +609,12 @@ export function DashboardBusiness() {
             setPromotions([]);
             setBookings([]);
             setMetrics(null);
-            setErrorMessage('Selecciona una organización para usar el dashboard');
+            setSelectedAiBusinessId('');
+            setSelectedManagedBusinessId('');
+            setAssistantPreviewReply('');
+            setBusinessAnalytics(null);
+            setManagedBusinessDetail(null);
+            setErrorMessage('Selecciona una organizaciÃ³n para usar el dashboard');
             return;
         }
 
@@ -479,6 +647,8 @@ export function DashboardBusiness() {
                 businessId: previous.businessId || loadedBusinesses[0]?.id || '',
             }));
             setSelectedVerificationBusinessId((previous) => previous || loadedBusinesses[0]?.id || '');
+            setSelectedAiBusinessId((previous) => previous || loadedBusinesses[0]?.id || '');
+            setSelectedManagedBusinessId((previous) => previous || loadedBusinesses[0]?.id || '');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el dashboard'));
         } finally {
@@ -505,18 +675,21 @@ export function DashboardBusiness() {
             const response = await messagingApi.getOrgConversations(params);
             const rows = (response.data?.data || []) as ConversationSummary[];
             setConversations(rows);
-            if (!selectedConversationId && rows[0]) {
-                setSelectedConversationId(rows[0].id);
-            }
-            if (selectedConversationId && !rows.some((item) => item.id === selectedConversationId)) {
-                setSelectedConversationId(rows[0]?.id ?? null);
-            }
+            setSelectedConversationId((previous) => {
+                if (!previous && rows[0]) {
+                    return rows[0].id;
+                }
+                if (previous && !rows.some((item) => item.id === previous)) {
+                    return rows[0]?.id ?? null;
+                }
+                return previous;
+            });
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la bandeja de entrada'));
         } finally {
             setConversationsLoading(false);
         }
-    }, [activeOrganizationId, conversationFilter, selectedConversationId]);
+    }, [activeOrganizationId, conversationFilter]);
 
     const loadConversationThread = useCallback(async (conversationId: string) => {
         setThreadLoading(true);
@@ -525,12 +698,12 @@ export function DashboardBusiness() {
             setSelectedThread(response.data as ConversationThread);
         } catch (error) {
             setSelectedThread(null);
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la conversación'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la conversaciÃ³n'));
         } finally {
             setThreadLoading(false);
         }
     }, []);
-    const loadCustomers = useCallback(async () => {
+    const loadCustomers = useCallback(async (searchTerm: string) => {
         if (!activeOrganizationId) {
             setCustomers([]);
             setSelectedCustomerId(null);
@@ -541,23 +714,26 @@ export function DashboardBusiness() {
         setCrmLoading(true);
         try {
             const response = await crmApi.getCustomers({
-                search: crmSearch.trim() || undefined,
+                search: searchTerm.trim() || undefined,
                 limit: 20,
             });
             const rows = (response.data?.data || []) as CrmCustomer[];
             setCustomers(rows);
-            if (!selectedCustomerId && rows[0]) {
-                setSelectedCustomerId(rows[0].user.id);
-            }
-            if (selectedCustomerId && !rows.some((item) => item.user.id === selectedCustomerId)) {
-                setSelectedCustomerId(rows[0]?.user.id ?? null);
-            }
+            setSelectedCustomerId((previous) => {
+                if (!previous && rows[0]) {
+                    return rows[0].user.id;
+                }
+                if (previous && !rows.some((item) => item.user.id === previous)) {
+                    return rows[0]?.user.id ?? null;
+                }
+                return previous;
+            });
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el CRM'));
         } finally {
             setCrmLoading(false);
         }
-    }, [activeOrganizationId, crmSearch, selectedCustomerId]);
+    }, [activeOrganizationId]);
 
     const loadCustomerHistory = useCallback(async (customerUserId: string) => {
         setCustomerHistoryLoading(true);
@@ -652,14 +828,18 @@ export function DashboardBusiness() {
         if (!activeOrganizationId) {
             setBillingSummary(null);
             setFiscalSummary(null);
+            setRecentPayments([]);
+            setRecentInvoices([]);
+            setRecentTransactions([]);
             return;
         }
 
         setBillingLoading(true);
         try {
+            const activeRange = billingRangeRef.current;
             const params = {
-                from: billingRange.from ? new Date(billingRange.from).toISOString() : undefined,
-                to: billingRange.to ? new Date(billingRange.to).toISOString() : undefined,
+                from: activeRange.from ? new Date(activeRange.from).toISOString() : undefined,
+                to: activeRange.to ? new Date(activeRange.to).toISOString() : undefined,
             };
             const [billingRes, fiscalRes] = await Promise.all([
                 paymentsApi.getBillingSummary(params),
@@ -667,12 +847,83 @@ export function DashboardBusiness() {
             ]);
             setBillingSummary(billingRes.data as BillingSummary);
             setFiscalSummary(fiscalRes.data as FiscalSummary);
+
+            const [paymentsRes, invoicesRes, transactionsRes] = await Promise.all([
+                paymentsApi.getMyPayments({ limit: 12 }),
+                paymentsApi.getMyInvoices({ limit: 12 }),
+                bookingsApi.getTransactionsMyOrganization({ limit: 12 }),
+            ]);
+            setRecentPayments((paymentsRes.data || []) as PaymentRow[]);
+            setRecentInvoices((invoicesRes.data || []) as InvoiceRow[]);
+            setRecentTransactions((transactionsRes.data?.data || []) as TransactionRow[]);
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar facturación'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar facturaciÃ³n'));
         } finally {
             setBillingLoading(false);
         }
-    }, [activeOrganizationId, billingRange.from, billingRange.to]);
+    }, [activeOrganizationId]);
+
+    const loadBusinessAnalytics = useCallback(async (businessId: string) => {
+        if (!businessId || !activeOrganizationId) {
+            setBusinessAnalytics(null);
+            return;
+        }
+
+        setBusinessAnalyticsLoading(true);
+        try {
+            const response = await analyticsApi.getBusinessAnalytics(businessId, { days: 30 });
+            setBusinessAnalytics(response.data as BusinessAnalyticsSnapshot);
+        } catch (error) {
+            setBusinessAnalytics(null);
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar analitica por negocio'));
+        } finally {
+            setBusinessAnalyticsLoading(false);
+        }
+    }, [activeOrganizationId]);
+
+    const loadManagedBusinessDetail = useCallback(async (businessId: string) => {
+        if (!businessId || !activeOrganizationId) {
+            setManagedBusinessDetail(null);
+            return;
+        }
+
+        setManagedBusinessLoading(true);
+        try {
+            const response = await businessApi.getById(businessId);
+            const payload = response.data as ManagedBusinessDetail;
+            setManagedBusinessDetail(payload);
+            setManagedBusinessForm({
+                name: payload.name || '',
+                description: payload.description || '',
+                phone: payload.phone || '',
+                whatsapp: payload.whatsapp || '',
+                address: payload.address || '',
+            });
+        } catch (error) {
+            setManagedBusinessDetail(null);
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el negocio para edicion'));
+        } finally {
+            setManagedBusinessLoading(false);
+        }
+    }, [activeOrganizationId]);
+
+    const loadWhatsAppConversations = useCallback(async () => {
+        if (!activeOrganizationId) {
+            setWhatsAppConversations([]);
+            return;
+        }
+
+        setWhatsAppLoading(true);
+        try {
+            const response = await whatsappApi.getMyConversations({ limit: 20 });
+            setWhatsAppConversations((response.data?.data || []) as WhatsAppConversationSummary[]);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el inbox de WhatsApp'));
+            setWhatsAppConversations([]);
+        } finally {
+            setWhatsAppLoading(false);
+        }
+    }, [activeOrganizationId]);
 
     const loadAdCampaigns = useCallback(async () => {
         if (!activeOrganizationId) {
@@ -693,7 +944,7 @@ export function DashboardBusiness() {
             setAdsWalletBalance(Number(walletRes.data?.balance ?? 0));
             setAdsWalletTopups((walletRes.data?.topups || []) as AdWalletTopup[]);
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar las campañas ads'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar las campaÃ±as ads'));
         } finally {
             setAdsLoading(false);
         }
@@ -718,21 +969,166 @@ export function DashboardBusiness() {
                 setVerificationStatus(null);
             }
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificación'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificaciÃ³n'));
         } finally {
             setVerificationLoading(false);
         }
     }, [activeOrganizationId, selectedVerificationBusinessId]);
+
+    const loadAssistantConfig = useCallback(async (businessId: string) => {
+        setAssistantConfigLoading(true);
+        try {
+            const response = await aiApi.getAssistantConfig(businessId);
+            const payload = response.data as BusinessAssistantConfig;
+            setAssistantConfigForm({
+                enabled: Boolean(payload.aiAutoResponderEnabled),
+                customPrompt: payload.aiAutoResponderPrompt || '',
+            });
+            setAssistantLastEmbeddedAt(payload.aiLastEmbeddedAt || null);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la configuracion IA'));
+        } finally {
+            setAssistantConfigLoading(false);
+        }
+    }, []);
+
+    const handleSaveAssistantConfig = async () => {
+        if (!selectedAiBusinessId) {
+            setErrorMessage('Selecciona un negocio para configurar IA');
+            return;
+        }
+
+        setAssistantConfigSaving(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            const response = await aiApi.updateAssistantConfig(selectedAiBusinessId, {
+                enabled: assistantConfigForm.enabled,
+                customPrompt: assistantConfigForm.customPrompt.trim() || undefined,
+            });
+            const payload = response.data as BusinessAssistantConfig;
+            setAssistantConfigForm({
+                enabled: Boolean(payload.aiAutoResponderEnabled),
+                customPrompt: payload.aiAutoResponderPrompt || '',
+            });
+            setAssistantLastEmbeddedAt(payload.aiLastEmbeddedAt || null);
+            setSuccessMessage('Configuracion IA actualizada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la configuracion IA'));
+        } finally {
+            setAssistantConfigSaving(false);
+        }
+    };
+
+    const handleReindexAssistantContext = async () => {
+        if (!selectedAiBusinessId) {
+            setErrorMessage('Selecciona un negocio para reindexar');
+            return;
+        }
+
+        setAssistantReindexing(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await aiApi.reindexBusiness(selectedAiBusinessId);
+            setAssistantLastEmbeddedAt(new Date().toISOString());
+            setSuccessMessage('Contexto IA reindexado correctamente');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo reindexar el contexto IA'));
+        } finally {
+            setAssistantReindexing(false);
+        }
+    };
+
+    const handleGenerateAssistantPreview = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!selectedAiBusinessId) {
+            setErrorMessage('Selecciona un negocio para probar la respuesta');
+            return;
+        }
+        if (!assistantPreviewMessage.trim()) {
+            setErrorMessage('Escribe un mensaje del cliente para la simulacion');
+            return;
+        }
+
+        setAssistantPreviewLoading(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            const response = await aiApi.generateAutoReply(selectedAiBusinessId, {
+                message: assistantPreviewMessage.trim(),
+                customerName: assistantPreviewCustomerName.trim() || undefined,
+            });
+            const payload = response.data as BusinessAutoReplyResponse;
+            setAssistantPreviewReply(payload.reply || '');
+        } catch (error) {
+            setAssistantPreviewReply('');
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo generar la respuesta IA'));
+        } finally {
+            setAssistantPreviewLoading(false);
+        }
+    };
 
     useEffect(() => {
         void loadDashboard();
     }, [loadDashboard]);
 
     useEffect(() => {
-        if (activeTab === 'inbox') {
+        if (loading || typeof window === 'undefined') {
+            return;
+        }
+
+        const prefetchTimer = window.setTimeout(() => {
+            void pageLoaders.dashboardBillingTab();
+            void pageLoaders.dashboardAdsTab();
+            void pageLoaders.dashboardVerificationTab();
+        }, 700);
+
+        return () => window.clearTimeout(prefetchTimer);
+    }, [loading]);
+
+    useEffect(() => {
+        if (!selectedAiBusinessId) {
+            setAssistantConfigForm({
+                enabled: false,
+                customPrompt: '',
+            });
+            setAssistantLastEmbeddedAt(null);
+            setBusinessAnalytics(null);
+            return;
+        }
+
+        void loadAssistantConfig(selectedAiBusinessId);
+        void loadBusinessAnalytics(selectedAiBusinessId);
+    }, [loadAssistantConfig, loadBusinessAnalytics, selectedAiBusinessId]);
+
+    useEffect(() => {
+        if (!selectedManagedBusinessId) {
+            setManagedBusinessDetail(null);
+            return;
+        }
+
+        void loadManagedBusinessDetail(selectedManagedBusinessId);
+    }, [loadManagedBusinessDetail, selectedManagedBusinessId]);
+
+    useEffect(() => {
+        if (activeTab !== 'inbox') {
+            return;
+        }
+
+        if (!hydratedTabsRef.current.inbox) {
+            hydratedTabsRef.current.inbox = true;
+            lastConversationFilterRef.current = conversationFilter;
+            void loadConversations();
+            void loadWhatsAppConversations();
+            return;
+        }
+
+        if (lastConversationFilterRef.current !== conversationFilter) {
+            lastConversationFilterRef.current = conversationFilter;
             void loadConversations();
         }
-    }, [activeTab, loadConversations]);
+    }, [activeTab, conversationFilter, loadConversations, loadWhatsAppConversations]);
 
     useEffect(() => {
         if (activeTab === 'inbox' && selectedConversationId) {
@@ -741,11 +1137,30 @@ export function DashboardBusiness() {
     }, [activeTab, selectedConversationId, loadConversationThread]);
 
     useEffect(() => {
-        if (activeTab === 'crm') {
-            void loadCustomers();
-            void loadPipeline();
+        if (activeTab !== 'crm') {
+            return;
         }
-    }, [activeTab, loadCustomers, loadPipeline]);
+
+        const normalizedSearch = crmSearch.trim();
+        if (!hydratedTabsRef.current.crm) {
+            hydratedTabsRef.current.crm = true;
+            lastCrmSearchRef.current = normalizedSearch;
+            void loadCustomers(normalizedSearch);
+            void loadPipeline();
+            return;
+        }
+
+        if (lastCrmSearchRef.current === normalizedSearch) {
+            return;
+        }
+
+        const debounceTimer = window.setTimeout(() => {
+            lastCrmSearchRef.current = normalizedSearch;
+            void loadCustomers(normalizedSearch);
+        }, 300);
+
+        return () => window.clearTimeout(debounceTimer);
+    }, [activeTab, crmSearch, loadCustomers, loadPipeline]);
 
     useEffect(() => {
         if (activeTab === 'crm' && selectedCustomerId) {
@@ -754,21 +1169,30 @@ export function DashboardBusiness() {
     }, [activeTab, selectedCustomerId, loadCustomerHistory]);
 
     useEffect(() => {
-        if (activeTab === 'billing') {
-            void loadBillingSummary();
+        if (activeTab !== 'billing' || hydratedTabsRef.current.billing) {
+            return;
         }
+
+        hydratedTabsRef.current.billing = true;
+        void loadBillingSummary();
     }, [activeTab, loadBillingSummary]);
 
     useEffect(() => {
-        if (activeTab === 'ads') {
-            void loadAdCampaigns();
+        if (activeTab !== 'ads' || hydratedTabsRef.current.ads) {
+            return;
         }
+
+        hydratedTabsRef.current.ads = true;
+        void loadAdCampaigns();
     }, [activeTab, loadAdCampaigns]);
 
     useEffect(() => {
-        if (activeTab === 'verification') {
-            void loadVerificationData();
+        if (activeTab !== 'verification' || hydratedTabsRef.current.verification) {
+            return;
         }
+
+        hydratedTabsRef.current.verification = true;
+        void loadVerificationData();
     }, [activeTab, loadVerificationData]);
 
     const verifiedBusinesses = useMemo(
@@ -786,7 +1210,7 @@ export function DashboardBusiness() {
 
         const discount = Number(promotionForm.discountValue);
         if (!promotionForm.businessId || !promotionForm.title.trim() || !Number.isFinite(discount) || discount <= 0) {
-            setErrorMessage('Completa negocio, título y descuento válido');
+            setErrorMessage('Completa negocio, tÃ­tulo y descuento vÃ¡lido');
             return;
         }
 
@@ -807,11 +1231,101 @@ export function DashboardBusiness() {
             });
             await loadDashboard();
             setPromotionForm((previous) => ({ ...EMPTY_PROMOTION_FORM, businessId: previous.businessId }));
-            setSuccessMessage('Promoción creada');
+            setSuccessMessage('PromociÃ³n creada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la promoción'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la promociÃ³n'));
         } finally {
             setCreatingPromotion(false);
+        }
+    };
+
+    const handleTogglePromotionStatus = async (promotion: Promotion) => {
+        setProcessingId(promotion.id);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await promotionsApi.update(promotion.id, {
+                isActive: !promotion.isActive,
+            });
+            await loadDashboard();
+            setSuccessMessage(promotion.isActive ? 'Promocion pausada' : 'Promocion reactivada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la promocion'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleDeletePromotion = async (promotionId: string) => {
+        const confirmed = window.confirm('Esta accion eliminara la promocion. Deseas continuar?');
+        if (!confirmed) {
+            return;
+        }
+
+        setProcessingId(promotionId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await promotionsApi.delete(promotionId);
+            await loadDashboard();
+            setSuccessMessage('Promocion eliminada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar la promocion'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleSaveManagedBusiness = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!selectedManagedBusinessId) {
+            setErrorMessage('Selecciona un negocio para editar');
+            return;
+        }
+
+        if (!managedBusinessForm.name.trim() || !managedBusinessForm.description.trim() || !managedBusinessForm.address.trim()) {
+            setErrorMessage('Nombre, descripcion y direccion son obligatorios');
+            return;
+        }
+
+        setManagedBusinessSaving(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await businessApi.update(selectedManagedBusinessId, {
+                name: managedBusinessForm.name.trim(),
+                description: managedBusinessForm.description.trim(),
+                phone: managedBusinessForm.phone.trim() || undefined,
+                whatsapp: managedBusinessForm.whatsapp.trim() || undefined,
+                address: managedBusinessForm.address.trim(),
+            });
+            await Promise.all([
+                loadDashboard(),
+                loadManagedBusinessDetail(selectedManagedBusinessId),
+                loadBusinessAnalytics(selectedManagedBusinessId),
+            ]);
+            setSuccessMessage('Datos del negocio actualizados');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar el negocio'));
+        } finally {
+            setManagedBusinessSaving(false);
+        }
+    };
+
+    const handleDeleteManagedBusinessImage = async (imageId: string) => {
+        setManagedBusinessDeletingImageId(imageId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await uploadApi.deleteBusinessImage(imageId);
+            if (selectedManagedBusinessId) {
+                await loadManagedBusinessDetail(selectedManagedBusinessId);
+            }
+            setSuccessMessage('Imagen eliminada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar la imagen'));
+        } finally {
+            setManagedBusinessDeletingImageId(null);
         }
     };
 
@@ -931,9 +1445,27 @@ export function DashboardBusiness() {
                 status: nextStatus,
             });
             await Promise.all([loadConversations(), loadConversationThread(selectedConversationId)]);
-            setSuccessMessage(nextStatus === 'OPEN' ? 'Conversación reabierta' : 'Conversación cerrada');
+            setSuccessMessage(nextStatus === 'OPEN' ? 'ConversaciÃ³n reabierta' : 'ConversaciÃ³n cerrada');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar el estado'));
+        }
+    };
+
+    const handleWhatsAppConversationStatus = async (
+        conversationId: string,
+        status: 'OPEN' | 'CLOSED' | 'ESCALATED',
+    ) => {
+        setUpdatingWhatsAppConversationId(conversationId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await whatsappApi.updateConversationStatus(conversationId, { status });
+            await loadWhatsAppConversations();
+            setSuccessMessage('Estado de WhatsApp actualizado');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar conversacion de WhatsApp'));
+        } finally {
+            setUpdatingWhatsAppConversationId(null);
         }
     };
 
@@ -957,9 +1489,9 @@ export function DashboardBusiness() {
                 notes: convertForm.notes.trim() || undefined,
             });
             await Promise.all([loadDashboard(), loadConversations(), loadConversationThread(selectedConversationId)]);
-            setSuccessMessage('Conversación convertida a reserva');
+            setSuccessMessage('ConversaciÃ³n convertida a reserva');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo convertir la conversación'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo convertir la conversaciÃ³n'));
         } finally {
             setConvertingConversation(false);
         }
@@ -1009,7 +1541,7 @@ export function DashboardBusiness() {
     const handleCreateCampaign = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!campaignForm.businessId || !campaignForm.name.trim()) {
-            setErrorMessage('Selecciona negocio y nombre para la campaña');
+            setErrorMessage('Selecciona negocio y nombre para la campaÃ±a');
             return;
         }
 
@@ -1017,12 +1549,12 @@ export function DashboardBusiness() {
         const totalBudget = Number(campaignForm.totalBudget);
         const bidAmount = Number(campaignForm.bidAmount);
         if (!Number.isFinite(dailyBudget) || !Number.isFinite(totalBudget) || !Number.isFinite(bidAmount)) {
-            setErrorMessage('Presupuestos y puja deben ser numéricos');
+            setErrorMessage('Presupuestos y puja deben ser numÃ©ricos');
             return;
         }
 
         if (!campaignForm.startsAt || !campaignForm.endsAt) {
-            setErrorMessage('Debes indicar rango de fechas para la campaña');
+            setErrorMessage('Debes indicar rango de fechas para la campaÃ±a');
             return;
         }
 
@@ -1047,9 +1579,9 @@ export function DashboardBusiness() {
                 startsAt: '',
                 endsAt: '',
             }));
-            setSuccessMessage('Campaña ads creada');
+            setSuccessMessage('CampaÃ±a ads creada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la campaña ads'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la campaÃ±a ads'));
         } finally {
             setCreatingCampaign(false);
         }
@@ -1059,7 +1591,7 @@ export function DashboardBusiness() {
         event.preventDefault();
         const amount = Number(adsWalletTopupAmount);
         if (!Number.isFinite(amount) || amount < 1) {
-            setErrorMessage('Monto de recarga inválido');
+            setErrorMessage('Monto de recarga invÃ¡lido');
             return;
         }
 
@@ -1077,7 +1609,7 @@ export function DashboardBusiness() {
 
             const checkoutUrl = response.data?.checkoutUrl as string | undefined;
             if (!checkoutUrl) {
-                throw new Error('No se recibió URL de checkout');
+                throw new Error('No se recibiÃ³ URL de checkout');
             }
 
             window.location.assign(checkoutUrl);
@@ -1098,9 +1630,9 @@ export function DashboardBusiness() {
         try {
             await adsApi.updateCampaignStatus(campaignId, { status });
             await loadAdCampaigns();
-            setSuccessMessage('Estado de campaña actualizado');
+            setSuccessMessage('Estado de campaÃ±a actualizado');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la campaña'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la campaÃ±a'));
         } finally {
             setUpdatingCampaignId(null);
         }
@@ -1127,7 +1659,7 @@ export function DashboardBusiness() {
             );
             const uploadedFileUrl = uploadResponse.data?.fileUrl as string | undefined;
             if (!uploadedFileUrl) {
-                throw new Error('No se recibió URL del documento');
+                throw new Error('No se recibiÃ³ URL del documento');
             }
 
             await verificationApi.submitDocument({
@@ -1137,7 +1669,7 @@ export function DashboardBusiness() {
             });
             setSelectedDocumentFile(null);
             await loadVerificationData();
-            setSuccessMessage('Documento de verificación cargado');
+            setSuccessMessage('Documento de verificaciÃ³n cargado');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar documento'));
         } finally {
@@ -1159,9 +1691,9 @@ export function DashboardBusiness() {
                 notes: verificationForm.notes.trim() || undefined,
             });
             await loadVerificationData();
-            setSuccessMessage('Negocio enviado a revisión');
+            setSuccessMessage('Negocio enviado a revisiÃ³n');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar a revisión'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar a revisiÃ³n'));
         } finally {
             setSubmittingBusinessVerification(false);
         }
@@ -1170,26 +1702,26 @@ export function DashboardBusiness() {
         <>
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div className="card p-5">
-                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Suscripción</h2>
+                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">SuscripciÃ³n</h2>
                     {metrics?.subscription ? (
                         <div className="text-sm text-gray-600 space-y-1">
                             <p>Plan: <span className="font-semibold text-gray-900">{metrics.subscription.plan.name}</span></p>
                             <p>Estado: <span className="font-semibold text-gray-900">{metrics.subscription.status}</span></p>
                             <p>Mensualidad: <span className="font-semibold text-gray-900">{formatCurrencyDo(Number(metrics.subscription.plan.priceMonthly), metrics.subscription.plan.currency)}</span></p>
                             <p>Fee marketplace: <span className="font-semibold text-gray-900">{(metrics.subscription.plan.transactionFeeBps / 100).toFixed(2)}%</span></p>
-                            <p>Próximo pago: <span className="font-semibold text-gray-900">{metrics.subscription.currentPeriodEnd ? formatDateDo(metrics.subscription.currentPeriodEnd) : 'No definido'}</span></p>
+                            <p>PrÃ³ximo pago: <span className="font-semibold text-gray-900">{metrics.subscription.currentPeriodEnd ? formatDateDo(metrics.subscription.currentPeriodEnd) : 'No definido'}</span></p>
                         </div>
-                    ) : <p className="text-sm text-gray-500">Sin datos de suscripción.</p>}
+                    ) : <p className="text-sm text-gray-500">Sin datos de suscripciÃ³n.</p>}
                 </div>
 
                 <div className="card p-5 xl:col-span-2">
                     <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Marketplace</h2>
                     <p className="text-sm text-gray-600">
-                        Promociones activas: <strong>{metrics?.marketplace.activePromotions || 0}</strong> ·
-                        Reservas pendientes: <strong>{metrics?.marketplace.pendingBookings || 0}</strong> ·
+                        Promociones activas: <strong>{metrics?.marketplace.activePromotions || 0}</strong> Â·
+                        Reservas pendientes: <strong>{metrics?.marketplace.pendingBookings || 0}</strong> Â·
                         Reservas confirmadas: <strong>{metrics?.marketplace.confirmedBookings || 0}</strong>
                     </p>
-                    <p className="text-sm text-gray-600 mt-2">Tasa de conversión: <strong>{metrics?.totals.conversionRate || 0}%</strong></p>
+                    <p className="text-sm text-gray-600 mt-2">Tasa de conversiÃ³n: <strong>{metrics?.totals.conversionRate || 0}%</strong></p>
                 </div>
             </div>
 
@@ -1237,13 +1769,276 @@ export function DashboardBusiness() {
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <div className="card p-5">
-                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Nueva promoción</h2>
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                        <h2 className="font-display text-lg font-semibold text-gray-900">Analitica por negocio</h2>
+                        <select
+                            className="input-field text-sm max-w-[260px]"
+                            value={selectedAiBusinessId}
+                            onChange={(event) => setSelectedAiBusinessId(event.target.value)}
+                        >
+                            <option value="">Selecciona negocio</option>
+                            {businesses.map((business) => (
+                                <option key={business.id} value={business.id}>
+                                    {business.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {businessAnalyticsLoading ? (
+                        <p className="text-sm text-gray-500">Cargando analitica...</p>
+                    ) : businessAnalytics ? (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="rounded-xl border border-gray-100 p-3">
+                                <p className="text-xs text-gray-500">Vistas 30d</p>
+                                <p className="text-xl font-semibold text-gray-900">{businessAnalytics.totals.views}</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 p-3">
+                                <p className="text-xs text-gray-500">Clics 30d</p>
+                                <p className="text-xl font-semibold text-gray-900">{businessAnalytics.totals.clicks}</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 p-3">
+                                <p className="text-xs text-gray-500">Conversiones</p>
+                                <p className="text-xl font-semibold text-gray-900">{businessAnalytics.totals.conversions}</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 p-3">
+                                <p className="text-xs text-gray-500">Tasa conversion</p>
+                                <p className="text-xl font-semibold text-primary-700">{businessAnalytics.totals.conversionRate}%</p>
+                            </div>
+                            <div className="rounded-xl border border-gray-100 p-3 col-span-2">
+                                <p className="text-xs text-gray-500">Ingresos estimados</p>
+                                <p className="text-xl font-semibold text-emerald-700">{formatCurrency(businessAnalytics.totals.grossRevenue)}</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-gray-500">Selecciona un negocio para ver su rendimiento detallado.</p>
+                    )}
+                </div>
+
+                <div className="card p-5">
+                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Editar negocio y media</h2>
+                    <div className="space-y-3">
+                        <select
+                            className="input-field text-sm"
+                            value={selectedManagedBusinessId}
+                            onChange={(event) => setSelectedManagedBusinessId(event.target.value)}
+                        >
+                            <option value="">Selecciona negocio</option>
+                            {businesses.map((business) => (
+                                <option key={business.id} value={business.id}>
+                                    {business.name}
+                                </option>
+                            ))}
+                        </select>
+
+                        {managedBusinessLoading ? (
+                            <p className="text-sm text-gray-500">Cargando datos del negocio...</p>
+                        ) : managedBusinessDetail ? (
+                            <>
+                                <form onSubmit={handleSaveManagedBusiness} className="space-y-2">
+                                    <input
+                                        className="input-field text-sm"
+                                        value={managedBusinessForm.name}
+                                        onChange={(event) => setManagedBusinessForm((previous) => ({ ...previous, name: event.target.value }))}
+                                        placeholder="Nombre"
+                                    />
+                                    <textarea
+                                        className="input-field text-sm"
+                                        rows={3}
+                                        value={managedBusinessForm.description}
+                                        onChange={(event) => setManagedBusinessForm((previous) => ({ ...previous, description: event.target.value }))}
+                                        placeholder="Descripcion"
+                                    />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <input
+                                            className="input-field text-sm"
+                                            value={managedBusinessForm.phone}
+                                            onChange={(event) => setManagedBusinessForm((previous) => ({ ...previous, phone: event.target.value }))}
+                                            placeholder="Telefono"
+                                        />
+                                        <input
+                                            className="input-field text-sm"
+                                            value={managedBusinessForm.whatsapp}
+                                            onChange={(event) => setManagedBusinessForm((previous) => ({ ...previous, whatsapp: event.target.value }))}
+                                            placeholder="WhatsApp"
+                                        />
+                                    </div>
+                                    <input
+                                        className="input-field text-sm"
+                                        value={managedBusinessForm.address}
+                                        onChange={(event) => setManagedBusinessForm((previous) => ({ ...previous, address: event.target.value }))}
+                                        placeholder="Direccion"
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="btn-primary text-sm"
+                                        disabled={managedBusinessSaving}
+                                    >
+                                        {managedBusinessSaving ? 'Guardando...' : 'Guardar cambios'}
+                                    </button>
+                                </form>
+
+                                <div className="rounded-xl border border-gray-100 p-3">
+                                    <p className="text-xs text-gray-500 mb-2">Imagenes publicadas</p>
+                                    {managedBusinessDetail.images && managedBusinessDetail.images.length > 0 ? (
+                                        <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                            {managedBusinessDetail.images.map((image) => (
+                                                <div key={image.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 p-2">
+                                                    <a
+                                                        href={image.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="truncate text-xs text-primary-700 hover:text-primary-800"
+                                                    >
+                                                        {image.url}
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                                                        onClick={() => void handleDeleteManagedBusinessImage(image.id)}
+                                                        disabled={managedBusinessDeletingImageId === image.id}
+                                                    >
+                                                        {managedBusinessDeletingImageId === image.id ? 'Eliminando...' : 'Eliminar'}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-gray-500">No hay imagenes cargadas en este negocio.</p>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <p className="text-sm text-gray-500">Selecciona un negocio para editar su perfil.</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="card p-5">
+                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Asistente IA del negocio</h2>
+                    <div className="space-y-3">
+                        <div>
+                            <label htmlFor="assistant-business-select" className="text-xs text-gray-600 mb-1 block">
+                                Negocio
+                            </label>
+                            <select
+                                id="assistant-business-select"
+                                className="input-field text-sm"
+                                value={selectedAiBusinessId}
+                                onChange={(event) => setSelectedAiBusinessId(event.target.value)}
+                            >
+                                <option value="">Selecciona negocio</option>
+                                {businesses.map((business) => (
+                                    <option key={business.id} value={business.id}>
+                                        {business.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={assistantConfigForm.enabled}
+                                onChange={(event) =>
+                                    setAssistantConfigForm((previous) => ({
+                                        ...previous,
+                                        enabled: event.target.checked,
+                                    }))
+                                }
+                            />
+                            Activar auto respondedor IA
+                        </label>
+
+                        <div>
+                            <label htmlFor="assistant-custom-prompt" className="text-xs text-gray-600 mb-1 block">
+                                Prompt personalizado
+                            </label>
+                            <textarea
+                                id="assistant-custom-prompt"
+                                rows={4}
+                                className="input-field text-sm"
+                                placeholder="Ej: responde con tono formal, menciona horario y motiva reservar por WhatsApp."
+                                value={assistantConfigForm.customPrompt}
+                                onChange={(event) =>
+                                    setAssistantConfigForm((previous) => ({
+                                        ...previous,
+                                        customPrompt: event.target.value,
+                                    }))
+                                }
+                            />
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                className="btn-primary text-sm"
+                                disabled={assistantConfigSaving || assistantConfigLoading}
+                                onClick={() => void handleSaveAssistantConfig()}
+                            >
+                                {assistantConfigSaving ? 'Guardando...' : 'Guardar configuracion'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn-secondary text-sm"
+                                disabled={assistantReindexing || assistantConfigLoading}
+                                onClick={() => void handleReindexAssistantContext()}
+                            >
+                                {assistantReindexing ? 'Reindexando...' : 'Reindexar contexto'}
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                            Ultima indexacion: {assistantLastEmbeddedAt ? formatDateTime(assistantLastEmbeddedAt) : 'N/D'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="card p-5">
+                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Simulador de respuesta IA</h2>
+                    <form onSubmit={handleGenerateAssistantPreview} className="space-y-3">
+                        <input
+                            className="input-field text-sm"
+                            placeholder="Nombre cliente (opcional)"
+                            value={assistantPreviewCustomerName}
+                            onChange={(event) => setAssistantPreviewCustomerName(event.target.value)}
+                        />
+                        <textarea
+                            className="input-field text-sm"
+                            rows={4}
+                            placeholder="Mensaje del cliente para probar el asistente..."
+                            value={assistantPreviewMessage}
+                            onChange={(event) => setAssistantPreviewMessage(event.target.value)}
+                        />
+                        <button
+                            type="submit"
+                            className="btn-primary text-sm"
+                            disabled={assistantPreviewLoading || assistantConfigLoading}
+                        >
+                            {assistantPreviewLoading ? 'Generando...' : 'Generar respuesta'}
+                        </button>
+                    </form>
+
+                    <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-3 min-h-[104px]">
+                        <p className="text-xs text-gray-500 mb-1">Respuesta de la IA</p>
+                        <p className="text-sm text-gray-800 whitespace-pre-line">
+                            {assistantPreviewReply || 'Aun no hay simulacion. Prueba un mensaje para ver el resultado.'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="card p-5">
+                    <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Nueva promociÃ³n</h2>
                     <form className="space-y-3" onSubmit={handleCreatePromotion}>
                         <select className="input-field text-sm" value={promotionForm.businessId} onChange={(event) => setPromotionForm((previous) => ({ ...previous, businessId: event.target.value }))}>
                             <option value="">Selecciona negocio</option>
                             {businesses.map((business) => <option key={business.id} value={business.id}>{business.name}</option>)}
                         </select>
-                        <input className="input-field text-sm" placeholder="Título" value={promotionForm.title} onChange={(event) => setPromotionForm((previous) => ({ ...previous, title: event.target.value }))} />
+                        <input className="input-field text-sm" placeholder="TÃ­tulo" value={promotionForm.title} onChange={(event) => setPromotionForm((previous) => ({ ...previous, title: event.target.value }))} />
                         <div className="grid grid-cols-2 gap-3">
                             <select className="input-field text-sm" value={promotionForm.discountType} onChange={(event) => setPromotionForm((previous) => ({ ...previous, discountType: event.target.value as 'PERCENTAGE' | 'FIXED' }))}>
                                 <option value="PERCENTAGE">Porcentaje %</option>
@@ -1251,7 +2046,7 @@ export function DashboardBusiness() {
                             </select>
                             <input className="input-field text-sm" type="number" min="1" step="0.01" placeholder="Descuento" value={promotionForm.discountValue} onChange={(event) => setPromotionForm((previous) => ({ ...previous, discountValue: event.target.value }))} />
                         </div>
-                        <input className="input-field text-sm" placeholder="Código (opcional)" value={promotionForm.couponCode} onChange={(event) => setPromotionForm((previous) => ({ ...previous, couponCode: event.target.value.toUpperCase() }))} />
+                        <input className="input-field text-sm" placeholder="CÃ³digo (opcional)" value={promotionForm.couponCode} onChange={(event) => setPromotionForm((previous) => ({ ...previous, couponCode: event.target.value.toUpperCase() }))} />
                         <div className="grid grid-cols-2 gap-3">
                             <input className="input-field text-sm" type="datetime-local" value={promotionForm.startsAt} onChange={(event) => setPromotionForm((previous) => ({ ...previous, startsAt: event.target.value }))} />
                             <input className="input-field text-sm" type="datetime-local" value={promotionForm.endsAt} onChange={(event) => setPromotionForm((previous) => ({ ...previous, endsAt: event.target.value }))} />
@@ -1265,9 +2060,43 @@ export function DashboardBusiness() {
                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                         {promotions.length > 0 ? promotions.map((promotion) => (
                             <div key={promotion.id} className="rounded-xl border border-gray-100 p-3">
-                                <p className="font-medium text-gray-900">{promotion.title}</p>
-                                <p className="text-xs text-gray-500">{promotion.business.name}</p>
-                                <p className="text-xs text-gray-500">{promotion.discountType === 'PERCENTAGE' ? `${asNumber(promotion.discountValue)}%` : formatCurrency(promotion.discountValue)}{promotion.couponCode ? ` · ${promotion.couponCode}` : ''}</p>
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                        <p className="font-medium text-gray-900">{promotion.title}</p>
+                                        <p className="text-xs text-gray-500">{promotion.business.name}</p>
+                                        <p className="text-xs text-gray-500">
+                                            {promotion.discountType === 'PERCENTAGE'
+                                                ? `${asNumber(promotion.discountValue)}%`
+                                                : formatCurrency(promotion.discountValue)}
+                                            {promotion.couponCode ? ` · ${promotion.couponCode}` : ''}
+                                        </p>
+                                        <p className="text-[11px] text-gray-500 mt-1">
+                                            Estado: {promotion.isActive ? 'Activa' : 'Pausada'}
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            disabled={processingId === promotion.id}
+                                            onClick={() => void handleTogglePromotionStatus(promotion)}
+                                        >
+                                            {processingId === promotion.id
+                                                ? 'Procesando...'
+                                                : promotion.isActive
+                                                    ? 'Pausar'
+                                                    : 'Activar'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                                            disabled={processingId === promotion.id}
+                                            onClick={() => void handleDeletePromotion(promotion.id)}
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )) : <p className="text-sm text-gray-500">No hay promociones registradas.</p>}
                     </div>
@@ -1289,7 +2118,7 @@ export function DashboardBusiness() {
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div>
                                         <p className="font-medium text-gray-900">{booking.business.name}</p>
-                                        <p className="text-xs text-gray-500">{formatDateTimeDo(booking.scheduledFor)} · {booking.user?.name || 'Cliente plataforma'}</p>
+                                        <p className="text-xs text-gray-500">{formatDateTimeDo(booking.scheduledFor)} Â· {booking.user?.name || 'Cliente plataforma'}</p>
                                         <p className="text-xs text-gray-500">{asNumber(booking.quotedAmount) > 0 ? formatCurrency(booking.quotedAmount) : 'Monto pendiente de cotizar'}</p>
                                     </div>
                                     <div className="flex flex-col items-end gap-1">
@@ -1355,12 +2184,12 @@ export function DashboardBusiness() {
             </div>
 
             <div className="card p-5 xl:col-span-2">
-                {!selectedConversationId ? <p className="text-sm text-gray-500">Selecciona una conversación.</p> : threadLoading ? <p className="text-sm text-gray-500">Cargando conversación...</p> : selectedThread ? (
+                {!selectedConversationId ? <p className="text-sm text-gray-500">Selecciona una conversaciÃ³n.</p> : threadLoading ? <p className="text-sm text-gray-500">Cargando conversaciÃ³n...</p> : selectedThread ? (
                     <div className="space-y-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <h3 className="font-display text-lg font-semibold text-gray-900">{selectedThread.subject || 'Conversación'}</h3>
-                                <p className="text-sm text-gray-500">{selectedThread.customerUser.name} · {selectedThread.customerUser.email}</p>
+                                <h3 className="font-display text-lg font-semibold text-gray-900">{selectedThread.subject || 'ConversaciÃ³n'}</h3>
+                                <p className="text-sm text-gray-500">{selectedThread.customerUser.name} Â· {selectedThread.customerUser.email}</p>
                                 <p className="text-xs text-gray-400">Negocio: {selectedThread.business.name}</p>
                             </div>
                             <button type="button" onClick={() => void handleToggleConversationStatus()} className="btn-secondary text-xs" disabled={selectedThread.status === 'CONVERTED'}>
@@ -1371,7 +2200,7 @@ export function DashboardBusiness() {
                         <div className="rounded-xl border border-gray-100 p-3 max-h-[20rem] overflow-y-auto space-y-2">
                             {selectedThread.messages.map((message) => (
                                 <div key={message.id} className={`rounded-lg px-3 py-2 text-sm ${message.senderRole === 'BUSINESS_STAFF' ? 'bg-primary-50 border border-primary-100' : message.senderRole === 'SYSTEM' ? 'bg-amber-50 border border-amber-100' : 'bg-gray-50 border border-gray-100'}`}>
-                                    <p className="text-xs text-gray-500 mb-1">{message.senderRole}{message.senderUser?.name ? ` · ${message.senderUser.name}` : ''} · {formatDateTime(message.createdAt)}</p>
+                                    <p className="text-xs text-gray-500 mb-1">{message.senderRole}{message.senderUser?.name ? ` Â· ${message.senderUser.name}` : ''} Â· {formatDateTime(message.createdAt)}</p>
                                     <p className="text-gray-800 whitespace-pre-line">{message.content}</p>
                                 </div>
                             ))}
@@ -1388,11 +2217,11 @@ export function DashboardBusiness() {
                                 <form onSubmit={handleConvertConversation} className="space-y-3">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <input type="datetime-local" className="input-field text-sm" value={convertForm.scheduledFor} onChange={(event) => setConvertForm((previous) => ({ ...previous, scheduledFor: event.target.value }))} />
-                                        <input type="number" min="1" className="input-field text-sm" placeholder="Tamaño grupo" value={convertForm.partySize} onChange={(event) => setConvertForm((previous) => ({ ...previous, partySize: event.target.value }))} />
+                                        <input type="number" min="1" className="input-field text-sm" placeholder="TamaÃ±o grupo" value={convertForm.partySize} onChange={(event) => setConvertForm((previous) => ({ ...previous, partySize: event.target.value }))} />
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <input type="number" min="0" step="0.01" className="input-field text-sm" placeholder="Monto cotizado" value={convertForm.quotedAmount} onChange={(event) => setConvertForm((previous) => ({ ...previous, quotedAmount: event.target.value }))} />
-                                        <input type="number" min="0" step="0.01" className="input-field text-sm" placeholder="Depósito" value={convertForm.depositAmount} onChange={(event) => setConvertForm((previous) => ({ ...previous, depositAmount: event.target.value }))} />
+                                        <input type="number" min="0" step="0.01" className="input-field text-sm" placeholder="DepÃ³sito" value={convertForm.depositAmount} onChange={(event) => setConvertForm((previous) => ({ ...previous, depositAmount: event.target.value }))} />
                                     </div>
                                     <textarea className="input-field text-sm" rows={2} placeholder="Notas" value={convertForm.notes} onChange={(event) => setConvertForm((previous) => ({ ...previous, notes: event.target.value }))} />
                                     <button type="submit" className="btn-primary text-sm" disabled={convertingConversation}>{convertingConversation ? 'Convirtiendo...' : 'Crear reserva'}</button>
@@ -1400,7 +2229,72 @@ export function DashboardBusiness() {
                             </div>
                         )}
                     </div>
-                ) : <p className="text-sm text-gray-500">No se pudo cargar esta conversación.</p>}
+                ) : <p className="text-sm text-gray-500">No se pudo cargar esta conversaciÃ³n.</p>}
+
+                <div className="mt-6 rounded-xl border border-gray-100 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-display text-base font-semibold text-gray-900">Canal WhatsApp</h3>
+                        <button
+                            type="button"
+                            className="btn-secondary text-xs"
+                            onClick={() => void loadWhatsAppConversations()}
+                            disabled={whatsAppLoading}
+                        >
+                            {whatsAppLoading ? 'Actualizando...' : 'Actualizar'}
+                        </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {whatsAppConversations.length > 0 ? whatsAppConversations.map((conversation) => (
+                            <div key={conversation.id} className="rounded-lg border border-gray-100 p-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900">
+                                            {conversation.customerName || conversation.customerPhone}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            {conversation.business.name} · {formatDateTime(conversation.lastMessageAt)}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                            {conversation.status}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            disabled={updatingWhatsAppConversationId === conversation.id}
+                                            onClick={() =>
+                                                void handleWhatsAppConversationStatus(
+                                                    conversation.id,
+                                                    conversation.status === 'OPEN' ? 'CLOSED' : 'OPEN',
+                                                )
+                                            }
+                                        >
+                                            {updatingWhatsAppConversationId === conversation.id
+                                                ? 'Procesando...'
+                                                : conversation.status === 'OPEN'
+                                                    ? 'Cerrar'
+                                                    : 'Reabrir'}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="mt-2 flex items-center justify-end">
+                                    <button
+                                        type="button"
+                                        className="text-xs text-amber-700 hover:text-amber-800 disabled:opacity-50"
+                                        disabled={updatingWhatsAppConversationId === conversation.id || conversation.status === 'ESCALATED'}
+                                        onClick={() => void handleWhatsAppConversationStatus(conversation.id, 'ESCALATED')}
+                                    >
+                                        Marcar escalada
+                                    </button>
+                                </div>
+                            </div>
+                        )) : (
+                            <p className="text-sm text-gray-500">No hay conversaciones en WhatsApp.</p>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -1419,7 +2313,7 @@ export function DashboardBusiness() {
                                 <th className="text-left py-2">Segmento</th>
                                 <th className="text-left py-2">Reservas</th>
                                 <th className="text-left py-2">Gasto</th>
-                                <th className="text-left py-2">Última actividad</th>
+                                <th className="text-left py-2">Ãšltima actividad</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1457,12 +2351,12 @@ export function DashboardBusiness() {
                             <p>Gasto: <strong>{formatCurrency(customerHistory.summary.totalSpent)}</strong></p>
                         </div>
                         <div>
-                            <p className="font-semibold text-gray-900 mb-1">Últimas reservas</p>
+                            <p className="font-semibold text-gray-900 mb-1">Ãšltimas reservas</p>
                             <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                                 {customerHistory.bookings.slice(0, 5).map((booking) => (
                                     <div key={booking.id} className="rounded-lg border border-gray-100 p-2">
                                         <p className="text-xs font-medium text-gray-900">{booking.business.name}</p>
-                                        <p className="text-xs text-gray-500">{booking.status} · {formatDateTime(booking.scheduledFor)}</p>
+                                        <p className="text-xs text-gray-500">{booking.status} Â· {formatDateTime(booking.scheduledFor)}</p>
                                     </div>
                                 ))}
                                 {customerHistory.bookings.length === 0 && <p className="text-xs text-gray-500">Sin reservas.</p>}
@@ -1619,7 +2513,7 @@ export function DashboardBusiness() {
             <div className="flex flex-wrap justify-between items-center gap-3">
                 <div>
                     <h1 className="font-display text-3xl font-bold text-gray-900">Dashboard SaaS</h1>
-                    <p className="text-gray-500">Métricas, operación, CRM y facturación</p>
+                    <p className="text-gray-500">MÃ©tricas, operaciÃ³n, CRM y facturaciÃ³n</p>
                 </div>
                 <Link to="/register-business" className="btn-accent">+ Nuevo Negocio</Link>
             </div>
@@ -1653,7 +2547,7 @@ export function DashboardBusiness() {
                     {activeTab === 'inbox' && renderInbox()}
                     {activeTab === 'crm' && renderCrm()}
                     {activeTab === 'billing' && (
-                        <Suspense fallback={<div className="card p-5 text-sm text-gray-500">Cargando facturación...</div>}>
+                        <Suspense fallback={<div className="card p-5 text-sm text-gray-500">Cargando facturaciÃ³n...</div>}>
                             <DashboardBillingTab
                                 billingRange={billingRange}
                                 setBillingRange={setBillingRange}
@@ -1663,7 +2557,11 @@ export function DashboardBusiness() {
                                 exportingCsv={exportingCsv}
                                 billingSummary={billingSummary}
                                 fiscalSummary={fiscalSummary}
+                                recentPayments={recentPayments}
+                                recentInvoices={recentInvoices}
+                                recentTransactions={recentTransactions}
                                 formatCurrency={formatCurrency}
+                                formatDateTime={formatDateTime}
                             />
                         </Suspense>
                     )}
@@ -1693,7 +2591,7 @@ export function DashboardBusiness() {
                         </Suspense>
                     )}
                     {activeTab === 'verification' && (
-                        <Suspense fallback={<div className="card p-5 text-sm text-gray-500">Cargando verificación...</div>}>
+                        <Suspense fallback={<div className="card p-5 text-sm text-gray-500">Cargando verificaciÃ³n...</div>}>
                             <DashboardVerificationTab
                                 selectedVerificationBusinessId={selectedVerificationBusinessId}
                                 setSelectedVerificationBusinessId={setSelectedVerificationBusinessId}

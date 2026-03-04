@@ -29,6 +29,7 @@ function resolveApiTimeoutMs(rawTimeoutMs: string | number | undefined): number 
 
 const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:3000');
 const API_TIMEOUT_MS = resolveApiTimeoutMs(import.meta.env.VITE_API_TIMEOUT_MS);
+const AUTH_REFRESH_TIMEOUT_MS = Math.max(5_000, Math.min(API_TIMEOUT_MS, 10_000));
 const ACCESS_TOKEN_STORAGE_KEY = 'accessToken';
 const hasWindow = typeof window !== 'undefined';
 
@@ -131,7 +132,7 @@ async function requestAccessTokenRefresh(): Promise<string | null> {
             {
                 headers: { 'Content-Type': 'application/json' },
                 withCredentials: true,
-                timeout: API_TIMEOUT_MS,
+                timeout: AUTH_REFRESH_TIMEOUT_MS,
             },
         )
         .then((response) => {

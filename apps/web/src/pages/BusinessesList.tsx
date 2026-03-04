@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationApi } from '../api/endpoints';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { calculateBusinessTrustScore } from '../lib/trust';
+import { preloadRouteChunk } from '../routes/preload';
 
 interface Business {
     id: string;
@@ -165,6 +166,23 @@ export function BusinessesList() {
         }
         return '/businesses';
     }, [categorySlug, provinceSlug, intentSlug]);
+    const trustByBusinessId = useMemo(() => {
+        const lookup = new Map<string, ReturnType<typeof calculateBusinessTrustScore>>();
+        businesses.forEach((business) => {
+            lookup.set(
+                business.id,
+                calculateBusinessTrustScore({
+                    verified: business.verified,
+                    reputationScore: business.reputationScore,
+                    reviewsCount: business._count?.reviews ?? 0,
+                    hasDescription: Boolean(business.description?.trim()),
+                    hasAddress: Boolean(business.address?.trim()),
+                    hasImages: Boolean(business.images?.length),
+                }),
+            );
+        });
+        return lookup;
+    }, [businesses]);
 
     useEffect(() => {
         setSearchInput(currentSearch);
@@ -369,26 +387,30 @@ export function BusinessesList() {
                 params.set('page', '1');
             }
 
-            navigate({
-                pathname: '/businesses',
-                search: params.toString() ? `?${params.toString()}` : '',
+            startTransition(() => {
+                navigate({
+                    pathname: '/businesses',
+                    search: params.toString() ? `?${params.toString()}` : '',
+                });
             });
             return;
         }
 
-        setSearchParams((prev) => {
-            const params = new URLSearchParams(prev);
-            if (value) {
-                params.set(key, value);
-            } else {
-                params.delete(key);
-            }
+        startTransition(() => {
+            setSearchParams((prev) => {
+                const params = new URLSearchParams(prev);
+                if (value) {
+                    params.set(key, value);
+                } else {
+                    params.delete(key);
+                }
 
-            if (options.resetPage ?? true) {
-                params.set('page', '1');
-            }
+                if (options.resetPage ?? true) {
+                    params.set('page', '1');
+                }
 
-            return params;
+                return params;
+            });
         });
     }, [setSearchParams, categorySlug, provinceSlug, intentSlug, searchParams, navigate]);
 
@@ -676,13 +698,19 @@ export function BusinessesList() {
                             )}
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                                {businesses.map((biz) => (
+                                {businesses.map((biz) => {
+                                    const trust = trustByBusinessId.get(biz.id);
+                                    const businessPath = `/businesses/${biz.slug || biz.id}`;
+
+                                    return (
                                     <Link
                                         key={biz.id}
-                                        to={`/businesses/${biz.slug || biz.id}`}
+                                        to={businessPath}
                                         onClick={() => {
                                             trackBusinessClick(biz.id, 'businesses-list');
                                         }}
+                                        onMouseEnter={() => preloadRouteChunk(businessPath)}
+                                        onFocus={() => preloadRouteChunk(businessPath)}
                                         className="card hover-lift group"
                                     >
                                         <div className="h-40 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
@@ -737,31 +765,22 @@ export function BusinessesList() {
                                             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                                 📍 {biz.province?.name || biz.address}
                                             </p>
-                                            {(() => {
-                                                const trust = calculateBusinessTrustScore({
-                                                    verified: biz.verified,
-                                                    reputationScore: biz.reputationScore,
-                                                    reviewsCount: biz._count?.reviews ?? 0,
-                                                    hasDescription: Boolean(biz.description?.trim()),
-                                                    hasAddress: Boolean(biz.address?.trim()),
-                                                    hasImages: Boolean(biz.images?.length),
-                                                });
-                                                return (
-                                                    <span className={`mt-1 inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                                        trust.level === 'ALTA'
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : trust.level === 'MEDIA'
-                                                                ? 'bg-amber-100 text-amber-700'
-                                                                : 'bg-red-100 text-red-700'
-                                                    }`}>
-                                                        Confianza {trust.score}/100
-                                                    </span>
-                                                );
-                                            })()}
+                                            {trust ? (
+                                                <span className={`mt-1 inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                                    trust.level === 'ALTA'
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : trust.level === 'MEDIA'
+                                                            ? 'bg-amber-100 text-amber-700'
+                                                            : 'bg-red-100 text-red-700'
+                                                }`}>
+                                                    Confianza {trust.score}/100
+                                                </span>
+                                            ) : null}
                                             <p className="text-sm text-gray-600 mt-2 line-clamp-2">{biz.description}</p>
                                         </div>
                                     </Link>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             {/* Pagination */}

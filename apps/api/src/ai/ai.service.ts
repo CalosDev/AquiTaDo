@@ -128,6 +128,43 @@ export class AiService {
         };
     }
 
+    async getBusinessAssistantConfig(
+        businessId: string,
+        organizationId: string,
+        actorGlobalRole: string,
+        organizationRole: OrganizationRole | null,
+    ) {
+        const business = await this.prisma.business.findUnique({
+            where: { id: businessId },
+            select: {
+                id: true,
+                organizationId: true,
+                aiAutoResponderEnabled: true,
+                aiAutoResponderPrompt: true,
+                aiLastEmbeddedAt: true,
+            },
+        });
+
+        if (!business) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        if (actorGlobalRole !== 'ADMIN' && business.organizationId !== organizationId) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        if (actorGlobalRole !== 'ADMIN' && !organizationRole) {
+            throw new ForbiddenException('No tienes permisos para ver la configuracion IA');
+        }
+
+        return {
+            id: business.id,
+            aiAutoResponderEnabled: business.aiAutoResponderEnabled,
+            aiAutoResponderPrompt: business.aiAutoResponderPrompt,
+            aiLastEmbeddedAt: business.aiLastEmbeddedAt,
+        };
+    }
+
     async generateBusinessAutoReply(
         businessId: string,
         userMessage: string,

@@ -2,25 +2,26 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import { pageLoaders } from './preload';
 
-const Home = lazy(async () => ({ default: (await import('../pages/Home')).Home }));
-const AppHome = lazy(async () => ({ default: (await import('../pages/AppHome')).AppHome }));
-const CustomerDashboard = lazy(async () => ({ default: (await import('../pages/CustomerDashboard')).CustomerDashboard }));
-const BusinessesList = lazy(async () => ({ default: (await import('../pages/BusinessesList')).BusinessesList }));
-const BusinessDetails = lazy(async () => ({ default: (await import('../pages/BusinessDetails')).BusinessDetails }));
-const Login = lazy(async () => ({ default: (await import('../pages/Login')).Login }));
-const Register = lazy(async () => ({ default: (await import('../pages/Register')).Register }));
-const RegisterBusiness = lazy(async () => ({ default: (await import('../pages/RegisterBusiness')).RegisterBusiness }));
-const DashboardBusiness = lazy(async () => ({ default: (await import('../pages/DashboardBusiness')).DashboardBusiness }));
-const AdminDashboard = lazy(async () => ({ default: (await import('../pages/AdminDashboard')).AdminDashboard }));
-const Terms = lazy(async () => ({ default: (await import('../pages/Terms')).Terms }));
-const Privacy = lazy(async () => ({ default: (await import('../pages/Privacy')).Privacy }));
-const About = lazy(async () => ({ default: (await import('../pages/About')).About }));
-const NotFound = lazy(async () => ({ default: (await import('../pages/NotFound')).NotFound }));
-const OrganizationSettings = lazy(async () => ({ default: (await import('../pages/OrganizationSettings')).OrganizationSettings }));
-const AcceptInvite = lazy(async () => ({ default: (await import('../pages/AcceptInvite')).AcceptInvite }));
-const Profile = lazy(async () => ({ default: (await import('../pages/Profile')).Profile }));
-const AdminSecurity = lazy(async () => ({ default: (await import('../pages/AdminSecurity')).AdminSecurity }));
+const Home = lazy(async () => ({ default: (await pageLoaders.home()).Home }));
+const AppHome = lazy(async () => ({ default: (await pageLoaders.appHome()).AppHome }));
+const CustomerDashboard = lazy(async () => ({ default: (await pageLoaders.customerDashboard()).CustomerDashboard }));
+const BusinessesList = lazy(async () => ({ default: (await pageLoaders.businessesList()).BusinessesList }));
+const BusinessDetails = lazy(async () => ({ default: (await pageLoaders.businessDetails()).BusinessDetails }));
+const Login = lazy(async () => ({ default: (await pageLoaders.login()).Login }));
+const Register = lazy(async () => ({ default: (await pageLoaders.register()).Register }));
+const RegisterBusiness = lazy(async () => ({ default: (await pageLoaders.registerBusiness()).RegisterBusiness }));
+const DashboardBusiness = lazy(async () => ({ default: (await pageLoaders.dashboardBusiness()).DashboardBusiness }));
+const AdminDashboard = lazy(async () => ({ default: (await pageLoaders.adminDashboard()).AdminDashboard }));
+const Terms = lazy(async () => ({ default: (await pageLoaders.terms()).Terms }));
+const Privacy = lazy(async () => ({ default: (await pageLoaders.privacy()).Privacy }));
+const About = lazy(async () => ({ default: (await pageLoaders.about()).About }));
+const NotFound = lazy(async () => ({ default: (await pageLoaders.notFound()).NotFound }));
+const OrganizationSettings = lazy(async () => ({ default: (await pageLoaders.organizationSettings()).OrganizationSettings }));
+const AcceptInvite = lazy(async () => ({ default: (await pageLoaders.acceptInvite()).AcceptInvite }));
+const Profile = lazy(async () => ({ default: (await pageLoaders.profile()).Profile }));
+const AdminSecurity = lazy(async () => ({ default: (await pageLoaders.adminSecurity()).AdminSecurity }));
 
 function RouteFallback() {
     return (

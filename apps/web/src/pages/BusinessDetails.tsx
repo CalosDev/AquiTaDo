@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, checkinsApi, favoritesApi, messagingApi, reputationApi, reviewApi, whatsappApi } from '../api/endpoints';
+import { analyticsApi, bookingsApi, businessApi, checkinsApi, favoritesApi, messagingApi, promotionsApi, reputationApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
@@ -31,6 +31,36 @@ interface Business {
     reviews?: { id: string; rating: number; comment?: string; user: { name: string }; createdAt: string }[];
     _count?: { reviews: number };
     owner?: { name: string };
+}
+
+interface ReviewEntry {
+    id: string;
+    rating: number;
+    comment?: string | null;
+    createdAt: string;
+    user: {
+        id: string;
+        name: string;
+    };
+}
+
+interface PublicPromotion {
+    id: string;
+    title: string;
+    description?: string | null;
+    discountType: 'PERCENTAGE' | 'FIXED';
+    discountValue: string | number;
+    couponCode?: string | null;
+    endsAt: string;
+    isFlashOffer?: boolean;
+}
+
+interface NearbyBusiness {
+    id: string;
+    name: string;
+    slug: string;
+    address?: string;
+    distance?: number | string | null;
 }
 
 interface CheckInStats {
@@ -135,6 +165,12 @@ export function BusinessDetails() {
     const [submittingReview, setSubmittingReview] = useState(false);
     const [messageForm, setMessageForm] = useState({ subject: '', content: '' });
     const [sendingMessage, setSendingMessage] = useState(false);
+    const [bookingForm, setBookingForm] = useState({
+        scheduledFor: '',
+        partySize: '2',
+        notes: '',
+    });
+    const [submittingBooking, setSubmittingBooking] = useState(false);
     const [publicLeadForm, setPublicLeadForm] = useState({
         contactName: '',
         contactPhone: '',
@@ -147,6 +183,8 @@ export function BusinessDetails() {
     const [reviewSuccessMessage, setReviewSuccessMessage] = useState('');
     const [messageErrorMessage, setMessageErrorMessage] = useState('');
     const [messageSuccessMessage, setMessageSuccessMessage] = useState('');
+    const [bookingErrorMessage, setBookingErrorMessage] = useState('');
+    const [bookingSuccessMessage, setBookingSuccessMessage] = useState('');
     const [publicLeadErrorMessage, setPublicLeadErrorMessage] = useState('');
     const [publicLeadSuccessMessage, setPublicLeadSuccessMessage] = useState('');
     const [contactVariant, setContactVariant] = useState('control');
@@ -166,6 +204,12 @@ export function BusinessDetails() {
     const [checkInErrorMessage, setCheckInErrorMessage] = useState('');
     const [reputationProfile, setReputationProfile] = useState<ReputationProfile | null>(null);
     const [reputationLoading, setReputationLoading] = useState(false);
+    const [reviews, setReviews] = useState<ReviewEntry[]>([]);
+    const [reviewsLoading, setReviewsLoading] = useState(false);
+    const [publicPromotions, setPublicPromotions] = useState<PublicPromotion[]>([]);
+    const [promotionsLoading, setPromotionsLoading] = useState(false);
+    const [nearbyBusinesses, setNearbyBusinesses] = useState<NearbyBusiness[]>([]);
+    const [nearbyLoading, setNearbyLoading] = useState(false);
 
     const loadBusiness = useCallback(async () => {
         if (!slug) {
@@ -174,7 +218,12 @@ export function BusinessDetails() {
         }
 
         try {
-            const res = await businessApi.getByIdentifier(slug);
+            let res;
+            try {
+                res = await businessApi.getBySlug(slug);
+            } catch {
+                res = await businessApi.getByIdentifier(slug);
+            }
             setBusiness(res.data);
             setActiveImage(0);
             setErrorMessage('');
@@ -367,6 +416,119 @@ export function BusinessDetails() {
         };
     }, [business?.id]);
 
+    useEffect(() => {
+        if (!business?.id) {
+            setReviews([]);
+            setPublicPromotions([]);
+            setNearbyBusinesses([]);
+            return;
+        }
+
+        let active = true;
+        setReviewsLoading(true);
+        setPromotionsLoading(true);
+        setNearbyLoading(Boolean(
+            typeof business.latitude === 'number' && typeof business.longitude === 'number',
+        ));
+
+        void reviewApi.getByBusiness(business.id)
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+                setReviews((response.data || []) as ReviewEntry[]);
+            })
+            .catch(() => {
+                if (active) {
+                    setReviews([]);
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setReviewsLoading(false);
+                }
+            });
+
+        void promotionsApi.getPublic({
+            businessId: business.id,
+            limit: 6,
+        })
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+
+                const payload = response.data;
+                const rows = Array.isArray(payload)
+                    ? payload
+                    : ((payload?.data || []) as PublicPromotion[]);
+                setPublicPromotions(rows as PublicPromotion[]);
+            })
+            .catch(() => {
+                if (active) {
+                    setPublicPromotions([]);
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setPromotionsLoading(false);
+                }
+            });
+
+        if (
+            typeof business.latitude === 'number'
+            && typeof business.longitude === 'number'
+        ) {
+            void businessApi.getNearby({
+                lat: business.latitude,
+                lng: business.longitude,
+                radius: 5,
+            })
+                .then((response) => {
+                    if (!active) {
+                        return;
+                    }
+
+                    const payload = response.data;
+                    const rows = (Array.isArray(payload)
+                        ? payload
+                        : (payload?.data || [])) as Array<Record<string, unknown>>;
+
+                    const normalized = rows
+                        .map((row) => ({
+                            id: String(row.id || ''),
+                            name: String(row.name || ''),
+                            slug: String(row.slug || ''),
+                            address: typeof row.address === 'string' ? row.address : undefined,
+                            distance: typeof row.distance === 'number' || typeof row.distance === 'string'
+                                ? row.distance
+                                : null,
+                        }))
+                        .filter((item) => item.id && item.id !== business.id)
+                        .slice(0, 6);
+
+                    setNearbyBusinesses(normalized);
+                })
+                .catch(() => {
+                    if (active) {
+                        setNearbyBusinesses([]);
+                    }
+                })
+                .finally(() => {
+                    if (active) {
+                        setNearbyLoading(false);
+                    }
+                });
+        } else {
+            setNearbyBusinesses([]);
+            setNearbyLoading(false);
+        }
+
+        return () => {
+            active = false;
+        };
+    }, [business?.id, business?.latitude, business?.longitude]);
+
     const handleReviewSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!business?.id) return;
@@ -420,16 +582,18 @@ export function BusinessDetails() {
         }
     };
 
+    const visibleReviews = reviews.length > 0 ? reviews : (business?.reviews ?? []);
+    const reviewCount = business?._count?.reviews ?? visibleReviews.length;
     const averageRating =
-        business?.reviews && business.reviews.length > 0
-            ? (business.reviews.reduce((acc, r) => acc + r.rating, 0) / business.reviews.length).toFixed(1)
+        visibleReviews.length > 0
+            ? (visibleReviews.reduce((acc, r) => acc + r.rating, 0) / visibleReviews.length).toFixed(1)
             : null;
     const averageRatingNumber = averageRating ? Number(averageRating) : null;
     const trust = calculateBusinessTrustScore({
         verified: business?.verified,
         reputationScore: business?.reputationScore,
         averageRating: averageRatingNumber,
-        reviewsCount: business?._count?.reviews ?? 0,
+        reviewsCount: reviewCount,
         hasPhone: Boolean(business?.phone),
         hasWhatsapp: Boolean(business?.whatsapp),
         hasDescription: Boolean(business?.description?.trim()),
@@ -463,7 +627,7 @@ export function BusinessDetails() {
         : null;
 
     const trackContactGrowthEvent = (
-        eventType: 'CONTACT_CLICK' | 'WHATSAPP_CLICK',
+        eventType: 'CONTACT_CLICK' | 'WHATSAPP_CLICK' | 'BOOKING_INTENT',
         metadata: Record<string, unknown>,
     ) => {
         if (!business?.id) {
@@ -659,6 +823,56 @@ export function BusinessDetails() {
             setFavoriteErrorMessage(getApiErrorMessage(error, 'No se pudo agregar a la lista'));
         } finally {
             setListProcessing(false);
+        }
+    };
+
+    const handleBookingSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!business?.id) {
+            return;
+        }
+
+        const scheduledFor = bookingForm.scheduledFor.trim();
+        const partySize = Number.parseInt(bookingForm.partySize, 10);
+        if (!scheduledFor) {
+            setBookingErrorMessage('Selecciona fecha y hora para tu reserva');
+            return;
+        }
+
+        if (!Number.isFinite(partySize) || partySize < 1) {
+            setBookingErrorMessage('El tamano del grupo debe ser mayor a 0');
+            return;
+        }
+
+        setSubmittingBooking(true);
+        setBookingErrorMessage('');
+        setBookingSuccessMessage('');
+        try {
+            await bookingsApi.create({
+                businessId: business.id,
+                scheduledFor: new Date(scheduledFor).toISOString(),
+                partySize,
+                notes: bookingForm.notes.trim() || undefined,
+            });
+            setBookingForm({
+                scheduledFor: '',
+                partySize: '2',
+                notes: '',
+            });
+            setBookingSuccessMessage('Reserva enviada correctamente');
+            void analyticsApi.trackEvent({
+                businessId: business.id,
+                eventType: 'RESERVATION_REQUEST',
+                visitorId: getOrCreateVisitorId(),
+            }).catch(() => undefined);
+            trackContactGrowthEvent('BOOKING_INTENT', {
+                source: 'business-details',
+                channel: 'booking-form',
+            });
+        } catch (error) {
+            setBookingErrorMessage(getApiErrorMessage(error, 'No se pudo crear la reserva'));
+        } finally {
+            setSubmittingBooking(false);
         }
     };
 
@@ -977,10 +1191,83 @@ export function BusinessDetails() {
                         </div>
                     )}
 
+                    <div className="card p-6">
+                        <h2 className="font-display font-semibold text-gray-900 mb-4">Ofertas activas</h2>
+                        {promotionsLoading ? (
+                            <p className="text-sm text-gray-500">Cargando promociones...</p>
+                        ) : publicPromotions.length > 0 ? (
+                            <div className="space-y-3">
+                                {publicPromotions.map((promotion) => (
+                                    <div key={promotion.id} className="rounded-xl border border-gray-100 p-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <p className="font-semibold text-gray-900">{promotion.title}</p>
+                                            <span className="text-xs rounded-full bg-primary-50 text-primary-700 px-2 py-1">
+                                                {promotion.discountType === 'PERCENTAGE'
+                                                    ? `${Number(promotion.discountValue)}% OFF`
+                                                    : `${formatCurrencyDop(Number(promotion.discountValue))} OFF`}
+                                            </span>
+                                        </div>
+                                        {promotion.description ? (
+                                            <p className="text-sm text-gray-600 mt-1">{promotion.description}</p>
+                                        ) : null}
+                                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                            {promotion.couponCode ? (
+                                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+                                                    Cupon: {promotion.couponCode}
+                                                </span>
+                                            ) : null}
+                                            {promotion.isFlashOffer ? (
+                                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">
+                                                    Flash
+                                                </span>
+                                            ) : null}
+                                            <span>Vence: {new Date(promotion.endsAt).toLocaleDateString('es-DO')}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500">Este negocio no tiene promociones activas.</p>
+                        )}
+                    </div>
+
+                    <div className="card p-6">
+                        <h2 className="font-display font-semibold text-gray-900 mb-4">Negocios cerca de aqui</h2>
+                        {nearbyLoading ? (
+                            <p className="text-sm text-gray-500">Cargando negocios cercanos...</p>
+                        ) : nearbyBusinesses.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {nearbyBusinesses.map((nearbyBusiness) => {
+                                    const parsedDistance = Number(nearbyBusiness.distance);
+                                    const distanceLabel = Number.isFinite(parsedDistance)
+                                        ? `${parsedDistance.toFixed(1)} km`
+                                        : null;
+                                    return (
+                                        <Link
+                                            key={nearbyBusiness.id}
+                                            to={`/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`}
+                                            className="rounded-xl border border-gray-100 p-3 hover:border-primary-200 hover:bg-primary-50/40 transition-colors"
+                                        >
+                                            <p className="font-medium text-gray-900">{nearbyBusiness.name}</p>
+                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                                {nearbyBusiness.address || 'Direccion no disponible'}
+                                            </p>
+                                            {distanceLabel ? (
+                                                <p className="text-xs text-primary-700 mt-2">{distanceLabel}</p>
+                                            ) : null}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500">No hay resultados cercanos para mostrar.</p>
+                        )}
+                    </div>
+
                     {/* Reviews */}
                     <div className="card p-6">
                         <h2 className="font-display font-semibold text-gray-900 mb-4">
-                            Resenas ({business.reviews?.length || 0})
+                            Resenas ({reviewCount})
                         </h2>
 
                         {/* Review Form */}
@@ -1039,7 +1326,11 @@ export function BusinessDetails() {
 
                         {/* Reviews List */}
                         <div className="space-y-4">
-                            {business.reviews?.map((review) => (
+                            {reviewsLoading ? (
+                                <p className="text-gray-600 text-sm text-center py-4">
+                                    Cargando resenas...
+                                </p>
+                            ) : visibleReviews.map((review) => (
                                 <div key={review.id} className="p-4 border border-gray-100 rounded-xl">
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
@@ -1057,7 +1348,7 @@ export function BusinessDetails() {
                                     {review.comment && <p className="text-sm text-gray-600">{review.comment}</p>}
                                 </div>
                             ))}
-                            {(!business.reviews || business.reviews.length === 0) && (
+                            {!reviewsLoading && visibleReviews.length === 0 && (
                                 <p className="text-gray-600 text-sm text-center py-4">
                                     Aun no hay resenas. Se el primero en opinar!
                                 </p>
@@ -1209,6 +1500,71 @@ export function BusinessDetails() {
                         </div>
 
                         <div className="mt-6 border-t border-gray-100 pt-6">
+                            {isAuthenticated && (
+                                <div className="mb-6">
+                                    <h3 className="font-display font-semibold text-gray-900 mb-3">
+                                        Reservar ahora
+                                    </h3>
+                                    <form onSubmit={handleBookingSubmit} className="space-y-3">
+                                        <input
+                                            type="datetime-local"
+                                            className="input-field text-sm"
+                                            value={bookingForm.scheduledFor}
+                                            onChange={(event) =>
+                                                setBookingForm((previous) => ({
+                                                    ...previous,
+                                                    scheduledFor: event.target.value,
+                                                }))
+                                            }
+                                        />
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            className="input-field text-sm"
+                                            placeholder="Cantidad de personas"
+                                            value={bookingForm.partySize}
+                                            onChange={(event) =>
+                                                setBookingForm((previous) => ({
+                                                    ...previous,
+                                                    partySize: event.target.value,
+                                                }))
+                                            }
+                                        />
+                                        <textarea
+                                            className="input-field text-sm"
+                                            rows={2}
+                                            placeholder="Notas de la reserva (opcional)"
+                                            value={bookingForm.notes}
+                                            onChange={(event) =>
+                                                setBookingForm((previous) => ({
+                                                    ...previous,
+                                                    notes: event.target.value,
+                                                }))
+                                            }
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="btn-primary text-sm w-full"
+                                            disabled={submittingBooking}
+                                        >
+                                            {submittingBooking ? 'Enviando reserva...' : 'Enviar reserva'}
+                                        </button>
+                                    </form>
+
+                                    {bookingErrorMessage && (
+                                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                            {bookingErrorMessage}
+                                        </div>
+                                    )}
+
+                                    {bookingSuccessMessage && (
+                                        <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                                            {bookingSuccessMessage}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <h3 className="font-display font-semibold text-gray-900 mb-3">
                                 Mensaje directo
                             </h3>

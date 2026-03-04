@@ -4,6 +4,7 @@ import { getRoleCapabilities } from '../auth/capabilities';
 import { resolveRoleHomeLabel, resolveRoleHomePath } from '../auth/roles';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
+import { preloadLikelyRoutesForSession, preloadRouteChunk } from '../routes/preload';
 
 interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;
@@ -39,9 +40,8 @@ export function Navbar() {
     const showOrganizationChip = organizationName.length > 0 && organizationName.length <= 18;
 
     const handleLogout = () => {
-        void logout().finally(() => {
-            navigate('/');
-        });
+        void logout();
+        navigate('/');
     };
 
     const handleInstallApp = async () => {
@@ -71,6 +71,40 @@ export function Navbar() {
             window.removeEventListener('beforeinstallprompt', handler);
         };
     }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const schedulePrefetch = () => {
+            preloadLikelyRoutesForSession({
+                isAuthenticated,
+                role: user?.role,
+            });
+        };
+
+        const withIdleCallback = window as Window & {
+            requestIdleCallback?: (
+                callback: IdleRequestCallback,
+                options?: IdleRequestOptions,
+            ) => number;
+            cancelIdleCallback?: (handle: number) => void;
+        };
+        if (typeof withIdleCallback.requestIdleCallback === 'function') {
+            const idleId = withIdleCallback.requestIdleCallback(() => {
+                schedulePrefetch();
+            }, { timeout: 1500 });
+            return () => {
+                if (typeof withIdleCallback.cancelIdleCallback === 'function') {
+                    withIdleCallback.cancelIdleCallback(idleId);
+                }
+            };
+        }
+
+        const timeoutId = window.setTimeout(schedulePrefetch, 600);
+        return () => window.clearTimeout(timeoutId);
+    }, [isAuthenticated, user?.role]);
 
     return (
         <header className="sticky top-0 z-50">
@@ -105,9 +139,23 @@ export function Navbar() {
                         </Link>
 
                         <div className="hidden lg:flex items-center gap-3 xl:gap-5 min-w-0">
-                            <Link to="/businesses" className="nav-link">Negocios</Link>
+                            <Link
+                                to="/businesses"
+                                className="nav-link"
+                                onMouseEnter={() => preloadRouteChunk('/businesses')}
+                                onFocus={() => preloadRouteChunk('/businesses')}
+                            >
+                                Negocios
+                            </Link>
                             {!isAuthenticated && (
-                                <Link to="/about" className="nav-link">Nosotros</Link>
+                                <Link
+                                    to="/about"
+                                    className="nav-link"
+                                    onMouseEnter={() => preloadRouteChunk('/about')}
+                                    onFocus={() => preloadRouteChunk('/about')}
+                                >
+                                    Nosotros
+                                </Link>
                             )}
                             {installPromptEvent && (
                                 <button type="button" className="btn-secondary text-sm" onClick={() => void handleInstallApp()}>
@@ -116,16 +164,49 @@ export function Navbar() {
                             )}
                             {isAuthenticated ? (
                                 <>
-                                    <Link to={roleHomePath} className="nav-link">{roleHomeLabel}</Link>
+                                    <Link
+                                        to={roleHomePath}
+                                        className="nav-link"
+                                        onMouseEnter={() => preloadRouteChunk(roleHomePath)}
+                                        onFocus={() => preloadRouteChunk(roleHomePath)}
+                                    >
+                                        {roleHomeLabel}
+                                    </Link>
                                     {canAccessOrganization && (
-                                        <Link to="/organization" className="nav-link">Organizacion</Link>
+                                        <Link
+                                            to="/organization"
+                                            className="nav-link"
+                                            onMouseEnter={() => preloadRouteChunk('/organization')}
+                                            onFocus={() => preloadRouteChunk('/organization')}
+                                        >
+                                            Organizacion
+                                        </Link>
                                     )}
                                     {user?.role === 'ADMIN' && (
-                                        <Link to="/security" className="nav-link">Seguridad</Link>
+                                        <Link
+                                            to="/security"
+                                            className="nav-link"
+                                            onMouseEnter={() => preloadRouteChunk('/security')}
+                                            onFocus={() => preloadRouteChunk('/security')}
+                                        >
+                                            Seguridad
+                                        </Link>
                                     )}
-                                    <Link to="/profile" className="nav-link">Perfil</Link>
+                                    <Link
+                                        to="/profile"
+                                        className="nav-link"
+                                        onMouseEnter={() => preloadRouteChunk('/profile')}
+                                        onFocus={() => preloadRouteChunk('/profile')}
+                                    >
+                                        Perfil
+                                    </Link>
                                     {canRegisterBusiness && (
-                                        <Link to="/register-business" className="btn-accent text-sm whitespace-nowrap shrink-0">
+                                        <Link
+                                            to="/register-business"
+                                            className="btn-accent text-sm whitespace-nowrap shrink-0"
+                                            onMouseEnter={() => preloadRouteChunk('/register-business')}
+                                            onFocus={() => preloadRouteChunk('/register-business')}
+                                        >
                                             <span className="xl:hidden">+ Negocio</span>
                                             <span className="hidden xl:inline 2xl:hidden">+ Registrar</span>
                                             <span className="hidden 2xl:inline">+ Registrar Negocio</span>
@@ -153,8 +234,22 @@ export function Navbar() {
                                 </>
                             ) : (
                                 <div className="flex items-center gap-3">
-                                    <Link to="/login" className="btn-secondary text-sm">Iniciar Sesion</Link>
-                                    <Link to="/register" className="btn-primary text-sm">Crear Cuenta</Link>
+                                    <Link
+                                        to="/login"
+                                        className="btn-secondary text-sm"
+                                        onMouseEnter={() => preloadRouteChunk('/login')}
+                                        onFocus={() => preloadRouteChunk('/login')}
+                                    >
+                                        Iniciar Sesion
+                                    </Link>
+                                    <Link
+                                        to="/register"
+                                        className="btn-primary text-sm"
+                                        onMouseEnter={() => preloadRouteChunk('/register')}
+                                        onFocus={() => preloadRouteChunk('/register')}
+                                    >
+                                        Crear Cuenta
+                                    </Link>
                                 </div>
                             )}
                         </div>
@@ -180,17 +275,21 @@ export function Navbar() {
                     {menuOpen && (
                         <div id="mobile-main-menu" className="lg:hidden pb-4 pt-2 animate-slide-down">
                             <div className="surface-panel p-2">
-                                <Link
-                                    to="/businesses"
-                                    className="touch-target block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
-                                    onClick={() => setMenuOpen(false)}
-                                >
-                                    Negocios
+                                    <Link
+                                        to="/businesses"
+                                        className="touch-target block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                        onMouseEnter={() => preloadRouteChunk('/businesses')}
+                                        onFocus={() => preloadRouteChunk('/businesses')}
+                                        onClick={() => setMenuOpen(false)}
+                                    >
+                                        Negocios
                                 </Link>
                                 {!isAuthenticated && (
                                     <Link
                                         to="/about"
                                         className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                        onMouseEnter={() => preloadRouteChunk('/about')}
+                                        onFocus={() => preloadRouteChunk('/about')}
                                         onClick={() => setMenuOpen(false)}
                                     >
                                         Nosotros
@@ -215,6 +314,8 @@ export function Navbar() {
                                             <Link
                                                 to="/register-business"
                                                 className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-accent-700 hover:bg-accent-50"
+                                                onMouseEnter={() => preloadRouteChunk('/register-business')}
+                                                onFocus={() => preloadRouteChunk('/register-business')}
                                                 onClick={() => setMenuOpen(false)}
                                             >
                                                 + Registrar Negocio
@@ -223,6 +324,8 @@ export function Navbar() {
                                         <Link
                                             to={roleHomePath}
                                             className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                            onMouseEnter={() => preloadRouteChunk(roleHomePath)}
+                                            onFocus={() => preloadRouteChunk(roleHomePath)}
                                             onClick={() => setMenuOpen(false)}
                                         >
                                             {roleHomeLabel}
@@ -231,6 +334,8 @@ export function Navbar() {
                                             <Link
                                                 to="/organization"
                                                 className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                                onMouseEnter={() => preloadRouteChunk('/organization')}
+                                                onFocus={() => preloadRouteChunk('/organization')}
                                                 onClick={() => setMenuOpen(false)}
                                             >
                                                 Organizacion
@@ -240,6 +345,8 @@ export function Navbar() {
                                             <Link
                                                 to="/security"
                                                 className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                                onMouseEnter={() => preloadRouteChunk('/security')}
+                                                onFocus={() => preloadRouteChunk('/security')}
                                                 onClick={() => setMenuOpen(false)}
                                             >
                                                 Seguridad
@@ -248,6 +355,8 @@ export function Navbar() {
                                         <Link
                                             to="/profile"
                                             className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                            onMouseEnter={() => preloadRouteChunk('/profile')}
+                                            onFocus={() => preloadRouteChunk('/profile')}
                                             onClick={() => setMenuOpen(false)}
                                         >
                                             Perfil
@@ -268,6 +377,8 @@ export function Navbar() {
                                         <Link
                                             to="/login"
                                             className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                            onMouseEnter={() => preloadRouteChunk('/login')}
+                                            onFocus={() => preloadRouteChunk('/login')}
                                             onClick={() => setMenuOpen(false)}
                                         >
                                             Iniciar Sesion
@@ -275,6 +386,8 @@ export function Navbar() {
                                         <Link
                                             to="/register"
                                             className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-50"
+                                            onMouseEnter={() => preloadRouteChunk('/register')}
+                                            onFocus={() => preloadRouteChunk('/register')}
                                             onClick={() => setMenuOpen(false)}
                                         >
                                             Crear Cuenta

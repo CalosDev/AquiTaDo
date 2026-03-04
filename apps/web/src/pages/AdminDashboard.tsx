@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../api/error';
-import { analyticsApi, businessApi, categoryApi, observabilityApi, reviewApi, verificationApi } from '../api/endpoints';
+import { aiApi, analyticsApi, businessApi, categoryApi, observabilityApi, reviewApi, verificationApi } from '../api/endpoints';
 
 interface Business {
     id: string;
@@ -87,12 +87,117 @@ interface ModerationQueueItem {
     };
 }
 
+interface ReviewAiSentimentInsight {
+    reviewId: string;
+    sentiment: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
+    score: number;
+    summary: string | null;
+    isNegative: boolean;
+}
+
 interface ObservabilitySummary {
     totalRequests: number;
     errors5xx: number;
     averageLatencyMs: number;
     rateLimitHits: number;
     externalFailures: number;
+}
+
+interface MarketInsightsSnapshot {
+    totals: {
+        trackedBusinesses: number;
+        views: number;
+        clicks: number;
+        conversions: number;
+        reservationRequests: number;
+        grossRevenue: number;
+        conversionRate: number;
+        reservationRequestRate: number;
+    };
+    topBusinesses: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        stats: {
+            views: number;
+            clicks: number;
+            conversions: number;
+            reservationRequests: number;
+            grossRevenue: number;
+            conversionRate: number;
+            averageRating: number;
+            reviewCount: number;
+        };
+    }>;
+    provinces: Array<{
+        provinceId: string;
+        provinceName: string;
+        businessCount: number;
+        views: number;
+        conversions: number;
+        reservationRequests: number;
+        grossRevenue: number;
+        conversionRate: number;
+        averageRating: number;
+    }>;
+    categories: Array<{
+        categoryId: string;
+        categoryName: string;
+        businessCount: number;
+        views: number;
+        conversions: number;
+        reservationRequests: number;
+        grossRevenue: number;
+        conversionRate: number;
+    }>;
+}
+
+interface GrowthInsightsSnapshot {
+    topSearchedCategories: Array<{
+        categoryId: string | null;
+        categoryName: string;
+        searches: number;
+        supplyBusinesses: number;
+        demandSupplyRatio: number;
+    }>;
+    demandSupplyGaps: Array<{
+        provinceId: string | null;
+        provinceName: string;
+        categoryId: string | null;
+        categoryName: string;
+        demandSearches: number;
+        supplyBusinesses: number;
+        demandSupplyRatio: number;
+    }>;
+    conversionFunnels: {
+        searchToWhatsApp: {
+            uniqueSearchVisitors: number;
+            uniqueWhatsAppVisitors: number;
+            conversionRate: number;
+        };
+    };
+    abTesting: {
+        experiment: string;
+        winner?: {
+            variantKey: string;
+            contactClicks: number;
+            whatsappClicks: number;
+            conversionRate: number;
+        } | null;
+        variants: Array<{
+            variantKey: string;
+            contactClicks: number;
+            whatsappClicks: number;
+            conversionRate: number;
+        }>;
+    };
+}
+
+interface MarketReportDetail extends MarketReport {
+    summary?: Record<string, unknown> | null;
+    filters?: Record<string, unknown> | null;
+    periodStart?: string;
+    periodEnd?: string;
 }
 
 type CategoryForm = {
@@ -215,10 +320,18 @@ export function AdminDashboard() {
     const [verificationLoading, setVerificationLoading] = useState(false);
     const [pendingVerifications, setPendingVerifications] = useState<PendingVerificationBusiness[]>([]);
     const [marketReports, setMarketReports] = useState<MarketReport[]>([]);
+    const [marketInsights, setMarketInsights] = useState<MarketInsightsSnapshot | null>(null);
+    const [growthInsights, setGrowthInsights] = useState<GrowthInsightsSnapshot | null>(null);
+    const [selectedMarketReportId, setSelectedMarketReportId] = useState<string | null>(null);
+    const [marketReportDetail, setMarketReportDetail] = useState<MarketReportDetail | null>(null);
+    const [marketReportLoading, setMarketReportLoading] = useState(false);
     const [flaggedReviews, setFlaggedReviews] = useState<FlaggedReview[]>([]);
+    const [reviewAiInsights, setReviewAiInsights] = useState<Record<string, ReviewAiSentimentInsight>>({});
+    const [analyzingReviewId, setAnalyzingReviewId] = useState<string | null>(null);
     const [moderationQueue, setModerationQueue] = useState<ModerationQueueItem[]>([]);
     const [generatingReport, setGeneratingReport] = useState(false);
     const [observabilityLoading, setObservabilityLoading] = useState(false);
+    const [insightsLoading, setInsightsLoading] = useState(false);
     const [observabilityRaw, setObservabilityRaw] = useState('');
     const [observabilitySummary, setObservabilitySummary] = useState<ObservabilitySummary>(EMPTY_OBSERVABILITY_SUMMARY);
 
@@ -249,21 +362,43 @@ export function AdminDashboard() {
 
     const loadVerificationData = useCallback(async () => {
         setVerificationLoading(true);
+        setInsightsLoading(true);
         try {
-            const [pendingRes, reportsRes, flaggedReviewsRes, moderationQueueRes] = await Promise.all([
+            const [
+                pendingRes,
+                reportsRes,
+                flaggedReviewsRes,
+                moderationQueueRes,
+                marketInsightsRes,
+                growthInsightsRes,
+            ] = await Promise.all([
                 verificationApi.getPendingBusinessesAdmin({ limit: 50 }),
                 analyticsApi.listMarketReports({ limit: 20 }),
                 reviewApi.getFlagged({ limit: 50 }),
                 verificationApi.getModerationQueueAdmin({ limit: 80 }),
+                analyticsApi.getMarketInsights({ days: 30, limit: 10 }),
+                analyticsApi.getGrowthInsights({ days: 30, limit: 10 }),
             ]);
+            const reports = (reportsRes.data || []) as MarketReport[];
             setPendingVerifications((pendingRes.data || []) as PendingVerificationBusiness[]);
-            setMarketReports((reportsRes.data || []) as MarketReport[]);
+            setMarketReports(reports);
             setFlaggedReviews((flaggedReviewsRes.data || []) as FlaggedReview[]);
             setModerationQueue((moderationQueueRes.data?.items || []) as ModerationQueueItem[]);
+            setMarketInsights((marketInsightsRes.data || null) as MarketInsightsSnapshot | null);
+            setGrowthInsights((growthInsightsRes.data || null) as GrowthInsightsSnapshot | null);
+            setSelectedMarketReportId((current) => {
+                if (current && reports.some((report) => report.id === current)) {
+                    return current;
+                }
+                return reports[0]?.id ?? null;
+            });
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificación y data layer'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificacion y data layer'));
+            setMarketInsights(null);
+            setGrowthInsights(null);
         } finally {
             setVerificationLoading(false);
+            setInsightsLoading(false);
         }
     }, []);
 
@@ -272,6 +407,33 @@ export function AdminDashboard() {
             void loadVerificationData();
         }
     }, [activeTab, loadVerificationData]);
+
+    const loadMarketReportDetail = useCallback(async (reportId: string) => {
+        if (!reportId) {
+            setMarketReportDetail(null);
+            return;
+        }
+
+        setMarketReportLoading(true);
+        try {
+            const response = await analyticsApi.getMarketReportById(reportId);
+            setMarketReportDetail((response.data || null) as MarketReportDetail | null);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el detalle del reporte'));
+            setMarketReportDetail(null);
+        } finally {
+            setMarketReportLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab !== 'verification' || !selectedMarketReportId) {
+            setMarketReportDetail(null);
+            return;
+        }
+
+        void loadMarketReportDetail(selectedMarketReportId);
+    }, [activeTab, selectedMarketReportId, loadMarketReportDetail]);
 
     const loadObservabilityData = useCallback(async () => {
         setObservabilityLoading(true);
@@ -366,9 +528,9 @@ export function AdminDashboard() {
             });
             setNewCategoryForm(EMPTY_CATEGORY_FORM);
             await loadData();
-            setSuccessMessage('Categoría creada correctamente');
+            setSuccessMessage('CategorÃ­a creada correctamente');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la categoría'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la categorÃ­a'));
         } finally {
             setProcessingId(null);
         }
@@ -408,9 +570,9 @@ export function AdminDashboard() {
             });
             await loadData();
             cancelCategoryEdit();
-            setSuccessMessage('Categoría actualizada correctamente');
+            setSuccessMessage('CategorÃ­a actualizada correctamente');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la categoría'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la categorÃ­a'));
         } finally {
             setProcessingId(null);
         }
@@ -456,13 +618,13 @@ export function AdminDashboard() {
             await verificationApi.reviewBusinessAdmin(businessId, {
                 status,
                 notes: status === 'VERIFIED'
-                    ? 'Verificación aprobada por equipo admin'
-                    : 'Revisión administrativa',
+                    ? 'VerificaciÃ³n aprobada por equipo admin'
+                    : 'RevisiÃ³n administrativa',
             });
             await Promise.all([loadData(), loadVerificationData()]);
-            setSuccessMessage('Revisión de verificación actualizada');
+            setSuccessMessage('RevisiÃ³n de verificaciÃ³n actualizada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la verificación'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la verificaciÃ³n'));
         } finally {
             setProcessingId(null);
         }
@@ -515,6 +677,52 @@ export function AdminDashboard() {
         }
     };
 
+    const handleReviewDocument = async (
+        documentId: string,
+        status: 'APPROVED' | 'REJECTED',
+    ) => {
+        setProcessingId(documentId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await verificationApi.reviewDocumentAdmin(documentId, {
+                status,
+                rejectionReason: status === 'REJECTED'
+                    ? 'Documento rechazado por moderacion administrativa'
+                    : undefined,
+            });
+            await loadVerificationData();
+            setSuccessMessage(
+                status === 'APPROVED'
+                    ? 'Documento aprobado correctamente'
+                    : 'Documento rechazado correctamente',
+            );
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo revisar el documento'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleAnalyzeFlaggedReview = async (reviewId: string) => {
+        setAnalyzingReviewId(reviewId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            const response = await aiApi.analyzeReviewSentiment(reviewId);
+            const payload = response.data as ReviewAiSentimentInsight;
+            setReviewAiInsights((current) => ({
+                ...current,
+                [reviewId]: payload,
+            }));
+            setSuccessMessage('Analisis IA generado para la reseÃ±a');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo analizar la reseÃ±a con IA'));
+        } finally {
+            setAnalyzingReviewId(null);
+        }
+    };
+
     const tabs = [
         { key: 'businesses', label: 'Negocios', icon: 'N' },
         { key: 'categories', label: 'Categorias', icon: 'C' },
@@ -525,7 +733,7 @@ export function AdminDashboard() {
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
             <h1 className="font-display text-3xl font-bold text-gray-900 mb-2">Panel Admin</h1>
-            <p className="text-gray-500 mb-8">Gestión de negocios y categorías</p>
+            <p className="text-gray-500 mb-8">GestiÃ³n de negocios y categorÃ­as</p>
 
             {errorMessage && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -558,7 +766,7 @@ export function AdminDashboard() {
                 </div>
                 <div className="card p-4 text-center">
                     <div className="text-2xl font-bold text-accent-600">{categories.length}</div>
-                    <div className="text-xs text-gray-500">Categorías</div>
+                    <div className="text-xs text-gray-500">CategorÃ­as</div>
                 </div>
             </div>
 
@@ -718,7 +926,7 @@ export function AdminDashboard() {
                     {activeTab === 'categories' && (
                         <div className="space-y-4">
                             <div className="card p-5">
-                                <h3 className="font-display font-semibold mb-3">Crear categoría</h3>
+                                <h3 className="font-display font-semibold mb-3">Crear categorÃ­a</h3>
                                 <form onSubmit={handleCreateCategory} className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                     <input
                                         type="text"
@@ -771,7 +979,7 @@ export function AdminDashboard() {
                             </div>
 
                             <div className="card p-5">
-                                <h3 className="font-display font-semibold mb-3">Categorías actuales</h3>
+                                <h3 className="font-display font-semibold mb-3">CategorÃ­as actuales</h3>
                                 <div className="space-y-3">
                                     {categories.map((category) => (
                                         <div
@@ -836,7 +1044,7 @@ export function AdminDashboard() {
                                             ) : (
                                                 <div className="flex items-center justify-between gap-4">
                                                     <div className="flex items-center gap-2 text-sm">
-                                                        <span>{category.icon || '📁'}</span>
+                                                        <span>{category.icon || 'ðŸ“'}</span>
                                                         <span className="font-medium text-gray-800">
                                                             {category.name}
                                                         </span>
@@ -910,10 +1118,10 @@ export function AdminDashboard() {
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
                                                     <p className="font-medium text-gray-900">
-                                                        {item.business.name} · {item.organization.name}
+                                                        {item.business.name} Â· {item.organization.name}
                                                     </p>
                                                     <p className="text-xs text-gray-500">
-                                                        {item.queueType} · {new Date(item.createdAt).toLocaleString('es-DO')}
+                                                        {item.queueType} Â· {new Date(item.createdAt).toLocaleString('es-DO')}
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -929,6 +1137,26 @@ export function AdminDashboard() {
                                                     </span>
                                                 </div>
                                             </div>
+                                            {item.queueType === 'DOCUMENT_REVIEW' ? (
+                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                    <button
+                                                        type="button"
+                                                        className="btn-primary text-xs"
+                                                        disabled={processingId === item.entityId}
+                                                        onClick={() => void handleReviewDocument(item.entityId, 'APPROVED')}
+                                                    >
+                                                        Aprobar documento
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn-secondary text-xs"
+                                                        disabled={processingId === item.entityId}
+                                                        onClick={() => void handleReviewDocument(item.entityId, 'REJECTED')}
+                                                    >
+                                                        Rechazar documento
+                                                    </button>
+                                                </div>
+                                            ) : null}
                                         </div>
                                     )) : (
                                         <p className="text-sm text-gray-500">No hay items en la cola unificada.</p>
@@ -938,7 +1166,7 @@ export function AdminDashboard() {
 
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                    <h3 className="font-display font-semibold">Verificación KYC pendiente</h3>
+                                    <h3 className="font-display font-semibold">VerificaciÃ³n KYC pendiente</h3>
                                     <button
                                         type="button"
                                         className="btn-secondary text-xs"
@@ -956,7 +1184,7 @@ export function AdminDashboard() {
                                                 <div>
                                                     <p className="font-medium text-gray-900">{business.name}</p>
                                                     <p className="text-xs text-gray-500">
-                                                        {business.organization.name} · riesgo {business.riskScore}/100 · docs {business.documents.total}
+                                                        {business.organization.name} Â· riesgo {business.riskScore}/100 Â· docs {business.documents.total}
                                                     </p>
                                                 </div>
                                                 <span className="text-xs rounded-full px-2 py-0.5 bg-yellow-100 text-yellow-700">
@@ -964,7 +1192,7 @@ export function AdminDashboard() {
                                                 </span>
                                             </div>
                                             <p className="text-xs text-gray-500 mt-1">
-                                                Pendientes {business.documents.pending} · Aprobados {business.documents.approved} · Rechazados {business.documents.rejected}
+                                                Pendientes {business.documents.pending} Â· Aprobados {business.documents.approved} Â· Rechazados {business.documents.rejected}
                                             </p>
                                             <div className="flex gap-2 mt-2">
                                                 <button
@@ -1019,10 +1247,10 @@ export function AdminDashboard() {
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
                                                     <p className="font-medium text-gray-900">
-                                                        {review.business.name} · {review.user.name}
+                                                        {review.business.name} Â· {review.user.name}
                                                     </p>
                                                     <p className="text-xs text-gray-500">
-                                                        Rating {review.rating}/5 · {new Date(review.flaggedAt || review.createdAt).toLocaleString('es-DO')}
+                                                        Rating {review.rating}/5 Â· {new Date(review.flaggedAt || review.createdAt).toLocaleString('es-DO')}
                                                     </p>
                                                 </div>
                                                 <span className="text-xs rounded-full px-2 py-0.5 bg-yellow-100 text-yellow-700">
@@ -1035,7 +1263,15 @@ export function AdminDashboard() {
                                             {review.moderationReason ? (
                                                 <p className="text-xs text-red-700 mt-1">{review.moderationReason}</p>
                                             ) : null}
-                                            <div className="flex gap-2 mt-2">
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                <button
+                                                    type="button"
+                                                    className="btn-secondary text-xs"
+                                                    disabled={analyzingReviewId === review.id}
+                                                    onClick={() => void handleAnalyzeFlaggedReview(review.id)}
+                                                >
+                                                    {analyzingReviewId === review.id ? 'Analizando IA...' : 'Analizar IA'}
+                                                </button>
                                                 <button
                                                     type="button"
                                                     className="btn-primary text-xs"
@@ -1053,11 +1289,116 @@ export function AdminDashboard() {
                                                     Mantener en cola
                                                 </button>
                                             </div>
+                                            {reviewAiInsights[review.id] ? (
+                                                <div className="mt-2 rounded-lg border border-primary-100 bg-primary-50 p-2 text-xs text-gray-700">
+                                                    <p>
+                                                        Sentimiento: <strong>{reviewAiInsights[review.id].sentiment}</strong>
+                                                        {' '}({(reviewAiInsights[review.id].score * 100).toFixed(0)}%)
+                                                    </p>
+                                                    {reviewAiInsights[review.id].isNegative ? (
+                                                        <p className="text-red-700 mt-1 font-medium">Alerta: reseÃ±a negativa detectada.</p>
+                                                    ) : null}
+                                                    {reviewAiInsights[review.id].summary ? (
+                                                        <p className="mt-1">{reviewAiInsights[review.id].summary}</p>
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
                                         </div>
                                     )) : (
                                         <p className="text-sm text-gray-500">No hay resenas sospechosas en este momento.</p>
                                     )}
                                 </div>
+                            </div>
+
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <h3 className="font-display font-semibold">Insights de mercado y growth</h3>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary text-xs"
+                                        onClick={() => void loadVerificationData()}
+                                        disabled={verificationLoading || insightsLoading}
+                                    >
+                                        {verificationLoading || insightsLoading ? 'Actualizando...' : 'Refrescar insights'}
+                                    </button>
+                                </div>
+
+                                {insightsLoading ? (
+                                    <p className="text-sm text-gray-500">Cargando insights...</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Negocios trackeados</p>
+                                                <p className="text-xl font-semibold text-gray-900">
+                                                    {marketInsights?.totals.trackedBusinesses ?? 0}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Conversion global</p>
+                                                <p className="text-xl font-semibold text-primary-700">
+                                                    {marketInsights?.totals.conversionRate ?? 0}%
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Search a WhatsApp</p>
+                                                <p className="text-xl font-semibold text-emerald-700">
+                                                    {growthInsights?.conversionFunnels.searchToWhatsApp.conversionRate ?? 0}%
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <h4 className="font-medium text-gray-900 mb-2">Top categorias buscadas</h4>
+                                                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                                                    {growthInsights?.topSearchedCategories?.length ? growthInsights.topSearchedCategories.slice(0, 8).map((item) => (
+                                                        <div key={`${item.categoryId || 'none'}-${item.categoryName}`} className="flex items-center justify-between text-sm">
+                                                            <span className="text-gray-700 truncate pr-2">{item.categoryName}</span>
+                                                            <span className="text-gray-900 font-medium">{item.searches}</span>
+                                                        </div>
+                                                    )) : (
+                                                        <p className="text-sm text-gray-500">Sin datos de categorias.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <h4 className="font-medium text-gray-900 mb-2">Brechas oferta-demanda</h4>
+                                                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                                                    {growthInsights?.demandSupplyGaps?.length ? growthInsights.demandSupplyGaps.slice(0, 8).map((gap) => (
+                                                        <div key={`${gap.provinceId || 'all'}-${gap.categoryId || 'all'}`} className="rounded-lg bg-gray-50 px-2 py-1.5">
+                                                            <p className="text-sm text-gray-900">
+                                                                {gap.provinceName} · {gap.categoryName}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500">
+                                                                Demanda {gap.demandSearches} · Oferta {gap.supplyBusinesses} · Ratio {gap.demandSupplyRatio}
+                                                            </p>
+                                                        </div>
+                                                    )) : (
+                                                        <p className="text-sm text-gray-500">Sin brechas registradas.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-xl border border-gray-100 p-3">
+                                            <h4 className="font-medium text-gray-900 mb-2">A/B test contacto a WhatsApp</h4>
+                                            <div className="space-y-2">
+                                                {growthInsights?.abTesting?.variants?.length ? growthInsights.abTesting.variants.map((variant) => (
+                                                    <div key={variant.variantKey} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2">
+                                                        <span className="text-sm text-gray-700">{variant.variantKey}</span>
+                                                        <span className="text-sm text-gray-900">
+                                                            {variant.conversionRate}% ({variant.whatsappClicks}/{variant.contactClicks})
+                                                        </span>
+                                                    </div>
+                                                )) : (
+                                                    <p className="text-sm text-gray-500">Sin variantes activas.</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="card p-5">
@@ -1099,14 +1440,58 @@ export function AdminDashboard() {
 
                                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                                     {marketReports.length > 0 ? marketReports.map((report) => (
-                                        <div key={report.id} className="rounded-xl border border-gray-100 p-3">
+                                        <button
+                                            type="button"
+                                            key={report.id}
+                                            onClick={() => setSelectedMarketReportId(report.id)}
+                                            className={`w-full text-left rounded-xl border p-3 transition-colors ${
+                                                selectedMarketReportId === report.id
+                                                    ? 'border-primary-200 bg-primary-50'
+                                                    : 'border-gray-100 hover:border-primary-100'
+                                            }`}
+                                        >
                                             <p className="text-sm font-medium text-gray-900">{report.reportType}</p>
                                             <p className="text-xs text-gray-500">
-                                                {new Date(report.generatedAt).toLocaleString('es-DO')} · {report.generatedByUser?.name || 'Sistema'}
+                                                {new Date(report.generatedAt).toLocaleString('es-DO')} Â· {report.generatedByUser?.name || 'Sistema'}
                                             </p>
-                                        </div>
+                                        </button>
                                     )) : (
                                         <p className="text-sm text-gray-500">Sin snapshots generados.</p>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 rounded-xl border border-gray-100 p-3">
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                        <h4 className="font-medium text-gray-900">Detalle del snapshot</h4>
+                                        {selectedMarketReportId ? (
+                                            <button
+                                                type="button"
+                                                className="btn-secondary text-xs"
+                                                onClick={() => void loadMarketReportDetail(selectedMarketReportId)}
+                                                disabled={marketReportLoading}
+                                            >
+                                                {marketReportLoading ? 'Cargando...' : 'Recargar detalle'}
+                                            </button>
+                                        ) : null}
+                                    </div>
+
+                                    {!selectedMarketReportId ? (
+                                        <p className="text-sm text-gray-500">Selecciona un snapshot para ver su detalle.</p>
+                                    ) : marketReportLoading ? (
+                                        <p className="text-sm text-gray-500">Cargando detalle...</p>
+                                    ) : marketReportDetail ? (
+                                        <div className="space-y-2">
+                                            <p className="text-xs text-gray-500">
+                                                {marketReportDetail.periodStart
+                                                    ? `Periodo: ${new Date(marketReportDetail.periodStart).toLocaleDateString('es-DO')} al ${new Date(marketReportDetail.periodEnd || marketReportDetail.periodStart).toLocaleDateString('es-DO')}`
+                                                    : `Generado: ${new Date(marketReportDetail.generatedAt).toLocaleString('es-DO')}`}
+                                            </p>
+                                            <pre className="max-h-56 overflow-auto rounded-lg bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
+                                                {JSON.stringify(marketReportDetail.summary || {}, null, 2)}
+                                            </pre>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-gray-500">No hay detalle disponible.</p>
                                     )}
                                 </div>
                             </div>

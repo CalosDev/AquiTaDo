@@ -46,6 +46,41 @@ interface BillingRange {
     to: string;
 }
 
+interface PaymentRow {
+    id: string;
+    provider: string;
+    amount: string | number;
+    currency: string;
+    status: string;
+    paidAt?: string | null;
+    createdAt: string;
+}
+
+interface InvoiceRow {
+    id: string;
+    number?: string | null;
+    amountTotal: string | number;
+    currency: string;
+    status: string;
+    issuedAt: string;
+    dueAt?: string | null;
+    paidAt?: string | null;
+}
+
+interface TransactionRow {
+    id: string;
+    status: string;
+    grossAmount: string | number;
+    platformFeeAmount: string | number;
+    netAmount: string | number;
+    currency: string;
+    createdAt: string;
+    paidAt?: string | null;
+    business: { id: string; name: string; slug: string };
+    booking?: { id: string; scheduledFor: string; status: string } | null;
+    buyerUser?: { id: string; name: string; email: string } | null;
+}
+
 interface DashboardBillingTabProps {
     billingRange: BillingRange;
     setBillingRange: Dispatch<SetStateAction<BillingRange>>;
@@ -55,7 +90,11 @@ interface DashboardBillingTabProps {
     exportingCsv: CsvTarget | null;
     billingSummary: BillingSummary | null;
     fiscalSummary: FiscalSummary | null;
+    recentPayments: PaymentRow[];
+    recentInvoices: InvoiceRow[];
+    recentTransactions: TransactionRow[];
     formatCurrency: (value: string | number | null | undefined) => string;
+    formatDateTime: (value?: string | null) => string;
 }
 
 export function DashboardBillingTab({
@@ -67,7 +106,11 @@ export function DashboardBillingTab({
     exportingCsv,
     billingSummary,
     fiscalSummary,
+    recentPayments,
+    recentInvoices,
+    recentTransactions,
     formatCurrency,
+    formatDateTime,
 }: DashboardBillingTabProps) {
     const invoiceStatuses = Object.entries(billingSummary?.invoices.byStatus || {});
     const paymentStatuses = Object.entries(billingSummary?.payments.byStatus || {});
@@ -159,6 +202,81 @@ export function DashboardBillingTab({
                             )}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="card p-5">
+                    <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Pagos recientes</h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {recentPayments.length > 0 ? recentPayments.map((payment) => (
+                            <div key={payment.id} className="rounded-lg border border-gray-100 p-3 text-sm">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="font-medium text-gray-900">{payment.provider}</p>
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                        {payment.status}
+                                    </span>
+                                </div>
+                                <p className="text-gray-700 mt-1">{formatCurrency(payment.amount)}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {formatDateTime(payment.paidAt || payment.createdAt)}
+                                </p>
+                            </div>
+                        )) : (
+                            <p className="text-sm text-gray-500">Sin pagos recientes.</p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="card p-5">
+                    <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Facturas recientes</h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {recentInvoices.length > 0 ? recentInvoices.map((invoice) => (
+                            <div key={invoice.id} className="rounded-lg border border-gray-100 p-3 text-sm">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="font-medium text-gray-900 truncate">
+                                        {invoice.number || invoice.id.slice(0, 8)}
+                                    </p>
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                        {invoice.status}
+                                    </span>
+                                </div>
+                                <p className="text-gray-700 mt-1">{formatCurrency(invoice.amountTotal)}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Emitida: {formatDateTime(invoice.issuedAt)}
+                                </p>
+                            </div>
+                        )) : (
+                            <p className="text-sm text-gray-500">Sin facturas recientes.</p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="card p-5">
+                    <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Transacciones marketplace</h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {recentTransactions.length > 0 ? recentTransactions.map((transaction) => (
+                            <div key={transaction.id} className="rounded-lg border border-gray-100 p-3 text-sm">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="font-medium text-gray-900 truncate">{transaction.business.name}</p>
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                        {transaction.status}
+                                    </span>
+                                </div>
+                                <p className="text-gray-700 mt-1">
+                                    Neto: {formatCurrency(transaction.netAmount)}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                    Fee: {formatCurrency(transaction.platformFeeAmount)}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {formatDateTime(transaction.paidAt || transaction.createdAt)}
+                                </p>
+                            </div>
+                        )) : (
+                            <p className="text-sm text-gray-500">Sin transacciones recientes.</p>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

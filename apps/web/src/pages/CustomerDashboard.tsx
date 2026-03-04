@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getApiErrorMessage } from '../api/error';
@@ -32,6 +32,27 @@ interface ConversationItem {
     messages?: Array<{
         id: string;
         content: string;
+    }>;
+}
+
+interface ConversationThread {
+    id: string;
+    status: ConversationStatus;
+    updatedAt: string;
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+    };
+    messages: Array<{
+        id: string;
+        content: string;
+        createdAt: string;
+        senderRole: 'CUSTOMER' | 'BUSINESS_STAFF' | 'SYSTEM';
+        senderUser?: {
+            id: string;
+            name: string;
+        } | null;
     }>;
 }
 
@@ -156,6 +177,16 @@ function conversationStatusLabel(status: ConversationStatus): string {
 
 export function CustomerDashboard() {
     const { user } = useAuth();
+    const [favoritesActionLoading, setFavoritesActionLoading] = useState<string | null>(null);
+    const [favoritesInfoMessage, setFavoritesInfoMessage] = useState('');
+    const [favoritesErrorMessage, setFavoritesErrorMessage] = useState('');
+    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+    const [selectedConversationThread, setSelectedConversationThread] = useState<ConversationThread | null>(null);
+    const [conversationThreadLoading, setConversationThreadLoading] = useState(false);
+    const [conversationReply, setConversationReply] = useState('');
+    const [conversationReplySending, setConversationReplySending] = useState(false);
+    const [conversationInfoMessage, setConversationInfoMessage] = useState('');
+    const [conversationErrorMessage, setConversationErrorMessage] = useState('');
     const dashboardQuery = useQuery({
         queryKey: ['customer-dashboard'],
         queryFn: async () => {
@@ -198,6 +229,119 @@ export function CustomerDashboard() {
         return bookings.find((booking) => new Date(booking.scheduledFor).getTime() >= now) ?? null;
     }, [bookings]);
 
+    useEffect(() => {
+        if (conversations.length === 0) {
+            setSelectedConversationId(null);
+            setSelectedConversationThread(null);
+            return;
+        }
+
+        if (!selectedConversationId || !conversations.some((conversation) => conversation.id === selectedConversationId)) {
+            setSelectedConversationId(conversations[0].id);
+        }
+    }, [conversations, selectedConversationId]);
+
+    const reloadDashboard = async () => {
+        await dashboardQuery.refetch();
+    };
+
+    const loadConversationThread = useCallback(async (conversationId: string) => {
+        setConversationThreadLoading(true);
+        setConversationErrorMessage('');
+        try {
+            const response = await messagingApi.getMyConversationThread(conversationId);
+            setSelectedConversationThread(response.data as ConversationThread);
+        } catch (threadError) {
+            setConversationErrorMessage(getApiErrorMessage(threadError, 'No se pudo cargar el chat'));
+            setSelectedConversationThread(null);
+        } finally {
+            setConversationThreadLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!selectedConversationId) {
+            return;
+        }
+
+        void loadConversationThread(selectedConversationId);
+    }, [loadConversationThread, selectedConversationId]);
+
+    const handleRemoveFavorite = async (businessId: string) => {
+        const actionKey = `favorite-${businessId}`;
+        setFavoritesActionLoading(actionKey);
+        setFavoritesErrorMessage('');
+        setFavoritesInfoMessage('');
+        try {
+            await favoritesApi.toggleFavoriteBusiness({ businessId });
+            await reloadDashboard();
+            setFavoritesInfoMessage('Negocio removido de favoritos');
+        } catch (actionError) {
+            setFavoritesErrorMessage(getApiErrorMessage(actionError, 'No se pudo remover el favorito'));
+        } finally {
+            setFavoritesActionLoading(null);
+        }
+    };
+
+    const handleDeleteList = async (listId: string) => {
+        const actionKey = `delete-list-${listId}`;
+        setFavoritesActionLoading(actionKey);
+        setFavoritesErrorMessage('');
+        setFavoritesInfoMessage('');
+        try {
+            await favoritesApi.deleteList(listId);
+            await reloadDashboard();
+            setFavoritesInfoMessage('Lista eliminada');
+        } catch (actionError) {
+            setFavoritesErrorMessage(getApiErrorMessage(actionError, 'No se pudo eliminar la lista'));
+        } finally {
+            setFavoritesActionLoading(null);
+        }
+    };
+
+    const handleRemoveFromList = async (listId: string, businessId: string) => {
+        const actionKey = `remove-item-${listId}-${businessId}`;
+        setFavoritesActionLoading(actionKey);
+        setFavoritesErrorMessage('');
+        setFavoritesInfoMessage('');
+        try {
+            await favoritesApi.removeBusinessFromList(listId, businessId);
+            await reloadDashboard();
+            setFavoritesInfoMessage('Negocio removido de la lista');
+        } catch (actionError) {
+            setFavoritesErrorMessage(getApiErrorMessage(actionError, 'No se pudo remover el negocio de la lista'));
+        } finally {
+            setFavoritesActionLoading(null);
+        }
+    };
+
+    const handleSendConversationReply = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!selectedConversationId || !conversationReply.trim()) {
+            setConversationErrorMessage('Escribe una respuesta para continuar');
+            return;
+        }
+
+        setConversationReplySending(true);
+        setConversationErrorMessage('');
+        setConversationInfoMessage('');
+        try {
+            await messagingApi.sendMessageAsCustomer(selectedConversationId, {
+                content: conversationReply.trim(),
+            });
+            setConversationReply('');
+            await Promise.all([
+                loadConversationThread(selectedConversationId),
+                reloadDashboard(),
+            ]);
+            setConversationInfoMessage('Mensaje enviado');
+        } catch (sendError) {
+            setConversationErrorMessage(getApiErrorMessage(sendError, 'No se pudo enviar el mensaje'));
+        } finally {
+            setConversationReplySending(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
@@ -238,6 +382,18 @@ export function CustomerDashboard() {
             {error && (
                 <section className="card p-4 border border-red-100 bg-red-50">
                     <p className="text-sm text-red-700">{error}</p>
+                </section>
+            )}
+
+            {favoritesErrorMessage && (
+                <section className="card p-4 border border-red-100 bg-red-50">
+                    <p className="text-sm text-red-700">{favoritesErrorMessage}</p>
+                </section>
+            )}
+
+            {favoritesInfoMessage && (
+                <section className="card p-4 border border-green-100 bg-green-50">
+                    <p className="text-sm text-green-700">{favoritesInfoMessage}</p>
                 </section>
             )}
 
@@ -316,7 +472,14 @@ export function CustomerDashboard() {
                     ) : (
                         <div className="space-y-3">
                             {conversations.map((conversation) => (
-                                <div key={conversation.id} className="rounded-xl border border-gray-100 p-4">
+                                <div
+                                    key={conversation.id}
+                                    className={`rounded-xl border p-4 transition-colors ${
+                                        selectedConversationId === conversation.id
+                                            ? 'border-primary-300 bg-primary-50/50'
+                                            : 'border-gray-100'
+                                    }`}
+                                >
                                     <div className="flex items-start justify-between gap-2">
                                         <p className="font-semibold text-gray-900">{conversation.business.name}</p>
                                         <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">
@@ -329,8 +492,76 @@ export function CustomerDashboard() {
                                     <p className="text-xs text-gray-500 mt-2">
                                         Actualizado: {formatDateTime(conversation.updatedAt)}
                                     </p>
+                                    <button
+                                        type="button"
+                                        className="mt-3 text-xs font-semibold text-primary-700 hover:text-primary-800"
+                                        onClick={() => setSelectedConversationId(conversation.id)}
+                                    >
+                                        {selectedConversationId === conversation.id ? 'Chat abierto' : 'Abrir chat'}
+                                    </button>
                                 </div>
                             ))}
+
+                            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                <h3 className="text-sm font-semibold text-gray-900 mb-2">Chat</h3>
+                                {conversationErrorMessage ? (
+                                    <p className="text-xs text-red-700 mb-2">{conversationErrorMessage}</p>
+                                ) : null}
+                                {conversationInfoMessage ? (
+                                    <p className="text-xs text-green-700 mb-2">{conversationInfoMessage}</p>
+                                ) : null}
+
+                                {conversationThreadLoading ? (
+                                    <p className="text-sm text-gray-500">Cargando conversación...</p>
+                                ) : selectedConversationThread ? (
+                                    <>
+                                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1 mb-3">
+                                            {selectedConversationThread.messages.length > 0 ? (
+                                                selectedConversationThread.messages.map((message) => (
+                                                    <div
+                                                        key={message.id}
+                                                        className={`rounded-lg px-3 py-2 text-sm ${
+                                                            message.senderRole === 'CUSTOMER'
+                                                                ? 'bg-primary-100 text-primary-900'
+                                                                : 'bg-white border border-gray-200 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        <p className="text-[11px] uppercase tracking-wide mb-1 text-gray-500">
+                                                            {message.senderRole === 'CUSTOMER'
+                                                                ? 'Tu'
+                                                                : message.senderUser?.name || 'Negocio'}
+                                                        </p>
+                                                        <p className="whitespace-pre-wrap">{message.content}</p>
+                                                        <p className="text-[11px] mt-1 text-gray-500">
+                                                            {formatDateTime(message.createdAt)}
+                                                        </p>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-sm text-gray-500">Sin mensajes en este chat.</p>
+                                            )}
+                                        </div>
+                                        <form onSubmit={handleSendConversationReply} className="space-y-2">
+                                            <textarea
+                                                className="input-field text-sm"
+                                                rows={3}
+                                                placeholder="Escribe una respuesta..."
+                                                value={conversationReply}
+                                                onChange={(event) => setConversationReply(event.target.value)}
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="btn-primary text-sm"
+                                                disabled={conversationReplySending}
+                                            >
+                                                {conversationReplySending ? 'Enviando...' : 'Responder'}
+                                            </button>
+                                        </form>
+                                    </>
+                                ) : (
+                                    <p className="text-sm text-gray-500">Selecciona una conversación para ver el hilo.</p>
+                                )}
+                            </div>
                         </div>
                     )}
                 </article>
@@ -383,13 +614,29 @@ export function CustomerDashboard() {
                         <div className="space-y-3">
                             {favorites.map((favorite) => (
                                 <div key={favorite.businessId} className="rounded-xl border border-gray-100 p-4">
-                                    <p className="font-semibold text-gray-900">{favorite.business.name}</p>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="font-semibold text-gray-900">{favorite.business.name}</p>
+                                        <button
+                                            type="button"
+                                            className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                                            onClick={() => void handleRemoveFavorite(favorite.businessId)}
+                                            disabled={favoritesActionLoading === `favorite-${favorite.businessId}`}
+                                        >
+                                            {favoritesActionLoading === `favorite-${favorite.businessId}` ? 'Quitando...' : 'Quitar'}
+                                        </button>
+                                    </div>
                                     <p className="text-xs text-gray-500 mt-1">
                                         {favorite.business.province?.name || favorite.business.address}
                                     </p>
                                     <p className="text-xs text-gray-400 mt-2">
                                         Guardado: {formatDateTime(favorite.createdAt)}
                                     </p>
+                                    <Link
+                                        to={`/businesses/${favorite.business.slug}`}
+                                        className="inline-flex mt-3 text-xs font-semibold text-primary-700 hover:text-primary-800"
+                                    >
+                                        Ver negocio
+                                    </Link>
                                 </div>
                             ))}
                         </div>
@@ -409,16 +656,47 @@ export function CustomerDashboard() {
                                 <div key={list.id} className="rounded-xl border border-gray-100 p-4">
                                     <div className="flex items-center justify-between gap-2">
                                         <p className="font-semibold text-gray-900">{list.name}</p>
-                                        <span className="text-xs rounded-full bg-gray-100 text-gray-600 px-2 py-0.5">
-                                            {list._count?.items ?? list.items.length} items
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs rounded-full bg-gray-100 text-gray-600 px-2 py-0.5">
+                                                {list._count?.items ?? list.items.length} items
+                                            </span>
+                                            <button
+                                                type="button"
+                                                className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                                                onClick={() => void handleDeleteList(list.id)}
+                                                disabled={favoritesActionLoading === `delete-list-${list.id}`}
+                                            >
+                                                {favoritesActionLoading === `delete-list-${list.id}` ? 'Eliminando...' : 'Borrar'}
+                                            </button>
+                                        </div>
                                     </div>
                                     {list.description ? (
                                         <p className="text-sm text-gray-600 mt-2 line-clamp-2">{list.description}</p>
                                     ) : null}
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        {list.items.slice(0, 2).map((item) => item.business.name).join(' - ') || 'Sin negocios aun'}
-                                    </p>
+                                    {list.items.length > 0 ? (
+                                        <div className="mt-2 space-y-2">
+                                            {list.items.slice(0, 3).map((item) => (
+                                                <div key={item.businessId} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-2 py-1.5">
+                                                    <Link
+                                                        to={`/businesses/${item.business.slug}`}
+                                                        className="text-xs font-medium text-gray-700 hover:text-primary-700"
+                                                    >
+                                                        {item.business.name}
+                                                    </Link>
+                                                    <button
+                                                        type="button"
+                                                        className="text-[11px] text-red-700 hover:text-red-800 disabled:opacity-50"
+                                                        onClick={() => void handleRemoveFromList(list.id, item.businessId)}
+                                                        disabled={favoritesActionLoading === `remove-item-${list.id}-${item.businessId}`}
+                                                    >
+                                                        {favoritesActionLoading === `remove-item-${list.id}-${item.businessId}` ? 'Quitando...' : 'Quitar'}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 mt-2">Sin negocios aun</p>
+                                    )}
                                 </div>
                             ))}
                         </div>
