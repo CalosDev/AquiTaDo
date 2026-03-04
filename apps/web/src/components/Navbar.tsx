@@ -49,9 +49,10 @@ export function Navbar() {
             return;
         }
 
-        await installPromptEvent.prompt();
-        const choice = await installPromptEvent.userChoice;
-        if (choice.outcome === 'accepted') {
+        try {
+            await installPromptEvent.prompt();
+            await installPromptEvent.userChoice;
+        } finally {
             setInstallPromptEvent(null);
         }
     };
@@ -62,13 +63,17 @@ export function Navbar() {
         }
 
         const handler = (event: Event) => {
-            event.preventDefault();
+            // Keep browser default install behavior to avoid console warning
+            // when users do not manually open the custom prompt.
             setInstallPromptEvent(event as BeforeInstallPromptEvent);
         };
+        const installedHandler = () => setInstallPromptEvent(null);
 
         window.addEventListener('beforeinstallprompt', handler);
+        window.addEventListener('appinstalled', installedHandler);
         return () => {
             window.removeEventListener('beforeinstallprompt', handler);
+            window.removeEventListener('appinstalled', installedHandler);
         };
     }, []);
 

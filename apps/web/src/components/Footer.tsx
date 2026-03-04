@@ -27,6 +27,7 @@ export function Footer() {
         <footer className="mt-16 border-t border-primary-100 bg-primary-900 text-slate-200">
             <div className="flag-ribbon" aria-hidden="true"></div>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+                <h2 className="sr-only">Navegacion del pie de pagina</h2>
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
                     <div className="lg:col-span-5">
                         <Link to="/" className="inline-flex items-center gap-3">
@@ -56,7 +57,7 @@ export function Footer() {
                     </div>
 
                     <div className="lg:col-span-2">
-                        <h4 className="font-display text-base font-semibold text-white">Explorar</h4>
+                        <h3 className="font-display text-base font-semibold text-white">Explorar</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
                             <li><Link to="/businesses" className="hover:text-white transition-colors">Negocios</Link></li>
                             <li><Link to="/about" className="hover:text-white transition-colors">Sobre el proyecto</Link></li>
@@ -67,7 +68,7 @@ export function Footer() {
                     </div>
 
                     <div className="lg:col-span-2">
-                        <h4 className="font-display text-base font-semibold text-white">Negocios</h4>
+                        <h3 className="font-display text-base font-semibold text-white">Negocios</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
                             <li><Link to={registerBusinessPath} className="hover:text-white transition-colors">{registerBusinessLabel}</Link></li>
                             <li><Link to="/dashboard" className="hover:text-white transition-colors">Panel negocio</Link></li>
@@ -77,7 +78,7 @@ export function Footer() {
                     </div>
 
                     <div className="lg:col-span-3">
-                        <h4 className="font-display text-base font-semibold text-white">Contacto</h4>
+                        <h3 className="font-display text-base font-semibold text-white">Contacto</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
                             <li>info@aquita.do</li>
                             <li>+1 (809) 555-0000</li>
