@@ -83,7 +83,7 @@ export class AiService {
             name: entry.name,
             slug: entry.slug,
             address: entry.address,
-            score: Number(entry.score.toFixed(4)),
+            score: Number(Math.max(0, Math.min(1, entry.score)).toFixed(4)),
             whatsapp: entry.whatsapp,
             latitude: entry.latitude,
             longitude: entry.longitude,
@@ -100,7 +100,19 @@ export class AiService {
             ))
             .join('\n\n');
 
-        const answer = await this.aiProviderService.generateChatCompletion({
+        if (matches.length === 0) {
+            return {
+                answer: this.buildNoMatchesResponse(normalizedQuery),
+                data: matches,
+                meta: {
+                    source: retrieval.source,
+                    query: normalizedQuery,
+                    modelProvider: this.aiProviderService.getProviderName(),
+                },
+            };
+        }
+
+        const rawAnswer = await this.aiProviderService.generateChatCompletion({
             systemPrompt: buildDominicanProfessionalPrompt([
                 'Eres el asistente de AquiTaDo para descubrimiento local.',
                 'Responde de forma profesional, cercana y breve.',
@@ -116,6 +128,9 @@ export class AiService {
                 'Genera una respuesta util con recomendaciones priorizadas y siguiente accion.',
             ].join('\n'),
         });
+        const answer = this.isProviderFallbackMessage(rawAnswer)
+            ? this.buildFallbackConciergeSummary(normalizedQuery, matches)
+            : rawAnswer;
 
         return {
             answer,
@@ -465,6 +480,35 @@ export class AiService {
         } catch {
             return null;
         }
+    }
+
+    private isProviderFallbackMessage(answer: string): boolean {
+        return answer.trim().startsWith('Asistente AquiTaDo (modo fallback):');
+    }
+
+    private buildNoMatchesResponse(query: string): string {
+        return [
+            `No encontre coincidencias directas para "${query}".`,
+            'Prueba ampliando la busqueda (sin categoria/provincia) o usando otra palabra clave.',
+            'Ejemplos: "tecnologia", "automotriz", "salones", "farmacia".',
+        ].join('\n');
+    }
+
+    private buildFallbackConciergeSummary(query: string, matches: ConciergeMatch[]): string {
+        const topMatches = matches.slice(0, 3);
+        const recommendations = topMatches
+            .map((entry, index) => {
+                const whatsapp = entry.whatsapp ? ` | WhatsApp: ${entry.whatsapp}` : '';
+                return `${index + 1}. ${entry.name} - ${entry.address}${whatsapp}`;
+            })
+            .join('\n');
+
+        return [
+            `Resultados para "${query}":`,
+            recommendations,
+            '',
+            'Te puedo ayudar a refinar por provincia, categoria o servicio especifico.',
+        ].join('\n');
     }
 
     private sentimentFromRating(rating: number): ReviewSentiment {

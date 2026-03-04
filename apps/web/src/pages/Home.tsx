@@ -152,6 +152,14 @@ function trackGrowthEvent(payload: {
     }).catch(() => undefined);
 }
 
+function toAffinityPercent(score: number): number {
+    if (!Number.isFinite(score)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(100, Math.round(score * 100)));
+}
+
 export function Home() {
     const { isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
@@ -556,7 +564,7 @@ export function Home() {
                                             <p className="font-semibold text-gray-900">{match.name}</p>
                                             <p className="text-xs text-gray-600 mt-1 line-clamp-2">{match.address}</p>
                                             <p className="text-xs text-primary-700 mt-2 font-medium">
-                                                Afinidad {Math.round(match.score * 100)}%
+                                                Afinidad {toAffinityPercent(match.score)}%
                                             </p>
                                         </Link>
                                     ))}
