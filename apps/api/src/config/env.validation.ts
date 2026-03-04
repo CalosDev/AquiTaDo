@@ -154,6 +154,7 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertValidUrl(config, 'GROQ_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'OPEN_METEO_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'FRANKFURTER_BASE_URL', ['http:', 'https:']);
+    assertValidUrl(config, 'NAGER_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'WHATSAPP_GRAPH_BASE_URL', ['http:', 'https:']);
 
     assertNonEmptyString(config, 'BULLMQ_PREFIX');

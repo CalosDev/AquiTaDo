@@ -73,6 +73,26 @@ interface MarketExchangeSnapshot {
     rate: number;
 }
 
+interface CommercialAgendaItemSnapshot {
+    id: string;
+    holidayDate: string;
+    holidayName: string;
+    daysUntil: number;
+    campaignWindow: {
+        start: string;
+        end: string;
+    };
+    suggestedCategories: string[];
+    recommendation: string;
+    urgency: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+interface CommercialAgendaSnapshot {
+    generatedAt: string;
+    horizonDays: number;
+    items: CommercialAgendaItemSnapshot[];
+}
+
 const INTENT_LINKS = [
     { slug: 'con-delivery', label: 'Con delivery', subtitle: 'Entrega rapida', icon: 'MOTO' },
     { slug: 'con-parqueo', label: 'Con parqueo', subtitle: 'Llega sin estres', icon: 'PARK' },
@@ -197,6 +217,16 @@ function formatDominicanTime(value: string): string {
     });
 }
 
+function formatDaysUntil(daysUntil: number): string {
+    if (daysUntil <= 0) {
+        return 'Hoy';
+    }
+    if (daysUntil === 1) {
+        return 'Manana';
+    }
+    return `En ${daysUntil} dias`;
+}
+
 export function Home() {
     const { isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
@@ -222,6 +252,7 @@ export function Home() {
     const [marketDataLoading, setMarketDataLoading] = useState(true);
     const [marketWeather, setMarketWeather] = useState<MarketWeatherSnapshot | null>(null);
     const [marketExchangeRate, setMarketExchangeRate] = useState<MarketExchangeSnapshot | null>(null);
+    const [commercialAgenda, setCommercialAgenda] = useState<CommercialAgendaItemSnapshot[]>([]);
 
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
@@ -335,8 +366,9 @@ export function Home() {
         void Promise.allSettled([
             marketDataApi.getCurrentWeather({ lat: 18.4861, lng: -69.9312 }),
             marketDataApi.getExchangeRate({ base: 'USD', target: 'DOP', amount: 1 }),
+            marketDataApi.getDominicanCommercialAgenda({ limit: 3, horizonDays: 75 }),
         ])
-            .then(([weatherResult, exchangeResult]) => {
+            .then(([weatherResult, exchangeResult, agendaResult]) => {
                 if (!active) {
                     return;
                 }
@@ -352,6 +384,13 @@ export function Home() {
                     const payload = exchangeResult.value.data as MarketExchangeSnapshot;
                     if (payload && Number.isFinite(payload.rate)) {
                         setMarketExchangeRate(payload);
+                    }
+                }
+
+                if (agendaResult.status === 'fulfilled') {
+                    const payload = agendaResult.value.data as CommercialAgendaSnapshot;
+                    if (payload && Array.isArray(payload.items)) {
+                        setCommercialAgenda(payload.items);
                     }
                 }
             })
@@ -613,6 +652,30 @@ export function Home() {
                                                 ) : null}
                                             </div>
                                         </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4">
+                                    <p className="text-xs uppercase tracking-wide text-blue-100">Agenda comercial RD</p>
+                                    {marketDataLoading ? (
+                                        <div className="mt-3 space-y-2">
+                                            <div className="h-14 rounded-xl bg-white/10 animate-pulse"></div>
+                                            <div className="h-14 rounded-xl bg-white/10 animate-pulse"></div>
+                                        </div>
+                                    ) : commercialAgenda.length > 0 ? (
+                                        <div className="mt-3 space-y-2">
+                                            {commercialAgenda.map((item) => (
+                                                <div key={item.id} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className="text-sm font-semibold text-white truncate">{item.holidayName}</p>
+                                                        <span className="text-[11px] text-blue-200 shrink-0">{formatDaysUntil(item.daysUntil)}</span>
+                                                    </div>
+                                                    <p className="text-xs text-blue-100 mt-1 line-clamp-2">{item.recommendation}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="mt-3 text-xs text-blue-100">No hay eventos comerciales proximos en el horizonte actual.</p>
                                     )}
                                 </div>
                             </div>

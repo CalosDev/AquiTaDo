@@ -417,6 +417,19 @@ export const marketDataApi = {
         api.get('/market-data/weather/current', { params }),
     getExchangeRate: (params?: { base?: string; target?: string; amount?: number }) =>
         api.get('/market-data/exchange-rate', { params }),
+    getDominicanHolidays: (params?: { year?: number; limit?: number; upcomingOnly?: boolean }) =>
+        api.get('/market-data/holidays/rd', {
+            params: {
+                ...params,
+                upcomingOnly: params?.upcomingOnly === undefined
+                    ? undefined
+                    : params.upcomingOnly
+                        ? 'true'
+                        : 'false',
+            },
+        }),
+    getDominicanCommercialAgenda: (params?: { limit?: number; horizonDays?: number }) =>
+        api.get('/market-data/commercial-agenda/rd', { params }),
 };
 
 // ---- Favorites ----

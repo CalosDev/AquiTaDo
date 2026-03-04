@@ -35,6 +35,38 @@ type ExchangeRateResponse = {
     observedOn: string;
 };
 
+type DominicanHoliday = {
+    date: string;
+    localName: string;
+    englishName: string;
+    global: boolean;
+    counties: string[] | null;
+    launchYear: number | null;
+    fixed: boolean;
+    daysUntil: number;
+    isUpcoming: boolean;
+};
+
+type CommercialAgendaItem = {
+    id: string;
+    holidayDate: string;
+    holidayName: string;
+    daysUntil: number;
+    campaignWindow: {
+        start: string;
+        end: string;
+    };
+    suggestedCategories: string[];
+    recommendation: string;
+    urgency: 'HIGH' | 'MEDIUM' | 'LOW';
+};
+
+type CommercialAgendaResponse = {
+    generatedAt: string;
+    horizonDays: number;
+    items: CommercialAgendaItem[];
+};
+
 @Injectable()
 export class MarketDataService {
     private readonly logger = new Logger(MarketDataService.name);
@@ -42,8 +74,10 @@ export class MarketDataService {
     private readonly requestTimeoutMs: number;
     private readonly openMeteoBaseUrl: string;
     private readonly frankfurterBaseUrl: string;
+    private readonly nagerBaseUrl: string;
     private readonly weatherCache = new Map<string, CachedValue<CurrentWeatherResponse>>();
     private readonly fxCache = new Map<string, CachedValue<ExchangeRateResponse>>();
+    private readonly holidayCache = new Map<string, CachedValue<DominicanHoliday[]>>();
 
     constructor(
         @Inject(ConfigService)
@@ -59,6 +93,8 @@ export class MarketDataService {
             || 'https://api.open-meteo.com';
         this.frankfurterBaseUrl = this.configService.get<string>('FRANKFURTER_BASE_URL')?.trim()
             || 'https://api.frankfurter.app';
+        this.nagerBaseUrl = this.configService.get<string>('NAGER_BASE_URL')?.trim()
+            || 'https://date.nager.at';
     }
 
     async getCurrentWeather(lat: number, lng: number): Promise<CurrentWeatherResponse> {
@@ -101,6 +137,107 @@ export class MarketDataService {
             expiresAt: Date.now() + this.cacheTtlMs,
         });
         return response;
+    }
+
+    async getDominicanHolidays(
+        year: number,
+        options?: {
+            limit?: number;
+            upcomingOnly?: boolean;
+            referenceDate?: Date;
+        },
+    ): Promise<DominicanHoliday[]> {
+        const cacheKey = `do:${year}`;
+        const cached = this.getValidCache(this.holidayCache, cacheKey);
+        const referenceDate = options?.referenceDate ?? new Date();
+        const referenceDay = this.startOfDay(referenceDate);
+
+        let holidays = cached;
+        if (!holidays) {
+            holidays = await this.fetchDominicanHolidays(year);
+            this.holidayCache.set(cacheKey, {
+                value: holidays,
+                expiresAt: Date.now() + this.cacheTtlMs,
+            });
+        }
+
+        const normalized = holidays.map((holiday) => {
+            const holidayDay = this.parseIsoDate(holiday.date);
+            const daysUntil = this.diffInDays(referenceDay, holidayDay);
+            return {
+                ...holiday,
+                daysUntil,
+                isUpcoming: daysUntil >= 0,
+            };
+        });
+
+        const filtered = options?.upcomingOnly
+            ? normalized.filter((holiday) => holiday.isUpcoming)
+            : normalized;
+        const limited = typeof options?.limit === 'number'
+            ? filtered.slice(0, options.limit)
+            : filtered;
+
+        return limited;
+    }
+
+    async getDominicanCommercialAgenda(options?: {
+        limit?: number;
+        horizonDays?: number;
+    }): Promise<CommercialAgendaResponse> {
+        const limit = options?.limit && options.limit > 0 ? options.limit : 4;
+        const horizonDays = options?.horizonDays && options.horizonDays > 0
+            ? options.horizonDays
+            : 60;
+
+        const today = new Date();
+        const currentYear = today.getUTCFullYear();
+        const nextYear = currentYear + 1;
+        const [currentYearHolidays, nextYearHolidays] = await Promise.all([
+            this.getDominicanHolidays(currentYear, {
+                upcomingOnly: true,
+                referenceDate: today,
+            }),
+            this.getDominicanHolidays(nextYear, {
+                upcomingOnly: true,
+                referenceDate: today,
+            }),
+        ]);
+
+        const merged = [...currentYearHolidays, ...nextYearHolidays]
+            .filter((holiday) => holiday.daysUntil >= 0 && holiday.daysUntil <= horizonDays)
+            .sort((left, right) => left.daysUntil - right.daysUntil);
+
+        const items = merged.slice(0, limit).map((holiday, index) => {
+            const campaignStart = this.addDaysIso(holiday.date, -7);
+            const campaignEnd = this.addDaysIso(holiday.date, 1);
+            const suggestion = this.resolveCommercialSuggestion(holiday.localName);
+            const urgency: 'HIGH' | 'MEDIUM' | 'LOW' = holiday.daysUntil <= 7
+                ? 'HIGH'
+                : holiday.daysUntil <= 21
+                    ? 'MEDIUM'
+                    : 'LOW';
+
+            return {
+                id: `${holiday.date}-${index}`,
+                holidayDate: holiday.date,
+                holidayName: holiday.localName || holiday.englishName,
+                daysUntil: holiday.daysUntil,
+                campaignWindow: {
+                    start: campaignStart,
+                    end: campaignEnd,
+                },
+                suggestedCategories: suggestion.categories,
+                recommendation: suggestion.recommendation,
+                urgency,
+            };
+        });
+
+        return {
+            generatedAt: new Date().toISOString(),
+            horizonDays,
+            items,
+        };
     }
 
     private async fetchCurrentWeather(lat: number, lng: number): Promise<CurrentWeatherResponse> {
@@ -214,6 +351,44 @@ export class MarketDataService {
         }
     }
 
+    private async fetchDominicanHolidays(year: number): Promise<DominicanHoliday[]> {
+        const startedAt = Date.now();
+        let success = true;
+
+        try {
+            const url = new URL(`/api/v3/PublicHolidays/${year}/DO`, this.nagerBaseUrl);
+            const payload = await this.getJsonWithTimeout(url.toString());
+
+            if (!Array.isArray(payload)) {
+                throw new Error('Invalid holidays payload');
+            }
+
+            const normalized = payload
+                .map((row) => this.normalizeHolidayRow(row))
+                .filter((row): row is DominicanHoliday => row !== null)
+                .sort((left, right) => left.date.localeCompare(right.date));
+
+            if (normalized.length === 0) {
+                return this.getLocalFallbackHolidays(year);
+            }
+
+            return normalized;
+        } catch (error) {
+            success = false;
+            this.logger.warn(
+                `Nager holidays request failed (${error instanceof Error ? error.message : String(error)}), using local fallback`,
+            );
+            return this.getLocalFallbackHolidays(year);
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'nager',
+                'holidays-rd',
+                Date.now() - startedAt,
+                success,
+            );
+        }
+    }
+
     private async getJsonWithTimeout(url: string): Promise<any> {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), this.requestTimeoutMs);
@@ -233,6 +408,110 @@ export class MarketDataService {
         } finally {
             clearTimeout(timeoutId);
         }
+    }
+
+    private normalizeHolidayRow(value: unknown): DominicanHoliday | null {
+        if (!value || typeof value !== 'object') {
+            return null;
+        }
+
+        const entry = value as Record<string, unknown>;
+        const date = typeof entry.date === 'string' ? entry.date : null;
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return null;
+        }
+
+        return {
+            date,
+            localName: typeof entry.localName === 'string' ? entry.localName : 'Feriado nacional',
+            englishName: typeof entry.name === 'string' ? entry.name : 'Public holiday',
+            global: typeof entry.global === 'boolean' ? entry.global : true,
+            counties: Array.isArray(entry.counties)
+                ? entry.counties.filter((county): county is string => typeof county === 'string')
+                : null,
+            launchYear: typeof entry.launchYear === 'number' ? entry.launchYear : null,
+            fixed: typeof entry.fixed === 'boolean' ? entry.fixed : false,
+            daysUntil: 0,
+            isUpcoming: false,
+        };
+    }
+
+    private getLocalFallbackHolidays(year: number): DominicanHoliday[] {
+        const rows = [
+            { month: 1, day: 1, localName: 'Ano Nuevo', englishName: 'New Year\'s Day' },
+            { month: 1, day: 6, localName: 'Dia de Reyes', englishName: 'Epiphany' },
+            { month: 1, day: 21, localName: 'Nuestra Senora de la Altagracia', englishName: 'Our Lady of Altagracia' },
+            { month: 1, day: 26, localName: 'Dia de Duarte', englishName: 'Duarte Day' },
+            { month: 2, day: 27, localName: 'Independencia Nacional', englishName: 'Independence Day' },
+            { month: 5, day: 1, localName: 'Dia del Trabajo', englishName: 'Labour Day' },
+            { month: 8, day: 16, localName: 'Restauracion', englishName: 'Restoration Day' },
+            { month: 9, day: 24, localName: 'Nuestra Senora de las Mercedes', englishName: 'Our Lady of Mercedes' },
+            { month: 11, day: 6, localName: 'Dia de la Constitucion', englishName: 'Constitution Day' },
+            { month: 12, day: 25, localName: 'Navidad', englishName: 'Christmas Day' },
+        ];
+
+        return rows.map((row) => ({
+            date: `${year}-${String(row.month).padStart(2, '0')}-${String(row.day).padStart(2, '0')}`,
+            localName: row.localName,
+            englishName: row.englishName,
+            global: true,
+            counties: null,
+            launchYear: null,
+            fixed: true,
+            daysUntil: 0,
+            isUpcoming: false,
+        }));
+    }
+
+    private resolveCommercialSuggestion(holidayName: string): {
+        categories: string[];
+        recommendation: string;
+    } {
+        const normalized = holidayName.toLowerCase();
+        if (normalized.includes('navidad') || normalized.includes('reyes')) {
+            return {
+                categories: ['Tiendas y moda', 'Tecnologia', 'Restaurantes'],
+                recommendation: 'Activa combos de regalo, extiende horario y usa cupos limitados por WhatsApp.',
+            };
+        }
+
+        if (normalized.includes('madre') || normalized.includes('mercedes')) {
+            return {
+                categories: ['Salones y barberias', 'Restaurantes', 'Tiendas y moda'],
+                recommendation: 'Prepara paquetes especiales y reservas anticipadas con recordatorio 24h antes.',
+            };
+        }
+
+        if (normalized.includes('trabajo')) {
+            return {
+                categories: ['Ferreterias y construccion', 'Automotriz y talleres', 'Colmados y mini markets'],
+                recommendation: 'Empuja ofertas de ticket medio alto y crea una promo flash de 48 horas.',
+            };
+        }
+
+        return {
+            categories: ['Restaurantes', 'Colmados y mini markets', 'Farmacias y salud'],
+            recommendation: 'Lanza una campaña local por barrio, prioriza conversion por WhatsApp y promo corta.',
+        };
+    }
+
+    private parseIsoDate(value: string): Date {
+        return new Date(`${value}T00:00:00.000Z`);
+    }
+
+    private startOfDay(value: Date): Date {
+        return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+    }
+
+    private diffInDays(from: Date, to: Date): number {
+        const diffMs = to.getTime() - from.getTime();
+        return Math.floor(diffMs / 86_400_000);
+    }
+
+    private addDaysIso(isoDate: string, delta: number): string {
+        const date = this.parseIsoDate(isoDate);
+        date.setUTCDate(date.getUTCDate() + delta);
+        return date.toISOString().slice(0, 10);
     }
 
     private resolveWeatherLabel(weatherCode: number | null): string {

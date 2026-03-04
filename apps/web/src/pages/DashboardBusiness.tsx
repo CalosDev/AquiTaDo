@@ -7,6 +7,7 @@ import {
     bookingsApi,
     businessApi,
     crmApi,
+    marketDataApi,
     messagingApi,
     paymentsApi,
     promotionsApi,
@@ -357,6 +358,20 @@ interface ManagedBusinessDetail {
     images?: Array<{ id: string; url: string }>;
 }
 
+interface CommercialAgendaItem {
+    id: string;
+    holidayDate: string;
+    holidayName: string;
+    daysUntil: number;
+    campaignWindow: {
+        start: string;
+        end: string;
+    };
+    suggestedCategories: string[];
+    recommendation: string;
+    urgency: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
 type PromotionForm = {
     businessId: string;
     title: string;
@@ -446,6 +461,12 @@ function resolveCsvFileName(contentDisposition: string | undefined, fallback: st
     return match?.[1] ?? fallback;
 }
 
+function formatDaysUntilLabel(daysUntil: number): string {
+    if (daysUntil <= 0) return 'Hoy';
+    if (daysUntil === 1) return 'Manana';
+    return `En ${daysUntil} dias`;
+}
+
 export function DashboardBusiness() {
     const { activeOrganizationId } = useOrganization();
 
@@ -456,6 +477,8 @@ export function DashboardBusiness() {
     const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [metrics, setMetrics] = useState<DashboardPayload | null>(null);
+    const [commercialAgenda, setCommercialAgenda] = useState<CommercialAgendaItem[]>([]);
+    const [commercialAgendaLoading, setCommercialAgendaLoading] = useState(false);
 
     const [promotionForm, setPromotionForm] = useState<PromotionForm>(EMPTY_PROMOTION_FORM);
     const [creatingPromotion, setCreatingPromotion] = useState(false);
@@ -609,6 +632,8 @@ export function DashboardBusiness() {
             setPromotions([]);
             setBookings([]);
             setMetrics(null);
+            setCommercialAgenda([]);
+            setCommercialAgendaLoading(false);
             setSelectedAiBusinessId('');
             setSelectedManagedBusinessId('');
             setAssistantPreviewReply('');
@@ -619,14 +644,16 @@ export function DashboardBusiness() {
         }
 
         setLoading(true);
+        setCommercialAgendaLoading(true);
         setErrorMessage('');
 
         try {
-            const [businessesRes, promotionsRes, bookingsRes, metricsRes] = await Promise.all([
+            const [businessesRes, promotionsRes, bookingsRes, metricsRes, agendaRes] = await Promise.all([
                 businessApi.getMine(),
                 promotionsApi.getMine({ limit: 10 }),
                 bookingsApi.getMineAsOrganization({ limit: 10 }),
                 analyticsApi.getMyDashboard({ days: 30 }),
+                marketDataApi.getDominicanCommercialAgenda({ limit: 4, horizonDays: 90 }),
             ]);
 
             const loadedBusinesses = businessesRes.data || [];
@@ -634,6 +661,7 @@ export function DashboardBusiness() {
             setPromotions(promotionsRes.data?.data || []);
             setBookings(bookingsRes.data?.data || []);
             setMetrics(metricsRes.data || null);
+            setCommercialAgenda(agendaRes.data?.items || []);
             setPromotionForm((previous) => ({
                 ...previous,
                 businessId: previous.businessId || loadedBusinesses[0]?.id || '',
@@ -653,6 +681,7 @@ export function DashboardBusiness() {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el dashboard'));
         } finally {
             setLoading(false);
+            setCommercialAgendaLoading(false);
         }
     }, [activeOrganizationId]);
 
@@ -1765,6 +1794,49 @@ export function DashboardBusiness() {
                         <p>ROI: <strong className={(metrics?.roi.roiPercent ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}>{metrics?.roi.roiPercent ?? 0}%</strong></p>
                     </div>
                 </div>
+            </div>
+
+            <div className="card p-5">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                        <h2 className="font-display text-lg font-semibold text-gray-900">Agenda comercial RD</h2>
+                        <p className="text-xs text-gray-500">Feriados proximos y acciones sugeridas para conversion local.</p>
+                    </div>
+                    <span className="chip !text-[11px] !py-1">Prox. 90 dias</span>
+                </div>
+
+                {commercialAgendaLoading ? (
+                    <div className="space-y-2">
+                        <div className="h-16 rounded-xl border border-gray-100 bg-gray-50 animate-pulse"></div>
+                        <div className="h-16 rounded-xl border border-gray-100 bg-gray-50 animate-pulse"></div>
+                    </div>
+                ) : commercialAgenda.length === 0 ? (
+                    <p className="text-sm text-gray-500">Sin eventos comerciales disponibles por ahora.</p>
+                ) : (
+                    <div className="space-y-2">
+                        {commercialAgenda.map((item) => (
+                            <div key={item.id} className="rounded-xl border border-gray-100 p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="font-semibold text-gray-900 truncate">{item.holidayName}</p>
+                                    <span className="text-xs text-primary-700 shrink-0">{formatDaysUntilLabel(item.daysUntil)}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Ventana: {formatDateDo(item.campaignWindow.start)} - {formatDateDo(item.campaignWindow.end)}
+                                </p>
+                                <p className="text-sm text-gray-700 mt-1 line-clamp-2">{item.recommendation}</p>
+                                {item.suggestedCategories.length > 0 ? (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {item.suggestedCategories.slice(0, 3).map((category) => (
+                                            <span key={`${item.id}-${category}`} className="rounded-full border border-primary-200 bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700">
+                                                {category}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

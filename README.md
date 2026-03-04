@@ -122,6 +122,7 @@ Servicios:
 - `EXTERNAL_DATA_TIMEOUT_MS=3500`
 - `OPEN_METEO_BASE_URL=https://api.open-meteo.com`
 - `FRANKFURTER_BASE_URL=https://api.frankfurter.app`
+- `NAGER_BASE_URL=https://date.nager.at`
 - `AI_PROVIDER=auto` (`auto|gemini|local`)
 - `AI_EMBEDDING_DIMENSIONS=1536` (mantener en 1536 por compatibilidad pgvector actual)
 - `GEMINI_API_KEY=...` (opcional, recomendado para plan gratis inicial)
@@ -232,6 +233,8 @@ Para E2E de API:
 | POST | /api/search/businesses/reindex | Admin | Reindexar documentos de negocios |
 | GET | /api/market-data/weather/current?lat=18.48&lng=-69.93 | No | Clima actual (Open-Meteo) |
 | GET | /api/market-data/exchange-rate?base=USD&target=DOP&amount=1 | No | Tasa de cambio (Frankfurter) |
+| GET | /api/market-data/holidays/rd?year=2026&upcomingOnly=true | No | Feriados de Republica Dominicana |
+| GET | /api/market-data/commercial-agenda/rd?limit=4&horizonDays=60 | No | Agenda comercial sugerida para feriados RD |
 | PUT | /api/businesses/:id/verify | Admin | Aprobar negocio |
 | GET | /api/categories | No | Listar categorias |
 | GET | /api/categories/:id | No | Ver categoria |
