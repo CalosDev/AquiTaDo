@@ -13,10 +13,7 @@ export interface PaginatedResult<TItem> {
     totalPages: number;
 }
 
-export type DynamicFilters = Record<string, string | number | boolean | null | undefined>;
-
 export interface FindManyQuery<TWhere> extends PaginationQuery {
     where?: TWhere;
     orderBy?: Prisma.Enumerable<Record<string, Prisma.SortOrder>>;
 }
-

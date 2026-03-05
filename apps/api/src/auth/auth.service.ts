@@ -514,7 +514,7 @@ export class AuthService {
     }
 
     private resolveRefreshCookieOptions(refreshTtlDays: number): CookieOptions {
-        const isProduction = (process.env.NODE_ENV ?? '').trim().toLowerCase() === 'production';
+        const isProduction = (this.configService.get<string>('NODE_ENV') ?? '').trim().toLowerCase() === 'production';
         const configuredSameSite = (this.configService.get<string>('AUTH_REFRESH_COOKIE_SAMESITE') ?? '')
             .trim()
             .toLowerCase();

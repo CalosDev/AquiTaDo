@@ -1,4 +1,5 @@
 import { Injectable, Inject, BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
@@ -21,7 +22,9 @@ export class UploadsService {
 
     constructor(
         @Inject(PrismaService)
-        private prisma: PrismaService,
+        private readonly prisma: PrismaService,
+        @Inject(ConfigService)
+        private readonly configService: ConfigService,
     ) { }
 
     private readonly allowedMimeTypes: Record<string, string> = {
@@ -336,7 +339,7 @@ export class UploadsService {
     }
 
     private resolveStorageProvider(): StorageProvider {
-        const rawProvider = (process.env.STORAGE_PROVIDER || 'local').trim().toLowerCase();
+        const rawProvider = (this.configService.get<string>('STORAGE_PROVIDER') || 'local').trim().toLowerCase();
         return rawProvider === 's3' ? 's3' : 'local';
     }
 
@@ -345,12 +348,12 @@ export class UploadsService {
             return this.s3Client;
         }
 
-        const region = (process.env.STORAGE_S3_REGION || 'us-east-1').trim();
-        const endpoint = process.env.STORAGE_S3_ENDPOINT?.trim();
-        const accessKeyId = process.env.STORAGE_S3_ACCESS_KEY_ID?.trim();
-        const secretAccessKey = process.env.STORAGE_S3_SECRET_ACCESS_KEY?.trim();
+        const region = (this.configService.get<string>('STORAGE_S3_REGION') || 'us-east-1').trim();
+        const endpoint = this.configService.get<string>('STORAGE_S3_ENDPOINT')?.trim();
+        const accessKeyId = this.configService.get<string>('STORAGE_S3_ACCESS_KEY_ID')?.trim();
+        const secretAccessKey = this.configService.get<string>('STORAGE_S3_SECRET_ACCESS_KEY')?.trim();
         const forcePathStyle = ['1', 'true'].includes(
-            (process.env.STORAGE_S3_FORCE_PATH_STYLE || 'false').trim().toLowerCase(),
+            (this.configService.get<string>('STORAGE_S3_FORCE_PATH_STYLE') || 'false').trim().toLowerCase(),
         );
 
         this.s3Client = new S3Client({
@@ -370,7 +373,7 @@ export class UploadsService {
     }
 
     private resolveS3Bucket(): string {
-        const bucket = process.env.STORAGE_S3_BUCKET?.trim();
+        const bucket = this.configService.get<string>('STORAGE_S3_BUCKET')?.trim();
         if (!bucket) {
             throw new BadRequestException('STORAGE_S3_BUCKET no esta configurado');
         }
@@ -378,16 +381,16 @@ export class UploadsService {
     }
 
     private resolvePublicObjectUrl(bucket: string, objectKey: string): string {
-        const explicitPublicBaseUrl = process.env.STORAGE_PUBLIC_BASE_URL?.trim();
+        const explicitPublicBaseUrl = this.configService.get<string>('STORAGE_PUBLIC_BASE_URL')?.trim();
         if (explicitPublicBaseUrl) {
             return `${explicitPublicBaseUrl.replace(/\/+$/, '')}/${objectKey}`;
         }
 
-        const endpoint = process.env.STORAGE_S3_ENDPOINT?.trim();
+        const endpoint = this.configService.get<string>('STORAGE_S3_ENDPOINT')?.trim();
         if (endpoint) {
             const baseEndpoint = endpoint.replace(/\/+$/, '');
             const forcePathStyle = ['1', 'true'].includes(
-                (process.env.STORAGE_S3_FORCE_PATH_STYLE || 'false').trim().toLowerCase(),
+                (this.configService.get<string>('STORAGE_S3_FORCE_PATH_STYLE') || 'false').trim().toLowerCase(),
             );
             if (forcePathStyle) {
                 return `${baseEndpoint}/${bucket}/${objectKey}`;
@@ -395,7 +398,7 @@ export class UploadsService {
             return `${baseEndpoint}/${objectKey}`;
         }
 
-        const region = (process.env.STORAGE_S3_REGION || 'us-east-1').trim();
+        const region = (this.configService.get<string>('STORAGE_S3_REGION') || 'us-east-1').trim();
         return `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
     }
 
@@ -404,7 +407,7 @@ export class UploadsService {
             throw new BadRequestException('Documento vacío');
         }
 
-        const mode = (process.env.UPLOAD_AV_SCAN_MODE || 'off').trim().toLowerCase();
+        const mode = (this.configService.get<string>('UPLOAD_AV_SCAN_MODE') || 'off').trim().toLowerCase();
         if (mode === 'off') {
             return;
         }
@@ -421,7 +424,7 @@ export class UploadsService {
 
     private resolveObjectKeyFromUrl(assetUrl: string): string | null {
         const normalized = assetUrl.trim();
-        const publicBase = process.env.STORAGE_PUBLIC_BASE_URL?.trim().replace(/\/+$/, '');
+        const publicBase = this.configService.get<string>('STORAGE_PUBLIC_BASE_URL')?.trim().replace(/\/+$/, '');
 
         if (publicBase && normalized.startsWith(`${publicBase}/`)) {
             return decodeURIComponent(normalized.slice(publicBase.length + 1));

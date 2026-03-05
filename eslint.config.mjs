@@ -22,6 +22,29 @@ export default tseslint.config(
         },
     },
     {
+        files: ['apps/api/src/**/*.ts'],
+        rules: {
+            'no-restricted-properties': [
+                'error',
+                {
+                    object: 'process',
+                    property: 'env',
+                    message: 'Use ConfigService for environment access inside app services/modules.',
+                },
+            ],
+        },
+    },
+    {
+        files: [
+            'apps/api/src/main.ts',
+            'apps/api/src/prisma/prisma.service.ts',
+            'apps/api/src/config/env.validation.ts',
+        ],
+        rules: {
+            'no-restricted-properties': 'off',
+        },
+    },
+    {
         files: ['apps/web/**/*.{ts,tsx}'],
         languageOptions: {
             globals: globals.browser,

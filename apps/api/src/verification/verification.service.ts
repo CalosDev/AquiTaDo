@@ -6,6 +6,7 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
     BusinessVerificationStatus,
     OrganizationRole,
@@ -34,6 +35,8 @@ export class VerificationService {
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
+        @Inject(ConfigService)
+        private readonly configService: ConfigService,
         @Inject(ReputationService)
         private readonly reputationService: ReputationService,
         @Inject(NotificationsQueueService)
@@ -743,7 +746,7 @@ export class VerificationService {
             throw new BadRequestException('La URL del documento debe pertenecer a verificación interna');
         }
 
-        const configuredPublicBase = process.env.STORAGE_PUBLIC_BASE_URL?.trim().replace(/\/+$/, '');
+        const configuredPublicBase = this.configService.get<string>('STORAGE_PUBLIC_BASE_URL')?.trim().replace(/\/+$/, '');
         if (configuredPublicBase) {
             if (!normalized.startsWith(`${configuredPublicBase}/`)) {
                 throw new BadRequestException('La URL del documento no pertenece al bucket configurado');
@@ -751,11 +754,11 @@ export class VerificationService {
             return;
         }
 
-        const bucket = process.env.STORAGE_S3_BUCKET?.trim();
-        const region = (process.env.STORAGE_S3_REGION || 'us-east-1').trim();
-        const endpoint = process.env.STORAGE_S3_ENDPOINT?.trim().replace(/\/+$/, '');
+        const bucket = this.configService.get<string>('STORAGE_S3_BUCKET')?.trim();
+        const region = (this.configService.get<string>('STORAGE_S3_REGION') || 'us-east-1').trim();
+        const endpoint = this.configService.get<string>('STORAGE_S3_ENDPOINT')?.trim().replace(/\/+$/, '');
         const forcePathStyle = ['1', 'true'].includes(
-            (process.env.STORAGE_S3_FORCE_PATH_STYLE || 'false').trim().toLowerCase(),
+            (this.configService.get<string>('STORAGE_S3_FORCE_PATH_STYLE') || 'false').trim().toLowerCase(),
         );
 
         const allowedPrefixes: string[] = [];

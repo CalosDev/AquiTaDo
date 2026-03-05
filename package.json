@@ -14,6 +14,8 @@
     "test": "pnpm --parallel -r --if-present run test",
     "test:unit": "pnpm --parallel -r --if-present run test:unit",
     "test:e2e:api": "pnpm --filter @aquita/api test:e2e",
+    "audit:architecture": "node scripts/audit-architecture.mjs",
+    "quality:check": "pnpm lint && pnpm audit:architecture && pnpm test",
     "smoke:api": "node scripts/smoke-api.mjs",
     "smoke:full": "node scripts/smoke-full.mjs",
     "smoke:saas": "node scripts/smoke-saas.mjs",
