@@ -769,9 +769,15 @@ export class BusinessesService {
         b.*,
         (
           ${earthRadiusKm} * acos(
-            cos(radians(${query.lat})) * cos(radians(b.latitude)) *
-            cos(radians(b.longitude) - radians(${query.lng})) +
-            sin(radians(${query.lat})) * sin(radians(b.latitude))
+            LEAST(
+              1.0,
+              GREATEST(
+                -1.0,
+                cos(radians(${query.lat})) * cos(radians(b.latitude)) *
+                cos(radians(b.longitude) - radians(${query.lng})) +
+                sin(radians(${query.lat})) * sin(radians(b.latitude))
+              )
+            )
           )
         ) AS distance
       FROM businesses b
@@ -783,9 +789,15 @@ export class BusinessesService {
         AND b.longitude BETWEEN ${minLng} AND ${maxLng}
         AND (
           ${earthRadiusKm} * acos(
-            cos(radians(${query.lat})) * cos(radians(b.latitude)) *
-            cos(radians(b.longitude) - radians(${query.lng})) +
-            sin(radians(${query.lat})) * sin(radians(b.latitude))
+            LEAST(
+              1.0,
+              GREATEST(
+                -1.0,
+                cos(radians(${query.lat})) * cos(radians(b.latitude)) *
+                cos(radians(b.longitude) - radians(${query.lng})) +
+                sin(radians(${query.lat})) * sin(radians(b.latitude))
+              )
+            )
           )
         ) <= ${radius}
       ORDER BY distance ASC
