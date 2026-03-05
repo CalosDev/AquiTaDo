@@ -57,7 +57,8 @@ export class AnalyticsController {
     }
 
     @Get('dashboard/my')
-    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard, OrgContextGuard)
+    @Roles('BUSINESS_OWNER')
     async getMyDashboard(
         @CurrentOrganization('organizationId') organizationId: string,
         @Query() query: AnalyticsRangeQueryDto,
@@ -69,7 +70,8 @@ export class AnalyticsController {
     }
 
     @Get('business/:businessId')
-    @UseGuards(JwtAuthGuard, OrgContextGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard, OrgContextGuard)
+    @Roles('BUSINESS_OWNER')
     async getBusinessAnalytics(
         @CurrentOrganization('organizationId') organizationId: string,
         @Param('businessId', new ParseUUIDPipe()) businessId: string,
