@@ -159,8 +159,21 @@ async function checkObservability(apiBaseUrl, adminToken) {
 
 async function checkWebHealth(webBaseUrl) {
     const health = await request(`${webBaseUrl}/health`, 'text/plain');
-    assert(health.response.ok, `/health failed with HTTP ${health.response.status}`);
-    assert(health.text.trim().toLowerCase() === 'ok', '/health did not return ok');
+    if (health.response.ok && health.text.trim().toLowerCase() === 'ok') {
+        return;
+    }
+
+    // SPA hosts (for example Vercel rewrites) can serve index.html for /health.
+    const webRoutes = ['/', '/businesses', '/login'];
+    for (const route of webRoutes) {
+        const response = await request(`${webBaseUrl}${route}`, 'text/html');
+        assert(response.response.ok, `${route} failed with HTTP ${response.response.status}`);
+        const contentType = response.response.headers.get('content-type') ?? '';
+        assert(
+            contentType.includes('text/html'),
+            `${route} should return text/html, got ${contentType || 'unknown'}`,
+        );
+    }
 }
 
 async function main() {
