@@ -640,24 +640,36 @@ export function Home() {
             )}
 
             <section className="gradient-hero relative overflow-hidden">
-                <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,#ffffff2b_1px,transparent_1px),linear-gradient(to_bottom,#ffffff2b_1px,transparent_1px)] [background-size:36px_36px]"></div>
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-                    <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
+                <div className="absolute inset-0 opacity-20 subtle-grid-bg"></div>
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20">
+                    <div className="grid gap-8 xl:gap-10 lg:grid-cols-12 lg:items-center">
                         <div className="lg:col-span-7">
                             <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-blue-100">
                                 <span className="h-2 w-2 rounded-full bg-red-300"></span>
-                                Dominicano desde el diseno
+                                Ecosistema local dominicano
                             </div>
-                            <h1 className="mt-5 font-display text-4xl md:text-6xl font-extrabold leading-tight text-white">
-                                El ecosistema local para
-                                <span className="block text-accent-300"> descubrir, vender y crecer en RD</span>
+                            <h1 className="mt-5 font-display text-4xl sm:text-5xl xl:text-6xl font-extrabold leading-tight text-white">
+                                Descubre negocios reales
+                                <span className="block text-accent-300">y haz crecer tu marca en RD</span>
                             </h1>
                             <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-blue-100">
-                                AquiTa.do conecta personas con negocios verificados y le da a cada local
-                                herramientas SaaS para operar mejor: reservas, CRM, mensajeria, promociones y mas.
+                                AquiTa.do conecta clientes con negocios verificados y entrega herramientas SaaS para operar mejor:
+                                CRM, mensajeria, promociones, reputacion y analitica en una sola plataforma.
                             </p>
 
-                            <form onSubmit={handleSearch} className="mt-8 max-w-3xl">
+                            <div className="mt-6 flex flex-wrap gap-3">
+                                <Link to="/businesses" className="btn-accent">
+                                    Explorar negocios
+                                </Link>
+                                <Link
+                                    to={registerBusinessPath}
+                                    className="btn-secondary !bg-white/92 !text-primary-800 hover:!bg-white"
+                                >
+                                    {registerBusinessLabel}
+                                </Link>
+                            </div>
+
+                            <form onSubmit={handleSearch} className="mt-7 max-w-3xl">
                                 <div className="hero-glass-card p-2 md:p-3">
                                     <div className="flex flex-col gap-2 md:flex-row">
                                         <input
@@ -672,26 +684,38 @@ export function Home() {
                                             Buscar ahora
                                         </button>
                                     </div>
+                                    <div className="mt-2 flex flex-wrap gap-2 px-1">
+                                        {['Comida criolla', 'Farmacia 24h', 'Taller automotriz'].map((preset) => (
+                                            <button
+                                                key={preset}
+                                                type="button"
+                                                onClick={() => setSearchQuery(preset)}
+                                                className="rounded-full border border-white/35 bg-white/12 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                                            >
+                                                {preset}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </form>
 
-                            <div className="mt-7 flex flex-wrap gap-3">
-                                <span className="chip !bg-white/10 !text-white !border-white/30">
+                            <div className="mt-6 flex flex-wrap gap-2.5">
+                                <span className="kpi-chip-soft">
                                     {loading ? '...' : formatNumberDo(totalBusinesses)} negocios
                                 </span>
-                                <span className="chip !bg-white/10 !text-white !border-white/30">
+                                <span className="kpi-chip-soft">
                                     {loading ? '...' : provinces.length} provincias
                                 </span>
-                                <span className="chip !bg-white/10 !text-white !border-white/30">
+                                <span className="kpi-chip-soft">
                                     {loading ? '...' : categories.length} categorias
                                 </span>
                                 {marketExchangeRate ? (
-                                    <span className="chip !bg-white/10 !text-white !border-white/30">
+                                    <span className="kpi-chip-soft">
                                         USD/DOP {marketExchangeRate.rate.toFixed(2)}
                                     </span>
                                 ) : null}
                                 {marketWeather ? (
-                                    <span className="chip !bg-white/10 !text-white !border-white/30">
+                                    <span className="kpi-chip-soft">
                                         Santo Domingo {Math.round(marketWeather.temperatureC)} C
                                     </span>
                                 ) : null}
@@ -699,12 +723,12 @@ export function Home() {
                         </div>
 
                         <div className="lg:col-span-5">
-                            <div className="hero-glass-card p-6 md:p-7 text-white">
+                            <div className="hero-accent-ring p-6 md:p-7 text-white">
                                 <p className="text-xs uppercase tracking-[0.18em] text-blue-200 font-semibold">Radar local</p>
                                 <h2 className="mt-2 font-display text-2xl font-bold">Que esta moviendo el mercado</h2>
 
                                 <div className="mt-5 space-y-3">
-                                    {topCategories.slice(0, 4).map((category) => (
+                                    {topCategories.slice(0, 4).length > 0 ? topCategories.slice(0, 4).map((category) => (
                                         <Link
                                             key={category.id}
                                             to={category.slug ? `/negocios/categoria/${category.slug}` : `/businesses?categoryId=${category.id}`}
@@ -717,12 +741,16 @@ export function Home() {
                                             }}
                                             className="flex items-center justify-between rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/20"
                                         >
-                                            <span>{category.name}</span>
+                                            <span className="truncate">{category.name}</span>
                                             <span className="text-blue-100">
                                                 {formatNumberDo(category._count?.businesses ?? 0)}
                                             </span>
                                         </Link>
-                                    ))}
+                                    )) : (
+                                        <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-blue-100">
+                                            Cargando categorias destacadas...
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="mt-5 rounded-2xl border border-white/20 bg-white/10 p-4">
@@ -837,8 +865,8 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-                <div className="card p-6 md:p-8 border-t-4 border-primary-600 mb-8">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
+                <div className="section-shell p-6 md:p-8 border-t-4 border-primary-600 mb-8">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-xs uppercase tracking-wide text-primary-700 font-semibold">Asistente IA</p>
@@ -887,7 +915,7 @@ export function Home() {
                                 ))}
                             </select>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             <button type="submit" className="btn-primary" disabled={aiLoading}>
                                 {aiLoading ? 'Consultando...' : 'Consultar asistente'}
                             </button>
@@ -898,7 +926,7 @@ export function Home() {
                     {(aiAnswer || aiMatches.length > 0) && (
                         <div className="mt-5 space-y-4">
                             {aiAnswer ? (
-                                <div className="rounded-xl border border-primary-100 bg-primary-50/40 px-4 py-3 text-sm text-gray-800">
+                                <div className="rounded-xl border border-primary-100 bg-primary-50/40 px-4 py-3 text-sm leading-relaxed text-gray-800">
                                     {aiAnswer}
                                 </div>
                             ) : null}
@@ -910,7 +938,7 @@ export function Home() {
                                             key={match.id}
                                             to={match.slug ? `/businesses/${match.slug}` : `/businesses/${match.id}`}
                                             onClick={() => handleBusinessClick(match.id)}
-                                            className="rounded-xl border border-gray-100 bg-white p-4 hover:border-primary-200 transition-colors"
+                                            className="panel-premium p-4"
                                         >
                                             <p className="font-semibold text-gray-900">{match.name}</p>
                                             <p className="text-xs text-gray-600 mt-1 line-clamp-2">{match.address}</p>
@@ -945,7 +973,7 @@ export function Home() {
                                         metadata: { source: 'home-intent-card', intent: intent.slug },
                                     });
                                 }}
-                                className="surface-panel p-4 transition-all hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-md"
+                                className="panel-premium p-4"
                             >
                                 <p className="text-[11px] uppercase tracking-[0.16em] text-primary-600 font-bold">{intent.icon}</p>
                                 <p className="mt-2 font-display text-lg font-semibold text-slate-900">{intent.label}</p>
@@ -956,7 +984,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
                 <div className="grid gap-8 lg:grid-cols-2">
                     <div className="section-shell p-6">
                         <div className="flex items-end justify-between gap-4">
@@ -980,7 +1008,7 @@ export function Home() {
                                             metadata: { source: category.source, categoryKey: category.key },
                                         });
                                     }}
-                                    className="surface-panel p-3 text-sm font-semibold text-slate-700 transition-colors hover:border-primary-300 hover:text-primary-700"
+                                    className="panel-premium p-3 text-sm font-semibold text-slate-700 hover:text-primary-700"
                                 >
                                     <div className="flex items-center justify-between gap-2">
                                         <span className="truncate">{category.label}</span>
@@ -1022,7 +1050,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
                 <div className="section-shell p-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                         <div>
@@ -1055,7 +1083,7 @@ export function Home() {
                     {rankingsLoading ? (
                         <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
                             {Array.from({ length: 4 }).map((_, index) => (
-                                <div key={index} className="surface-panel p-4">
+                                <div key={index} className="panel-premium p-4">
                                     <div className="h-4 w-32 rounded bg-gray-100 animate-pulse"></div>
                                     <div className="mt-2 h-3 w-56 rounded bg-gray-100 animate-pulse"></div>
                                 </div>
@@ -1070,7 +1098,7 @@ export function Home() {
                                     key={item.id}
                                     to={`/businesses/${item.slug || item.id}`}
                                     onClick={() => handleBusinessClick(item.id)}
-                                    className="surface-panel p-4 hover:border-primary-300 transition-colors"
+                                    className="panel-premium p-4"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
@@ -1098,7 +1126,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h2 className="section-title !text-3xl">Negocios recientes</h2>
@@ -1120,7 +1148,7 @@ export function Home() {
                                 key={business.id}
                                 to={`/businesses/${business.slug || business.id}`}
                                 onClick={() => handleBusinessClick(business.id)}
-                                className="card group"
+                                className="panel-premium group overflow-hidden"
                             >
                                 <div className="relative h-48 bg-gradient-to-br from-primary-50 to-accent-50">
                                     {business.images?.[0] ? (
@@ -1157,7 +1185,7 @@ export function Home() {
                 )}
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
                 <div className="section-shell p-6 md:p-8">
                     <h2 className="section-title !text-3xl">Por que AquiTa.do es diferente</h2>
                     <p className="section-subtitle mt-2">
@@ -1165,7 +1193,7 @@ export function Home() {
                     </p>
                     <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                         {OPERATING_POINTS.map((point) => (
-                            <article key={point.title} className="surface-panel p-5">
+                            <article key={point.title} className="panel-premium p-5">
                                 <h3 className="font-display text-xl font-semibold text-slate-900">{point.title}</h3>
                                 <p className="mt-2 text-sm leading-relaxed text-slate-600">{point.description}</p>
                             </article>
@@ -1184,9 +1212,14 @@ export function Home() {
                         Crea tu perfil, recibe contactos, activa promociones y opera tu embudo de ventas
                         desde un solo dashboard.
                     </p>
-                    <Link to={registerBusinessPath} className="btn-accent mt-8 inline-flex text-base md:text-lg px-8">
-                        {registerBusinessLabel}
-                    </Link>
+                    <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                        <Link to={registerBusinessPath} className="btn-accent inline-flex text-base md:text-lg px-8">
+                            {registerBusinessLabel}
+                        </Link>
+                        <Link to="/businesses" className="btn-secondary !bg-white/90 !text-primary-800 hover:!bg-white">
+                            Ver directorio publico
+                        </Link>
+                    </div>
                 </div>
             </section>
         </div>

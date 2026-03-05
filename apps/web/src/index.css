@@ -160,6 +160,45 @@
     @apply rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md shadow-2xl shadow-black/20;
   }
 
+  .hero-accent-ring {
+    @apply relative overflow-hidden rounded-3xl border border-white/25 bg-white/10 backdrop-blur-md;
+    box-shadow:
+      0 20px 45px -20px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  }
+
+  .hero-accent-ring::before {
+    content: '';
+    position: absolute;
+    inset: -35% auto auto -25%;
+    width: 220px;
+    height: 220px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0) 70%);
+    pointer-events: none;
+  }
+
+  .panel-premium {
+    @apply rounded-2xl border border-slate-200/90 bg-white shadow-sm transition-all duration-300;
+    box-shadow: 0 14px 34px -24px rgba(15, 23, 42, 0.38);
+  }
+
+  .panel-premium:hover {
+    @apply border-primary-200;
+    box-shadow: 0 22px 42px -26px rgba(0, 45, 98, 0.45);
+  }
+
+  .kpi-chip-soft {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/12 px-3 py-1.5 text-xs font-semibold text-white;
+  }
+
+  .subtle-grid-bg {
+    background-image:
+      linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+
   .flag-ribbon {
     height: 4px;
     background: linear-gradient(

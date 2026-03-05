@@ -929,8 +929,8 @@ export function BusinessDetails() {
 
             const pointsAwarded = Number(reward?.pointsAwarded ?? 0);
             const verifiedLabel = reward?.verifiedLocation ? ' con GPS verificado' : '';
-            const streakLabel = reward?.checkinStreak ? ` · racha ${reward.checkinStreak}` : '';
-            const tierLabel = reward?.loyaltyTier ? ` · tier ${reward.loyaltyTier}` : '';
+            const streakLabel = reward?.checkinStreak ? ` - racha ${reward.checkinStreak}` : '';
+            const tierLabel = reward?.loyaltyTier ? ` - tier ${reward.loyaltyTier}` : '';
 
             setCheckInInfoMessage(
                 `Check-in registrado: +${pointsAwarded} pts${verifiedLabel}${streakLabel}${tierLabel}`,
@@ -970,11 +970,11 @@ export function BusinessDetails() {
                     {errorMessage}
                 </div>
             )}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Image Gallery */}
-                    <div className="card overflow-hidden">
+                    <div className="panel-premium overflow-hidden">
                         <div className="h-72 md:h-96 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
                             {currentImage ? (
                                 <OptimizedImage
@@ -1009,16 +1009,16 @@ export function BusinessDetails() {
                     </div>
 
                     {/* Info */}
-                    <div className="card p-6">
-                        <div className="flex items-start justify-between mb-4">
+                    <div className="panel-premium p-6 md:p-7">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-4">
                             <div>
-                                <div className="flex items-center gap-2 mb-2">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
                                     {business.verified && (
                                         <span className="bg-primary-100 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium border border-primary-200">
                                             OK Verificado
                                         </span>
                                     )}
-                                    <div className="flex gap-1">
+                                    <div className="flex flex-wrap gap-1">
                                         {business.categories?.map((bc, i) => (
                                             <span key={i} className="bg-primary-50 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium">
                                                 {bc.category.icon} {bc.category.name}
@@ -1026,15 +1026,15 @@ export function BusinessDetails() {
                                         ))}
                                     </div>
                                 </div>
-                                <h1 className="font-display text-3xl font-bold text-gray-900">{business.name}</h1>
-                                <p className="text-gray-500 mt-1 flex items-center gap-1">
+                                <h1 className="font-display text-3xl md:text-4xl font-bold text-gray-900 leading-tight">{business.name}</h1>
+                                <p className="text-gray-500 mt-2 flex items-center gap-1">
                                     Direccion: {business.address}
                                     {business.province && ` - ${business.province.name}`}
                                     {business.city && `, ${business.city.name}`}
                                 </p>
                             </div>
                             {averageRating && (
-                                <div className="text-center bg-accent-50 border border-accent-100 px-4 py-2 rounded-xl">
+                                <div className="text-center bg-accent-50 border border-accent-100 px-4 py-2 rounded-xl md:min-w-[110px]">
                                     <div className="text-2xl font-bold text-accent-600">* {averageRating}</div>
                                     <div className="text-xs text-gray-500">{business._count?.reviews} resenas</div>
                                 </div>
@@ -1190,7 +1190,7 @@ export function BusinessDetails() {
 
                     {/* Map */}
                     {openStreetMapEmbedUrl && (
-                        <div className="card p-6">
+                        <div className="panel-premium p-6">
                             <h2 className="font-display font-semibold text-gray-900 mb-3">Ubicacion</h2>
                             <div className="h-64 bg-gray-100 rounded-xl flex items-center justify-center">
                                 <iframe
@@ -1216,14 +1216,14 @@ export function BusinessDetails() {
                         </div>
                     )}
 
-                    <div className="card p-6">
+                    <div className="panel-premium p-6">
                         <h2 className="font-display font-semibold text-gray-900 mb-4">Ofertas activas</h2>
                         {promotionsLoading ? (
                             <p className="text-sm text-gray-500">Cargando promociones...</p>
                         ) : publicPromotions.length > 0 ? (
                             <div className="space-y-3">
                                 {publicPromotions.map((promotion) => (
-                                    <div key={promotion.id} className="rounded-xl border border-gray-100 p-4">
+                                    <div key={promotion.id} className="rounded-xl border border-gray-100 bg-white p-4">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <p className="font-semibold text-gray-900">{promotion.title}</p>
                                             <span className="text-xs rounded-full bg-primary-50 text-primary-700 px-2 py-1">
@@ -1256,7 +1256,7 @@ export function BusinessDetails() {
                         )}
                     </div>
 
-                    <div className="card p-6">
+                    <div className="panel-premium p-6">
                         <h2 className="font-display font-semibold text-gray-900 mb-4">Negocios cerca de aqui</h2>
                         {nearbyLoading ? (
                             <p className="text-sm text-gray-500">Cargando negocios cercanos...</p>
@@ -1271,7 +1271,7 @@ export function BusinessDetails() {
                                         <Link
                                             key={nearbyBusiness.id}
                                             to={`/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`}
-                                            className="rounded-xl border border-gray-100 p-3 hover:border-primary-200 hover:bg-primary-50/40 transition-colors"
+                                            className="rounded-xl border border-gray-100 bg-white p-3 hover:border-primary-200 hover:bg-primary-50/40 transition-colors"
                                         >
                                             <p className="font-medium text-gray-900">{nearbyBusiness.name}</p>
                                             <p className="text-xs text-gray-500 mt-1 line-clamp-2">
@@ -1290,7 +1290,7 @@ export function BusinessDetails() {
                     </div>
 
                     {/* Reviews */}
-                    <div className="card p-6">
+                    <div className="panel-premium p-6">
                         <h2 className="font-display font-semibold text-gray-900 mb-4">
                             Resenas ({reviewCount})
                         </h2>
@@ -1303,7 +1303,7 @@ export function BusinessDetails() {
                         )}
 
                         {isAuthenticated && (
-                            <form onSubmit={handleReviewSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl">
+                            <form onSubmit={handleReviewSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
                                 <div className="flex items-center gap-3 mb-3">
                                     <span className="text-sm font-medium text-gray-600">Tu calificacion:</span>
                                     <div className="flex gap-1">
@@ -1356,7 +1356,7 @@ export function BusinessDetails() {
                                     Cargando resenas...
                                 </p>
                             ) : visibleReviews.map((review) => (
-                                <div key={review.id} className="p-4 border border-gray-100 rounded-xl">
+                                <div key={review.id} className="p-4 border border-gray-100 rounded-xl bg-white">
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
                                             <span className="font-semibold text-gray-900">{review.user.name}</span>
@@ -1384,7 +1384,7 @@ export function BusinessDetails() {
 
                 {/* Sidebar - Contact */}
                 <div className="space-y-6">
-                    <div className="card p-6 lg:sticky lg:top-24 border-t-4 border-accent-600">
+                    <div className="panel-premium p-6 lg:sticky lg:top-24 border-t-4 border-accent-600">
                         <h2 className="font-display font-semibold text-gray-900 mb-4">Contacto</h2>
                         <div className="flex flex-wrap gap-2 mb-4">
                             {business.verified && (
@@ -1486,7 +1486,7 @@ export function BusinessDetails() {
                                 <a
                                     href={`tel:${business.phone}`}
                                     onClick={handlePhoneClick}
-                                    className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 hover:bg-primary-100 transition-colors hover-lift group"
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 border border-primary-100 hover:bg-primary-100 transition-colors hover-lift group"
                                 >
                                     <span className="text-lg">Tel</span>
                                     <div>
@@ -1503,7 +1503,7 @@ export function BusinessDetails() {
                                     onClick={handleWhatsAppClick}
                                     className={`flex items-center gap-3 p-3 rounded-xl transition-colors hover-lift group ${contactVariant === 'emphasis'
                                         ? 'bg-green-100 hover:bg-green-200 border border-green-300 shadow-sm'
-                                        : 'bg-green-50 hover:bg-green-100'
+                                        : 'bg-green-50 hover:bg-green-100 border border-green-100'
                                         }`}
                                 >
                                     <span className="text-lg">WA</span>
@@ -1686,7 +1686,7 @@ export function BusinessDetails() {
                                     />
                                     <button
                                         type="submit"
-                                        className="btn-primary text-sm"
+                                        className="btn-primary text-sm w-full sm:w-auto"
                                         disabled={sendingMessage}
                                     >
                                         {sendingMessage ? 'Enviando...' : 'Enviar mensaje'}
