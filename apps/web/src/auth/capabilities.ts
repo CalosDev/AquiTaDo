@@ -33,9 +33,8 @@ export function getRoleCapabilities(role: unknown): RoleCapabilities {
         canAccessCustomerPanel: isCustomer,
         canAccessBusinessPanel: isBusinessOwner,
         canAccessAdminPanel: isAdmin,
-        canManageOrganizations: isBusinessOwner,
+        canManageOrganizations: false,
         canRegisterBusiness: isBusinessOwner,
         isPlatformOperator: isAdmin,
     };
 }
-

@@ -17,7 +17,7 @@ describe('getRoleCapabilities', () => {
         expect(capabilities.canAccessBusinessPanel).toBe(true);
         expect(capabilities.canAccessAdminPanel).toBe(false);
         expect(capabilities.canRegisterBusiness).toBe(true);
-        expect(capabilities.canManageOrganizations).toBe(true);
+        expect(capabilities.canManageOrganizations).toBe(false);
     });
 
     it('grants only admin capabilities to ADMIN', () => {

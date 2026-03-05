@@ -67,14 +67,6 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
         };
     }
 
-    if (pathname === '/organization') {
-        return {
-            title: 'Organizacion | AquiTa.do',
-            description: 'Configura miembros, planes y permisos de tu organizacion.',
-            noindex: true,
-        };
-    }
-
     if (pathname === '/profile') {
         return {
             title: 'Perfil | AquiTa.do',

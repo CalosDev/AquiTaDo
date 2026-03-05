@@ -18,8 +18,6 @@ const Terms = lazy(async () => ({ default: (await pageLoaders.terms()).Terms }))
 const Privacy = lazy(async () => ({ default: (await pageLoaders.privacy()).Privacy }));
 const About = lazy(async () => ({ default: (await pageLoaders.about()).About }));
 const NotFound = lazy(async () => ({ default: (await pageLoaders.notFound()).NotFound }));
-const OrganizationSettings = lazy(async () => ({ default: (await pageLoaders.organizationSettings()).OrganizationSettings }));
-const AcceptInvite = lazy(async () => ({ default: (await pageLoaders.acceptInvite()).AcceptInvite }));
 const Profile = lazy(async () => ({ default: (await pageLoaders.profile()).Profile }));
 const AdminSecurity = lazy(async () => ({ default: (await pageLoaders.adminSecurity()).AdminSecurity }));
 
@@ -75,26 +73,10 @@ export function AppRouter() {
                         }
                     />
                     <Route
-                        path="/organization"
-                        element={
-                            <ProtectedRoute roles={['BUSINESS_OWNER']}>
-                                <OrganizationSettings />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
                         path="/profile"
                         element={
                             <ProtectedRoute>
                                 <Profile />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/invites/:token"
-                        element={
-                            <ProtectedRoute>
-                                <AcceptInvite />
                             </ProtectedRoute>
                         }
                     />

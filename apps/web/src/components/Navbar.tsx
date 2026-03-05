@@ -35,7 +35,6 @@ export function Navbar() {
     const roleHomeLabel = resolveRoleHomeLabel(user?.role);
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
-    const canAccessOrganization = roleCapabilities.canManageOrganizations;
     const organizationName = activeOrganization?.name?.trim() ?? '';
     const showOrganizationChip = organizationName.length > 0 && organizationName.length <= 18;
 
@@ -177,16 +176,6 @@ export function Navbar() {
                                     >
                                         {roleHomeLabel}
                                     </Link>
-                                    {canAccessOrganization && (
-                                        <Link
-                                            to="/organization"
-                                            className="nav-link"
-                                            onMouseEnter={() => preloadRouteChunk('/organization')}
-                                            onFocus={() => preloadRouteChunk('/organization')}
-                                        >
-                                            Organizacion
-                                        </Link>
-                                    )}
                                     {user?.role === 'ADMIN' && (
                                         <Link
                                             to="/security"
@@ -335,17 +324,6 @@ export function Navbar() {
                                         >
                                             {roleHomeLabel}
                                         </Link>
-                                        {canAccessOrganization && (
-                                            <Link
-                                                to="/organization"
-                                                className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
-                                                onMouseEnter={() => preloadRouteChunk('/organization')}
-                                                onFocus={() => preloadRouteChunk('/organization')}
-                                                onClick={() => setMenuOpen(false)}
-                                            >
-                                                Organizacion
-                                            </Link>
-                                        )}
                                         {user?.role === 'ADMIN' && (
                                             <Link
                                                 to="/security"

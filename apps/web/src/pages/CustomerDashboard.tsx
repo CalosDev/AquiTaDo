@@ -1,24 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { favoritesApi, messagingApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
-import { bookingsApi, checkinsApi, favoritesApi, messagingApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { formatDateTimeDo } from '../lib/market';
 
-type BookingStatus = 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW';
 type ConversationStatus = 'OPEN' | 'CLOSED' | 'CONVERTED';
-
-interface BookingItem {
-    id: string;
-    status: BookingStatus;
-    scheduledFor: string;
-    business: {
-        id: string;
-        name: string;
-        slug: string;
-    };
-}
 
 interface ConversationItem {
     id: string;
@@ -69,10 +57,6 @@ interface FavoriteBusinessItem {
             name: string;
             slug: string;
         } | null;
-        images: Array<{
-            id: string;
-            url: string;
-        }>;
     };
 }
 
@@ -95,72 +79,9 @@ interface UserBusinessList {
     }>;
 }
 
-interface CheckInItem {
-    id: string;
-    createdAt: string;
-    pointsAwarded: number;
-    verifiedLocation: boolean;
-    business: {
-        id: string;
-        name: string;
-        slug: string;
-        address: string;
-        province?: {
-            id: string;
-            name: string;
-            slug: string;
-        } | null;
-        city?: {
-            id: string;
-            name: string;
-        } | null;
-    };
-}
-
-interface CheckInSummary {
-    loyaltyPoints: number;
-    checkinCount: number;
-    checkinStreak: number;
-    loyaltyTier: 'NUEVO' | 'EXPLORADOR' | 'LOCAL_PRO' | 'EMBAJADOR';
-    lastCheckinAt?: string | null;
-}
-
-const EMPTY_BOOKINGS: BookingItem[] = [];
 const EMPTY_CONVERSATIONS: ConversationItem[] = [];
 const EMPTY_FAVORITES: FavoriteBusinessItem[] = [];
 const EMPTY_LISTS: UserBusinessList[] = [];
-const EMPTY_CHECKINS: CheckInItem[] = [];
-const EMPTY_CHECKIN_SUMMARY: CheckInSummary = {
-    loyaltyPoints: 0,
-    checkinCount: 0,
-    checkinStreak: 0,
-    loyaltyTier: 'NUEVO',
-    lastCheckinAt: null,
-};
-
-function formatDateTime(value: string): string {
-    return formatDateTimeDo(value, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-}
-
-function bookingStatusLabel(status: BookingStatus): string {
-    switch (status) {
-        case 'PENDING':
-            return 'Pendiente';
-        case 'CONFIRMED':
-            return 'Confirmada';
-        case 'COMPLETED':
-            return 'Completada';
-        case 'CANCELED':
-            return 'Cancelada';
-        case 'NO_SHOW':
-            return 'No Show';
-        default:
-            return status;
-    }
-}
 
 function conversationStatusLabel(status: ConversationStatus): string {
     switch (status) {
@@ -180,6 +101,7 @@ export function CustomerDashboard() {
     const [favoritesActionLoading, setFavoritesActionLoading] = useState<string | null>(null);
     const [favoritesInfoMessage, setFavoritesInfoMessage] = useState('');
     const [favoritesErrorMessage, setFavoritesErrorMessage] = useState('');
+
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
     const [selectedConversationThread, setSelectedConversationThread] = useState<ConversationThread | null>(null);
     const [conversationThreadLoading, setConversationThreadLoading] = useState(false);
@@ -187,28 +109,20 @@ export function CustomerDashboard() {
     const [conversationReplySending, setConversationReplySending] = useState(false);
     const [conversationInfoMessage, setConversationInfoMessage] = useState('');
     const [conversationErrorMessage, setConversationErrorMessage] = useState('');
+
     const dashboardQuery = useQuery({
-        queryKey: ['customer-dashboard'],
+        queryKey: ['customer-dashboard-lite'],
         queryFn: async () => {
-            const [bookingsResponse, conversationsResponse, favoritesResponse, listsResponse, checkinsResponse] = await Promise.all([
-                bookingsApi.getMineAsUser({ limit: 6 }),
-                messagingApi.getMyConversations({ limit: 6 }),
-                favoritesApi.getFavoriteBusinesses({ limit: 6 }),
-                favoritesApi.getMyLists({ limit: 6 }),
-                checkinsApi.getMine({ limit: 6 }),
+            const [conversationsResponse, favoritesResponse, listsResponse] = await Promise.all([
+                messagingApi.getMyConversations({ limit: 8 }),
+                favoritesApi.getFavoriteBusinesses({ limit: 8 }),
+                favoritesApi.getMyLists({ limit: 8 }),
             ]);
 
-            const bookings = ((bookingsResponse.data?.data ?? []) as BookingItem[])
-                .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime());
-            const conversations = (conversationsResponse.data?.data ?? []) as ConversationItem[];
-
             return {
-                bookings,
-                conversations,
+                conversations: (conversationsResponse.data?.data ?? []) as ConversationItem[],
                 favorites: (favoritesResponse.data?.data ?? []) as FavoriteBusinessItem[],
                 lists: (listsResponse.data?.data ?? []) as UserBusinessList[],
-                checkins: (checkinsResponse.data?.data ?? []) as CheckInItem[],
-                checkinSummary: (checkinsResponse.data?.summary ?? EMPTY_CHECKIN_SUMMARY) as CheckInSummary,
             };
         },
     });
@@ -217,17 +131,15 @@ export function CustomerDashboard() {
     const error = dashboardQuery.error
         ? getApiErrorMessage(dashboardQuery.error, 'No se pudo cargar tu panel')
         : '';
-    const bookings = dashboardQuery.data?.bookings ?? EMPTY_BOOKINGS;
+
     const conversations = dashboardQuery.data?.conversations ?? EMPTY_CONVERSATIONS;
     const favorites = dashboardQuery.data?.favorites ?? EMPTY_FAVORITES;
     const lists = dashboardQuery.data?.lists ?? EMPTY_LISTS;
-    const checkins = dashboardQuery.data?.checkins ?? EMPTY_CHECKINS;
-    const checkinSummary = dashboardQuery.data?.checkinSummary ?? EMPTY_CHECKIN_SUMMARY;
 
-    const nextBooking = useMemo(() => {
-        const now = Date.now();
-        return bookings.find((booking) => new Date(booking.scheduledFor).getTime() >= now) ?? null;
-    }, [bookings]);
+    const openConversationsCount = useMemo(
+        () => conversations.filter((conversation) => conversation.status === 'OPEN').length,
+        [conversations],
+    );
 
     useEffect(() => {
         if (conversations.length === 0) {
@@ -263,7 +175,6 @@ export function CustomerDashboard() {
         if (!selectedConversationId) {
             return;
         }
-
         void loadConversationThread(selectedConversationId);
     }, [loadConversationThread, selectedConversationId]);
 
@@ -351,7 +262,7 @@ export function CustomerDashboard() {
                     {Array.from({ length: 3 }).map((_, index) => (
                         <div key={index} className="card p-6">
                             <div className="h-4 w-24 bg-gray-100 rounded mb-3 animate-pulse"></div>
-                            <div className="h-7 w-12 bg-gray-100 rounded animate-pulse"></div>
+                            <div className="h-7 w-16 bg-gray-100 rounded animate-pulse"></div>
                         </div>
                     ))}
                 </div>
@@ -367,7 +278,7 @@ export function CustomerDashboard() {
                     Hola, {user?.name?.split(' ')[0] ?? 'Usuario'}
                 </h1>
                 <p className="text-gray-600 mt-2">
-                    Gestiona tus reservas, conversaciones con negocios y preferencias de cuenta.
+                    Gestiona tus favoritos, listas y conversaciones con negocios.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
                     <Link className="btn-primary" to="/businesses">
@@ -384,223 +295,36 @@ export function CustomerDashboard() {
                     <p className="text-sm text-red-700">{error}</p>
                 </section>
             )}
-
             {favoritesErrorMessage && (
                 <section className="card p-4 border border-red-100 bg-red-50">
                     <p className="text-sm text-red-700">{favoritesErrorMessage}</p>
                 </section>
             )}
-
             {favoritesInfoMessage && (
                 <section className="card p-4 border border-green-100 bg-green-50">
                     <p className="text-sm text-green-700">{favoritesInfoMessage}</p>
                 </section>
             )}
 
-            <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-                <article className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Reservas</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{bookings.length}</p>
-                    <p className="text-sm text-gray-500 mt-1">Registros recientes</p>
-                </article>
-                <article className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversaciones</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{conversations.length}</p>
-                    <p className="text-sm text-gray-500 mt-1">Hilos activos e historial</p>
-                </article>
-                <article className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Proxima reserva</p>
-                    <p className="text-base font-semibold text-gray-900 mt-2">
-                        {nextBooking ? nextBooking.business.name : 'Sin reservas proximas'}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                        {nextBooking ? formatDateTime(nextBooking.scheduledFor) : 'Agenda cuando quieras'}
-                    </p>
-                </article>
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <article className="card p-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Favoritos</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{favorites.length}</p>
-                    <p className="text-sm text-gray-500 mt-1">Guardados para comparar</p>
+                    <p className="text-sm text-gray-500 mt-1">Negocios guardados</p>
                 </article>
                 <article className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Loyalty</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{checkinSummary.loyaltyPoints}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Tier {checkinSummary.loyaltyTier} - racha {checkinSummary.checkinStreak}
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Listas</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{lists.length}</p>
+                    <p className="text-sm text-gray-500 mt-1">Colecciones personales</p>
+                </article>
+                <article className="card p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversaciones</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{openConversationsCount}</p>
+                    <p className="text-sm text-gray-500 mt-1">Hilos abiertos</p>
                 </article>
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <article className="card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Mis reservas</h2>
-                        <Link to="/businesses" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                            Nueva reserva
-                        </Link>
-                    </div>
-                    {bookings.length === 0 ? (
-                        <p className="text-sm text-gray-500">No tienes reservas todavia.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {bookings.map((booking) => (
-                                <div key={booking.id} className="rounded-xl border border-gray-100 p-4">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div>
-                                            <p className="font-semibold text-gray-900">{booking.business.name}</p>
-                                            <p className="text-xs text-gray-500 mt-1">{formatDateTime(booking.scheduledFor)}</p>
-                                        </div>
-                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">
-                                            {bookingStatusLabel(booking.status)}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </article>
-
-                <article className="card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Mis mensajes</h2>
-                        <Link to="/businesses" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                            Escribir a negocio
-                        </Link>
-                    </div>
-                    {conversations.length === 0 ? (
-                        <p className="text-sm text-gray-500">No tienes conversaciones todavia.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {conversations.map((conversation) => (
-                                <div
-                                    key={conversation.id}
-                                    className={`rounded-xl border p-4 transition-colors ${
-                                        selectedConversationId === conversation.id
-                                            ? 'border-primary-300 bg-primary-50/50'
-                                            : 'border-gray-100'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <p className="font-semibold text-gray-900">{conversation.business.name}</p>
-                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">
-                                            {conversationStatusLabel(conversation.status)}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                                        {conversation.messages?.[0]?.content ?? 'Sin mensajes recientes'}
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        Actualizado: {formatDateTime(conversation.updatedAt)}
-                                    </p>
-                                    <button
-                                        type="button"
-                                        className="mt-3 text-xs font-semibold text-primary-700 hover:text-primary-800"
-                                        onClick={() => setSelectedConversationId(conversation.id)}
-                                    >
-                                        {selectedConversationId === conversation.id ? 'Chat abierto' : 'Abrir chat'}
-                                    </button>
-                                </div>
-                            ))}
-
-                            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                                <h3 className="text-sm font-semibold text-gray-900 mb-2">Chat</h3>
-                                {conversationErrorMessage ? (
-                                    <p className="text-xs text-red-700 mb-2">{conversationErrorMessage}</p>
-                                ) : null}
-                                {conversationInfoMessage ? (
-                                    <p className="text-xs text-green-700 mb-2">{conversationInfoMessage}</p>
-                                ) : null}
-
-                                {conversationThreadLoading ? (
-                                    <p className="text-sm text-gray-500">Cargando conversación...</p>
-                                ) : selectedConversationThread ? (
-                                    <>
-                                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1 mb-3">
-                                            {selectedConversationThread.messages.length > 0 ? (
-                                                selectedConversationThread.messages.map((message) => (
-                                                    <div
-                                                        key={message.id}
-                                                        className={`rounded-lg px-3 py-2 text-sm ${
-                                                            message.senderRole === 'CUSTOMER'
-                                                                ? 'bg-primary-100 text-primary-900'
-                                                                : 'bg-white border border-gray-200 text-gray-700'
-                                                        }`}
-                                                    >
-                                                        <p className="text-[11px] uppercase tracking-wide mb-1 text-gray-500">
-                                                            {message.senderRole === 'CUSTOMER'
-                                                                ? 'Tu'
-                                                                : message.senderUser?.name || 'Negocio'}
-                                                        </p>
-                                                        <p className="whitespace-pre-wrap">{message.content}</p>
-                                                        <p className="text-[11px] mt-1 text-gray-500">
-                                                            {formatDateTime(message.createdAt)}
-                                                        </p>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <p className="text-sm text-gray-500">Sin mensajes en este chat.</p>
-                                            )}
-                                        </div>
-                                        <form onSubmit={handleSendConversationReply} className="space-y-2">
-                                            <textarea
-                                                className="input-field text-sm"
-                                                rows={3}
-                                                placeholder="Escribe una respuesta..."
-                                                value={conversationReply}
-                                                onChange={(event) => setConversationReply(event.target.value)}
-                                            />
-                                            <button
-                                                type="submit"
-                                                className="btn-primary text-sm"
-                                                disabled={conversationReplySending}
-                                            >
-                                                {conversationReplySending ? 'Enviando...' : 'Responder'}
-                                            </button>
-                                        </form>
-                                    </>
-                                ) : (
-                                    <p className="text-sm text-gray-500">Selecciona una conversación para ver el hilo.</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </article>
-            </section>
-
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <article className="card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Mis check-ins</h2>
-                        <span className="text-xs rounded-full bg-primary-50 text-primary-700 px-2 py-0.5">
-                            {checkinSummary.checkinCount} total
-                        </span>
-                    </div>
-                    {checkins.length === 0 ? (
-                        <p className="text-sm text-gray-500">
-                            Aun no tienes check-ins. Haz check-in desde el detalle de un negocio para ganar puntos.
-                        </p>
-                    ) : (
-                        <div className="space-y-3">
-                            {checkins.map((entry) => (
-                                <div key={entry.id} className="rounded-xl border border-gray-100 p-4">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <p className="font-semibold text-gray-900">{entry.business.name}</p>
-                                        <span className="text-xs px-2 py-1 rounded-full bg-primary-100 text-primary-700 font-semibold">
-                                            +{entry.pointsAwarded} pts
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {entry.business.province?.name || entry.business.address}
-                                    </p>
-                                    <p className="text-xs text-gray-400 mt-2">
-                                        {formatDateTime(entry.createdAt)} - {entry.verifiedLocation ? 'Ubicacion verificada' : 'Sin verificacion GPS'}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </article>
-
                 <article className="card p-6">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="font-display text-xl font-bold text-gray-900">Mis favoritos</h2>
@@ -629,7 +353,7 @@ export function CustomerDashboard() {
                                         {favorite.business.province?.name || favorite.business.address}
                                     </p>
                                     <p className="text-xs text-gray-400 mt-2">
-                                        Guardado: {formatDateTime(favorite.createdAt)}
+                                        Guardado: {formatDateTimeDo(favorite.createdAt)}
                                     </p>
                                     <Link
                                         to={`/businesses/${favorite.business.slug}`}
@@ -649,7 +373,7 @@ export function CustomerDashboard() {
                         <span className="text-xs text-gray-500">{lists.length} listas</span>
                     </div>
                     {lists.length === 0 ? (
-                        <p className="text-sm text-gray-500">Crea listas guardando negocios en detalle.</p>
+                        <p className="text-sm text-gray-500">Crea listas guardando negocios desde su detalle.</p>
                     ) : (
                         <div className="space-y-3">
                             {lists.map((list) => (
@@ -695,13 +419,117 @@ export function CustomerDashboard() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-xs text-gray-500 mt-2">Sin negocios aun</p>
+                                        <p className="text-xs text-gray-500 mt-2">Sin negocios aun.</p>
                                     )}
                                 </div>
                             ))}
                         </div>
                     )}
                 </article>
+            </section>
+
+            <section className="card p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display text-xl font-bold text-gray-900">Mensajeria con negocios</h2>
+                    <Link to="/businesses" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                        Escribir a negocio
+                    </Link>
+                </div>
+
+                {conversations.length === 0 ? (
+                    <p className="text-sm text-gray-500">No tienes conversaciones todavia.</p>
+                ) : (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                            {conversations.map((conversation) => (
+                                <button
+                                    type="button"
+                                    key={conversation.id}
+                                    className={`w-full rounded-xl border p-4 text-left transition-colors ${
+                                        selectedConversationId === conversation.id
+                                            ? 'border-primary-300 bg-primary-50/50'
+                                            : 'border-gray-100 hover:border-primary-100'
+                                    }`}
+                                    onClick={() => setSelectedConversationId(conversation.id)}
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <p className="font-semibold text-gray-900">{conversation.business.name}</p>
+                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">
+                                            {conversationStatusLabel(conversation.status)}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                        {conversation.messages?.[0]?.content ?? 'Sin mensajes recientes'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Actualizado: {formatDateTimeDo(conversation.updatedAt)}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                            {conversationErrorMessage ? (
+                                <p className="text-xs text-red-700 mb-2">{conversationErrorMessage}</p>
+                            ) : null}
+                            {conversationInfoMessage ? (
+                                <p className="text-xs text-green-700 mb-2">{conversationInfoMessage}</p>
+                            ) : null}
+
+                            {conversationThreadLoading ? (
+                                <p className="text-sm text-gray-500">Cargando conversacion...</p>
+                            ) : selectedConversationThread ? (
+                                <>
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1 mb-3">
+                                        {selectedConversationThread.messages.length > 0 ? (
+                                            selectedConversationThread.messages.map((message) => (
+                                                <div
+                                                    key={message.id}
+                                                    className={`rounded-lg px-3 py-2 text-sm ${
+                                                        message.senderRole === 'CUSTOMER'
+                                                            ? 'bg-primary-100 text-primary-900'
+                                                            : 'bg-white border border-gray-200 text-gray-700'
+                                                    }`}
+                                                >
+                                                    <p className="text-[11px] uppercase tracking-wide mb-1 text-gray-500">
+                                                        {message.senderRole === 'CUSTOMER'
+                                                            ? 'Tu'
+                                                            : message.senderUser?.name || 'Negocio'}
+                                                    </p>
+                                                    <p className="whitespace-pre-wrap">{message.content}</p>
+                                                    <p className="text-[11px] mt-1 text-gray-500">
+                                                        {formatDateTimeDo(message.createdAt)}
+                                                    </p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">Sin mensajes en este chat.</p>
+                                        )}
+                                    </div>
+
+                                    <form onSubmit={handleSendConversationReply} className="space-y-2">
+                                        <textarea
+                                            className="input-field text-sm"
+                                            rows={3}
+                                            placeholder="Escribe una respuesta..."
+                                            value={conversationReply}
+                                            onChange={(event) => setConversationReply(event.target.value)}
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="btn-primary text-sm"
+                                            disabled={conversationReplySending}
+                                        >
+                                            {conversationReplySending ? 'Enviando...' : 'Responder'}
+                                        </button>
+                                    </form>
+                                </>
+                            ) : (
+                                <p className="text-sm text-gray-500">Selecciona una conversacion para ver el hilo.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
             </section>
         </div>
     );

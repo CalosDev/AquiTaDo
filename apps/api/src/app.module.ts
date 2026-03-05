@@ -15,7 +15,6 @@ import { LocationsModule } from './locations/locations.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { HealthModule } from './health/health.module';
-import { OrganizationsModule } from './organizations/organizations.module';
 import { PlansModule } from './plans/plans.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -83,7 +82,6 @@ import { MarketDataModule } from './market-data/market-data.module';
         ReviewsModule,
         UploadsModule,
         HealthModule,
-        OrganizationsModule,
         PlansModule,
         SubscriptionsModule,
         PaymentsModule,

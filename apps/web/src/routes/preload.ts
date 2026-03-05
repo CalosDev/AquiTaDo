@@ -15,13 +15,8 @@ export const pageLoaders = {
     privacy: () => import('../pages/Privacy'),
     about: () => import('../pages/About'),
     notFound: () => import('../pages/NotFound'),
-    organizationSettings: () => import('../pages/OrganizationSettings'),
-    acceptInvite: () => import('../pages/AcceptInvite'),
     profile: () => import('../pages/Profile'),
     adminSecurity: () => import('../pages/AdminSecurity'),
-    dashboardBillingTab: () => import('../components/dashboard-business/DashboardBillingTab'),
-    dashboardAdsTab: () => import('../components/dashboard-business/DashboardAdsTab'),
-    dashboardVerificationTab: () => import('../components/dashboard-business/DashboardVerificationTab'),
 } as const;
 
 type LoaderKey = keyof typeof pageLoaders;
@@ -93,17 +88,7 @@ export function preloadRouteChunk(pathname: string): void {
     }
 
     if (normalizedPath === '/dashboard') {
-        preloadMany([
-            'dashboardBusiness',
-            'dashboardBillingTab',
-            'dashboardAdsTab',
-            'dashboardVerificationTab',
-        ]);
-        return;
-    }
-
-    if (normalizedPath === '/organization') {
-        preloadByKey('organizationSettings');
+        preloadByKey('dashboardBusiness');
         return;
     }
 
@@ -163,11 +148,7 @@ export function preloadLikelyRoutesForSession(options: {
     if (options.role === 'BUSINESS_OWNER') {
         preloadMany([
             'dashboardBusiness',
-            'organizationSettings',
             'registerBusiness',
-            'dashboardBillingTab',
-            'dashboardAdsTab',
-            'dashboardVerificationTab',
         ]);
         return;
     }

@@ -72,7 +72,6 @@ export function Footer() {
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
                             <li><Link to={registerBusinessPath} className="hover:text-white transition-colors">{registerBusinessLabel}</Link></li>
                             <li><Link to="/dashboard" className="hover:text-white transition-colors">Panel negocio</Link></li>
-                            <li><Link to="/organization" className="hover:text-white transition-colors">Organizacion</Link></li>
                             <li><Link to="/admin" className="hover:text-white transition-colors">Moderacion</Link></li>
                         </ul>
                     </div>
