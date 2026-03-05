@@ -58,7 +58,9 @@ export function Login() {
                             </label>
                             <input
                                 id="login-email"
+                                name="email"
                                 type="email"
+                                autoComplete="email"
                                 required
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -72,7 +74,9 @@ export function Login() {
                             </label>
                             <input
                                 id="login-password"
+                                name="password"
                                 type="password"
+                                autoComplete="current-password"
                                 required
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -87,7 +91,9 @@ export function Login() {
                                 </label>
                                 <input
                                     id="login-2fa"
+                                    name="one-time-code"
                                     type="text"
+                                    autoComplete="one-time-code"
                                     inputMode="numeric"
                                     pattern="\d{6}"
                                     maxLength={6}
