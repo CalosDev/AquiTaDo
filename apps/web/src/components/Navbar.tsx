@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { resolveRoleHomeLabel, resolveRoleHomePath } from '../auth/roles';
 import { useAuth } from '../context/useAuth';
@@ -28,6 +28,7 @@ export function Navbar() {
     const { isAuthenticated, user, logout } = useAuth();
     const { activeOrganization } = useOrganization();
     const navigate = useNavigate();
+    const location = useLocation();
     const [menuOpen, setMenuOpen] = useState(false);
     const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
 
@@ -36,7 +37,7 @@ export function Navbar() {
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const organizationName = activeOrganization?.name?.trim() ?? '';
-    const showOrganizationChip = organizationName.length > 0 && organizationName.length <= 18;
+    const showOrganizationChip = organizationName.length > 0;
 
     const handleLogout = () => {
         void logout();
@@ -110,9 +111,13 @@ export function Navbar() {
         return () => window.clearTimeout(timeoutId);
     }, [isAuthenticated, user?.role]);
 
+    useEffect(() => {
+        setMenuOpen(false);
+    }, [location.pathname]);
+
     return (
-        <header className="sticky top-0 z-50">
-            <div className="hidden md:block border-b border-primary-100/70 bg-white/80 backdrop-blur-md">
+        <header className="sticky top-0 z-50 overflow-x-clip">
+            <div className="hidden xl:block border-b border-primary-100/70 bg-white/85 backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     <div className="flex items-center gap-3">
                         <span className="chip !px-2.5 !py-0.5 !text-[10px]">Hecho en RD</span>
@@ -142,7 +147,7 @@ export function Navbar() {
                             </div>
                         </Link>
 
-                        <div className="hidden lg:flex items-center gap-3 xl:gap-5 min-w-0">
+                        <div className="hidden xl:flex items-center gap-3 2xl:gap-5 min-w-0">
                             <Link
                                 to="/businesses"
                                 className="nav-link"
@@ -210,13 +215,15 @@ export function Navbar() {
                                         <span className="chip !py-1 whitespace-nowrap shrink-0">{roleBadgeLabel(user?.role)}</span>
                                         {showOrganizationChip && (
                                             <span
-                                                className="chip-danger !py-1 max-w-[140px] 2xl:max-w-[180px] truncate overflow-hidden"
+                                                className="chip-danger hidden 2xl:inline-flex !py-1 max-w-[180px] truncate overflow-hidden"
                                                 title={organizationName}
                                             >
                                                 {organizationName}
                                             </span>
                                         )}
-                                        <span className="text-sm text-slate-500 whitespace-nowrap">Hola, {user?.name?.split(' ')[0]}</span>
+                                        <span className="text-sm text-slate-500 whitespace-nowrap max-w-[120px] truncate">
+                                            Hola, {user?.name?.split(' ')[0]}
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={handleLogout}
@@ -248,9 +255,40 @@ export function Navbar() {
                             )}
                         </div>
 
+                        <div className="hidden lg:flex xl:hidden items-center gap-2 min-w-0">
+                            <Link
+                                to="/businesses"
+                                className="nav-link"
+                                onMouseEnter={() => preloadRouteChunk('/businesses')}
+                                onFocus={() => preloadRouteChunk('/businesses')}
+                            >
+                                Negocios
+                            </Link>
+                            {isAuthenticated && (
+                                <Link
+                                    to={roleHomePath}
+                                    className="nav-link"
+                                    onMouseEnter={() => preloadRouteChunk(roleHomePath)}
+                                    onFocus={() => preloadRouteChunk(roleHomePath)}
+                                >
+                                    {roleHomeLabel}
+                                </Link>
+                            )}
+                            {canRegisterBusiness && (
+                                <Link
+                                    to="/register-business"
+                                    className="btn-accent !px-4 !py-2 text-sm whitespace-nowrap"
+                                    onMouseEnter={() => preloadRouteChunk('/register-business')}
+                                    onFocus={() => preloadRouteChunk('/register-business')}
+                                >
+                                    + Negocio
+                                </Link>
+                            )}
+                        </div>
+
                         <button
                             type="button"
-                            className="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-700"
+                            className="xl:hidden inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-700"
                             onClick={() => setMenuOpen((previous) => !previous)}
                             aria-label={menuOpen ? 'Cerrar menu principal' : 'Abrir menu principal'}
                             aria-expanded={menuOpen}
@@ -267,7 +305,7 @@ export function Navbar() {
                     </div>
 
                     {menuOpen && (
-                        <div id="mobile-main-menu" className="lg:hidden pb-4 pt-2 animate-slide-down">
+                        <div id="mobile-main-menu" className="xl:hidden pb-4 pt-2 animate-slide-down">
                             <div className="surface-panel p-2">
                                     <Link
                                         to="/businesses"
