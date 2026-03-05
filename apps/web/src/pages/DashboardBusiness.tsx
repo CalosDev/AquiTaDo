@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { analyticsApi, businessApi, verificationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { useOrganization } from '../context/useOrganization';
 import { formatCurrencyDo, formatDateTimeDo } from '../lib/market';
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
@@ -87,6 +88,7 @@ function getStatusClass(status: VerificationStatus | 'APPROVED' | 'REJECTED' | '
 }
 
 export function DashboardBusiness() {
+    const { activeOrganizationId, loading: organizationLoading, organizations } = useOrganization();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -106,6 +108,8 @@ export function DashboardBusiness() {
         () => businesses.find((business) => business.id === selectedBusinessId) || null,
         [businesses, selectedBusinessId],
     );
+    const hasOrganizations = organizations.length > 0;
+    const needsFirstBusinessSetup = !organizationLoading && !activeOrganizationId && !hasOrganizations;
 
     const totals = metrics?.totals ?? {};
 
@@ -129,7 +133,17 @@ export function DashboardBusiness() {
                 return nextBusinesses[0]?.id || '';
             });
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el panel del negocio'));
+            const message = getApiErrorMessage(error, 'No se pudo cargar el panel del negocio');
+            if (message.toLowerCase().includes('organizacion activa') || message.toLowerCase().includes('organización activa')) {
+                setBusinesses([]);
+                setMetrics(null);
+                setSelectedBusinessId('');
+                setVerificationStatus(null);
+                setDocuments([]);
+                setErrorMessage('');
+            } else {
+                setErrorMessage(message);
+            }
         } finally {
             setLoading(false);
         }
@@ -165,15 +179,29 @@ export function DashboardBusiness() {
     }, []);
 
     useEffect(() => {
+        if (organizationLoading) {
+            return;
+        }
+
+        if (!activeOrganizationId) {
+            setLoading(false);
+            setBusinesses([]);
+            setMetrics(null);
+            setSelectedBusinessId('');
+            setVerificationStatus(null);
+            setDocuments([]);
+            return;
+        }
+
         void loadDashboard();
-    }, [loadDashboard]);
+    }, [activeOrganizationId, loadDashboard, organizationLoading]);
 
     useEffect(() => {
-        if (!selectedBusinessId) {
+        if (!activeOrganizationId || !selectedBusinessId) {
             return;
         }
         void loadVerificationData(selectedBusinessId);
-    }, [loadVerificationData, selectedBusinessId]);
+    }, [activeOrganizationId, loadVerificationData, selectedBusinessId]);
 
     const handleUploadDocument = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -235,7 +263,7 @@ export function DashboardBusiness() {
         }
     };
 
-    if (loading) {
+    if (loading || organizationLoading) {
         return (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
                 <div className="h-10 w-64 rounded-xl bg-gray-100 animate-pulse mb-4"></div>
@@ -269,6 +297,24 @@ export function DashboardBusiness() {
                     </Link>
                 </div>
             </section>
+
+            {needsFirstBusinessSetup && (
+                <section className="card p-6 lg:p-8 border border-primary-100 bg-primary-50/50">
+                    <p className="text-sm uppercase tracking-wide text-primary-700 font-semibold">Primer paso</p>
+                    <h2 className="font-display text-2xl font-bold text-gray-900 mt-2">Registra tu primer negocio</h2>
+                    <p className="text-gray-600 mt-2 max-w-2xl">
+                        Tu panel de negocio se activa despues de crear el primer negocio. En ese proceso se prepara tu organizacion interna y la verificacion documental.
+                    </p>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                        <Link className="btn-primary" to="/register-business">
+                            Registrar negocio ahora
+                        </Link>
+                        <Link className="btn-secondary" to="/businesses">
+                            Ver directorio publico
+                        </Link>
+                    </div>
+                </section>
+            )}
 
             {errorMessage && (
                 <section className="card p-4 border border-red-100 bg-red-50">

@@ -37,6 +37,9 @@ export const OrganizationContext = createContext<OrganizationContextType | undef
 export function OrganizationProvider({ children }: { children: ReactNode }) {
     const { isAuthenticated, loading: authLoading, user } = useAuth();
     const roleCapabilities = getRoleCapabilities(user?.role);
+    const shouldBootstrapOrganizationContext = isAuthenticated && (
+        roleCapabilities.canManageOrganizations || user?.role === 'BUSINESS_OWNER'
+    );
     const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
     const [activeOrganizationId, setActiveOrganizationIdState] = useState<string | null>(
         localStorage.getItem(ACTIVE_ORGANIZATION_STORAGE_KEY),
@@ -61,8 +64,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const refreshOrganizations = useCallback(async (preferredOrganizationId?: string | null) => {
-        const canUseOrganizations = roleCapabilities.canManageOrganizations;
-        if (!isAuthenticated || !canUseOrganizations) {
+        if (!shouldBootstrapOrganizationContext) {
             clearOrganizationState();
             setLoading(false);
             return;
@@ -91,22 +93,21 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false);
         }
-    }, [clearOrganizationState, isAuthenticated, roleCapabilities.canManageOrganizations, setActiveOrganizationId]);
+    }, [clearOrganizationState, setActiveOrganizationId, shouldBootstrapOrganizationContext]);
 
     useEffect(() => {
         if (authLoading) {
             return;
         }
 
-        const canUseOrganizations = roleCapabilities.canManageOrganizations;
-        if (!isAuthenticated || !canUseOrganizations) {
+        if (!shouldBootstrapOrganizationContext) {
             clearOrganizationState();
             setLoading(false);
             return;
         }
 
         void refreshOrganizations();
-    }, [authLoading, clearOrganizationState, isAuthenticated, refreshOrganizations, roleCapabilities.canManageOrganizations]);
+    }, [authLoading, clearOrganizationState, refreshOrganizations, shouldBootstrapOrganizationContext]);
 
     const activeOrganization = useMemo(
         () =>

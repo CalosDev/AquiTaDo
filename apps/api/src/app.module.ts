@@ -33,6 +33,7 @@ import { ObservabilityModule } from './observability/observability.module';
 import { AiModule } from './ai/ai.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { RequestContextModule } from './core/request-context/request-context.module';
 import { DomainEventsModule } from './core/events/domain-events.module';
 import { AuthorizationModule } from './core/authorization/authorization.module';
@@ -90,6 +91,7 @@ import { MarketDataModule } from './market-data/market-data.module';
         AnalyticsModule,
         MessagingModule,
         CrmModule,
+        OrganizationsModule,
         ReputationModule,
         AdsModule,
         VerificationModule,
