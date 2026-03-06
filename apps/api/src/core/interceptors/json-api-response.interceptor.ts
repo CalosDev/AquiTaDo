@@ -1,6 +1,7 @@
 import {
     CallHandler,
     ExecutionContext,
+    Inject,
     Injectable,
     NestInterceptor,
 } from '@nestjs/common';
@@ -21,7 +22,7 @@ type JsonApiEnvelope<T> = {
 export class JsonApiResponseInterceptor implements NestInterceptor {
     private readonly enabled: boolean;
 
-    constructor(private readonly configService: ConfigService) {
+    constructor(@Inject(ConfigService) private readonly configService: ConfigService) {
         const raw = (this.configService.get<string>('JSON_API_RESPONSE_ENABLED') ?? 'false')
             .trim()
             .toLowerCase();

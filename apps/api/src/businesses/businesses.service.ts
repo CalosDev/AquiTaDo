@@ -667,7 +667,15 @@ export class BusinessesService {
 
         const imageUrls = business.images.map((image) => image.url);
         const now = new Date();
-        const normalizedReason = deleteReason.trim();
+        const normalizedReason = typeof deleteReason === 'string' ? deleteReason.trim() : '';
+
+        if (normalizedReason.length < 15) {
+            throw new BadRequestException('El motivo de eliminacion debe tener al menos 15 caracteres');
+        }
+
+        if (normalizedReason.length > 500) {
+            throw new BadRequestException('El motivo de eliminacion no puede superar 500 caracteres');
+        }
 
         try {
             await this.prisma.$transaction(async (tx) => {

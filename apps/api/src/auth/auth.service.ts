@@ -56,7 +56,16 @@ export class AuthService {
             throw new ConflictException('El correo electronico ya esta registrado');
         }
 
-        const requestedRole: Role = dto.role === 'BUSINESS_OWNER' ? 'BUSINESS_OWNER' : 'USER';
+        const rawRequestedRole = (dto as { role?: unknown }).role;
+        if (
+            rawRequestedRole !== undefined
+            && rawRequestedRole !== 'USER'
+            && rawRequestedRole !== 'BUSINESS_OWNER'
+        ) {
+            throw new BadRequestException('Rol no permitido para registro publico');
+        }
+
+        const requestedRole: Role = rawRequestedRole === 'BUSINESS_OWNER' ? 'BUSINESS_OWNER' : 'USER';
         const normalizedPhone = dto.phone?.trim();
 
         const hashedPassword = await bcrypt.hash(dto.password, 12);
