@@ -282,12 +282,43 @@ export function DashboardBusiness() {
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6 animate-fade-in">
-            <section className="card p-6 lg:p-8">
-                <p className="text-sm uppercase tracking-wide text-gray-500 font-semibold">Panel Negocio</p>
-                <h1 className="font-display text-3xl font-bold text-gray-900 mt-1">Resumen de rendimiento</h1>
-                <p className="text-gray-600 mt-2">
+            <section className="role-hero role-hero-owner">
+                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
+                <h1 className="font-display text-3xl font-bold text-white mt-2">Resumen de rendimiento</h1>
+                <p className="text-blue-100 mt-2 max-w-2xl">
                     Vista simplificada enfocada en analitica base y verificacion documental.
                 </p>
+
+                <div className="mt-5 role-kpi-grid">
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Negocios activos</p>
+                        <p className="role-kpi-value">{businesses.length}</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Vistas</p>
+                        <p className="role-kpi-value">{totals.views ?? 0}</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Conversion</p>
+                        <p className="role-kpi-value">{totals.conversionRate ?? 0}%</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Ingresos</p>
+                        <p className="mt-1 font-display text-xl font-bold text-white">
+                            {formatCurrencyDo(totals.grossRevenue ?? 0)}
+                        </p>
+                    </article>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2.5">
+                    <span className="chip !border-white/30 !bg-white/10 !text-white">
+                        Negocio seleccionado: {selectedBusiness?.name || 'Ninguno'}
+                    </span>
+                    <span className={`chip !border-white/30 !bg-white/10 !text-white ${verificationStatus?.verified ? '!text-emerald-100' : ''}`}>
+                        Estado KYC: {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
+                    </span>
+                </div>
+
                 <div className="mt-5 flex flex-wrap gap-3">
                     <Link className="btn-primary" to="/register-business">
                         Registrar otro negocio
@@ -328,23 +359,23 @@ export function DashboardBusiness() {
             )}
 
             <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-                <article className="card p-5">
+                <article className="panel-premium p-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Negocios activos</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{businesses.length}</p>
                 </article>
-                <article className="card p-5">
+                <article className="panel-premium p-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Vistas</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.views ?? 0}</p>
                 </article>
-                <article className="card p-5">
+                <article className="panel-premium p-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Clicks</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.clicks ?? 0}</p>
                 </article>
-                <article className="card p-5">
+                <article className="panel-premium p-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversion</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.conversionRate ?? 0}%</p>
                 </article>
-                <article className="card p-5">
+                <article className="panel-premium p-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ingresos</p>
                     <p className="text-2xl font-bold text-gray-900 mt-2">{formatCurrencyDo(totals.grossRevenue ?? 0)}</p>
                 </article>

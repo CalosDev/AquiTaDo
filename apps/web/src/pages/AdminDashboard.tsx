@@ -732,8 +732,37 @@ export function AdminDashboard() {
 
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
-            <h1 className="font-display text-3xl font-bold text-gray-900 mb-2">Panel Admin</h1>
-            <p className="text-gray-500 mb-8">GestiÃ³n de negocios y categorÃ­as</p>
+            
+            <section className="role-hero role-hero-admin mb-8">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-200 font-semibold">Panel Admin</p>
+                <h1 className="font-display text-3xl font-bold text-white mt-2">Control de plataforma</h1>
+                <p className="text-slate-200 mt-2 max-w-2xl">
+                    Gestion de negocios, categorias, moderacion de contenido y salud operativa.
+                </p>
+
+                <div className="mt-5 role-kpi-grid !xl:grid-cols-4">
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Total negocios</p>
+                        <p className="role-kpi-value">{businesses.length}</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Verificados</p>
+                        <p className="role-kpi-value">{businesses.filter((business) => business.verified).length}</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Pendientes</p>
+                        <p className="role-kpi-value">{businesses.filter((business) => !business.verified).length}</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Categorias</p>
+                        <p className="role-kpi-value">{categories.length}</p>
+                    </article>
+                </div>
+            </section>
+
+            <p className="text-gray-500 mb-8">
+                Gestion de negocios, categorias, moderacion y observabilidad en un solo panel.
+            </p>
 
             {errorMessage && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -747,41 +776,22 @@ export function AdminDashboard() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
-                <div className="card p-4 text-center">
-                    <div className="text-2xl font-bold text-primary-600">{businesses.length}</div>
-                    <div className="text-xs text-gray-500">Total Negocios</div>
-                </div>
-                <div className="card p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                        {businesses.filter((business) => business.verified).length}
-                    </div>
-                    <div className="text-xs text-gray-500">Verificados</div>
-                </div>
-                <div className="card p-4 text-center">
-                    <div className="text-2xl font-bold text-yellow-600">
-                        {businesses.filter((business) => !business.verified).length}
-                    </div>
-                    <div className="text-xs text-gray-500">Pendientes</div>
-                </div>
-                <div className="card p-4 text-center">
-                    <div className="text-2xl font-bold text-accent-600">{categories.length}</div>
-                    <div className="text-xs text-gray-500">CategorÃ­as</div>
-                </div>
-            </div>
-
-            <div className="flex gap-2 mb-6">
+            <div className="flex flex-wrap gap-2 mb-6">
                 {tabs.map((tab) => (
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
-                        className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        aria-current={activeTab === tab.key ? 'page' : undefined}
+                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                             activeTab === tab.key
-                                ? 'bg-primary-600 text-white shadow-lg'
-                                : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-400'
+                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
+                                : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-400 hover:text-primary-700'
                         }`}
                     >
-                        {tab.icon} {tab.label}
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-black/10 text-[11px] font-semibold">
+                            {tab.icon}
+                        </span>
+                        {tab.label}
                     </button>
                 ))}
             </div>

@@ -272,14 +272,34 @@ export function CustomerDashboard() {
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-fade-in">
-            <section className="card p-6 lg:p-8">
-                <p className="text-sm uppercase tracking-wide text-gray-500 font-semibold">Panel Cliente</p>
-                <h1 className="font-display text-3xl font-bold text-gray-900 mt-1">
+            <section className="role-hero role-hero-user">
+                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Cliente</p>
+                <h1 className="font-display text-3xl font-bold text-white mt-2">
                     Hola, {user?.name?.split(' ')[0] ?? 'Usuario'}
                 </h1>
-                <p className="text-gray-600 mt-2">
+                <p className="text-blue-100 mt-2 max-w-2xl">
                     Gestiona tus favoritos, listas y conversaciones con negocios.
                 </p>
+
+                <div className="mt-5 role-kpi-grid">
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Favoritos</p>
+                        <p className="role-kpi-value">{favorites.length}</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Listas</p>
+                        <p className="role-kpi-value">{lists.length}</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Chats abiertos</p>
+                        <p className="role-kpi-value">{openConversationsCount}</p>
+                    </article>
+                    <article className="role-kpi-card">
+                        <p className="role-kpi-label">Total conversaciones</p>
+                        <p className="role-kpi-value">{conversations.length}</p>
+                    </article>
+                </div>
+
                 <div className="mt-5 flex flex-wrap gap-3">
                     <Link className="btn-primary" to="/businesses">
                         Explorar negocios
@@ -305,24 +325,6 @@ export function CustomerDashboard() {
                     <p className="text-sm text-green-700">{favoritesInfoMessage}</p>
                 </section>
             )}
-
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <article className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Favoritos</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{favorites.length}</p>
-                    <p className="text-sm text-gray-500 mt-1">Negocios guardados</p>
-                </article>
-                <article className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Listas</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{lists.length}</p>
-                    <p className="text-sm text-gray-500 mt-1">Colecciones personales</p>
-                </article>
-                <article className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversaciones</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{openConversationsCount}</p>
-                    <p className="text-sm text-gray-500 mt-1">Hilos abiertos</p>
-                </article>
-            </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <article className="card p-6">
