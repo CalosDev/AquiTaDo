@@ -197,6 +197,13 @@ async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
         bodyParser: false,
     });
+    const storageProvider = (process.env.STORAGE_PROVIDER || 'local').trim().toLowerCase();
+    if (process.env.NODE_ENV === 'production' && storageProvider === 'local') {
+        logger.warn(
+            'STORAGE_PROVIDER=local in production: uploads can be lost after redeploy/restart. Use STORAGE_PROVIDER=s3.',
+        );
+    }
+
     const trustProxy = (process.env.SECURITY_TRUST_PROXY?.trim() || 'true').toLowerCase();
     if (trustProxy === 'true' || trustProxy === '1') {
         app.set('trust proxy', 1);

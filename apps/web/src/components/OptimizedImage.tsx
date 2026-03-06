@@ -1,10 +1,12 @@
-import { ImgHTMLAttributes } from 'react';
+import { ImgHTMLAttributes, useEffect, useState } from 'react';
 
 type OptimizedImageProps = ImgHTMLAttributes<HTMLImageElement> & {
     src: string;
+    fallbackSrc?: string;
 };
 
 const UPLOAD_IMAGE_REGEX = /^(.*\/uploads\/businesses\/.+)\.(jpe?g|png|webp)(\?.*)?$/i;
+const DEFAULT_FALLBACK_SRC = '/business-image-fallback.svg';
 
 function resolveApiOrigin(rawApiUrl: string | undefined): string {
     const fallbackOrigin = typeof window !== 'undefined'
@@ -51,11 +53,28 @@ function resolveAssetUrl(src: string): string {
     return normalized;
 }
 
-export function OptimizedImage({ src, alt, ...rest }: OptimizedImageProps) {
+export function OptimizedImage({ src, alt, fallbackSrc, onError, ...rest }: OptimizedImageProps) {
+    const [hasLoadError, setHasLoadError] = useState(false);
+
+    useEffect(() => {
+        setHasLoadError(false);
+    }, [src]);
+
     const resolvedSrc = resolveAssetUrl(src);
+    const resolvedFallbackSrc = resolveAssetUrl((fallbackSrc || DEFAULT_FALLBACK_SRC).trim());
+
+    const handleError: ImgHTMLAttributes<HTMLImageElement>['onError'] = (event) => {
+        setHasLoadError(true);
+        onError?.(event);
+    };
+
+    if (hasLoadError || !resolvedSrc) {
+        return <img src={resolvedFallbackSrc} alt={alt} onError={onError} {...rest} />;
+    }
+
     const match = resolvedSrc.match(UPLOAD_IMAGE_REGEX);
     if (!match) {
-        return <img src={resolvedSrc} alt={alt} {...rest} />;
+        return <img src={resolvedSrc} alt={alt} onError={handleError} {...rest} />;
     }
 
     const basePath = match[1];
@@ -64,7 +83,7 @@ export function OptimizedImage({ src, alt, ...rest }: OptimizedImageProps) {
         <picture>
             <source srcSet={`${basePath}.avif${queryString}`} type="image/avif" />
             <source srcSet={`${basePath}.webp${queryString}`} type="image/webp" />
-            <img src={resolvedSrc} alt={alt} {...rest} />
+            <img src={resolvedSrc} alt={alt} onError={handleError} {...rest} />
         </picture>
     );
 }

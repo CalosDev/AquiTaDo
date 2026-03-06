@@ -105,6 +105,14 @@ Servicios:
 
 - `DATABASE_URL=postgresql://aquita:aquita123@localhost:5432/aquita_db`
 - `JWT_SECRET=change-this-secret-minimum-16-chars`
+- `STORAGE_PROVIDER=local|s3` (en produccion usa `s3`, `local` es efimero)
+- `STORAGE_S3_BUCKET=...` (requerido si `STORAGE_PROVIDER=s3`)
+- `STORAGE_S3_REGION=us-east-1` (requerido si `STORAGE_PROVIDER=s3`)
+- `STORAGE_S3_ENDPOINT=...` (opcional, para R2/MinIO/S3 compatible)
+- `STORAGE_S3_ACCESS_KEY_ID=...` (opcional segun proveedor)
+- `STORAGE_S3_SECRET_ACCESS_KEY=...` (opcional segun proveedor)
+- `STORAGE_S3_FORCE_PATH_STYLE=false` (true para algunos S3 compatibles)
+- `STORAGE_PUBLIC_BASE_URL=...` (opcional, recomendado para CDN/public bucket)
 - `PORT=3000`
 - `CORS_ORIGIN=http://localhost:5173`
 - `SECURITY_TRUST_PROXY=true`
