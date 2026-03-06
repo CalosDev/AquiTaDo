@@ -9,6 +9,7 @@ type CachedRequest<T = AxiosResponse> = {
 };
 
 let categoriesCache: CachedRequest | null = null;
+let featuresCache: CachedRequest | null = null;
 let provincesCache: CachedRequest | null = null;
 const citiesCacheByProvince = new Map<string, CachedRequest>();
 
@@ -105,6 +106,17 @@ export const categoryApi = {
         categoriesCache = null;
         return response;
     }),
+};
+
+// ---- Features ----
+export const featuresApi = {
+    getAll: () => {
+        featuresCache = resolveCachedRequest(
+            featuresCache,
+            () => api.get('/features'),
+        );
+        return featuresCache.promise;
+    },
 };
 
 // ---- Locations ----

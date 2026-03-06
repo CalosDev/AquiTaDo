@@ -163,6 +163,8 @@ function normalizeText(value: string): string {
         .trim();
 }
 
+const BOOKING_FEATURE_CANONICAL = 'reservaciones';
+
 function businessSupportsBooking(features?: { feature: { name: string } }[]): boolean {
     if (!features || features.length === 0) {
         return false;
@@ -170,12 +172,7 @@ function businessSupportsBooking(features?: { feature: { name: string } }[]): bo
 
     return features.some((entry) => {
         const normalized = normalizeText(entry.feature.name);
-        return (
-            normalized.includes('reservacion')
-            || normalized.includes('reserva')
-            || normalized.includes('cita')
-            || normalized.includes('appointment')
-        );
+        return normalized === BOOKING_FEATURE_CANONICAL;
     });
 }
 

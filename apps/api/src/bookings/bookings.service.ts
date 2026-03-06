@@ -27,6 +27,7 @@ import {
 @Injectable()
 export class BookingsService {
     private readonly logger = new Logger(BookingsService.name);
+    private static readonly BOOKING_FEATURE_CANONICAL = 'reservaciones';
 
     constructor(
         @Inject(PrismaService)
@@ -79,12 +80,7 @@ export class BookingsService {
 
     private supportsBookingFeature(featureName: string): boolean {
         const normalized = this.normalizeText(featureName);
-        return (
-            normalized.includes('reservacion')
-            || normalized.includes('reserva')
-            || normalized.includes('cita')
-            || normalized.includes('appointment')
-        );
+        return normalized === BookingsService.BOOKING_FEATURE_CANONICAL;
     }
 
     async createForUser(userId: string, dto: CreateBookingDto) {

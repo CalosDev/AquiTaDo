@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
-import { businessApi, categoryApi, locationApi, uploadApi } from '../api/endpoints';
+import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
 
@@ -9,6 +9,11 @@ interface Category {
     id: string;
     name: string;
     icon?: string;
+}
+
+interface Feature {
+    id: string;
+    name: string;
 }
 
 interface Province {
@@ -22,12 +27,13 @@ interface City {
 }
 
 type RegisterStep = 1 | 2 | 3 | 4;
+const BOOKING_FEATURE_CANONICAL = 'reservaciones';
 
 const STEP_TITLES: Array<{ step: RegisterStep; title: string; subtitle: string }> = [
     { step: 1, title: 'Informacion', subtitle: 'Nombre y propuesta' },
     { step: 2, title: 'Contacto', subtitle: 'Telefono y WhatsApp' },
     { step: 3, title: 'Ubicacion', subtitle: 'Direccion y mapa' },
-    { step: 4, title: 'Categorias', subtitle: 'Donde apareceras' },
+    { step: 4, title: 'Categorias y servicios', subtitle: 'Donde apareceras y como operas' },
 ];
 
 const TOTAL_STEPS = STEP_TITLES.length;
@@ -38,6 +44,7 @@ export function RegisterBusiness() {
     const { refreshOrganizations, setActiveOrganizationId } = useOrganization();
 
     const [categories, setCategories] = useState<Category[]>([]);
+    const [features, setFeatures] = useState<Feature[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [cities, setCities] = useState<City[]>([]);
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -57,6 +64,7 @@ export function RegisterBusiness() {
         latitude: '',
         longitude: '',
         categoryIds: [] as string[],
+        featureIds: [] as string[],
     });
 
     const progressPercentage = useMemo(
@@ -80,11 +88,13 @@ export function RegisterBusiness() {
     const loadFormData = async () => {
         setLoadingData(true);
         try {
-            const [catRes, provRes] = await Promise.all([
+            const [catRes, featRes, provRes] = await Promise.all([
                 categoryApi.getAll(),
+                featuresApi.getAll(),
                 locationApi.getProvinces(),
             ]);
             setCategories(catRes.data || []);
+            setFeatures(featRes.data || []);
             setProvinces(provRes.data || []);
         } catch (err: unknown) {
             setError(getApiErrorMessage(err, 'No se pudieron cargar categorias y provincias'));
@@ -108,6 +118,15 @@ export function RegisterBusiness() {
             categoryIds: previous.categoryIds.includes(id)
                 ? previous.categoryIds.filter((categoryId) => categoryId !== id)
                 : [...previous.categoryIds, id],
+        }));
+    };
+
+    const toggleFeature = (id: string) => {
+        setFormData((previous) => ({
+            ...previous,
+            featureIds: previous.featureIds.includes(id)
+                ? previous.featureIds.filter((featureId) => featureId !== id)
+                : [...previous.featureIds, id],
         }));
     };
 
@@ -228,6 +247,7 @@ export function RegisterBusiness() {
             if (formData.phone.trim()) payload.phone = formData.phone.trim();
             if (formData.whatsapp.trim()) payload.whatsapp = formData.whatsapp.trim();
             if (formData.cityId) payload.cityId = formData.cityId;
+            if (formData.featureIds.length > 0) payload.featureIds = formData.featureIds;
 
             if (formData.latitude.trim()) {
                 const parsedLatitude = Number.parseFloat(formData.latitude);
@@ -529,6 +549,29 @@ export function RegisterBusiness() {
                     </p>
                 </div>
 
+                <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Servicios / modalidades (opcional)</h3>
+                    <div className="flex flex-wrap gap-2">
+                        {features.map((feature) => (
+                            <button
+                                key={feature.id}
+                                type="button"
+                                onClick={() => toggleFeature(feature.id)}
+                                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                                    formData.featureIds.includes(feature.id)
+                                        ? 'bg-primary-600 text-white border-primary-600'
+                                        : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
+                                }`}
+                            >
+                                {feature.name}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                        Si marcas "Reservaciones", el negocio mostrara formulario de reserva en su perfil.
+                    </p>
+                </div>
+
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                     <h3 className="font-medium text-gray-900 mb-2">Resumen antes de publicar</h3>
                     <ul className="text-sm text-gray-600 space-y-1">
@@ -536,6 +579,11 @@ export function RegisterBusiness() {
                         <li><strong>Provincia:</strong> {provinces.find((province) => province.id === formData.provinceId)?.name || 'Sin definir'}</li>
                         <li><strong>Ciudad:</strong> {cities.find((city) => city.id === formData.cityId)?.name || 'Sin definir'}</li>
                         <li><strong>Contacto:</strong> {formData.whatsapp || formData.phone || 'Sin definir'}</li>
+                        <li><strong>Reservas:</strong> {features
+                            .filter((feature) => formData.featureIds.includes(feature.id))
+                            .some((feature) => feature.name.trim().toLowerCase() === BOOKING_FEATURE_CANONICAL)
+                            ? 'Habilitadas'
+                            : 'No habilitadas'}</li>
                     </ul>
                 </div>
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { businessApi, categoryApi, locationApi, uploadApi } from '../api/endpoints';
+import { Link, useParams } from 'react-router-dom';
+import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { OptimizedImage } from '../components/OptimizedImage';
 
@@ -8,6 +8,11 @@ interface Category {
     id: string;
     name: string;
     icon?: string;
+}
+
+interface Feature {
+    id: string;
+    name: string;
 }
 
 interface Province {
@@ -33,6 +38,7 @@ interface BusinessDetail {
     province?: { id: string; name: string } | null;
     city?: { id: string; name: string } | null;
     categories?: Array<{ category: { id: string; name: string; icon?: string } }>;
+    features?: Array<{ feature: { id: string; name: string } }>;
     images?: Array<{ id: string; url: string }>;
 }
 
@@ -47,6 +53,7 @@ interface EditFormData {
     latitude: string;
     longitude: string;
     categoryIds: string[];
+    featureIds: string[];
 }
 
 const EMPTY_FORM: EditFormData = {
@@ -60,14 +67,15 @@ const EMPTY_FORM: EditFormData = {
     latitude: '',
     longitude: '',
     categoryIds: [],
+    featureIds: [],
 };
 
 export function EditBusiness() {
     const { businessId } = useParams<{ businessId: string }>();
-    const navigate = useNavigate();
 
     const [business, setBusiness] = useState<BusinessDetail | null>(null);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [features, setFeatures] = useState<Feature[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [cities, setCities] = useState<City[]>([]);
     const [formData, setFormData] = useState<EditFormData>(EMPTY_FORM);
@@ -82,6 +90,10 @@ export function EditBusiness() {
     const selectedCategorySet = useMemo(
         () => new Set(formData.categoryIds),
         [formData.categoryIds],
+    );
+    const selectedFeatureSet = useMemo(
+        () => new Set(formData.featureIds),
+        [formData.featureIds],
     );
 
     const loadCities = useCallback(async (provinceId: string) => {
@@ -108,9 +120,10 @@ export function EditBusiness() {
         setErrorMessage('');
 
         try {
-            const [businessResponse, categoriesResponse, provincesResponse] = await Promise.all([
+            const [businessResponse, categoriesResponse, featuresResponse, provincesResponse] = await Promise.all([
                 businessApi.getById(businessId),
                 categoryApi.getAll(),
+                featuresApi.getAll(),
                 locationApi.getProvinces(),
             ]);
 
@@ -133,10 +146,12 @@ export function EditBusiness() {
                 latitude: typeof payload.latitude === 'number' ? String(payload.latitude) : '',
                 longitude: typeof payload.longitude === 'number' ? String(payload.longitude) : '',
                 categoryIds: (payload.categories || []).map((entry) => entry.category.id),
+                featureIds: (payload.features || []).map((entry) => entry.feature.id),
             };
 
             setBusiness(payload);
             setCategories((categoriesResponse.data || []) as Category[]);
+            setFeatures((featuresResponse.data || []) as Feature[]);
             setProvinces((provincesResponse.data || []) as Province[]);
             setFormData(nextForm);
             setInitialProvinceId(nextForm.provinceId);
@@ -174,6 +189,18 @@ export function EditBusiness() {
                 categoryIds: exists
                     ? previous.categoryIds.filter((id) => id !== categoryId)
                     : [...previous.categoryIds, categoryId],
+            };
+        });
+    };
+
+    const toggleFeature = (featureId: string) => {
+        setFormData((previous) => {
+            const exists = previous.featureIds.includes(featureId);
+            return {
+                ...previous,
+                featureIds: exists
+                    ? previous.featureIds.filter((id) => id !== featureId)
+                    : [...previous.featureIds, featureId],
             };
         });
     };
@@ -285,6 +312,7 @@ export function EditBusiness() {
                 address: formData.address.trim(),
                 provinceId: formData.provinceId,
                 categoryIds: formData.categoryIds,
+                featureIds: formData.featureIds,
             };
 
             if (formData.phone.trim()) {
@@ -556,6 +584,29 @@ export function EditBusiness() {
                             </button>
                         ))}
                     </div>
+                </div>
+
+                <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Servicios / modalidades</p>
+                    <div className="flex flex-wrap gap-2">
+                        {features.map((feature) => (
+                            <button
+                                key={feature.id}
+                                type="button"
+                                onClick={() => toggleFeature(feature.id)}
+                                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                                    selectedFeatureSet.has(feature.id)
+                                        ? 'bg-primary-600 text-white border-primary-600'
+                                        : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
+                                }`}
+                            >
+                                {feature.name}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                        Marca "Reservaciones" solo si el negocio realmente trabaja con citas o reservas.
+                    </p>
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-gray-100 p-4">
