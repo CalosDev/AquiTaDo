@@ -12,6 +12,7 @@ const BusinessDetails = lazy(async () => ({ default: (await pageLoaders.business
 const Login = lazy(async () => ({ default: (await pageLoaders.login()).Login }));
 const Register = lazy(async () => ({ default: (await pageLoaders.register()).Register }));
 const RegisterBusiness = lazy(async () => ({ default: (await pageLoaders.registerBusiness()).RegisterBusiness }));
+const EditBusiness = lazy(async () => ({ default: (await pageLoaders.editBusiness()).EditBusiness }));
 const DashboardBusiness = lazy(async () => ({ default: (await pageLoaders.dashboardBusiness()).DashboardBusiness }));
 const AdminDashboard = lazy(async () => ({ default: (await pageLoaders.adminDashboard()).AdminDashboard }));
 const Terms = lazy(async () => ({ default: (await pageLoaders.terms()).Terms }));
@@ -93,6 +94,14 @@ export function AppRouter() {
                         element={
                             <ProtectedRoute roles={['BUSINESS_OWNER']}>
                                 <DashboardBusiness />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/dashboard/businesses/:businessId/edit"
+                        element={
+                            <ProtectedRoute roles={['BUSINESS_OWNER']}>
+                                <EditBusiness />
                             </ProtectedRoute>
                         }
                     />

@@ -6,10 +6,12 @@ export function Footer() {
     const { isAuthenticated, user } = useAuth();
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
+    const canAccessBusinessPanel = roleCapabilities.canAccessBusinessPanel;
+    const canAccessAdminPanel = roleCapabilities.canAccessAdminPanel;
 
     const registerBusinessPath = !isAuthenticated
         ? '/register'
-        : roleCapabilities.canAccessAdminPanel
+        : canAccessAdminPanel
             ? '/admin'
             : canRegisterBusiness
                 ? '/register-business'
@@ -17,7 +19,7 @@ export function Footer() {
 
     const registerBusinessLabel = !isAuthenticated
         ? 'Crear cuenta'
-        : roleCapabilities.canAccessAdminPanel
+        : canAccessAdminPanel
             ? 'Panel admin'
             : canRegisterBusiness
                 ? 'Registrar negocio'
@@ -71,8 +73,15 @@ export function Footer() {
                         <h3 className="font-display text-base font-semibold text-white">Negocios</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
                             <li><Link to={registerBusinessPath} className="hover:text-white transition-colors">{registerBusinessLabel}</Link></li>
-                            <li><Link to="/dashboard" className="hover:text-white transition-colors">Panel negocio</Link></li>
-                            <li><Link to="/admin" className="hover:text-white transition-colors">Moderacion</Link></li>
+                            {isAuthenticated && canAccessBusinessPanel && (
+                                <li><Link to="/dashboard" className="hover:text-white transition-colors">Panel negocio</Link></li>
+                            )}
+                            {isAuthenticated && canAccessAdminPanel && (
+                                <>
+                                    <li><Link to="/admin" className="hover:text-white transition-colors">Panel admin</Link></li>
+                                    <li><Link to="/security" className="hover:text-white transition-colors">Seguridad</Link></li>
+                                </>
+                            )}
                         </ul>
                     </div>
 

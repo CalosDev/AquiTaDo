@@ -9,8 +9,10 @@ type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | '
 
 interface BusinessItem {
     id: string;
+    slug?: string;
     name: string;
     verified?: boolean;
+    verificationStatus?: VerificationStatus;
 }
 
 interface DashboardMetrics {
@@ -323,6 +325,14 @@ export function DashboardBusiness() {
                     <Link className="btn-primary" to="/register-business">
                         Registrar otro negocio
                     </Link>
+                    {selectedBusinessId && (
+                        <Link
+                            className="btn-secondary"
+                            to={`/dashboard/businesses/${selectedBusinessId}/edit`}
+                        >
+                            Editar negocio
+                        </Link>
+                    )}
                     <Link className="btn-secondary" to="/profile">
                         Editar perfil
                     </Link>
@@ -383,7 +393,17 @@ export function DashboardBusiness() {
 
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <article className="card p-6">
-                    <h2 className="font-display text-xl font-bold text-gray-900 mb-4">Mis negocios</h2>
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="font-display text-xl font-bold text-gray-900">Mis negocios</h2>
+                        {selectedBusinessId && (
+                            <Link
+                                to={`/dashboard/businesses/${selectedBusinessId}/edit`}
+                                className="text-xs rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 font-semibold text-primary-700 hover:bg-primary-100"
+                            >
+                                Editar seleccionado
+                            </Link>
+                        )}
+                    </div>
                     {businesses.length === 0 ? (
                         <p className="text-sm text-gray-500">Aun no tienes negocios creados.</p>
                     ) : (

@@ -9,6 +9,7 @@ export const pageLoaders = {
     login: () => import('../pages/Login'),
     register: () => import('../pages/Register'),
     registerBusiness: () => import('../pages/RegisterBusiness'),
+    editBusiness: () => import('../pages/EditBusiness'),
     dashboardBusiness: () => import('../pages/DashboardBusiness'),
     adminDashboard: () => import('../pages/AdminDashboard'),
     terms: () => import('../pages/Terms'),
@@ -88,7 +89,12 @@ export function preloadRouteChunk(pathname: string): void {
     }
 
     if (normalizedPath === '/dashboard') {
-        preloadByKey('dashboardBusiness');
+        preloadMany(['dashboardBusiness', 'editBusiness']);
+        return;
+    }
+
+    if (normalizedPath.startsWith('/dashboard/businesses/')) {
+        preloadMany(['editBusiness', 'dashboardBusiness']);
         return;
     }
 
@@ -149,6 +155,7 @@ export function preloadLikelyRoutesForSession(options: {
         preloadMany([
             'dashboardBusiness',
             'registerBusiness',
+            'editBusiness',
         ]);
         return;
     }
