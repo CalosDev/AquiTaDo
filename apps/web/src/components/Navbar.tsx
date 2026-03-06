@@ -44,7 +44,7 @@ export function Navbar() {
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const organizationName = activeOrganization?.name?.trim() ?? '';
-    const showOrganizationChip = organizationName.length > 0;
+    const firstName = user?.name?.split(' ')[0] ?? 'Cuenta';
     const businessesActive = location.pathname === '/businesses'
         || location.pathname.startsWith('/businesses/')
         || location.pathname.startsWith('/negocios/');
@@ -168,7 +168,7 @@ export function Navbar() {
                             </div>
                         </Link>
 
-                        <div className="hidden xl:flex items-center gap-3 2xl:gap-5 min-w-0">
+                        <div className="hidden xl:flex items-center gap-3 2xl:gap-4 min-w-0">
                             <Link
                                 to="/businesses"
                                 className={desktopNavClass(businessesActive)}
@@ -228,7 +228,7 @@ export function Navbar() {
                                     {canRegisterBusiness && (
                                         <Link
                                             to="/register-business"
-                                            className="btn-accent text-sm whitespace-nowrap shrink-0"
+                                            className="btn-accent text-sm whitespace-nowrap shrink-0 !px-5 !py-2.5"
                                             onMouseEnter={() => preloadRouteChunk('/register-business')}
                                             onFocus={() => preloadRouteChunk('/register-business')}
                                         >
@@ -237,19 +237,28 @@ export function Navbar() {
                                             <span className="hidden 2xl:inline">+ Registrar Negocio</span>
                                         </Link>
                                     )}
-                                    <div className="flex items-center gap-2 min-w-0 shrink-0">
-                                        <span className="chip !py-1 whitespace-nowrap shrink-0">{roleBadgeLabel(user?.role)}</span>
-                                        {showOrganizationChip && (
-                                            <span
-                                                className="chip-danger hidden 2xl:inline-flex !py-1 max-w-[180px] truncate overflow-hidden"
-                                                title={organizationName}
-                                            >
-                                                {organizationName}
-                                            </span>
-                                        )}
-                                        <span className="text-sm text-slate-500 whitespace-nowrap max-w-[120px] truncate">
-                                            Hola, {user?.name?.split(' ')[0]}
+                                    <div className="flex items-center gap-2 min-w-0 shrink-0 border-l border-primary-100 pl-2">
+                                        <span className="chip hidden 2xl:inline-flex !py-1 whitespace-nowrap shrink-0">
+                                            {roleBadgeLabel(user?.role)}
                                         </span>
+                                        <div className="min-w-0">
+                                            <Link
+                                                to="/profile"
+                                                className="text-sm font-semibold text-slate-600 transition-colors hover:text-primary-700 whitespace-nowrap"
+                                                onMouseEnter={() => preloadRouteChunk('/profile')}
+                                                onFocus={() => preloadRouteChunk('/profile')}
+                                            >
+                                                Hola, {firstName}
+                                            </Link>
+                                            {organizationName && (
+                                                <p
+                                                    className="hidden 2xl:block text-[11px] text-slate-500 leading-tight max-w-[170px] truncate"
+                                                    title={organizationName}
+                                                >
+                                                    {organizationName}
+                                                </p>
+                                            )}
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={handleLogout}
