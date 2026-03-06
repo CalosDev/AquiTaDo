@@ -183,6 +183,10 @@ export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
     const { isAuthenticated, user } = useAuth();
     const isCustomerRole = user?.role === 'USER';
+    const isBusinessOwnerRole = user?.role === 'BUSINESS_OWNER';
+    const isAdminRole = user?.role === 'ADMIN';
+    const hasOperatorRole = isBusinessOwnerRole || isAdminRole;
+    const canUseCustomerContactFlows = !isAuthenticated || isCustomerRole;
     const showBookings = featureFlags.bookings;
     const showCheckins = featureFlags.checkins;
     const [business, setBusiness] = useState<Business | null>(null);
@@ -335,7 +339,7 @@ export function BusinessDetails() {
     }, [business?.id, isAuthenticated, isCustomerRole]);
 
     const loadCheckInStats = useCallback(async () => {
-        if (!showCheckins) {
+        if (!showCheckins || (isAuthenticated && !isCustomerRole)) {
             setCheckInStats(null);
             return;
         }
@@ -354,7 +358,7 @@ export function BusinessDetails() {
         } finally {
             setCheckInStatsLoading(false);
         }
-    }, [business?.id, showCheckins]);
+    }, [business?.id, isAuthenticated, isCustomerRole, showCheckins]);
 
     useEffect(() => {
         void loadCheckInStats();
@@ -563,6 +567,10 @@ export function BusinessDetails() {
 
     const handleReviewSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!isAuthenticated || !isCustomerRole) {
+            setReviewErrorMessage('Solo usuarios clientes pueden dejar resenas');
+            return;
+        }
         if (!business?.id) return;
         setSubmittingReview(true);
         setReviewErrorMessage('');
@@ -585,6 +593,10 @@ export function BusinessDetails() {
 
     const handleMessageSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (!isAuthenticated || !isCustomerRole) {
+            setMessageErrorMessage('Solo usuarios clientes pueden enviar mensajes directos');
+            return;
+        }
         if (!business?.id || !messageForm.content.trim()) {
             setMessageErrorMessage('Escribe un mensaje para el negocio');
             return;
@@ -1127,7 +1139,7 @@ export function BusinessDetails() {
                             </div>
                         )}
 
-                        {showCheckins && (
+                        {showCheckins && (!isAuthenticated || isCustomerRole) && (
                             <div className="mt-5 rounded-xl border border-accent-100 bg-accent-50/40 p-4">
                             <div className="flex items-center justify-between gap-2">
                                 <h2 className="font-display font-semibold text-gray-900">Actividad local</h2>
@@ -1316,7 +1328,13 @@ export function BusinessDetails() {
                             </div>
                         )}
 
-                        {isAuthenticated && (
+                        {isAuthenticated && !isCustomerRole && (
+                            <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                                Las resenas estan habilitadas para cuentas tipo cliente.
+                            </div>
+                        )}
+
+                        {isAuthenticated && isCustomerRole && (
                             <form onSubmit={handleReviewSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
                                 <div className="flex items-center gap-3 mb-3">
                                     <span className="text-sm font-medium text-gray-600">Tu calificacion:</span>
@@ -1499,37 +1517,57 @@ export function BusinessDetails() {
                         </div>
                         <div className="space-y-3">
                             {business.phone && (
-                                <a
-                                    href={`tel:${business.phone}`}
-                                    onClick={handlePhoneClick}
-                                    className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 border border-primary-100 hover:bg-primary-100 transition-colors hover-lift group"
-                                >
-                                    <span className="text-lg">Tel</span>
-                                    <div>
-                                        <div className="text-xs text-gray-600">Telefono</div>
-                                        <div className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{business.phone}</div>
-                                    </div>
-                                </a>
-                            )}
-                            {business.whatsapp && (
-                                <a
-                                    href={whatsappDirectUrl ?? '#'}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={handleWhatsAppClick}
-                                    className={`flex items-center gap-3 p-3 rounded-xl transition-colors hover-lift group ${contactVariant === 'emphasis'
-                                        ? 'bg-green-100 hover:bg-green-200 border border-green-300 shadow-sm'
-                                        : 'bg-green-50 hover:bg-green-100 border border-green-100'
-                                        }`}
-                                >
-                                    <span className="text-lg">WA</span>
-                                    <div>
-                                        <div className="text-xs text-gray-600">WhatsApp</div>
-                                        <div className="text-sm font-medium text-green-700">
-                                            {contactVariant === 'emphasis' ? 'Chatea ahora' : business.whatsapp}
+                                canUseCustomerContactFlows ? (
+                                    <a
+                                        href={`tel:${business.phone}`}
+                                        onClick={handlePhoneClick}
+                                        className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 border border-primary-100 hover:bg-primary-100 transition-colors hover-lift group"
+                                    >
+                                        <span className="text-lg">Tel</span>
+                                        <div>
+                                            <div className="text-xs text-gray-600">Telefono</div>
+                                            <div className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{business.phone}</div>
+                                        </div>
+                                    </a>
+                                ) : (
+                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
+                                        <span className="text-lg">Tel</span>
+                                        <div>
+                                            <div className="text-xs text-gray-600">Telefono</div>
+                                            <div className="text-sm text-gray-700">{business.phone}</div>
                                         </div>
                                     </div>
-                                </a>
+                                )
+                            )}
+                            {business.whatsapp && (
+                                canUseCustomerContactFlows ? (
+                                    <a
+                                        href={whatsappDirectUrl ?? '#'}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={handleWhatsAppClick}
+                                        className={`flex items-center gap-3 p-3 rounded-xl transition-colors hover-lift group ${contactVariant === 'emphasis'
+                                            ? 'bg-green-100 hover:bg-green-200 border border-green-300 shadow-sm'
+                                            : 'bg-green-50 hover:bg-green-100 border border-green-100'
+                                            }`}
+                                    >
+                                        <span className="text-lg">WA</span>
+                                        <div>
+                                            <div className="text-xs text-gray-600">WhatsApp</div>
+                                            <div className="text-sm font-medium text-green-700">
+                                                {contactVariant === 'emphasis' ? 'Chatea ahora' : business.whatsapp}
+                                            </div>
+                                        </div>
+                                    </a>
+                                ) : (
+                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-green-50/50 border border-green-100">
+                                        <span className="text-lg">WA</span>
+                                        <div>
+                                            <div className="text-xs text-gray-600">WhatsApp</div>
+                                            <div className="text-sm text-green-700">{business.whatsapp}</div>
+                                        </div>
+                                    </div>
+                                )
                             )}
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
                                 <span className="text-lg">Dir</span>
@@ -1541,6 +1579,26 @@ export function BusinessDetails() {
                         </div>
 
                         <div className="mt-6 border-t border-gray-100 pt-6">
+                            {hasOperatorRole && (
+                                <div className="mb-6 space-y-3">
+                                    <h3 className="font-display font-semibold text-gray-900">
+                                        {isAdminRole ? 'Herramientas de moderacion' : 'Herramientas de gestion'}
+                                    </h3>
+                                    <p className="text-sm text-slate-700">
+                                        {isAdminRole
+                                            ? 'Gestiona verificaciones, calidad de datos y cumplimiento desde el panel administrativo.'
+                                            : 'Gestiona tu operacion comercial desde tu panel de negocio.'}
+                                    </p>
+                                    <Link
+                                        to={isAdminRole ? '/admin' : '/dashboard'}
+                                        className="btn-secondary text-sm inline-flex"
+                                    >
+                                        {isAdminRole ? 'Ir a Panel Admin' : 'Ir a Panel Negocio'}
+                                    </Link>
+                                </div>
+                            )}
+                            {!hasOperatorRole && (
+                                <>
                             {showBookings && isAuthenticated && isCustomerRole && canBookThisBusiness && (
                                 <div className="mb-6">
                                     <h3 className="font-display font-semibold text-gray-900 mb-3">
@@ -1675,7 +1733,7 @@ export function BusinessDetails() {
                                 </form>
                             )}
 
-                            {isAuthenticated && (
+                            {isAuthenticated && isCustomerRole && (
                                 <form onSubmit={handleMessageSubmit} className="space-y-3">
                                     <input
                                         className="input-field text-sm"
@@ -1733,12 +1791,14 @@ export function BusinessDetails() {
                                     {messageSuccessMessage}
                                 </div>
                             )}
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {(business.phone || business.whatsapp) && (
+            {canUseCustomerContactFlows && (business.phone || business.whatsapp) && (
                 <div className="fixed inset-x-4 bottom-4 z-40 lg:hidden">
                     <div className="rounded-2xl border border-primary-100 bg-white/95 backdrop-blur shadow-xl p-2 flex gap-2">
                         {business.phone && (
