@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { ObservabilityService } from '../observability/observability.service';
 import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
 
+type CachedValue<T> = {
+    value: T;
+    expiresAt: number;
+};
+
 type GeocodeInput = {
     address: string;
     province?: string | null;
@@ -14,7 +19,7 @@ type GeocodeResult = {
     longitude: number;
     formattedAddress: string | null;
     confidence: number | null;
-    provider: 'geoapify';
+    provider: 'geoapify' | 'nominatim';
 };
 
 type PhoneValidationResult = {
@@ -39,13 +44,22 @@ type VeriphonePayload = {
 @Injectable()
 export class IntegrationsService {
     private readonly logger = new Logger(IntegrationsService.name);
+    private readonly cacheTtlMs: number;
     private readonly requestTimeoutMs: number;
     private readonly geoapifyApiKey: string | null;
     private readonly geoapifyBaseUrl: string;
     private readonly geoapifyMinConfidence: number;
+    private readonly nominatimEnabled: boolean;
+    private readonly nominatimBaseUrl: string;
+    private readonly nominatimUserAgent: string;
+    private readonly nominatimEmail: string | null;
+    private readonly nominatimMinIntervalMs: number;
     private readonly veriphoneApiKey: string | null;
     private readonly veriphoneBaseUrl: string;
     private readonly veriphoneStrictMode: boolean;
+    private readonly geocodeCache = new Map<string, CachedValue<GeocodeResult | null>>();
+    private readonly phoneValidationCache = new Map<string, CachedValue<PhoneValidationResult>>();
+    private nominatimNextAllowedAt = 0;
 
     constructor(
         @Inject(ConfigService)
@@ -55,10 +69,18 @@ export class IntegrationsService {
         @Inject(ObservabilityService)
         private readonly observabilityService: ObservabilityService,
     ) {
+        this.cacheTtlMs = this.resolvePositiveInt('EXTERNAL_DATA_CACHE_TTL_SECONDS', 600) * 1000;
         this.requestTimeoutMs = this.resolvePositiveInt('EXTERNAL_DATA_TIMEOUT_MS', 3500);
         this.geoapifyApiKey = this.resolveOptionalString('GEOAPIFY_API_KEY');
         this.geoapifyBaseUrl = this.resolveOptionalString('GEOAPIFY_BASE_URL') || 'https://api.geoapify.com';
         this.geoapifyMinConfidence = this.resolveRangeNumber('GEOAPIFY_MIN_CONFIDENCE', 0, 1, 0.65);
+        this.nominatimEnabled = this.resolveBooleanLike('NOMINATIM_ENABLED', false);
+        this.nominatimBaseUrl = this.resolveOptionalString('NOMINATIM_BASE_URL')
+            || 'https://nominatim.openstreetmap.org';
+        this.nominatimUserAgent = this.resolveOptionalString('NOMINATIM_USER_AGENT')
+            || 'AquiTaDo-Geocoder/1.0 (+https://aquitado.vercel.app)';
+        this.nominatimEmail = this.resolveOptionalString('NOMINATIM_EMAIL');
+        this.nominatimMinIntervalMs = this.resolvePositiveInt('NOMINATIM_MIN_INTERVAL_MS', 1100);
         this.veriphoneApiKey = this.resolveOptionalString('VERIPHONE_API_KEY');
         this.veriphoneBaseUrl = this.resolveOptionalString('VERIPHONE_BASE_URL') || 'https://api.veriphone.io';
         this.veriphoneStrictMode = this.resolveBooleanLike('VERIPHONE_STRICT_MODE', false);
@@ -66,7 +88,7 @@ export class IntegrationsService {
 
     async geocodeDominicanAddress(input: GeocodeInput): Promise<GeocodeResult | null> {
         const address = input.address.trim();
-        if (address.length === 0 || !this.geoapifyApiKey) {
+        if (address.length === 0) {
             return null;
         }
 
@@ -74,24 +96,53 @@ export class IntegrationsService {
             .filter((part): part is string => !!part && part.length > 0);
 
         const query = queryParts.join(', ');
-        try {
-            const geocode = await this.circuitBreakerService.execute(
-                'geoapify.geocode',
-                async () => this.fetchGeoapifyGeocode(query),
-            );
-            if (!geocode) {
-                return null;
-            }
-            if (geocode.confidence !== null && geocode.confidence < this.geoapifyMinConfidence) {
-                return null;
-            }
-            return geocode;
-        } catch (error) {
-            this.logger.warn(
-                `Geoapify geocoding failed (${error instanceof Error ? error.message : String(error)})`,
-            );
-            return null;
+        const cacheKey = query.toLowerCase();
+        const cached = this.getValidCache(this.geocodeCache, cacheKey);
+        if (cached !== undefined) {
+            return cached;
         }
+
+        let geocode: GeocodeResult | null = null;
+
+        if (this.geoapifyApiKey) {
+            try {
+                geocode = await this.circuitBreakerService.execute(
+                    'geoapify.geocode',
+                    async () => this.fetchGeoapifyGeocode(query),
+                );
+                if (
+                    geocode
+                    && geocode.confidence !== null
+                    && geocode.confidence < this.geoapifyMinConfidence
+                ) {
+                    geocode = null;
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Geoapify geocoding failed (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }
+        }
+
+        if (!geocode && this.nominatimEnabled) {
+            try {
+                geocode = await this.circuitBreakerService.execute(
+                    'nominatim.geocode',
+                    async () => this.fetchNominatimGeocode(query),
+                );
+            } catch (error) {
+                this.logger.warn(
+                    `Nominatim geocoding failed (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }
+        }
+
+        this.geocodeCache.set(cacheKey, {
+            value: geocode,
+            expiresAt: Date.now() + this.cacheTtlMs,
+        });
+
+        return geocode;
     }
 
     async validateDominicanPhone(rawPhone: string): Promise<PhoneValidationResult> {
@@ -108,8 +159,42 @@ export class IntegrationsService {
             };
         }
 
+        const cached = this.getValidCache(this.phoneValidationCache, normalizedLocal);
+        if (cached) {
+            return cached;
+        }
+
+        let result: PhoneValidationResult;
         if (!this.veriphoneApiKey) {
-            return {
+            result = {
+                isValid: true,
+                normalizedPhone: normalizedLocal,
+                provider: 'local',
+                countryCode: 'DO',
+                carrier: null,
+                lineType: null,
+                reason: null,
+            };
+            this.phoneValidationCache.set(normalizedLocal, {
+                value: result,
+                expiresAt: Date.now() + this.cacheTtlMs,
+            });
+            return result;
+        }
+
+        try {
+            result = await this.circuitBreakerService.execute(
+                'veriphone.phone',
+                async () => this.fetchVeriphoneValidation(normalizedLocal),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Veriphone validation failed (${error instanceof Error ? error.message : String(error)})`,
+            );
+            if (this.veriphoneStrictMode) {
+                throw new ServiceUnavailableException('No se pudo validar el numero telefonico');
+            }
+            result = {
                 isValid: true,
                 normalizedPhone: normalizedLocal,
                 provider: 'local',
@@ -120,29 +205,11 @@ export class IntegrationsService {
             };
         }
 
-        try {
-            const providerResult = await this.circuitBreakerService.execute(
-                'veriphone.phone',
-                async () => this.fetchVeriphoneValidation(normalizedLocal),
-            );
-            return providerResult;
-        } catch (error) {
-            this.logger.warn(
-                `Veriphone validation failed (${error instanceof Error ? error.message : String(error)})`,
-            );
-            if (this.veriphoneStrictMode) {
-                throw new ServiceUnavailableException('No se pudo validar el numero telefonico');
-            }
-            return {
-                isValid: true,
-                normalizedPhone: normalizedLocal,
-                provider: 'local',
-                countryCode: 'DO',
-                carrier: null,
-                lineType: null,
-                reason: null,
-            };
-        }
+        this.phoneValidationCache.set(normalizedLocal, {
+            value: result,
+            expiresAt: Date.now() + this.cacheTtlMs,
+        });
+        return result;
     }
 
     normalizeDominicanPhone(rawPhone: string): string | null {
@@ -184,6 +251,69 @@ export class IntegrationsService {
         } finally {
             this.observabilityService.trackExternalDependencyCall(
                 'geoapify',
+                'geocode-search',
+                Date.now() - startedAt,
+                success,
+            );
+        }
+    }
+
+    private async fetchNominatimGeocode(query: string): Promise<GeocodeResult | null> {
+        if (Date.now() < this.nominatimNextAllowedAt) {
+            return null;
+        }
+        this.nominatimNextAllowedAt = Date.now() + this.nominatimMinIntervalMs;
+
+        const startedAt = Date.now();
+        let success = true;
+
+        try {
+            const url = new URL('/search', this.nominatimBaseUrl);
+            url.searchParams.set('format', 'jsonv2');
+            url.searchParams.set('limit', '1');
+            url.searchParams.set('countrycodes', 'do');
+            url.searchParams.set('q', query);
+            if (this.nominatimEmail) {
+                url.searchParams.set('email', this.nominatimEmail);
+            }
+
+            const payload = await this.getJsonWithTimeout(url.toString(), {
+                'User-Agent': this.nominatimUserAgent,
+            });
+
+            if (!Array.isArray(payload) || payload.length === 0) {
+                return null;
+            }
+
+            const first = payload[0] as {
+                lat?: unknown;
+                lon?: unknown;
+                display_name?: unknown;
+            };
+            const lat = this.coerceNumber(first.lat);
+            const lng = this.coerceNumber(first.lon);
+            if (lat === null || lng === null) {
+                return null;
+            }
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                return null;
+            }
+
+            return {
+                latitude: lat,
+                longitude: lng,
+                formattedAddress: typeof first.display_name === 'string'
+                    ? first.display_name
+                    : null,
+                confidence: null,
+                provider: 'nominatim',
+            };
+        } catch (error) {
+            success = false;
+            throw error;
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'nominatim',
                 'geocode-search',
                 Date.now() - startedAt,
                 success,
@@ -346,14 +476,20 @@ export class IntegrationsService {
         };
     }
 
-    private async getJsonWithTimeout(url: string): Promise<unknown> {
+    private async getJsonWithTimeout(
+        url: string,
+        headers?: Record<string, string>,
+    ): Promise<unknown> {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), this.requestTimeoutMs);
 
         try {
             const response = await fetch(url, {
                 method: 'GET',
-                headers: { Accept: 'application/json' },
+                headers: {
+                    Accept: 'application/json',
+                    ...(headers || {}),
+                },
                 signal: abortController.signal,
             });
 
@@ -414,6 +550,18 @@ export class IntegrationsService {
         return fallbackValue;
     }
 
+    private getValidCache<T>(cache: Map<string, CachedValue<T>>, cacheKey: string): T | undefined {
+        const entry = cache.get(cacheKey);
+        if (!entry) {
+            return undefined;
+        }
+        if (entry.expiresAt <= Date.now()) {
+            cache.delete(cacheKey);
+            return undefined;
+        }
+        return entry.value;
+    }
+
     private coerceNumber(value: unknown): number | null {
         if (typeof value === 'number' && Number.isFinite(value)) {
             return value;
@@ -427,4 +575,3 @@ export class IntegrationsService {
         return null;
     }
 }
-

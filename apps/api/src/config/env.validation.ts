@@ -153,6 +153,7 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertValidUrl(config, 'GEMINI_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GROQ_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GEOAPIFY_BASE_URL', ['http:', 'https:']);
+    assertValidUrl(config, 'NOMINATIM_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'VERIPHONE_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'RD_DIVISIONS_API_URL', ['http:', 'https:']);
     assertValidUrl(config, 'OPEN_METEO_BASE_URL', ['http:', 'https:']);
@@ -165,6 +166,9 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertBooleanLike(config, 'JSON_API_RESPONSE_ENABLED');
     assertBooleanLike(config, 'WHATSAPP_ENABLED');
     assertBooleanLike(config, 'VERIPHONE_STRICT_MODE');
+    assertBooleanLike(config, 'NOMINATIM_ENABLED');
+    assertNonEmptyString(config, 'NOMINATIM_USER_AGENT');
+    assertPositiveInteger(config, 'NOMINATIM_MIN_INTERVAL_MS');
 
     assertRangeNumber(config, 'HEALTH_DB_POOL_WARN_RATIO', 0.1, 1);
     assertRangeNumber(config, 'HEALTH_DB_POOL_CRITICAL_RATIO', 0.1, 1);

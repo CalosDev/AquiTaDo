@@ -123,6 +123,11 @@ Servicios:
 - `OPEN_METEO_BASE_URL=https://api.open-meteo.com`
 - `FRANKFURTER_BASE_URL=https://api.frankfurter.app`
 - `NAGER_BASE_URL=https://date.nager.at`
+- `NOMINATIM_ENABLED=false` (opcional, fallback de geocoding cuando Geoapify no responda)
+- `NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org`
+- `NOMINATIM_USER_AGENT=AquiTaDo-Geocoder/1.0 (+https://aquitado.vercel.app)` (requerido por politica del proveedor)
+- `NOMINATIM_EMAIL=` (opcional, recomendado para identificar contacto)
+- `NOMINATIM_MIN_INTERVAL_MS=1100` (evita exceder limites de uso)
 - `AI_PROVIDER=auto` (`auto|gemini|local`)
 - `AI_EMBEDDING_DIMENSIONS=1536` (mantener en 1536 por compatibilidad pgvector actual)
 - `GEMINI_API_KEY=...` (opcional, recomendado para plan gratis inicial)
