@@ -105,6 +105,7 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
 export function MainLayout() {
     const location = useLocation();
     const { isAuthenticated } = useAuth();
+    const showFooter = !isAuthenticated;
     const routeSeo = useMemo(
         () => resolveRouteSeo(location.pathname),
         [location.pathname],
@@ -122,10 +123,10 @@ export function MainLayout() {
     return (
         <div className="min-h-screen flex flex-col">
             <Navbar />
-            <main className="flex-1">
+            <main className={showFooter ? '' : 'flex-1'}>
                 <Outlet />
             </main>
-            {!isAuthenticated && <Footer />}
+            {showFooter && <Footer />}
         </div>
     );
 }
