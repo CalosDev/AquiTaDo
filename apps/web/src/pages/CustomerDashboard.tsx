@@ -311,17 +311,17 @@ export function CustomerDashboard() {
             </section>
 
             {error && (
-                <section className="card p-4 border border-red-100 bg-red-50">
+                <section role="alert" aria-live="assertive" className="card p-4 border border-red-100 bg-red-50">
                     <p className="text-sm text-red-700">{error}</p>
                 </section>
             )}
             {favoritesErrorMessage && (
-                <section className="card p-4 border border-red-100 bg-red-50">
+                <section role="alert" aria-live="assertive" className="card p-4 border border-red-100 bg-red-50">
                     <p className="text-sm text-red-700">{favoritesErrorMessage}</p>
                 </section>
             )}
             {favoritesInfoMessage && (
-                <section className="card p-4 border border-green-100 bg-green-50">
+                <section role="status" aria-live="polite" className="card p-4 border border-green-100 bg-green-50">
                     <p className="text-sm text-green-700">{favoritesInfoMessage}</p>
                 </section>
             )}

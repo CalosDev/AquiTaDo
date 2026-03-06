@@ -528,9 +528,9 @@ export function AdminDashboard() {
             });
             setNewCategoryForm(EMPTY_CATEGORY_FORM);
             await loadData();
-            setSuccessMessage('CategorÃ­a creada correctamente');
+            setSuccessMessage('Categoria creada correctamente');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la categorÃ­a'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la categoria'));
         } finally {
             setProcessingId(null);
         }
@@ -570,9 +570,9 @@ export function AdminDashboard() {
             });
             await loadData();
             cancelCategoryEdit();
-            setSuccessMessage('CategorÃ­a actualizada correctamente');
+            setSuccessMessage('Categoria actualizada correctamente');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la categorÃ­a'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la categoria'));
         } finally {
             setProcessingId(null);
         }
@@ -618,13 +618,13 @@ export function AdminDashboard() {
             await verificationApi.reviewBusinessAdmin(businessId, {
                 status,
                 notes: status === 'VERIFIED'
-                    ? 'VerificaciÃ³n aprobada por equipo admin'
-                    : 'RevisiÃ³n administrativa',
+                    ? 'Verificacion aprobada por equipo admin'
+                    : 'Revision administrativa',
             });
             await Promise.all([loadData(), loadVerificationData()]);
-            setSuccessMessage('RevisiÃ³n de verificaciÃ³n actualizada');
+            setSuccessMessage('Revision de verificacion actualizada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la verificaciÃ³n'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la verificacion'));
         } finally {
             setProcessingId(null);
         }
@@ -715,9 +715,9 @@ export function AdminDashboard() {
                 ...current,
                 [reviewId]: payload,
             }));
-            setSuccessMessage('Analisis IA generado para la reseÃ±a');
+            setSuccessMessage('Analisis IA generado para la resena');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo analizar la reseÃ±a con IA'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo analizar la resena con IA'));
         } finally {
             setAnalyzingReviewId(null);
         }
@@ -765,13 +765,21 @@ export function AdminDashboard() {
             </p>
 
             {errorMessage && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div
+                    role="alert"
+                    aria-live="assertive"
+                    className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                >
                     {errorMessage}
                 </div>
             )}
 
             {successMessage && (
-                <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                >
                     {successMessage}
                 </div>
             )}
@@ -779,6 +787,7 @@ export function AdminDashboard() {
             <div className="flex flex-wrap gap-2 mb-6">
                 {tabs.map((tab) => (
                     <button
+                        type="button"
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
                         aria-current={activeTab === tab.key ? 'page' : undefined}
@@ -936,7 +945,7 @@ export function AdminDashboard() {
                     {activeTab === 'categories' && (
                         <div className="space-y-4">
                             <div className="card p-5">
-                                <h3 className="font-display font-semibold mb-3">Crear categorÃ­a</h3>
+                                <h3 className="font-display font-semibold mb-3">Crear categoria</h3>
                                 <form onSubmit={handleCreateCategory} className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                     <input
                                         type="text"
@@ -989,7 +998,7 @@ export function AdminDashboard() {
                             </div>
 
                             <div className="card p-5">
-                                <h3 className="font-display font-semibold mb-3">CategorÃ­as actuales</h3>
+                                <h3 className="font-display font-semibold mb-3">Categorias actuales</h3>
                                 <div className="space-y-3">
                                     {categories.map((category) => (
                                         <div
@@ -1054,7 +1063,7 @@ export function AdminDashboard() {
                                             ) : (
                                                 <div className="flex items-center justify-between gap-4">
                                                     <div className="flex items-center gap-2 text-sm">
-                                                        <span>{category.icon || 'ðŸ“'}</span>
+                                                        <span>{category.icon || '[icon]'}</span>
                                                         <span className="font-medium text-gray-800">
                                                             {category.name}
                                                         </span>
@@ -1128,10 +1137,10 @@ export function AdminDashboard() {
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
                                                     <p className="font-medium text-gray-900">
-                                                        {item.business.name} Â· {item.organization.name}
+                                                        {item.business.name} - {item.organization.name}
                                                     </p>
                                                     <p className="text-xs text-gray-500">
-                                                        {item.queueType} Â· {new Date(item.createdAt).toLocaleString('es-DO')}
+                                                        {item.queueType} - {new Date(item.createdAt).toLocaleString('es-DO')}
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -1176,7 +1185,7 @@ export function AdminDashboard() {
 
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                    <h3 className="font-display font-semibold">VerificaciÃ³n KYC pendiente</h3>
+                                    <h3 className="font-display font-semibold">Verificacion KYC pendiente</h3>
                                     <button
                                         type="button"
                                         className="btn-secondary text-xs"
@@ -1194,7 +1203,7 @@ export function AdminDashboard() {
                                                 <div>
                                                     <p className="font-medium text-gray-900">{business.name}</p>
                                                     <p className="text-xs text-gray-500">
-                                                        {business.organization.name} Â· riesgo {business.riskScore}/100 Â· docs {business.documents.total}
+                                                        {business.organization.name} - riesgo {business.riskScore}/100 - docs {business.documents.total}
                                                     </p>
                                                 </div>
                                                 <span className="text-xs rounded-full px-2 py-0.5 bg-yellow-100 text-yellow-700">
@@ -1202,7 +1211,7 @@ export function AdminDashboard() {
                                                 </span>
                                             </div>
                                             <p className="text-xs text-gray-500 mt-1">
-                                                Pendientes {business.documents.pending} Â· Aprobados {business.documents.approved} Â· Rechazados {business.documents.rejected}
+                                                Pendientes {business.documents.pending} - Aprobados {business.documents.approved} - Rechazados {business.documents.rejected}
                                             </p>
                                             <div className="flex gap-2 mt-2">
                                                 <button
@@ -1257,10 +1266,10 @@ export function AdminDashboard() {
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
                                                     <p className="font-medium text-gray-900">
-                                                        {review.business.name} Â· {review.user.name}
+                                                        {review.business.name} - {review.user.name}
                                                     </p>
                                                     <p className="text-xs text-gray-500">
-                                                        Rating {review.rating}/5 Â· {new Date(review.flaggedAt || review.createdAt).toLocaleString('es-DO')}
+                                                        Rating {review.rating}/5 - {new Date(review.flaggedAt || review.createdAt).toLocaleString('es-DO')}
                                                     </p>
                                                 </div>
                                                 <span className="text-xs rounded-full px-2 py-0.5 bg-yellow-100 text-yellow-700">
@@ -1306,7 +1315,7 @@ export function AdminDashboard() {
                                                         {' '}({(reviewAiInsights[review.id].score * 100).toFixed(0)}%)
                                                     </p>
                                                     {reviewAiInsights[review.id].isNegative ? (
-                                                        <p className="text-red-700 mt-1 font-medium">Alerta: reseÃ±a negativa detectada.</p>
+                                                        <p className="text-red-700 mt-1 font-medium">Alerta: resena negativa detectada.</p>
                                                     ) : null}
                                                     {reviewAiInsights[review.id].summary ? (
                                                         <p className="mt-1">{reviewAiInsights[review.id].summary}</p>
@@ -1462,7 +1471,7 @@ export function AdminDashboard() {
                                         >
                                             <p className="text-sm font-medium text-gray-900">{report.reportType}</p>
                                             <p className="text-xs text-gray-500">
-                                                {new Date(report.generatedAt).toLocaleString('es-DO')} Â· {report.generatedByUser?.name || 'Sistema'}
+                                                {new Date(report.generatedAt).toLocaleString('es-DO')} - {report.generatedByUser?.name || 'Sistema'}
                                             </p>
                                         </button>
                                     )) : (
