@@ -411,33 +411,6 @@ export const crmApi = {
     ) => api.patch(`/crm/pipeline/my/leads/${leadId}/stage`, data),
 };
 
-// ---- Market data (public external APIs proxied by backend) ----
-export const marketDataApi = {
-    getCurrentWeather: (params: { lat: number; lng: number }) =>
-        api.get('/market-data/weather/current', { params }),
-    getExchangeRate: (params?: { base?: string; target?: string; amount?: number }) =>
-        api.get('/market-data/exchange-rate', { params }),
-    getDominicanHolidays: (params?: { year?: number; limit?: number; upcomingOnly?: boolean }) =>
-        api.get('/market-data/holidays/rd', {
-            params: {
-                ...params,
-                upcomingOnly: params?.upcomingOnly === undefined
-                    ? undefined
-                    : params.upcomingOnly
-                        ? 'true'
-                        : 'false',
-            },
-        }),
-    getDominicanCommercialAgenda: (params?: { limit?: number; horizonDays?: number }) =>
-        api.get('/market-data/commercial-agenda/rd', { params }),
-    getDominicanCommercialCalendar: (params?: {
-        limit?: number;
-        horizonDays?: number;
-        provinceId?: string;
-        categoryId?: string;
-    }) => api.get('/market-data/commercial-calendar/rd', { params }),
-};
-
 // ---- Favorites ----
 export const favoritesApi = {
     getFavoriteBusinesses: (params?: { page?: number; limit?: number; businessId?: string }) =>

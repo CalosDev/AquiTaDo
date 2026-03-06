@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { getApiErrorMessage } from '../api/error';
-import { aiApi, analyticsApi, businessApi, categoryApi, locationApi, marketDataApi, reputationApi } from '../api/endpoints';
+import { aiApi, analyticsApi, businessApi, categoryApi, locationApi, reputationApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { formatNumberDo } from '../lib/market';
@@ -59,61 +59,6 @@ interface ReputationRankingItem {
         reviewCount: number;
     };
 }
-
-interface MarketWeatherSnapshot {
-    observedAt: string;
-    temperatureC: number;
-    weatherLabel: string;
-}
-
-interface MarketExchangeSnapshot {
-    observedOn: string;
-    base: string;
-    target: string;
-    rate: number;
-}
-
-interface CommercialAgendaItemSnapshot {
-    id: string;
-    holidayDate: string;
-    holidayName: string;
-    daysUntil: number;
-    campaignWindow: {
-        start: string;
-        end: string;
-    };
-    suggestedCategories: string[];
-    recommendation: string;
-    urgency: 'HIGH' | 'MEDIUM' | 'LOW';
-}
-
-interface CommercialAgendaSnapshot {
-    generatedAt: string;
-    horizonDays: number;
-    items: CommercialAgendaItemSnapshot[];
-}
-
-interface CommercialCalendarSnapshot extends CommercialAgendaSnapshot {
-    appliedFilters?: {
-        province?: { id: string; name: string } | null;
-        category?: { id: string; name: string } | null;
-    };
-    demandSignals?: Array<{
-        categoryId: string;
-        categoryName: string;
-        eventCount: number;
-        eventScore: number;
-        sharePct: number;
-    }>;
-}
-
-interface CachedMarketDataSnapshot {
-    weather: MarketWeatherSnapshot | null;
-    exchangeRate: MarketExchangeSnapshot | null;
-    updatedAt: string;
-}
-
-const MARKET_DATA_CACHE_KEY = 'aquita.home.market-data.v1';
 
 const INTENT_LINKS = [
     { slug: 'con-delivery', label: 'Con delivery', subtitle: 'Entrega rapida', icon: 'MOTO' },
@@ -215,40 +160,6 @@ function toAffinityPercent(score: number): number {
     return Math.max(0, Math.min(100, Math.round(score * 100)));
 }
 
-function formatDominicanDate(value: string): string {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return 'Hoy';
-    }
-
-    return date.toLocaleDateString('es-DO', {
-        day: '2-digit',
-        month: 'short',
-    });
-}
-
-function formatDominicanTime(value: string): string {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return '--:--';
-    }
-
-    return date.toLocaleTimeString('es-DO', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
-
-function formatDaysUntil(daysUntil: number): string {
-    if (daysUntil <= 0) {
-        return 'Hoy';
-    }
-    if (daysUntil === 1) {
-        return 'Manana';
-    }
-    return `En ${daysUntil} dias`;
-}
-
 export function Home() {
     const { isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
@@ -271,19 +182,6 @@ export function Home() {
     const [rankingsLoading, setRankingsLoading] = useState(false);
     const [rankingsError, setRankingsError] = useState('');
     const [rankings, setRankings] = useState<ReputationRankingItem[]>([]);
-    const [marketDataLoading, setMarketDataLoading] = useState(true);
-    const [marketWeather, setMarketWeather] = useState<MarketWeatherSnapshot | null>(null);
-    const [marketExchangeRate, setMarketExchangeRate] = useState<MarketExchangeSnapshot | null>(null);
-    const [marketDataDegraded, setMarketDataDegraded] = useState(false);
-    const [marketDataFromCache, setMarketDataFromCache] = useState(false);
-    const [agendaLoading, setAgendaLoading] = useState(true);
-    const [commercialAgenda, setCommercialAgenda] = useState<CommercialAgendaItemSnapshot[]>([]);
-    const [agendaDemandSignals, setAgendaDemandSignals] = useState<Array<{
-        categoryId: string;
-        categoryName: string;
-        sharePct: number;
-    }>>([]);
-    const [agendaUnavailable, setAgendaUnavailable] = useState(false);
 
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
@@ -389,150 +287,6 @@ export function Home() {
     useEffect(() => {
         void loadData();
     }, [loadData]);
-
-    useEffect(() => {
-        let active = true;
-        setMarketDataLoading(true);
-        setMarketDataDegraded(false);
-        setMarketDataFromCache(false);
-
-        let cachedWeather: MarketWeatherSnapshot | null = null;
-        let cachedExchangeRate: MarketExchangeSnapshot | null = null;
-        let hasCachedData = false;
-
-        try {
-            const rawValue = window.localStorage.getItem(MARKET_DATA_CACHE_KEY);
-            if (rawValue) {
-                const parsed = JSON.parse(rawValue) as Partial<CachedMarketDataSnapshot>;
-                if (
-                    parsed.weather &&
-                    Number.isFinite(parsed.weather.temperatureC) &&
-                    typeof parsed.weather.observedAt === 'string'
-                ) {
-                    cachedWeather = parsed.weather;
-                    setMarketWeather(parsed.weather);
-                }
-                if (
-                    parsed.exchangeRate &&
-                    Number.isFinite(parsed.exchangeRate.rate) &&
-                    typeof parsed.exchangeRate.observedOn === 'string'
-                ) {
-                    cachedExchangeRate = parsed.exchangeRate;
-                    setMarketExchangeRate(parsed.exchangeRate);
-                }
-                hasCachedData = Boolean(cachedWeather || cachedExchangeRate);
-            }
-        } catch {
-            cachedWeather = null;
-            cachedExchangeRate = null;
-            hasCachedData = false;
-        }
-
-        void Promise.allSettled([
-            marketDataApi.getCurrentWeather({ lat: 18.4861, lng: -69.9312 }),
-            marketDataApi.getExchangeRate({ base: 'USD', target: 'DOP', amount: 1 }),
-        ])
-            .then(([weatherResult, exchangeResult]) => {
-                if (!active) {
-                    return;
-                }
-
-                let freshWeather: MarketWeatherSnapshot | null = null;
-                let freshExchangeRate: MarketExchangeSnapshot | null = null;
-
-                if (weatherResult.status === 'fulfilled') {
-                    const payload = weatherResult.value.data as MarketWeatherSnapshot;
-                    if (payload && Number.isFinite(payload.temperatureC)) {
-                        freshWeather = payload;
-                        setMarketWeather(payload);
-                    }
-                }
-
-                if (exchangeResult.status === 'fulfilled') {
-                    const payload = exchangeResult.value.data as MarketExchangeSnapshot;
-                    if (payload && Number.isFinite(payload.rate)) {
-                        freshExchangeRate = payload;
-                        setMarketExchangeRate(payload);
-                    }
-                }
-
-                const hasFreshData = Boolean(freshWeather || freshExchangeRate);
-                setMarketDataDegraded(!hasFreshData);
-                setMarketDataFromCache(!hasFreshData && hasCachedData);
-
-                if (hasFreshData) {
-                    const snapshot: CachedMarketDataSnapshot = {
-                        weather: freshWeather ?? cachedWeather,
-                        exchangeRate: freshExchangeRate ?? cachedExchangeRate,
-                        updatedAt: new Date().toISOString(),
-                    };
-                    if (snapshot.weather || snapshot.exchangeRate) {
-                        try {
-                            window.localStorage.setItem(MARKET_DATA_CACHE_KEY, JSON.stringify(snapshot));
-                        } catch {
-                            // Ignore storage errors to keep home page resilient.
-                        }
-                    }
-                }
-            })
-            .catch(() => undefined)
-            .finally(() => {
-                if (active) {
-                    setMarketDataLoading(false);
-                }
-            });
-
-        return () => {
-            active = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        let active = true;
-        setAgendaLoading(true);
-        setAgendaUnavailable(false);
-
-        void marketDataApi.getDominicanCommercialCalendar({
-            limit: 3,
-            horizonDays: 75,
-            provinceId: aiProvinceId || undefined,
-            categoryId: aiCategoryId || undefined,
-        })
-            .then((response) => {
-                if (!active) {
-                    return;
-                }
-                const payload = response.data as CommercialCalendarSnapshot;
-                setCommercialAgenda(Array.isArray(payload?.items) ? payload.items : []);
-                setAgendaDemandSignals(
-                    Array.isArray(payload?.demandSignals)
-                        ? payload.demandSignals.slice(0, 3).map((item) => ({
-                            categoryId: item.categoryId,
-                            categoryName: item.categoryName,
-                            sharePct: item.sharePct,
-                        }))
-                        : [],
-                );
-                setAgendaUnavailable(false);
-            })
-            .catch(() => {
-                if (!active) {
-                    return;
-                }
-                setCommercialAgenda([]);
-                setAgendaDemandSignals([]);
-                setAgendaUnavailable(true);
-            })
-            .finally(() => {
-                if (active) {
-                    setAgendaLoading(false);
-                }
-            });
-
-        return () => {
-            active = false;
-        };
-    }, [aiCategoryId, aiProvinceId]);
 
     useEffect(() => {
         let active = true;
@@ -709,16 +463,6 @@ export function Home() {
                                 <span className="kpi-chip-soft">
                                     {loading ? '...' : categories.length} categorias
                                 </span>
-                                {marketExchangeRate ? (
-                                    <span className="kpi-chip-soft">
-                                        USD/DOP {marketExchangeRate.rate.toFixed(2)}
-                                    </span>
-                                ) : null}
-                                {marketWeather ? (
-                                    <span className="kpi-chip-soft">
-                                        Santo Domingo {Math.round(marketWeather.temperatureC)} C
-                                    </span>
-                                ) : null}
                             </div>
                         </div>
 
@@ -765,100 +509,6 @@ export function Home() {
                                     </p>
                                 </div>
 
-                                <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4">
-                                    <p className="text-xs uppercase tracking-wide text-blue-100">Contexto RD en vivo</p>
-                                    {marketDataLoading ? (
-                                        <div className="mt-3 grid grid-cols-2 gap-3">
-                                            <div className="rounded-xl border border-white/15 bg-white/10 p-3">
-                                                <div className="h-3 w-16 rounded bg-white/30 animate-pulse"></div>
-                                                <div className="mt-2 h-5 w-24 rounded bg-white/25 animate-pulse"></div>
-                                            </div>
-                                            <div className="rounded-xl border border-white/15 bg-white/10 p-3">
-                                                <div className="h-3 w-16 rounded bg-white/30 animate-pulse"></div>
-                                                <div className="mt-2 h-5 w-20 rounded bg-white/25 animate-pulse"></div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <div className="rounded-xl border border-white/15 bg-white/10 p-3">
-                                                <p className="text-[11px] uppercase tracking-wide text-blue-200">Clima SD</p>
-                                                <p className="mt-1 text-lg font-semibold text-white">
-                                                    {marketWeather ? `${Math.round(marketWeather.temperatureC)} C` : 'No disponible'}
-                                                </p>
-                                                <p className="text-xs text-blue-100">
-                                                    {marketWeather
-                                                        ? marketWeather.weatherLabel
-                                                        : marketDataDegraded
-                                                            ? 'Dato temporalmente no disponible'
-                                                            : 'Sin datos del proveedor'}
-                                                </p>
-                                                {marketWeather ? (
-                                                    <p className="mt-1 text-[11px] text-blue-200">
-                                                        Actualizado {formatDominicanTime(marketWeather.observedAt)}
-                                                    </p>
-                                                ) : null}
-                                            </div>
-
-                                            <div className="rounded-xl border border-white/15 bg-white/10 p-3">
-                                                <p className="text-[11px] uppercase tracking-wide text-blue-200">USD / DOP</p>
-                                                <p className="mt-1 text-lg font-semibold text-white">
-                                                    {marketExchangeRate ? marketExchangeRate.rate.toFixed(2) : 'No disponible'}
-                                                </p>
-                                                <p className="text-xs text-blue-100">Referencia de mercado</p>
-                                                {marketExchangeRate ? (
-                                                    <p className="mt-1 text-[11px] text-blue-200">
-                                                        Fecha {formatDominicanDate(marketExchangeRate.observedOn)}
-                                                    </p>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {marketDataDegraded ? (
-                                        <p className="mt-3 text-[11px] text-blue-100">
-                                            {marketDataFromCache
-                                                ? 'Mostrando ultimo dato guardado por indisponibilidad temporal del proveedor.'
-                                                : 'Contexto de mercado temporalmente no disponible. Reintenta en unos minutos.'}
-                                        </p>
-                                    ) : null}
-                                </div>
-
-                                <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4">
-                                    <p className="text-xs uppercase tracking-wide text-blue-100">Agenda comercial RD</p>
-                                    {agendaLoading ? (
-                                        <div className="mt-3 space-y-2">
-                                            <div className="h-14 rounded-xl bg-white/10 animate-pulse"></div>
-                                            <div className="h-14 rounded-xl bg-white/10 animate-pulse"></div>
-                                        </div>
-                                    ) : agendaUnavailable ? (
-                                        <p className="mt-3 text-xs text-blue-100">
-                                            Agenda comercial temporalmente no disponible. Intenta nuevamente en unos minutos.
-                                        </p>
-                                    ) : commercialAgenda.length > 0 ? (
-                                        <div className="mt-3 space-y-2">
-                                            {commercialAgenda.map((item) => (
-                                                <div key={item.id} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <p className="text-sm font-semibold text-white truncate">{item.holidayName}</p>
-                                                        <span className="text-[11px] text-blue-200 shrink-0">{formatDaysUntil(item.daysUntil)}</span>
-                                                    </div>
-                                                    <p className="text-xs text-blue-100 mt-1 line-clamp-2">{item.recommendation}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="mt-3 text-xs text-blue-100">No hay eventos comerciales proximos en el horizonte actual.</p>
-                                    )}
-
-                                    {agendaDemandSignals.length > 0 && !agendaUnavailable ? (
-                                        <div className="mt-3 flex flex-wrap gap-1.5">
-                                            {agendaDemandSignals.map((signal) => (
-                                                <span key={signal.categoryId} className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[11px] text-blue-100">
-                                                    {signal.categoryName} {signal.sharePct}%
-                                                </span>
-                                            ))}
-                                        </div>
-                                    ) : null}
-                                </div>
                             </div>
                         </div>
                     </div>
