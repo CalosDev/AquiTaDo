@@ -17,31 +17,39 @@ export class CategoriesService {
     ) { }
 
     async findAll() {
-        return this.prisma.category.findMany({
+        const categories = await this.prisma.category.findMany({
             orderBy: { name: 'asc' },
-            include: {
-                _count: {
-                    select: { businesses: true },
-                },
-            },
         });
+
+        const publicBusinessCountByCategoryId = await this.resolvePublicBusinessCountByCategoryId(
+            categories.map((category) => category.id),
+        );
+
+        return categories.map((category) => ({
+            ...category,
+            _count: {
+                businesses: publicBusinessCountByCategoryId.get(category.id) ?? 0,
+            },
+        }));
     }
 
     async findById(id: string) {
         const category = await this.prisma.category.findUnique({
             where: { id },
-            include: {
-                _count: {
-                    select: { businesses: true },
-                },
-            },
         });
 
         if (!category) {
             throw new NotFoundException('Categoría no encontrada');
         }
 
-        return category;
+        const publicBusinessCountByCategoryId = await this.resolvePublicBusinessCountByCategoryId([id]);
+
+        return {
+            ...category,
+            _count: {
+                businesses: publicBusinessCountByCategoryId.get(id) ?? 0,
+            },
+        };
     }
 
     async create(data: CreateCategoryDto) {
@@ -91,5 +99,29 @@ export class CategoriesService {
         if (error.code === 'P2003') {
             throw new BadRequestException('No se pudo procesar la categoría por referencias inválidas');
         }
+    }
+
+    private async resolvePublicBusinessCountByCategoryId(categoryIds: string[]): Promise<Map<string, number>> {
+        if (categoryIds.length === 0) {
+            return new Map();
+        }
+
+        const grouped = await this.prisma.businessCategory.groupBy({
+            by: ['categoryId'],
+            where: {
+                categoryId: { in: categoryIds },
+                business: {
+                    deletedAt: null,
+                    verified: true,
+                },
+            },
+            _count: {
+                _all: true,
+            },
+        });
+
+        return new Map(
+            grouped.map((row) => [row.categoryId, row._count._all]),
+        );
     }
 }

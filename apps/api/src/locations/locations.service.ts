@@ -9,14 +9,40 @@ export class LocationsService {
     ) { }
 
     async findAllProvinces() {
-        return this.prisma.province.findMany({
+        const provinces = await this.prisma.province.findMany({
             orderBy: { name: 'asc' },
             include: {
                 _count: {
-                    select: { cities: true, businesses: true },
+                    select: { cities: true },
                 },
             },
         });
+
+        const groupedBusinessCounts = await this.prisma.business.groupBy({
+            by: ['provinceId'],
+            where: {
+                deletedAt: null,
+                verified: true,
+                provinceId: {
+                    in: provinces.map((province) => province.id),
+                },
+            },
+            _count: {
+                _all: true,
+            },
+        });
+
+        const businessCountByProvinceId = new Map(
+            groupedBusinessCounts.map((row) => [row.provinceId, row._count._all]),
+        );
+
+        return provinces.map((province) => ({
+            ...province,
+            _count: {
+                cities: province._count.cities,
+                businesses: businessCountByProvinceId.get(province.id) ?? 0,
+            },
+        }));
     }
 
     async findCitiesByProvince(provinceId: string) {
