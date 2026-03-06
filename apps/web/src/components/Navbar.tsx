@@ -24,6 +24,13 @@ function roleBadgeLabel(role: string | undefined): string {
     return 'Usuario';
 }
 
+function isPathActive(pathname: string, target: string): boolean {
+    if (target === '/') {
+        return pathname === '/';
+    }
+    return pathname === target || pathname.startsWith(`${target}/`);
+}
+
 export function Navbar() {
     const { isAuthenticated, user, logout } = useAuth();
     const { activeOrganization } = useOrganization();
@@ -38,6 +45,20 @@ export function Navbar() {
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const organizationName = activeOrganization?.name?.trim() ?? '';
     const showOrganizationChip = organizationName.length > 0;
+    const businessesActive = location.pathname === '/businesses'
+        || location.pathname.startsWith('/businesses/')
+        || location.pathname.startsWith('/negocios/');
+    const aboutActive = isPathActive(location.pathname, '/about');
+    const roleHomeActive = isPathActive(location.pathname, roleHomePath);
+    const securityActive = isPathActive(location.pathname, '/security');
+    const profileActive = isPathActive(location.pathname, '/profile');
+
+    const desktopNavClass = (isActive: boolean) => (isActive ? 'nav-link nav-link-active' : 'nav-link');
+    const mobileNavClass = (isActive: boolean) => (
+        `touch-target block rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${isActive
+            ? 'bg-primary-50 text-primary-700'
+            : 'text-slate-700 hover:bg-primary-50'}`
+    );
 
     const handleLogout = () => {
         void logout();
@@ -150,7 +171,8 @@ export function Navbar() {
                         <div className="hidden xl:flex items-center gap-3 2xl:gap-5 min-w-0">
                             <Link
                                 to="/businesses"
-                                className="nav-link"
+                                className={desktopNavClass(businessesActive)}
+                                aria-current={businessesActive ? 'page' : undefined}
                                 onMouseEnter={() => preloadRouteChunk('/businesses')}
                                 onFocus={() => preloadRouteChunk('/businesses')}
                             >
@@ -159,7 +181,8 @@ export function Navbar() {
                             {!isAuthenticated && (
                                 <Link
                                     to="/about"
-                                    className="nav-link"
+                                    className={desktopNavClass(aboutActive)}
+                                    aria-current={aboutActive ? 'page' : undefined}
                                     onMouseEnter={() => preloadRouteChunk('/about')}
                                     onFocus={() => preloadRouteChunk('/about')}
                                 >
@@ -175,7 +198,8 @@ export function Navbar() {
                                 <>
                                     <Link
                                         to={roleHomePath}
-                                        className="nav-link"
+                                        className={desktopNavClass(roleHomeActive)}
+                                        aria-current={roleHomeActive ? 'page' : undefined}
                                         onMouseEnter={() => preloadRouteChunk(roleHomePath)}
                                         onFocus={() => preloadRouteChunk(roleHomePath)}
                                     >
@@ -184,7 +208,8 @@ export function Navbar() {
                                     {user?.role === 'ADMIN' && (
                                         <Link
                                             to="/security"
-                                            className="nav-link"
+                                            className={desktopNavClass(securityActive)}
+                                            aria-current={securityActive ? 'page' : undefined}
                                             onMouseEnter={() => preloadRouteChunk('/security')}
                                             onFocus={() => preloadRouteChunk('/security')}
                                         >
@@ -193,7 +218,8 @@ export function Navbar() {
                                     )}
                                     <Link
                                         to="/profile"
-                                        className="nav-link"
+                                        className={desktopNavClass(profileActive)}
+                                        aria-current={profileActive ? 'page' : undefined}
                                         onMouseEnter={() => preloadRouteChunk('/profile')}
                                         onFocus={() => preloadRouteChunk('/profile')}
                                     >
@@ -258,7 +284,8 @@ export function Navbar() {
                         <div className="hidden lg:flex xl:hidden items-center gap-2 min-w-0">
                             <Link
                                 to="/businesses"
-                                className="nav-link"
+                                className={desktopNavClass(businessesActive)}
+                                aria-current={businessesActive ? 'page' : undefined}
                                 onMouseEnter={() => preloadRouteChunk('/businesses')}
                                 onFocus={() => preloadRouteChunk('/businesses')}
                             >
@@ -267,7 +294,8 @@ export function Navbar() {
                             {isAuthenticated && (
                                 <Link
                                     to={roleHomePath}
-                                    className="nav-link"
+                                    className={desktopNavClass(roleHomeActive)}
+                                    aria-current={roleHomeActive ? 'page' : undefined}
                                     onMouseEnter={() => preloadRouteChunk(roleHomePath)}
                                     onFocus={() => preloadRouteChunk(roleHomePath)}
                                 >
@@ -309,7 +337,8 @@ export function Navbar() {
                             <div className="surface-panel p-2">
                                     <Link
                                         to="/businesses"
-                                        className="touch-target block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                        className={mobileNavClass(businessesActive)}
+                                        aria-current={businessesActive ? 'page' : undefined}
                                         onMouseEnter={() => preloadRouteChunk('/businesses')}
                                         onFocus={() => preloadRouteChunk('/businesses')}
                                         onClick={() => setMenuOpen(false)}
@@ -319,7 +348,8 @@ export function Navbar() {
                                 {!isAuthenticated && (
                                     <Link
                                         to="/about"
-                                        className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                        className={`mt-1 ${mobileNavClass(aboutActive)}`}
+                                        aria-current={aboutActive ? 'page' : undefined}
                                         onMouseEnter={() => preloadRouteChunk('/about')}
                                         onFocus={() => preloadRouteChunk('/about')}
                                         onClick={() => setMenuOpen(false)}
@@ -355,7 +385,8 @@ export function Navbar() {
                                         )}
                                         <Link
                                             to={roleHomePath}
-                                            className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                            className={`mt-1 ${mobileNavClass(roleHomeActive)}`}
+                                            aria-current={roleHomeActive ? 'page' : undefined}
                                             onMouseEnter={() => preloadRouteChunk(roleHomePath)}
                                             onFocus={() => preloadRouteChunk(roleHomePath)}
                                             onClick={() => setMenuOpen(false)}
@@ -365,7 +396,8 @@ export function Navbar() {
                                         {user?.role === 'ADMIN' && (
                                             <Link
                                                 to="/security"
-                                                className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                                className={`mt-1 ${mobileNavClass(securityActive)}`}
+                                                aria-current={securityActive ? 'page' : undefined}
                                                 onMouseEnter={() => preloadRouteChunk('/security')}
                                                 onFocus={() => preloadRouteChunk('/security')}
                                                 onClick={() => setMenuOpen(false)}
@@ -375,7 +407,8 @@ export function Navbar() {
                                         )}
                                         <Link
                                             to="/profile"
-                                            className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                            className={`mt-1 ${mobileNavClass(profileActive)}`}
+                                            aria-current={profileActive ? 'page' : undefined}
                                             onMouseEnter={() => preloadRouteChunk('/profile')}
                                             onFocus={() => preloadRouteChunk('/profile')}
                                             onClick={() => setMenuOpen(false)}
@@ -397,7 +430,8 @@ export function Navbar() {
                                     <>
                                         <Link
                                             to="/login"
-                                            className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-primary-50"
+                                            className={`mt-1 ${mobileNavClass(isPathActive(location.pathname, '/login'))}`}
+                                            aria-current={isPathActive(location.pathname, '/login') ? 'page' : undefined}
                                             onMouseEnter={() => preloadRouteChunk('/login')}
                                             onFocus={() => preloadRouteChunk('/login')}
                                             onClick={() => setMenuOpen(false)}
@@ -406,7 +440,8 @@ export function Navbar() {
                                         </Link>
                                         <Link
                                             to="/register"
-                                            className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-50"
+                                            className={`mt-1 ${mobileNavClass(isPathActive(location.pathname, '/register'))}`}
+                                            aria-current={isPathActive(location.pathname, '/register') ? 'page' : undefined}
                                             onMouseEnter={() => preloadRouteChunk('/register')}
                                             onFocus={() => preloadRouteChunk('/register')}
                                             onClick={() => setMenuOpen(false)}

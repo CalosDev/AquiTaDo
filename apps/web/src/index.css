@@ -108,6 +108,14 @@
     transform: scaleX(1);
   }
 
+  .nav-link-active {
+    @apply text-primary-700;
+  }
+
+  .nav-link-active::after {
+    transform: scaleX(1);
+  }
+
   .touch-target {
     min-height: 44px;
     min-width: 44px;
@@ -176,6 +184,28 @@
     border-radius: 999px;
     background: radial-gradient(circle, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0) 70%);
     pointer-events: none;
+  }
+
+  .hero-metric-card {
+    @apply rounded-2xl border border-white/20 bg-white/10 px-4 py-3;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  .hero-metric-label {
+    @apply text-[11px] uppercase tracking-[0.16em] text-blue-200 font-bold;
+  }
+
+  .hero-metric-value {
+    @apply mt-1 text-2xl font-display font-bold text-white;
+  }
+
+  .hero-radar-item {
+    @apply flex items-center justify-between rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold transition-all;
+  }
+
+  .hero-radar-item:hover {
+    @apply bg-white/20;
+    transform: translateY(-1px);
   }
 
   .panel-premium {

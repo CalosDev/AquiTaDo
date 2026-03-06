@@ -208,6 +208,10 @@ export function Home() {
         () => [...provinces].sort((a, b) => (b._count?.businesses ?? 0) - (a._count?.businesses ?? 0)).slice(0, 10),
         [provinces],
     );
+    const topRadarCategories = useMemo(
+        () => topCategories.slice(0, 4),
+        [topCategories],
+    );
     const topCategoryCards = useMemo<HomeTopCategoryCard[]>(() => {
         const cards: HomeTopCategoryCard[] = [];
         const usedCategoryIds = new Set<string>();
@@ -411,6 +415,12 @@ export function Home() {
                                 CRM, mensajeria, promociones, reputacion y analitica en una sola plataforma.
                             </p>
 
+                            <div className="mt-5 flex flex-wrap gap-2.5">
+                                <span className="chip !border-white/30 !bg-white/10 !text-white">Enfocado 100% en RD</span>
+                                <span className="chip !border-white/30 !bg-white/10 !text-white">Directorio + SaaS</span>
+                                <span className="chip !border-white/30 !bg-white/10 !text-white">Listo para escalar</span>
+                            </div>
+
                             <div className="mt-6 flex flex-wrap gap-3">
                                 <Link to="/businesses" className="btn-accent">
                                     Explorar negocios
@@ -471,8 +481,23 @@ export function Home() {
                                 <p className="text-xs uppercase tracking-[0.18em] text-blue-200 font-semibold">Radar local</p>
                                 <h2 className="mt-2 font-display text-2xl font-bold">Que esta moviendo el mercado</h2>
 
+                                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div className="hero-metric-card">
+                                        <p className="hero-metric-label">Top categoria</p>
+                                        <p className="hero-metric-value truncate">
+                                            {topRadarCategories[0]?.name || 'Cargando'}
+                                        </p>
+                                    </div>
+                                    <div className="hero-metric-card">
+                                        <p className="hero-metric-label">Cobertura activa</p>
+                                        <p className="hero-metric-value">
+                                            {loading ? '...' : formatNumberDo(totalBusinesses)}
+                                        </p>
+                                    </div>
+                                </div>
+
                                 <div className="mt-5 space-y-3">
-                                    {topCategories.slice(0, 4).length > 0 ? topCategories.slice(0, 4).map((category) => (
+                                    {topRadarCategories.length > 0 ? topRadarCategories.map((category, index) => (
                                         <Link
                                             key={category.id}
                                             to={category.slug ? `/negocios/categoria/${category.slug}` : `/businesses?categoryId=${category.id}`}
@@ -483,12 +508,15 @@ export function Home() {
                                                     metadata: { source: 'home-radar-category' },
                                                 });
                                             }}
-                                            className="flex items-center justify-between rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/20"
+                                            className="hero-radar-item"
                                         >
-                                            <span className="truncate">{category.name}</span>
-                                            <span className="text-blue-100">
-                                                {formatNumberDo(category._count?.businesses ?? 0)}
-                                            </span>
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-bold text-white">
+                                                    {index + 1}
+                                                </span>
+                                                <span className="truncate">{category.name}</span>
+                                            </div>
+                                            <span className="text-blue-100">{formatNumberDo(category._count?.businesses ?? 0)}</span>
                                         </Link>
                                     )) : (
                                         <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-blue-100">
