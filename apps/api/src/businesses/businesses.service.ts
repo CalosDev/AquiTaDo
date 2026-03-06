@@ -25,6 +25,7 @@ import { RedisService } from '../cache/redis.service';
 import { hashedCacheKey } from '../cache/cache-key';
 import { DomainEventsService } from '../core/events/domain-events.service';
 import { NotificationsQueueService } from '../notifications/notifications.queue.service';
+import { IntegrationsService } from '../integrations/integrations.service';
 
 @Injectable()
 export class BusinessesService {
@@ -45,6 +46,8 @@ export class BusinessesService {
         private readonly domainEventsService: DomainEventsService,
         @Inject(NotificationsQueueService)
         private readonly notificationsQueueService: NotificationsQueueService,
+        @Inject(IntegrationsService)
+        private readonly integrationsService: IntegrationsService,
     ) { }
     private readonly uploadsRoot = path.resolve(process.cwd(), 'uploads');
 
@@ -147,13 +150,13 @@ export class BusinessesService {
         const contactName = dto.contactName.trim();
         const contactEmail = dto.contactEmail?.trim().toLowerCase() || null;
         const contactPhone = dto.contactPhone.trim();
-        const normalizedPhone = contactPhone.replace(/\D+/g, '');
+        const phoneValidation = await this.integrationsService.validateDominicanPhone(contactPhone);
+        if (!phoneValidation.isValid || !phoneValidation.normalizedPhone) {
+            throw new BadRequestException('El telefono de contacto no es valido para Republica Dominicana');
+        }
+        const normalizedPhone = phoneValidation.normalizedPhone;
         const preferredChannel = dto.preferredChannel?.trim().toUpperCase() || null;
         const message = dto.message.trim();
-
-        if (normalizedPhone.length < 7) {
-            throw new BadRequestException('El telefono ingresado no es valido');
-        }
 
         const duplicateWindowStart = new Date(Date.now() - 10 * 60 * 1000);
         const recentDuplicate = await this.prisma.salesLead.findFirst({
@@ -193,7 +196,7 @@ export class BusinessesService {
                     source: 'public-business-page',
                     contactName,
                     contactPhone,
-                    contactPhoneNormalized: normalizedPhone || null,
+                    contactPhoneNormalized: normalizedPhone,
                     contactEmail,
                     preferredChannel,
                     businessSlug: business.slug,
@@ -449,7 +452,6 @@ export class BusinessesService {
 
         return business;
     }
-
     async create(
         dto: CreateBusinessDto,
         userId: string,
@@ -457,14 +459,23 @@ export class BusinessesService {
         organizationId?: string,
         organizationRole?: OrganizationRole,
     ) {
+        this.assertCoordinatePair(dto.latitude, dto.longitude);
         const baseSlug = slugify(dto.name, { lower: true, strict: true });
         if (!baseSlug) {
-            throw new BadRequestException('El nombre del negocio no es válido para generar un slug');
+            throw new BadRequestException('El nombre del negocio no es valido para generar un slug');
         }
 
         const slug = await this.generateUniqueSlug(baseSlug);
         const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
+        const contactChannels = await this.normalizeBusinessContactChannels(dto.phone, dto.whatsapp);
+        const coordinates = await this.resolveCoordinatesForBusiness({
+            address: dto.address,
+            provinceId: dto.provinceId,
+            cityId: dto.cityId,
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+        });
 
         try {
             const createdBusiness = await this.prisma.$transaction(async (tx) => {
@@ -473,7 +484,7 @@ export class BusinessesService {
 
                 if (organizationId) {
                     if (!organizationRole) {
-                        throw new ForbiddenException('No tienes permisos para crear negocios en esta organización');
+                        throw new ForbiddenException('No tienes permisos para crear negocios en esta organizacion');
                     }
 
                     if (organizationRole === 'STAFF') {
@@ -488,13 +499,13 @@ export class BusinessesService {
                         name: dto.name,
                         slug,
                         description: dto.description,
-                        phone: dto.phone,
-                        whatsapp: dto.whatsapp,
+                        phone: contactChannels.phone,
+                        whatsapp: contactChannels.whatsapp,
                         address: dto.address,
                         provinceId: dto.provinceId,
                         cityId: dto.cityId,
-                        latitude: dto.latitude,
-                        longitude: dto.longitude,
+                        latitude: coordinates.latitude,
+                        longitude: coordinates.longitude,
                         ownerId: userId,
                         organizationId: effectiveOrganizationId,
                         categories: categoryIds
@@ -514,7 +525,7 @@ export class BusinessesService {
                     },
                     include: this.fullInclude,
                 });
-                await this.syncBusinessLocation(tx, business.id, dto.latitude, dto.longitude);
+                await this.syncBusinessLocation(tx, business.id, coordinates.latitude, coordinates.longitude);
 
                 // Only promote regular users; never downgrade admin users.
                 await tx.user.updateMany({
@@ -542,8 +553,45 @@ export class BusinessesService {
         organizationId: string,
         organizationRole: OrganizationRole,
     ) {
+        this.assertCoordinatePair(dto.latitude, dto.longitude);
         const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
+        const contactChannels = await this.normalizeBusinessContactChannels(dto.phone, dto.whatsapp);
+
+        const existingBusiness = await this.prisma.business.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                provinceId: true,
+                cityId: true,
+                address: true,
+                latitude: true,
+                longitude: true,
+            },
+        });
+        const targetAddress = dto.address ?? existingBusiness?.address ?? '';
+        const targetProvinceId = dto.provinceId ?? existingBusiness?.provinceId;
+        const targetCityId = dto.cityId ?? existingBusiness?.cityId ?? undefined;
+        const shouldAttemptGeocoding = !!existingBusiness
+            && dto.latitude === undefined
+            && dto.longitude === undefined
+            && (
+                existingBusiness.latitude === null
+                || existingBusiness.longitude === null
+                || dto.address !== undefined
+                || dto.provinceId !== undefined
+                || dto.cityId !== undefined
+            );
+
+        const geocodedCoordinates = shouldAttemptGeocoding && targetProvinceId
+            ? await this.resolveCoordinatesForBusiness({
+                address: targetAddress,
+                provinceId: targetProvinceId,
+                cityId: targetCityId,
+                latitude: undefined,
+                longitude: undefined,
+            })
+            : { latitude: undefined, longitude: undefined };
 
         try {
             const updatedBusiness = await this.prisma.$transaction(async (tx) => {
@@ -572,9 +620,9 @@ export class BusinessesService {
                     throw new ForbiddenException('No tienes permisos para editar este negocio');
                 }
 
-                const targetProvinceId = dto.provinceId ?? business.provinceId;
-                const targetCityId = dto.cityId ?? business.cityId ?? undefined;
-                await this.assertCityBelongsToProvince(tx, targetProvinceId, targetCityId);
+                const normalizedTargetProvinceId = dto.provinceId ?? business.provinceId;
+                const normalizedTargetCityId = dto.cityId ?? business.cityId ?? undefined;
+                await this.assertCityBelongsToProvince(tx, normalizedTargetProvinceId, normalizedTargetCityId);
 
                 if (categoryIds) {
                     await tx.businessCategory.deleteMany({ where: { businessId: id } });
@@ -589,13 +637,13 @@ export class BusinessesService {
                     data: {
                         name: dto.name,
                         description: dto.description,
-                        phone: dto.phone,
-                        whatsapp: dto.whatsapp,
+                        phone: contactChannels.phone,
+                        whatsapp: contactChannels.whatsapp,
                         address: dto.address,
                         provinceId: dto.provinceId,
                         cityId: dto.cityId,
-                        latitude: dto.latitude,
-                        longitude: dto.longitude,
+                        latitude: dto.latitude ?? geocodedCoordinates.latitude,
+                        longitude: dto.longitude ?? geocodedCoordinates.longitude,
                         categories: categoryIds
                             ? {
                                 create: categoryIds.map((categoryId) => ({
@@ -614,8 +662,8 @@ export class BusinessesService {
                     include: this.fullInclude,
                 });
 
-                const nextLatitude = dto.latitude ?? updatedBusiness.latitude ?? business.latitude ?? undefined;
-                const nextLongitude = dto.longitude ?? updatedBusiness.longitude ?? business.longitude ?? undefined;
+                const nextLatitude = updatedBusiness.latitude ?? business.latitude ?? undefined;
+                const nextLongitude = updatedBusiness.longitude ?? business.longitude ?? undefined;
                 await this.syncBusinessLocation(tx, id, nextLatitude, nextLongitude);
 
                 return updatedBusiness;
@@ -837,6 +885,114 @@ export class BusinessesService {
             this.handlePrismaError(error);
             throw error;
         }
+    }
+
+    private assertCoordinatePair(latitude?: number, longitude?: number): void {
+        const hasLatitude = latitude !== undefined && latitude !== null;
+        const hasLongitude = longitude !== undefined && longitude !== null;
+        if (hasLatitude !== hasLongitude) {
+            throw new BadRequestException('Debes enviar latitud y longitud juntas');
+        }
+    }
+
+    private async normalizeBusinessContactChannels(
+        phone?: string,
+        whatsapp?: string,
+    ): Promise<{ phone?: string | null; whatsapp?: string | null }> {
+        const result: { phone?: string | null; whatsapp?: string | null } = {};
+
+        if (phone !== undefined) {
+            const trimmedPhone = phone.trim();
+            if (trimmedPhone.length === 0) {
+                result.phone = null;
+            } else {
+                const validation = await this.integrationsService.validateDominicanPhone(trimmedPhone);
+                if (!validation.isValid || !validation.normalizedPhone) {
+                    throw new BadRequestException('El telefono del negocio no es valido para Republica Dominicana');
+                }
+                result.phone = validation.normalizedPhone;
+            }
+        }
+
+        if (whatsapp !== undefined) {
+            const trimmedWhatsApp = whatsapp.trim();
+            if (trimmedWhatsApp.length === 0) {
+                result.whatsapp = null;
+            } else {
+                const validation = await this.integrationsService.validateDominicanPhone(trimmedWhatsApp);
+                if (!validation.isValid || !validation.normalizedPhone) {
+                    throw new BadRequestException('El WhatsApp del negocio no es valido para Republica Dominicana');
+                }
+                result.whatsapp = validation.normalizedPhone;
+            }
+        }
+
+        return result;
+    }
+
+    private async resolveCoordinatesForBusiness(input: {
+        address: string;
+        provinceId: string;
+        cityId?: string;
+        latitude?: number;
+        longitude?: number;
+    }): Promise<{ latitude?: number; longitude?: number }> {
+        this.assertCoordinatePair(input.latitude, input.longitude);
+
+        if (input.latitude !== undefined && input.longitude !== undefined) {
+            return {
+                latitude: input.latitude,
+                longitude: input.longitude,
+            };
+        }
+
+        const normalizedAddress = input.address.trim();
+        if (!normalizedAddress) {
+            return { latitude: undefined, longitude: undefined };
+        }
+
+        const locationNames = await this.resolveProvinceAndCityNames(input.provinceId, input.cityId);
+        if (!locationNames.provinceName) {
+            return { latitude: undefined, longitude: undefined };
+        }
+
+        const geocoded = await this.integrationsService.geocodeDominicanAddress({
+            address: normalizedAddress,
+            province: locationNames.provinceName,
+            city: locationNames.cityName,
+        });
+
+        if (!geocoded) {
+            return { latitude: undefined, longitude: undefined };
+        }
+
+        return {
+            latitude: geocoded.latitude,
+            longitude: geocoded.longitude,
+        };
+    }
+
+    private async resolveProvinceAndCityNames(
+        provinceId: string,
+        cityId?: string,
+    ): Promise<{ provinceName: string | null; cityName: string | null }> {
+        const [province, city] = await Promise.all([
+            this.prisma.province.findUnique({
+                where: { id: provinceId },
+                select: { name: true },
+            }),
+            cityId
+                ? this.prisma.city.findUnique({
+                    where: { id: cityId },
+                    select: { name: true },
+                })
+                : Promise.resolve(null),
+        ]);
+
+        return {
+            provinceName: province?.name ?? null,
+            cityName: city?.name ?? null,
+        };
     }
 
     private async generateUniqueSlug(baseSlug: string): Promise<string> {

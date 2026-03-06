@@ -10,6 +10,127 @@ if (!connectionString) {
 
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
+const RD_DIVISIONS_DEFAULT_URL = 'https://rawcdn.githack.com/kamikazechaser/administrative-divisions-db/master/api/DO.json';
+
+const PROVINCES_FALLBACK = [
+    'Azua',
+    'Bahoruco',
+    'Barahona',
+    'Dajabón',
+    'Distrito Nacional',
+    'Duarte',
+    'El Seibo',
+    'Elías Piña',
+    'Espaillat',
+    'Hato Mayor',
+    'Hermanas Mirabal',
+    'Independencia',
+    'La Altagracia',
+    'La Romana',
+    'La Vega',
+    'María Trinidad Sánchez',
+    'Monseñor Nouel',
+    'Monte Cristi',
+    'Monte Plata',
+    'Pedernales',
+    'Peravia',
+    'Puerto Plata',
+    'Samaná',
+    'San Cristóbal',
+    'San José de Ocoa',
+    'San Juan',
+    'San Pedro de Macorís',
+    'Sánchez Ramírez',
+    'Santiago',
+    'Santiago Rodríguez',
+    'Santo Domingo',
+    'Valverde',
+] as const;
+
+const PROVINCE_ALIASES: Record<string, string> = {
+    nacional: 'Distrito Nacional',
+    baoruco: 'Bahoruco',
+    'el seibo': 'El Seibo',
+};
+
+function normalizeText(input: string): string {
+    return input
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function toSlug(name: string): string {
+    return normalizeText(name)
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-');
+}
+
+function canonicalizeProvinceName(rawName: string): string {
+    const normalized = normalizeText(rawName);
+    const aliasKey = normalized.toLowerCase();
+
+    if (PROVINCE_ALIASES[aliasKey]) {
+        return PROVINCE_ALIASES[aliasKey];
+    }
+
+    const fallbackMatch = PROVINCES_FALLBACK.find(
+        (candidate) => normalizeText(candidate).toLowerCase() === aliasKey,
+    );
+    if (fallbackMatch) {
+        return fallbackMatch;
+    }
+
+    return normalized;
+}
+
+async function loadProvincesFromAdministrativeDivisionsDb(): Promise<string[] | null> {
+    const sourceUrl = process.env['RD_DIVISIONS_API_URL']?.trim() || RD_DIVISIONS_DEFAULT_URL;
+    const timeoutMs = Number(process.env['EXTERNAL_DATA_TIMEOUT_MS'] ?? 3500);
+
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        return null;
+    }
+
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(sourceUrl, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            signal: abortController.signal,
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        if (!Array.isArray(payload)) {
+            throw new Error('invalid payload');
+        }
+
+        const provinces = payload
+            .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+            .map(canonicalizeProvinceName);
+
+        const uniqueProvinces = [...new Set(provinces)];
+        if (uniqueProvinces.length < 20) {
+            throw new Error('insufficient province records');
+        }
+
+        return uniqueProvinces;
+    } catch (error) {
+        console.warn(
+            `[seed] Administrative divisions source unavailable (${error instanceof Error ? error.message : String(error)}), using fallback province list`,
+        );
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 async function main() {
     console.log('🌱 Seeding AquiTa.do database...');
@@ -155,34 +276,20 @@ async function main() {
     console.log(`✅ ${dominicanLocalCategories.length} Dominican local categories ensured`);
 
     // Create provinces
-    const provinces = [
-        'Azua', 'Bahoruco', 'Barahona', 'Dajabón', 'Distrito Nacional',
-        'Duarte', 'El Seibo', 'Elías Piña', 'Espaillat', 'Hato Mayor',
-        'Hermanas Mirabal', 'Independencia', 'La Altagracia', 'La Romana',
-        'La Vega', 'María Trinidad Sánchez', 'Monseñor Nouel', 'Monte Cristi',
-        'Monte Plata', 'Pedernales', 'Peravia', 'Puerto Plata',
-        'Samaná', 'San Cristóbal', 'San José de Ocoa', 'San Juan',
-        'San Pedro de Macorís', 'Sánchez Ramírez', 'Santiago',
-        'Santiago Rodríguez', 'Santo Domingo', 'Valverde',
-    ];
-
-    const createdProvinces: Record<string, string> = {};
+    const provincesFromApi = await loadProvincesFromAdministrativeDivisionsDb();
+    const provinces = provincesFromApi ?? [...PROVINCES_FALLBACK];
+    const createdProvincesBySlug: Record<string, string> = {};
 
     for (const name of provinces) {
-        const slug = name
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/\s+/g, '-');
-
+        const slug = toSlug(name);
         const province = await prisma.province.upsert({
             where: { slug },
-            update: {},
+            update: { name },
             create: { name, slug },
         });
-        createdProvinces[name] = province.id;
+        createdProvincesBySlug[slug] = province.id;
     }
-    console.log(`✅ ${provinces.length} provinces created`);
+    console.log(`✅ ${provinces.length} provinces created/updated`);
 
     // Create cities for major provinces
     const citiesData: Record<string, string[]> = {
@@ -198,7 +305,7 @@ async function main() {
     };
 
     for (const [provinceName, cities] of Object.entries(citiesData)) {
-        const provinceId = createdProvinces[provinceName];
+        const provinceId = createdProvincesBySlug[toSlug(provinceName)];
         if (provinceId) {
             for (const cityName of cities) {
                 await prisma.city.upsert({

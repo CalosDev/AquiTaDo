@@ -52,4 +52,34 @@ describe('validateEnv', () => {
             }),
         ).toThrow('THROTTLE_LIMIT must be a positive integer');
     });
+
+    it('throws if GEOAPIFY_MIN_CONFIDENCE is outside 0..1', () => {
+        expect(() =>
+            validateEnv({
+                DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+                JWT_SECRET: 'this-is-a-long-enough-secret',
+                GEOAPIFY_MIN_CONFIDENCE: '1.5',
+            }),
+        ).toThrow('GEOAPIFY_MIN_CONFIDENCE must be a number between 0 and 1');
+    });
+
+    it('throws if VERIPHONE_STRICT_MODE is not boolean-like', () => {
+        expect(() =>
+            validateEnv({
+                DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+                JWT_SECRET: 'this-is-a-long-enough-secret',
+                VERIPHONE_STRICT_MODE: 'maybe',
+            }),
+        ).toThrow('VERIPHONE_STRICT_MODE must be a boolean-like value (true/false/1/0)');
+    });
+
+    it('throws if GEOAPIFY_BASE_URL is invalid', () => {
+        expect(() =>
+            validateEnv({
+                DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+                JWT_SECRET: 'this-is-a-long-enough-secret',
+                GEOAPIFY_BASE_URL: 'not-a-url',
+            }),
+        ).toThrow('GEOAPIFY_BASE_URL must be a valid URL');
+    });
 });

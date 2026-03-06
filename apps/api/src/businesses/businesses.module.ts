@@ -7,9 +7,10 @@ import { BusinessRepository } from './business.repository';
 import { BusinessCoreService } from './business-core.service';
 import { BusinessProjectionListener } from './business-projection.listener';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 
 @Module({
-    imports: [ReputationModule, SearchModule, NotificationsModule],
+    imports: [ReputationModule, SearchModule, NotificationsModule, IntegrationsModule],
     controllers: [BusinessesController],
     providers: [
         BusinessesService,

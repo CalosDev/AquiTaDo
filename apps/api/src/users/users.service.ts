@@ -1,6 +1,7 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { UpdateMyProfileDto } from './dto/user.dto';
 
 @Injectable()
@@ -8,6 +9,8 @@ export class UsersService {
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
+        @Inject(IntegrationsService)
+        private readonly integrationsService: IntegrationsService,
     ) { }
 
     private readonly userSelect = {
@@ -53,12 +56,25 @@ export class UsersService {
         const name = dto.name?.trim();
         const phone = dto.phone?.trim();
         const avatarUrl = dto.avatarUrl?.trim();
+        let normalizedPhone: string | null | undefined;
+
+        if (phone !== undefined) {
+            if (phone.length === 0) {
+                normalizedPhone = null;
+            } else {
+                const validation = await this.integrationsService.validateDominicanPhone(phone);
+                if (!validation.isValid || !validation.normalizedPhone) {
+                    throw new BadRequestException('El telefono debe ser un numero dominicano valido');
+                }
+                normalizedPhone = validation.normalizedPhone;
+            }
+        }
 
         return this.prisma.user.update({
             where: { id: userId },
             data: {
                 ...(name !== undefined ? { name } : {}),
-                ...(phone !== undefined ? { phone: phone || null } : {}),
+                ...(normalizedPhone !== undefined ? { phone: normalizedPhone } : {}),
                 ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
             },
             select: this.userSelect,

@@ -79,7 +79,7 @@ describe('AuthController (e2e)', () => {
         expect(response.body.user).toMatchObject({
             name: payload.name,
             email: payload.email,
-            phone: payload.phone,
+            phone: '+18095550000',
             role: 'USER',
         });
         expect(response.body.user).not.toHaveProperty('password');

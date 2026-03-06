@@ -14,6 +14,7 @@ import { CookieOptions, Request, Response } from 'express';
 import { Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { IntegrationsService } from '../integrations/integrations.service';
 import {
     buildTotpOtpauthUrl,
     generateTotpSecret,
@@ -45,6 +46,8 @@ export class AuthService {
         private readonly jwtService: JwtService,
         @Inject(ConfigService)
         private readonly configService: ConfigService,
+        @Inject(IntegrationsService)
+        private readonly integrationsService: IntegrationsService,
     ) { }
 
     async register(dto: RegisterDto, request: Request, response: Response) {
@@ -66,7 +69,15 @@ export class AuthService {
         }
 
         const requestedRole: Role = rawRequestedRole === 'BUSINESS_OWNER' ? 'BUSINESS_OWNER' : 'USER';
-        const normalizedPhone = dto.phone?.trim();
+        const requestedPhone = dto.phone?.trim();
+        let normalizedPhone: string | null = null;
+        if (requestedPhone && requestedPhone.length > 0) {
+            const phoneValidation = await this.integrationsService.validateDominicanPhone(requestedPhone);
+            if (!phoneValidation.isValid || !phoneValidation.normalizedPhone) {
+                throw new BadRequestException('El telefono debe ser un numero dominicano valido');
+            }
+            normalizedPhone = phoneValidation.normalizedPhone;
+        }
 
         const hashedPassword = await bcrypt.hash(dto.password, 12);
 
@@ -75,7 +86,7 @@ export class AuthService {
                 name: dto.name.trim(),
                 email: dto.email.trim().toLowerCase(),
                 password: hashedPassword,
-                phone: normalizedPhone && normalizedPhone.length > 0 ? normalizedPhone : null,
+                phone: normalizedPhone,
                 role: requestedRole,
             },
         });

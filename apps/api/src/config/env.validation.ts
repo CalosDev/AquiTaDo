@@ -152,6 +152,9 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertValidUrl(config, 'APP_PUBLIC_WEB_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GEMINI_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GROQ_BASE_URL', ['http:', 'https:']);
+    assertValidUrl(config, 'GEOAPIFY_BASE_URL', ['http:', 'https:']);
+    assertValidUrl(config, 'VERIPHONE_BASE_URL', ['http:', 'https:']);
+    assertValidUrl(config, 'RD_DIVISIONS_API_URL', ['http:', 'https:']);
     assertValidUrl(config, 'OPEN_METEO_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'FRANKFURTER_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'NAGER_BASE_URL', ['http:', 'https:']);
@@ -161,9 +164,11 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertBooleanLike(config, 'SECURITY_TRUST_PROXY');
     assertBooleanLike(config, 'JSON_API_RESPONSE_ENABLED');
     assertBooleanLike(config, 'WHATSAPP_ENABLED');
+    assertBooleanLike(config, 'VERIPHONE_STRICT_MODE');
 
     assertRangeNumber(config, 'HEALTH_DB_POOL_WARN_RATIO', 0.1, 1);
     assertRangeNumber(config, 'HEALTH_DB_POOL_CRITICAL_RATIO', 0.1, 1);
+    assertRangeNumber(config, 'GEOAPIFY_MIN_CONFIDENCE', 0, 1);
 
     const dbPoolWarn = Number(config.HEALTH_DB_POOL_WARN_RATIO ?? 0.75);
     const dbPoolCritical = Number(config.HEALTH_DB_POOL_CRITICAL_RATIO ?? 0.9);
