@@ -1,13 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '../api/error';
-import { aiApi, analyticsApi, businessApi, categoryApi, observabilityApi, reviewApi, verificationApi } from '../api/endpoints';
+import {
+    aiApi,
+    analyticsApi,
+    businessApi,
+    categoryApi,
+    healthApi,
+    observabilityApi,
+    reviewApi,
+    verificationApi,
+} from '../api/endpoints';
+
+type BusinessVerificationState = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED' | 'UNVERIFIED';
 
 interface Business {
     id: string;
     name: string;
+    slug: string;
     verified: boolean;
+    verificationStatus: BusinessVerificationState;
     createdAt: string;
     owner?: { name: string };
+    organization?: { id: string; name: string; slug: string };
+    province?: { id: string; name: string; slug: string };
+    _count?: { reviews: number };
 }
 
 interface Category {
@@ -101,6 +117,43 @@ interface ObservabilitySummary {
     averageLatencyMs: number;
     rateLimitHits: number;
     externalFailures: number;
+}
+
+interface OperationalDashboardSnapshot {
+    status: 'up' | 'degraded' | 'down';
+    timestamp: string;
+    uptimeSeconds: number;
+    responseTimeMs?: number;
+    checks?: {
+        database?: {
+            status?: 'up' | 'degraded' | 'down';
+            schema?: 'up' | 'down';
+            pool?: {
+                status?: 'up' | 'degraded' | 'down';
+                activeConnections?: number;
+                maxConnections?: number;
+                saturationPct?: number;
+            };
+        };
+        ai?: {
+            status?: 'up' | 'degraded' | 'down';
+            thresholdMs?: number;
+            operations?: Array<{
+                operation: string;
+                p95Ms: number;
+                errorRatePct: number;
+            }>;
+        };
+        whatsapp?: {
+            status?: 'up' | 'degraded' | 'down';
+            thresholdMs?: number;
+            operations?: Array<{
+                operation: string;
+                p95Ms: number;
+                errorRatePct: number;
+            }>;
+        };
+    };
 }
 
 interface MarketInsightsSnapshot {
@@ -220,6 +273,49 @@ const EMPTY_OBSERVABILITY_SUMMARY: ObservabilitySummary = {
     externalFailures: 0,
 };
 
+function normalizeBusinessVerificationStatus(business: Business): BusinessVerificationState {
+    if (business.verificationStatus) {
+        return business.verificationStatus;
+    }
+    return business.verified ? 'VERIFIED' : 'PENDING';
+}
+
+function verificationStatusLabel(status: BusinessVerificationState): string {
+    if (status === 'VERIFIED') {
+        return 'Verificado';
+    }
+    if (status === 'REJECTED') {
+        return 'Rechazado';
+    }
+    if (status === 'SUSPENDED') {
+        return 'Suspendido';
+    }
+    return 'Pendiente';
+}
+
+function verificationStatusClass(status: BusinessVerificationState): string {
+    if (status === 'VERIFIED') {
+        return 'bg-green-100 text-green-700';
+    }
+    if (status === 'REJECTED') {
+        return 'bg-red-100 text-red-700';
+    }
+    if (status === 'SUSPENDED') {
+        return 'bg-amber-100 text-amber-700';
+    }
+    return 'bg-yellow-100 text-yellow-700';
+}
+
+function healthStatusClass(status: 'up' | 'degraded' | 'down' | undefined): string {
+    if (status === 'up') {
+        return 'bg-green-100 text-green-700';
+    }
+    if (status === 'degraded') {
+        return 'bg-amber-100 text-amber-700';
+    }
+    return 'bg-red-100 text-red-700';
+}
+
 function sumMetric(metricText: string, metricName: string): number {
     const escaped = metricName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(`^${escaped}(?:\\{[^}]*\\})?\\s+([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)$`);
@@ -309,6 +405,8 @@ export function AdminDashboard() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'verification' | 'observability'>('businesses');
+    const [businessSearch, setBusinessSearch] = useState('');
+    const [businessStatusFilter, setBusinessStatusFilter] = useState<'ALL' | 'VERIFIED' | 'PENDING' | 'SUSPENDED' | 'REJECTED'>('ALL');
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [confirmDeleteBusinessId, setConfirmDeleteBusinessId] = useState<string | null>(null);
@@ -334,10 +432,73 @@ export function AdminDashboard() {
     const [insightsLoading, setInsightsLoading] = useState(false);
     const [observabilityRaw, setObservabilityRaw] = useState('');
     const [observabilitySummary, setObservabilitySummary] = useState<ObservabilitySummary>(EMPTY_OBSERVABILITY_SUMMARY);
+    const [operationalHealth, setOperationalHealth] = useState<OperationalDashboardSnapshot | null>(null);
+    const [operationalHealthLoading, setOperationalHealthLoading] = useState(false);
 
     const [newCategoryForm, setNewCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
     const [editingCategoryForm, setEditingCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
+
+    const businessStatusSummary = useMemo(() => {
+        const summary = {
+            total: businesses.length,
+            verified: 0,
+            pending: 0,
+            suspended: 0,
+            rejected: 0,
+        };
+
+        businesses.forEach((business) => {
+            const status = normalizeBusinessVerificationStatus(business);
+            if (status === 'VERIFIED') {
+                summary.verified += 1;
+                return;
+            }
+            if (status === 'SUSPENDED') {
+                summary.suspended += 1;
+                return;
+            }
+            if (status === 'REJECTED') {
+                summary.rejected += 1;
+                return;
+            }
+            summary.pending += 1;
+        });
+
+        return summary;
+    }, [businesses]);
+
+    const filteredBusinesses = useMemo(() => {
+        const normalizedSearch = businessSearch.trim().toLowerCase();
+
+        return businesses.filter((business) => {
+            const status = normalizeBusinessVerificationStatus(business);
+            const matchesStatus = businessStatusFilter === 'ALL'
+                ? true
+                : businessStatusFilter === 'PENDING'
+                    ? (status === 'PENDING' || status === 'UNVERIFIED')
+                    : status === businessStatusFilter;
+
+            if (!matchesStatus) {
+                return false;
+            }
+
+            if (!normalizedSearch) {
+                return true;
+            }
+
+            const ownerName = business.owner?.name?.toLowerCase() || '';
+            const organizationName = business.organization?.name?.toLowerCase() || '';
+            const provinceName = business.province?.name?.toLowerCase() || '';
+
+            return (
+                business.name.toLowerCase().includes(normalizedSearch)
+                || ownerName.includes(normalizedSearch)
+                || organizationName.includes(normalizedSearch)
+                || provinceName.includes(normalizedSearch)
+            );
+        });
+    }, [businessSearch, businessStatusFilter, businesses]);
 
     const loadData = useCallback(async () => {
         setErrorMessage('');
@@ -452,27 +613,25 @@ export function AdminDashboard() {
         }
     }, []);
 
+    const loadOperationalHealth = useCallback(async () => {
+        setOperationalHealthLoading(true);
+        try {
+            const response = await healthApi.getDashboard();
+            setOperationalHealth((response.data || null) as OperationalDashboardSnapshot | null);
+        } catch (error) {
+            setOperationalHealth(null);
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el dashboard operacional'));
+        } finally {
+            setOperationalHealthLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         if (activeTab === 'observability') {
             void loadObservabilityData();
+            void loadOperationalHealth();
         }
-    }, [activeTab, loadObservabilityData]);
-
-    const handleVerifyBusiness = async (businessId: string) => {
-        setProcessingId(businessId);
-        setErrorMessage('');
-        setSuccessMessage('');
-
-        try {
-            await businessApi.verify(businessId);
-            await loadData();
-            setSuccessMessage('Negocio aprobado correctamente');
-        } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo aprobar el negocio'));
-        } finally {
-            setProcessingId(null);
-        }
-    };
+    }, [activeTab, loadObservabilityData, loadOperationalHealth]);
 
     const handleDeleteBusiness = async (businessId: string, reason: string) => {
         setProcessingId(businessId);
@@ -743,15 +902,15 @@ export function AdminDashboard() {
                 <div className="mt-5 role-kpi-grid !xl:grid-cols-4">
                     <article className="role-kpi-card">
                         <p className="role-kpi-label">Total negocios</p>
-                        <p className="role-kpi-value">{businesses.length}</p>
+                        <p className="role-kpi-value">{businessStatusSummary.total}</p>
                     </article>
                     <article className="role-kpi-card">
                         <p className="role-kpi-label">Verificados</p>
-                        <p className="role-kpi-value">{businesses.filter((business) => business.verified).length}</p>
+                        <p className="role-kpi-value">{businessStatusSummary.verified}</p>
                     </article>
                     <article className="role-kpi-card">
-                        <p className="role-kpi-label">Pendientes</p>
-                        <p className="role-kpi-value">{businesses.filter((business) => !business.verified).length}</p>
+                        <p className="role-kpi-label">Pendientes KYC</p>
+                        <p className="role-kpi-value">{businessStatusSummary.pending}</p>
                     </article>
                     <article className="role-kpi-card">
                         <p className="role-kpi-label">Categorias</p>
@@ -813,6 +972,62 @@ export function AdminDashboard() {
                 <>
                     {activeTab === 'businesses' && (
                         <div className="card overflow-hidden">
+                            <div className="border-b border-gray-100 p-4">
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                        <input
+                                            type="text"
+                                            value={businessSearch}
+                                            onChange={(event) => setBusinessSearch(event.target.value)}
+                                            className="input-field text-sm sm:w-80"
+                                            placeholder="Buscar por negocio, propietario, organizacion o provincia"
+                                        />
+                                        <select
+                                            value={businessStatusFilter}
+                                            onChange={(event) =>
+                                                setBusinessStatusFilter(
+                                                    event.target.value as 'ALL' | 'VERIFIED' | 'PENDING' | 'SUSPENDED' | 'REJECTED',
+                                                )
+                                            }
+                                            className="input-field text-sm sm:w-52"
+                                        >
+                                            <option value="ALL">Todos los estados</option>
+                                            <option value="VERIFIED">Verificados</option>
+                                            <option value="PENDING">Pendientes</option>
+                                            <option value="SUSPENDED">Suspendidos</option>
+                                            <option value="REJECTED">Rechazados</option>
+                                        </select>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="btn-secondary text-xs w-fit"
+                                        onClick={() => void loadData()}
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'Actualizando...' : 'Actualizar lista'}
+                                    </button>
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                        Total {businessStatusSummary.total}
+                                    </span>
+                                    <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                                        Verificados {businessStatusSummary.verified}
+                                    </span>
+                                    <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">
+                                        Pendientes {businessStatusSummary.pending}
+                                    </span>
+                                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                                        Suspendidos {businessStatusSummary.suspended}
+                                    </span>
+                                    <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
+                                        Rechazados {businessStatusSummary.rejected}
+                                    </span>
+                                </div>
+                            </div>
+
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead className="bg-gray-50 border-b">
@@ -822,6 +1037,9 @@ export function AdminDashboard() {
                                             </th>
                                             <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
                                                 Propietario
+                                            </th>
+                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                                Organizacion
                                             </th>
                                             <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
                                                 Estado
@@ -835,39 +1053,61 @@ export function AdminDashboard() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {businesses.map((business) => (
+                                        {filteredBusinesses.map((business) => {
+                                            const verificationStatus = normalizeBusinessVerificationStatus(business);
+                                            return (
                                             <tr key={business.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="p-4 font-medium text-gray-900">{business.name}</td>
+                                                <td className="p-4">
+                                                    <p className="font-medium text-gray-900">{business.name}</p>
+                                                    <p className="text-xs text-gray-500">{business.province?.name || 'Sin provincia'}</p>
+                                                </td>
                                                 <td className="p-4 text-sm text-gray-500">
                                                     {business.owner?.name || '-'}
                                                 </td>
+                                                <td className="p-4 text-sm text-gray-500">
+                                                    {business.organization?.name || '-'}
+                                                </td>
                                                 <td className="p-4">
                                                     <span
-                                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                                            business.verified
-                                                                ? 'bg-green-100 text-green-700'
-                                                                : 'bg-yellow-100 text-yellow-700'
-                                                        }`}
+                                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${verificationStatusClass(verificationStatus)}`}
                                                     >
-                                                        {business.verified ? 'Verificado' : 'Pendiente'}
+                                                        {verificationStatusLabel(verificationStatus)}
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-sm text-gray-400">
                                                     {new Date(business.createdAt).toLocaleDateString('es-DO')}
                                                 </td>
                                                 <td className="p-4 text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        {!business.verified && (
+                                                    <div className="flex flex-wrap justify-end gap-2">
+                                                        {verificationStatus !== 'VERIFIED' && (
                                                             <button
-                                                                onClick={() =>
-                                                                    void handleVerifyBusiness(business.id)
-                                                                }
+                                                                onClick={() => void handleReviewVerification(business.id, 'VERIFIED')}
                                                                 disabled={processingId === business.id}
                                                                 className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-lg hover:bg-green-200 transition-colors font-medium disabled:opacity-50"
                                                             >
                                                                 {processingId === business.id
                                                                     ? 'Procesando...'
-                                                                    : 'Aprobar'}
+                                                                    : verificationStatus === 'SUSPENDED' || verificationStatus === 'REJECTED'
+                                                                        ? 'Reactivar'
+                                                                        : 'Aprobar'}
+                                                            </button>
+                                                        )}
+                                                        {verificationStatus !== 'SUSPENDED' && (
+                                                            <button
+                                                                onClick={() => void handleReviewVerification(business.id, 'SUSPENDED')}
+                                                                disabled={processingId === business.id}
+                                                                className="text-xs bg-amber-100 text-amber-700 px-3 py-1 rounded-lg hover:bg-amber-200 transition-colors font-medium disabled:opacity-50"
+                                                            >
+                                                                Suspender
+                                                            </button>
+                                                        )}
+                                                        {verificationStatus !== 'REJECTED' && verificationStatus !== 'SUSPENDED' && (
+                                                            <button
+                                                                onClick={() => void handleReviewVerification(business.id, 'REJECTED')}
+                                                                disabled={processingId === business.id}
+                                                                className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-lg hover:bg-orange-200 transition-colors font-medium disabled:opacity-50"
+                                                            >
+                                                                Rechazar
                                                             </button>
                                                         )}
                                                         {confirmDeleteBusinessId === business.id ? (
@@ -930,13 +1170,13 @@ export function AdminDashboard() {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        );})}
                                     </tbody>
                                 </table>
                             </div>
-                            {businesses.length === 0 && (
+                            {filteredBusinesses.length === 0 && (
                                 <div className="p-10 text-center text-gray-400">
-                                    No hay negocios registrados
+                                    No hay negocios que coincidan con el filtro actual
                                 </div>
                             )}
                         </div>
@@ -1521,11 +1761,78 @@ export function AdminDashboard() {
                         <div className="space-y-4">
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                                    <h3 className="font-display font-semibold text-gray-900">Centro de operaciones</h3>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary text-xs"
+                                        onClick={() => {
+                                            void loadOperationalHealth();
+                                            void loadObservabilityData();
+                                        }}
+                                        disabled={operationalHealthLoading || observabilityLoading}
+                                    >
+                                        {operationalHealthLoading ? 'Actualizando...' : 'Actualizar estado'}
+                                    </button>
+                                </div>
+
+                                {operationalHealth ? (
+                                    <div className="space-y-3">
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.status)}`}>
+                                                Plataforma {operationalHealth.status.toUpperCase()}
+                                            </span>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.database?.status)}`}>
+                                                DB {String(operationalHealth.checks?.database?.status || 'down').toUpperCase()}
+                                            </span>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.database?.pool?.status)}`}>
+                                                Pool DB {String(operationalHealth.checks?.database?.pool?.status || 'down').toUpperCase()}
+                                            </span>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.ai?.status)}`}>
+                                                AI {String(operationalHealth.checks?.ai?.status || 'down').toUpperCase()}
+                                            </span>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.whatsapp?.status)}`}>
+                                                WhatsApp {String(operationalHealth.checks?.whatsapp?.status || 'down').toUpperCase()}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                                <p className="text-xs text-gray-500">Saturacion DB</p>
+                                                <p className="text-xl font-semibold text-gray-900">
+                                                    {operationalHealth.checks?.database?.pool?.saturationPct ?? 0}%
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                                <p className="text-xs text-gray-500">Uptime</p>
+                                                <p className="text-xl font-semibold text-gray-900">
+                                                    {Math.floor((operationalHealth.uptimeSeconds || 0) / 60)} min
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                                <p className="text-xs text-gray-500">Latencia health</p>
+                                                <p className="text-xl font-semibold text-gray-900">
+                                                    {operationalHealth.responseTimeMs ?? 0} ms
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-500">
+                                        No hay datos operativos disponibles en este momento.
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                                     <h3 className="font-display font-semibold text-gray-900">Resumen operativo</h3>
                                     <button
                                         type="button"
                                         className="btn-secondary text-xs"
-                                        onClick={() => void loadObservabilityData()}
+                                        onClick={() => {
+                                            void loadObservabilityData();
+                                            void loadOperationalHealth();
+                                        }}
                                         disabled={observabilityLoading}
                                     >
                                         {observabilityLoading ? 'Actualizando...' : 'Actualizar'}

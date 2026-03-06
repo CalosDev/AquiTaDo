@@ -544,3 +544,10 @@ export const verificationApi = {
 export const observabilityApi = {
     getMetrics: () => api.get<string>('/observability/metrics', { responseType: 'text' }),
 };
+
+// ---- Health ----
+export const healthApi = {
+    getLiveness: () => api.get('/health'),
+    getReadiness: () => api.get('/health/ready'),
+    getDashboard: () => api.get('/health/dashboard'),
+};
