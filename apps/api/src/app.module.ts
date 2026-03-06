@@ -43,7 +43,6 @@ import { PublicCacheInterceptor } from './core/interceptors/public-cache.interce
 import { GlobalExceptionFilter } from './core/filters/global-exception.filter';
 import { validateEnv } from './config/env.validation';
 import { SecurityModule } from './security/security.module';
-import { MarketDataModule } from './market-data/market-data.module';
 
 @Module({
     imports: [
@@ -97,7 +96,6 @@ import { MarketDataModule } from './market-data/market-data.module';
         VerificationModule,
         FavoritesModule,
         CheckInsModule,
-        MarketDataModule,
         AiModule,
         WhatsAppModule,
         NotificationsModule,

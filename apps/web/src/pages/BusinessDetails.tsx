@@ -8,6 +8,7 @@ import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
+import { featureFlags } from '../config/features';
 
 interface Business {
     id: string;
@@ -182,6 +183,8 @@ export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
     const { isAuthenticated, user } = useAuth();
     const isCustomerRole = user?.role === 'USER';
+    const showBookings = featureFlags.bookings;
+    const showCheckins = featureFlags.checkins;
     const [business, setBusiness] = useState<Business | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeImage, setActiveImage] = useState(0);
@@ -332,6 +335,11 @@ export function BusinessDetails() {
     }, [business?.id, isAuthenticated, isCustomerRole]);
 
     const loadCheckInStats = useCallback(async () => {
+        if (!showCheckins) {
+            setCheckInStats(null);
+            return;
+        }
+
         if (!business?.id) {
             setCheckInStats(null);
             return;
@@ -346,7 +354,7 @@ export function BusinessDetails() {
         } finally {
             setCheckInStatsLoading(false);
         }
-    }, [business?.id]);
+    }, [business?.id, showCheckins]);
 
     useEffect(() => {
         void loadCheckInStats();
@@ -649,7 +657,7 @@ export function BusinessDetails() {
     const whatsappDirectUrl = business?.whatsapp
         ? `https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`
         : null;
-    const canBookThisBusiness = businessSupportsBooking(business?.features);
+    const canBookThisBusiness = showBookings && businessSupportsBooking(business?.features);
 
     const trackContactGrowthEvent = (
         eventType: 'CONTACT_CLICK' | 'WHATSAPP_CLICK' | 'BOOKING_INTENT',
@@ -853,6 +861,10 @@ export function BusinessDetails() {
 
     const handleBookingSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (!showBookings) {
+            return;
+        }
+
         if (!business?.id) {
             return;
         }
@@ -902,7 +914,7 @@ export function BusinessDetails() {
     };
 
     const handleCreateCheckIn = async () => {
-        if (!business?.id || !isAuthenticated || !isCustomerRole) {
+        if (!showCheckins || !business?.id || !isAuthenticated || !isCustomerRole) {
             return;
         }
 
@@ -1115,7 +1127,8 @@ export function BusinessDetails() {
                             </div>
                         )}
 
-                        <div className="mt-5 rounded-xl border border-accent-100 bg-accent-50/40 p-4">
+                        {showCheckins && (
+                            <div className="mt-5 rounded-xl border border-accent-100 bg-accent-50/40 p-4">
                             <div className="flex items-center justify-between gap-2">
                                 <h2 className="font-display font-semibold text-gray-900">Actividad local</h2>
                                 {checkInStatsLoading ? (
@@ -1171,7 +1184,8 @@ export function BusinessDetails() {
                                     Inicia sesion como usuario para registrar check-ins y ganar puntos.
                                 </p>
                             )}
-                        </div>
+                            </div>
+                        )}
 
                         {/* Features */}
                         {business.features && business.features.length > 0 && (
@@ -1462,12 +1476,14 @@ export function BusinessDetails() {
                                             {reputationProfile.metrics.reviewCount}
                                         </p>
                                     </div>
-                                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Reservas completadas</p>
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            {reputationProfile.metrics.bookings.completed}
-                                        </p>
-                                    </div>
+                                    {showBookings && (
+                                        <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                            <p className="text-[10px] uppercase tracking-wide text-slate-500">Reservas completadas</p>
+                                            <p className="text-sm font-semibold text-slate-900">
+                                                {reputationProfile.metrics.bookings.completed}
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="col-span-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5">
                                         <p className="text-[10px] uppercase tracking-wide text-slate-500">Volumen transaccional</p>
                                         <p className="text-sm font-semibold text-slate-900">
@@ -1525,7 +1541,7 @@ export function BusinessDetails() {
                         </div>
 
                         <div className="mt-6 border-t border-gray-100 pt-6">
-                            {isAuthenticated && isCustomerRole && canBookThisBusiness && (
+                            {showBookings && isAuthenticated && isCustomerRole && canBookThisBusiness && (
                                 <div className="mb-6">
                                     <h3 className="font-display font-semibold text-gray-900 mb-3">
                                         Reservar ahora
@@ -1589,7 +1605,7 @@ export function BusinessDetails() {
                                     )}
                                 </div>
                             )}
-                            {isAuthenticated && isCustomerRole && !canBookThisBusiness && (
+                            {showBookings && isAuthenticated && isCustomerRole && !canBookThisBusiness && (
                                 <div className="mb-6 rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm text-slate-700">
                                     Este negocio no gestiona reservas en linea. Usa WhatsApp o mensaje directo para coordinar.
                                 </div>

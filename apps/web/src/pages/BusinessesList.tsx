@@ -8,6 +8,7 @@ import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { preloadRouteChunk } from '../routes/preload';
+import { featureFlags } from '../config/features';
 
 interface Business {
     id: string;
@@ -127,6 +128,7 @@ export function BusinessesList() {
     const [favoriteProcessingId, setFavoriteProcessingId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
+    const showSponsoredAds = featureFlags.sponsoredAds;
 
     const currentSearch = searchParams.get('search') || '';
     const currentCategory = searchParams.get('categoryId') || '';
@@ -286,25 +288,25 @@ export function BusinessesList() {
             }
             if (currentFeature) params.feature = currentFeature;
 
-            const [businessesRes, sponsoredRes] = await Promise.all([
-                businessApi.getAll(params),
-                adsApi.getPlacements({
+            const businessesRes = await businessApi.getAll(params);
+            const sponsoredRes = showSponsoredAds
+                ? await adsApi.getPlacements({
                     provinceId: currentProvince || undefined,
                     categoryId: currentCategory || undefined,
                     limit: 3,
-                }),
-            ]);
+                })
+                : null;
 
             setBusinesses(businessesRes.data.data || []);
             setTotal(businessesRes.data.total || 0);
             setTotalPages(businessesRes.data.totalPages || 0);
-            setSponsoredPlacements((sponsoredRes.data || []) as SponsoredPlacement[]);
+            setSponsoredPlacements(showSponsoredAds ? ((sponsoredRes?.data || []) as SponsoredPlacement[]) : []);
         } catch (error) {
             setLoadError(getApiErrorMessage(error, 'No se pudieron cargar los negocios'));
         } finally {
             setLoading(false);
         }
-    }, [categorySlug, currentCategory, currentFeature, currentPage, currentProvince, currentSearch, provinceSlug]);
+    }, [categorySlug, currentCategory, currentFeature, currentPage, currentProvince, currentSearch, provinceSlug, showSponsoredAds]);
 
     useEffect(() => {
         void loadBusinesses();
@@ -335,7 +337,7 @@ export function BusinessesList() {
     }, [isAuthenticated, isCustomerRole]);
 
     useEffect(() => {
-        if (sponsoredPlacements.length === 0) {
+        if (!showSponsoredAds || sponsoredPlacements.length === 0) {
             return;
         }
 
@@ -346,7 +348,7 @@ export function BusinessesList() {
                 placementKey: 'businesses-list',
             }).catch(() => undefined);
         });
-    }, [sponsoredPlacements]);
+    }, [showSponsoredAds, sponsoredPlacements]);
 
     const trackBusinessClick = useCallback((businessId: string, source: string) => {
         void analyticsApi.trackGrowthEvent({
@@ -665,17 +667,19 @@ export function BusinessesList() {
                         </div>
                     ) : businesses.length > 0 ? (
                         <>
-                            {sponsoredPlacements.length > 0 && (
+                            {showSponsoredAds && sponsoredPlacements.length > 0 && (
                                 <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                                     {sponsoredPlacements.map((placement) => (
                                         <Link
                                             key={placement.campaign.id}
                                             to={`/businesses/${placement.business.slug || placement.business.id}`}
                                             onClick={() => {
-                                                void adsApi.trackClick(placement.campaign.id, {
-                                                    visitorId: getOrCreateVisitorId(),
-                                                    placementKey: 'businesses-list',
-                                                }).catch(() => undefined);
+                                                if (showSponsoredAds) {
+                                                    void adsApi.trackClick(placement.campaign.id, {
+                                                        visitorId: getOrCreateVisitorId(),
+                                                        placementKey: 'businesses-list',
+                                                    }).catch(() => undefined);
+                                                }
                                                 trackBusinessClick(placement.business.id, 'sponsored-placement');
                                             }}
                                             className="rounded-xl border border-amber-200 bg-amber-50 p-3 hover:border-amber-300 transition-colors hover-lift"

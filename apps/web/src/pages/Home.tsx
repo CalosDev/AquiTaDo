@@ -7,6 +7,7 @@ import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { formatNumberDo } from '../lib/market';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { featureFlags } from '../config/features';
 
 interface Category {
     id: string;
@@ -79,7 +80,7 @@ const OPERATING_POINTS = [
     },
     {
         title: 'Opera como SaaS',
-        description: 'Panel de negocio con CRM, reservas, promociones, facturacion y analitica accionable.',
+        description: 'Panel de negocio para gestionar perfil, reputacion, mensajes y crecimiento comercial.',
     },
 ];
 
@@ -182,6 +183,7 @@ export function Home() {
     const [rankingsLoading, setRankingsLoading] = useState(false);
     const [rankingsError, setRankingsError] = useState('');
     const [rankings, setRankings] = useState<ReputationRankingItem[]>([]);
+    const showAiConcierge = featureFlags.aiConcierge;
 
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
@@ -351,6 +353,10 @@ export function Home() {
 
     const handleAiSearch = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (!showAiConcierge) {
+            return;
+        }
+
         const query = aiQuery.trim();
         if (!query) {
             setAiError('Escribe una consulta para el asistente');
@@ -544,7 +550,8 @@ export function Home() {
             </section>
 
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
-                <div className="section-shell p-6 md:p-8 border-t-4 border-primary-600 mb-8">
+                {showAiConcierge && (
+                    <div className="section-shell p-6 md:p-8 border-t-4 border-primary-600 mb-8">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-xs uppercase tracking-wide text-primary-700 font-semibold">Asistente IA</p>
@@ -631,7 +638,8 @@ export function Home() {
                             )}
                         </div>
                     )}
-                </div>
+                    </div>
+                )}
 
                 <div className="section-shell p-5 md:p-7">
                     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
