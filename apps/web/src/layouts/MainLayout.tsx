@@ -105,7 +105,7 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
 export function MainLayout() {
     const location = useLocation();
     const { isAuthenticated } = useAuth();
-    const showFooter = !isAuthenticated;
+    const showFooter = !isAuthenticated && ['/', '/about', '/terms', '/privacy'].includes(location.pathname);
     const routeSeo = useMemo(
         () => resolveRouteSeo(location.pathname),
         [location.pathname],
