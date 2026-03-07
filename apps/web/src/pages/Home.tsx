@@ -76,11 +76,11 @@ const OPERATING_POINTS = [
     },
     {
         title: 'Contacta directo',
-        description: 'WhatsApp y mensajeria integrada para convertir busqueda en conversacion inmediata.',
+        description: 'WhatsApp y contacto directo para convertir descubrimiento en accion inmediata.',
     },
     {
         title: 'Opera como SaaS',
-        description: 'Panel de negocio para gestionar perfil, reputacion, mensajes y crecimiento comercial.',
+        description: 'Panel de negocio para gestionar perfil, reputacion y crecimiento comercial.',
     },
 ];
 
@@ -418,7 +418,7 @@ export function Home() {
                             </h1>
                             <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-blue-100">
                                 AquiTa.do conecta clientes con negocios verificados y entrega herramientas SaaS para operar mejor:
-                                CRM, mensajeria, promociones, reputacion y analitica en una sola plataforma.
+                                CRM, promociones, reputacion y analitica en una sola plataforma.
                             </p>
 
                             <div className="mt-5 flex flex-wrap gap-2.5">

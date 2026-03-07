@@ -1,48 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { favoritesApi, messagingApi } from '../api/endpoints';
+import { favoritesApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { useAuth } from '../context/useAuth';
 import { formatDateTimeDo } from '../lib/market';
-
-type ConversationStatus = 'OPEN' | 'CLOSED' | 'CONVERTED';
-
-interface ConversationItem {
-    id: string;
-    status: ConversationStatus;
-    updatedAt: string;
-    business: {
-        id: string;
-        name: string;
-        slug: string;
-    };
-    messages?: Array<{
-        id: string;
-        content: string;
-    }>;
-}
-
-interface ConversationThread {
-    id: string;
-    status: ConversationStatus;
-    updatedAt: string;
-    business: {
-        id: string;
-        name: string;
-        slug: string;
-    };
-    messages: Array<{
-        id: string;
-        content: string;
-        createdAt: string;
-        senderRole: 'CUSTOMER' | 'BUSINESS_STAFF' | 'SYSTEM';
-        senderUser?: {
-            id: string;
-            name: string;
-        } | null;
-    }>;
-}
 
 interface FavoriteBusinessItem {
     businessId: string;
@@ -79,22 +41,8 @@ interface UserBusinessList {
     }>;
 }
 
-const EMPTY_CONVERSATIONS: ConversationItem[] = [];
 const EMPTY_FAVORITES: FavoriteBusinessItem[] = [];
 const EMPTY_LISTS: UserBusinessList[] = [];
-
-function conversationStatusLabel(status: ConversationStatus): string {
-    switch (status) {
-        case 'OPEN':
-            return 'Abierta';
-        case 'CLOSED':
-            return 'Cerrada';
-        case 'CONVERTED':
-            return 'Convertida';
-        default:
-            return status;
-    }
-}
 
 export function CustomerDashboard() {
     const { user } = useAuth();
@@ -102,25 +50,15 @@ export function CustomerDashboard() {
     const [favoritesInfoMessage, setFavoritesInfoMessage] = useState('');
     const [favoritesErrorMessage, setFavoritesErrorMessage] = useState('');
 
-    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-    const [selectedConversationThread, setSelectedConversationThread] = useState<ConversationThread | null>(null);
-    const [conversationThreadLoading, setConversationThreadLoading] = useState(false);
-    const [conversationReply, setConversationReply] = useState('');
-    const [conversationReplySending, setConversationReplySending] = useState(false);
-    const [conversationInfoMessage, setConversationInfoMessage] = useState('');
-    const [conversationErrorMessage, setConversationErrorMessage] = useState('');
-
     const dashboardQuery = useQuery({
         queryKey: ['customer-dashboard-lite'],
         queryFn: async () => {
-            const [conversationsResponse, favoritesResponse, listsResponse] = await Promise.all([
-                messagingApi.getMyConversations({ limit: 8 }),
+            const [favoritesResponse, listsResponse] = await Promise.all([
                 favoritesApi.getFavoriteBusinesses({ limit: 8 }),
                 favoritesApi.getMyLists({ limit: 8 }),
             ]);
 
             return {
-                conversations: (conversationsResponse.data?.data ?? []) as ConversationItem[],
                 favorites: (favoritesResponse.data?.data ?? []) as FavoriteBusinessItem[],
                 lists: (listsResponse.data?.data ?? []) as UserBusinessList[],
             };
@@ -132,51 +70,12 @@ export function CustomerDashboard() {
         ? getApiErrorMessage(dashboardQuery.error, 'No se pudo cargar tu panel')
         : '';
 
-    const conversations = dashboardQuery.data?.conversations ?? EMPTY_CONVERSATIONS;
     const favorites = dashboardQuery.data?.favorites ?? EMPTY_FAVORITES;
     const lists = dashboardQuery.data?.lists ?? EMPTY_LISTS;
-
-    const openConversationsCount = useMemo(
-        () => conversations.filter((conversation) => conversation.status === 'OPEN').length,
-        [conversations],
-    );
-
-    useEffect(() => {
-        if (conversations.length === 0) {
-            setSelectedConversationId(null);
-            setSelectedConversationThread(null);
-            return;
-        }
-
-        if (!selectedConversationId || !conversations.some((conversation) => conversation.id === selectedConversationId)) {
-            setSelectedConversationId(conversations[0].id);
-        }
-    }, [conversations, selectedConversationId]);
 
     const reloadDashboard = async () => {
         await dashboardQuery.refetch();
     };
-
-    const loadConversationThread = useCallback(async (conversationId: string) => {
-        setConversationThreadLoading(true);
-        setConversationErrorMessage('');
-        try {
-            const response = await messagingApi.getMyConversationThread(conversationId);
-            setSelectedConversationThread(response.data as ConversationThread);
-        } catch (threadError) {
-            setConversationErrorMessage(getApiErrorMessage(threadError, 'No se pudo cargar el chat'));
-            setSelectedConversationThread(null);
-        } finally {
-            setConversationThreadLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!selectedConversationId) {
-            return;
-        }
-        void loadConversationThread(selectedConversationId);
-    }, [loadConversationThread, selectedConversationId]);
 
     const handleRemoveFavorite = async (businessId: string) => {
         const actionKey = `favorite-${businessId}`;
@@ -226,40 +125,13 @@ export function CustomerDashboard() {
         }
     };
 
-    const handleSendConversationReply = async (event: React.FormEvent) => {
-        event.preventDefault();
-        if (!selectedConversationId || !conversationReply.trim()) {
-            setConversationErrorMessage('Escribe una respuesta para continuar');
-            return;
-        }
-
-        setConversationReplySending(true);
-        setConversationErrorMessage('');
-        setConversationInfoMessage('');
-        try {
-            await messagingApi.sendMessageAsCustomer(selectedConversationId, {
-                content: conversationReply.trim(),
-            });
-            setConversationReply('');
-            await Promise.all([
-                loadConversationThread(selectedConversationId),
-                reloadDashboard(),
-            ]);
-            setConversationInfoMessage('Mensaje enviado');
-        } catch (sendError) {
-            setConversationErrorMessage(getApiErrorMessage(sendError, 'No se pudo enviar el mensaje'));
-        } finally {
-            setConversationReplySending(false);
-        }
-    };
-
     if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
                 <div className="h-10 w-56 rounded-xl bg-gray-100 animate-pulse mb-4"></div>
                 <div className="h-5 w-80 rounded-lg bg-gray-100 animate-pulse mb-8"></div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {Array.from({ length: 3 }).map((_, index) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Array.from({ length: 2 }).map((_, index) => (
                         <div key={index} className="card p-6">
                             <div className="h-4 w-24 bg-gray-100 rounded mb-3 animate-pulse"></div>
                             <div className="h-7 w-16 bg-gray-100 rounded animate-pulse"></div>
@@ -278,7 +150,7 @@ export function CustomerDashboard() {
                     Hola, {user?.name?.split(' ')[0] ?? 'Usuario'}
                 </h1>
                 <p className="text-blue-100 mt-2 max-w-2xl">
-                    Gestiona tus favoritos, listas y conversaciones con negocios.
+                    Gestiona tus favoritos y listas guardadas.
                 </p>
 
                 <div className="mt-5 role-kpi-grid">
@@ -289,14 +161,6 @@ export function CustomerDashboard() {
                     <article className="role-kpi-card">
                         <p className="role-kpi-label">Listas</p>
                         <p className="role-kpi-value">{lists.length}</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Chats abiertos</p>
-                        <p className="role-kpi-value">{openConversationsCount}</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Total conversaciones</p>
-                        <p className="role-kpi-value">{conversations.length}</p>
                     </article>
                 </div>
 
@@ -428,110 +292,6 @@ export function CustomerDashboard() {
                         </div>
                     )}
                 </article>
-            </section>
-
-            <section className="card p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-display text-xl font-bold text-gray-900">Mensajeria con negocios</h2>
-                    <Link to="/businesses" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                        Escribir a negocio
-                    </Link>
-                </div>
-
-                {conversations.length === 0 ? (
-                    <p className="text-sm text-gray-500">No tienes conversaciones todavia.</p>
-                ) : (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                            {conversations.map((conversation) => (
-                                <button
-                                    type="button"
-                                    key={conversation.id}
-                                    className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                                        selectedConversationId === conversation.id
-                                            ? 'border-primary-300 bg-primary-50/50'
-                                            : 'border-gray-100 hover:border-primary-100'
-                                    }`}
-                                    onClick={() => setSelectedConversationId(conversation.id)}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <p className="font-semibold text-gray-900">{conversation.business.name}</p>
-                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">
-                                            {conversationStatusLabel(conversation.status)}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                                        {conversation.messages?.[0]?.content ?? 'Sin mensajes recientes'}
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        Actualizado: {formatDateTimeDo(conversation.updatedAt)}
-                                    </p>
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                            {conversationErrorMessage ? (
-                                <p className="text-xs text-red-700 mb-2">{conversationErrorMessage}</p>
-                            ) : null}
-                            {conversationInfoMessage ? (
-                                <p className="text-xs text-green-700 mb-2">{conversationInfoMessage}</p>
-                            ) : null}
-
-                            {conversationThreadLoading ? (
-                                <p className="text-sm text-gray-500">Cargando conversacion...</p>
-                            ) : selectedConversationThread ? (
-                                <>
-                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1 mb-3">
-                                        {selectedConversationThread.messages.length > 0 ? (
-                                            selectedConversationThread.messages.map((message) => (
-                                                <div
-                                                    key={message.id}
-                                                    className={`rounded-lg px-3 py-2 text-sm ${
-                                                        message.senderRole === 'CUSTOMER'
-                                                            ? 'bg-primary-100 text-primary-900'
-                                                            : 'bg-white border border-gray-200 text-gray-700'
-                                                    }`}
-                                                >
-                                                    <p className="text-[11px] uppercase tracking-wide mb-1 text-gray-500">
-                                                        {message.senderRole === 'CUSTOMER'
-                                                            ? 'Tu'
-                                                            : message.senderUser?.name || 'Negocio'}
-                                                    </p>
-                                                    <p className="whitespace-pre-wrap">{message.content}</p>
-                                                    <p className="text-[11px] mt-1 text-gray-500">
-                                                        {formatDateTimeDo(message.createdAt)}
-                                                    </p>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-gray-500">Sin mensajes en este chat.</p>
-                                        )}
-                                    </div>
-
-                                    <form onSubmit={handleSendConversationReply} className="space-y-2">
-                                        <textarea
-                                            className="input-field text-sm"
-                                            rows={3}
-                                            placeholder="Escribe una respuesta..."
-                                            value={conversationReply}
-                                            onChange={(event) => setConversationReply(event.target.value)}
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="btn-primary text-sm"
-                                            disabled={conversationReplySending}
-                                        >
-                                            {conversationReplySending ? 'Enviando...' : 'Responder'}
-                                        </button>
-                                    </form>
-                                </>
-                            ) : (
-                                <p className="text-sm text-gray-500">Selecciona una conversacion para ver el hilo.</p>
-                            )}
-                        </div>
-                    </div>
-                )}
             </section>
         </div>
     );

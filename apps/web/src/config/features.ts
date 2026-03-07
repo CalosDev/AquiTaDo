@@ -19,5 +19,5 @@ export const featureFlags = {
     sponsoredAds: parseBooleanFlag(import.meta.env.VITE_FEATURE_SPONSORED_ADS, false),
     bookings: parseBooleanFlag(import.meta.env.VITE_FEATURE_BOOKINGS, false),
     checkins: parseBooleanFlag(import.meta.env.VITE_FEATURE_CHECKINS, false),
+    messaging: parseBooleanFlag(import.meta.env.VITE_FEATURE_MESSAGING, false),
 } as const;
-

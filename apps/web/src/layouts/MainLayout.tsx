@@ -54,7 +54,7 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
     if (pathname === '/dashboard') {
         return {
             title: 'Dashboard Negocio | AquiTa.do',
-            description: 'Panel SaaS para gestionar promociones, reservas, mensajes y analiticas.',
+            description: 'Panel SaaS para gestionar promociones, reservas y analiticas.',
             noindex: true,
         };
     }

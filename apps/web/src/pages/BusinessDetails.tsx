@@ -186,6 +186,7 @@ export function BusinessDetails() {
     const canUseCustomerContactFlows = !isAuthenticated || isCustomerRole;
     const showBookings = featureFlags.bookings;
     const showCheckins = featureFlags.checkins;
+    const showMessaging = featureFlags.messaging;
     const [business, setBusiness] = useState<Business | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeImage, setActiveImage] = useState(0);
@@ -1662,131 +1663,134 @@ export function BusinessDetails() {
                             )}
                             {showBookings && isAuthenticated && isCustomerRole && !canBookThisBusiness && (
                                 <div className="mb-6 rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm text-slate-700">
-                                    Este negocio no gestiona reservas en linea. Usa WhatsApp o mensaje directo para coordinar.
+                                    Este negocio no gestiona reservas en linea. Usa los canales de contacto disponibles para coordinar.
                                 </div>
                             )}
+                            {showMessaging && (
+                                <>
+                                    <h3 className="font-display font-semibold text-gray-900 mb-3">
+                                        Mensaje directo
+                                    </h3>
 
-                            <h3 className="font-display font-semibold text-gray-900 mb-3">
-                                Mensaje directo
-                            </h3>
+                                    {!isAuthenticated && (
+                                        <form onSubmit={handlePublicLeadSubmit} className="space-y-3">
+                                            <input
+                                                className="input-field text-sm"
+                                                placeholder="Tu nombre"
+                                                value={publicLeadForm.contactName}
+                                                onChange={(event) =>
+                                                    setPublicLeadForm((previous) => ({
+                                                        ...previous,
+                                                        contactName: event.target.value,
+                                                    }))
+                                                }
+                                            />
+                                            <input
+                                                className="input-field text-sm"
+                                                placeholder="Tu telefono"
+                                                value={publicLeadForm.contactPhone}
+                                                onChange={(event) =>
+                                                    setPublicLeadForm((previous) => ({
+                                                        ...previous,
+                                                        contactPhone: event.target.value,
+                                                    }))
+                                                }
+                                            />
+                                            <input
+                                                className="input-field text-sm"
+                                                placeholder="Tu email (opcional)"
+                                                value={publicLeadForm.contactEmail}
+                                                onChange={(event) =>
+                                                    setPublicLeadForm((previous) => ({
+                                                        ...previous,
+                                                        contactEmail: event.target.value,
+                                                    }))
+                                                }
+                                            />
+                                            <textarea
+                                                className="input-field text-sm"
+                                                rows={3}
+                                                placeholder="Que necesitas?"
+                                                value={publicLeadForm.message}
+                                                onChange={(event) =>
+                                                    setPublicLeadForm((previous) => ({
+                                                        ...previous,
+                                                        message: event.target.value,
+                                                    }))
+                                                }
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="btn-primary text-sm w-full"
+                                                disabled={submittingPublicLead}
+                                            >
+                                                {submittingPublicLead ? 'Enviando...' : 'Solicitar cotizacion sin cuenta'}
+                                            </button>
+                                            <p className="text-xs text-gray-500">
+                                                Ya tienes cuenta? <Link to="/login" className="underline font-medium">Inicia sesion</Link>
+                                            </p>
+                                        </form>
+                                    )}
 
-                            {!isAuthenticated && (
-                                <form onSubmit={handlePublicLeadSubmit} className="space-y-3">
-                                    <input
-                                        className="input-field text-sm"
-                                        placeholder="Tu nombre"
-                                        value={publicLeadForm.contactName}
-                                        onChange={(event) =>
-                                            setPublicLeadForm((previous) => ({
-                                                ...previous,
-                                                contactName: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                    <input
-                                        className="input-field text-sm"
-                                        placeholder="Tu telefono"
-                                        value={publicLeadForm.contactPhone}
-                                        onChange={(event) =>
-                                            setPublicLeadForm((previous) => ({
-                                                ...previous,
-                                                contactPhone: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                    <input
-                                        className="input-field text-sm"
-                                        placeholder="Tu email (opcional)"
-                                        value={publicLeadForm.contactEmail}
-                                        onChange={(event) =>
-                                            setPublicLeadForm((previous) => ({
-                                                ...previous,
-                                                contactEmail: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                    <textarea
-                                        className="input-field text-sm"
-                                        rows={3}
-                                        placeholder="Que necesitas?"
-                                        value={publicLeadForm.message}
-                                        onChange={(event) =>
-                                            setPublicLeadForm((previous) => ({
-                                                ...previous,
-                                                message: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                    <button
-                                        type="submit"
-                                        className="btn-primary text-sm w-full"
-                                        disabled={submittingPublicLead}
-                                    >
-                                        {submittingPublicLead ? 'Enviando...' : 'Solicitar cotizacion sin cuenta'}
-                                    </button>
-                                    <p className="text-xs text-gray-500">
-                                        Ya tienes cuenta? <Link to="/login" className="underline font-medium">Inicia sesion</Link>
-                                    </p>
-                                </form>
-                            )}
+                                    {isAuthenticated && isCustomerRole && (
+                                        <form onSubmit={handleMessageSubmit} className="space-y-3">
+                                            <input
+                                                className="input-field text-sm"
+                                                placeholder="Asunto (opcional)"
+                                                value={messageForm.subject}
+                                                onChange={(event) =>
+                                                    setMessageForm((previous) => ({
+                                                        ...previous,
+                                                        subject: event.target.value,
+                                                    }))
+                                                }
+                                            />
+                                            <textarea
+                                                className="input-field text-sm"
+                                                rows={3}
+                                                placeholder="Escribe tu consulta..."
+                                                value={messageForm.content}
+                                                onChange={(event) =>
+                                                    setMessageForm((previous) => ({
+                                                        ...previous,
+                                                        content: event.target.value,
+                                                    }))
+                                                }
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="btn-primary text-sm w-full sm:w-auto"
+                                                disabled={sendingMessage}
+                                            >
+                                                {sendingMessage ? 'Enviando...' : 'Enviar mensaje'}
+                                            </button>
+                                        </form>
+                                    )}
 
-                            {isAuthenticated && isCustomerRole && (
-                                <form onSubmit={handleMessageSubmit} className="space-y-3">
-                                    <input
-                                        className="input-field text-sm"
-                                        placeholder="Asunto (opcional)"
-                                        value={messageForm.subject}
-                                        onChange={(event) =>
-                                            setMessageForm((previous) => ({
-                                                ...previous,
-                                                subject: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                    <textarea
-                                        className="input-field text-sm"
-                                        rows={3}
-                                        placeholder="Escribe tu consulta..."
-                                        value={messageForm.content}
-                                        onChange={(event) =>
-                                            setMessageForm((previous) => ({
-                                                ...previous,
-                                                content: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                    <button
-                                        type="submit"
-                                        className="btn-primary text-sm w-full sm:w-auto"
-                                        disabled={sendingMessage}
-                                    >
-                                        {sendingMessage ? 'Enviando...' : 'Enviar mensaje'}
-                                    </button>
-                                </form>
-                            )}
+                                    {publicLeadErrorMessage && (
+                                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                            {publicLeadErrorMessage}
+                                        </div>
+                                    )}
 
-                            {publicLeadErrorMessage && (
-                                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                                    {publicLeadErrorMessage}
-                                </div>
-                            )}
+                                    {publicLeadSuccessMessage && (
+                                        <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                                            {publicLeadSuccessMessage}
+                                        </div>
+                                    )}
 
-                            {publicLeadSuccessMessage && (
-                                <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                                    {publicLeadSuccessMessage}
-                                </div>
-                            )}
+                                    {messageErrorMessage && (
+                                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                            {messageErrorMessage}
+                                        </div>
+                                    )}
 
-                            {messageErrorMessage && (
-                                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                                    {messageErrorMessage}
-                                </div>
-                            )}
-
-                            {messageSuccessMessage && (
-                                <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                                    {messageSuccessMessage}
-                                </div>
+                                    {messageSuccessMessage && (
+                                        <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                                            {messageSuccessMessage}
+                                        </div>
+                                    )}
+                                </>
                             )}
                                 </>
                             )}
