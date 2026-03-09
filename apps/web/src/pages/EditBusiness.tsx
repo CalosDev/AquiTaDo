@@ -163,7 +163,7 @@ export function EditBusiness() {
             }
         } catch (error) {
             setBusiness(null);
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la edicion del negocio'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la edición del negocio'));
         } finally {
             setLoading(false);
         }
@@ -262,13 +262,13 @@ export function EditBusiness() {
             return 'La descripcion debe tener al menos 20 caracteres';
         }
         if (!formData.address.trim()) {
-            return 'La direccion es obligatoria';
+            return 'La dirección es obligatoria';
         }
         if (!formData.provinceId) {
             return 'Debes seleccionar una provincia';
         }
         if (formData.categoryIds.length === 0) {
-            return 'Debes seleccionar al menos una categoria';
+            return 'Debes seleccionar al menos una categoría';
         }
         if (formData.provinceId !== initialProvinceId && !formData.cityId) {
             return 'Si cambias la provincia, selecciona una ciudad para completar la actualizacion';
@@ -341,7 +341,7 @@ export function EditBusiness() {
                 if (failedCount > 0) {
                     setSuccessMessage(`Negocio actualizado. ${failedCount} imagen(es) no se pudieron subir.`);
                 } else {
-                    setSuccessMessage('Negocio e imagenes actualizados correctamente');
+                    setSuccessMessage('Negocio e imágenes actualizados correctamente');
                 }
             } else {
                 setSuccessMessage('Negocio actualizado correctamente');
@@ -376,9 +376,9 @@ export function EditBusiness() {
         return (
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
                 <div className="card p-8">
-                    <h1 className="font-display text-2xl font-bold text-gray-900">No se pudo abrir esta edicion</h1>
+                    <h1 className="font-display text-2xl font-bold text-gray-900">No se pudo abrir esta edición</h1>
                     <p className="text-gray-600 mt-2">
-                        Verifica que el negocio existe y que pertenece a tu organizacion.
+                        Verifica que el negocio existe y que pertenece a tu organización.
                     </p>
                     {errorMessage && (
                         <p className="mt-3 text-sm text-red-700">{errorMessage}</p>
@@ -398,13 +398,13 @@ export function EditBusiness() {
                 <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Editar negocio</h1>
                 <p className="text-blue-100 mt-2 max-w-2xl">
-                    Actualiza la informacion publica de tu negocio y manten su perfil siempre al dia.
+                    Actualiza la información pública de tu negocio y mantén su perfil siempre al día.
                 </p>
 
                 <div className="mt-5 flex flex-wrap gap-3">
                     <Link to="/dashboard" className="btn-secondary">Volver al panel</Link>
                     <Link to={`/businesses/${business.slug || business.id}`} className="btn-primary">
-                        Ver perfil publico
+                        Ver perfil público
                     </Link>
                 </div>
             </section>
@@ -451,7 +451,7 @@ export function EditBusiness() {
                     </div>
                     <div>
                         <label htmlFor="edit-business-phone" className="text-sm font-medium text-gray-700 mb-1 block">
-                            Telefono
+                            Teléfono
                         </label>
                         <input
                             id="edit-business-phone"
@@ -477,7 +477,7 @@ export function EditBusiness() {
                     </div>
                     <div className="md:col-span-2">
                         <label htmlFor="edit-business-address" className="text-sm font-medium text-gray-700 mb-1 block">
-                            Direccion *
+                            Dirección *
                         </label>
                         <input
                             id="edit-business-address"
@@ -566,7 +566,7 @@ export function EditBusiness() {
                 </div>
 
                 <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Categorias *</p>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Categorías *</p>
                     <div className="flex flex-wrap gap-2">
                         {categories.map((category) => (
                             <button
@@ -611,9 +611,9 @@ export function EditBusiness() {
 
                 <div className="space-y-4 rounded-xl border border-gray-100 p-4">
                     <div>
-                        <h2 className="font-display text-lg font-semibold text-gray-900">Imagenes del negocio</h2>
+                        <h2 className="font-display text-lg font-semibold text-gray-900">Imágenes del negocio</h2>
                         <p className="text-sm text-gray-600">
-                            Puedes eliminar imagenes actuales y subir nuevas imagenes.
+                            Puedes eliminar imágenes actuales y subir nuevas imágenes.
                         </p>
                     </div>
 
@@ -644,12 +644,12 @@ export function EditBusiness() {
                             ))}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-500">Este negocio aun no tiene imagenes.</p>
+                        <p className="text-sm text-gray-500">Este negocio aún no tiene imágenes.</p>
                     )}
 
                     <div>
                         <label htmlFor="edit-business-new-images" className="text-sm font-medium text-gray-700 mb-1 block">
-                            Subir nuevas imagenes
+                            Subir nuevas imágenes
                         </label>
                         <input
                             id="edit-business-new-images"
@@ -660,7 +660,7 @@ export function EditBusiness() {
                             className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-primary-700 hover:file:bg-primary-100"
                         />
                         <p className="mt-2 text-xs text-gray-500">
-                            Hasta 5 imagenes por envio. Formatos JPG, PNG o WEBP (maximo 5MB c/u).
+                            Hasta 5 imágenes por envio. Formatos JPG, PNG o WEBP (máximo 5MB c/u).
                         </p>
                         {selectedImages.length > 0 && (
                             <ul className="mt-2 text-xs text-gray-600 space-y-1">

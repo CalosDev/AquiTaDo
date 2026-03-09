@@ -92,7 +92,7 @@ export class AdvancedRateLimitGuard implements CanActivate {
                 response.setHeader('Retry-After', String(config.windowSeconds));
                 throw new HttpException(
                     {
-                        message: `Rate limit excedido para politica "${policy}"`,
+                        message: `Rate limit excedido para política "${policy}"`,
                         policy,
                         identifier: check.identifier,
                         retryAfterSeconds: config.windowSeconds,

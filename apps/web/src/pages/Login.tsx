@@ -23,7 +23,7 @@ export function Login() {
             navigate('/app');
         } catch (err: unknown) {
             const requestError = err as { response?: { data?: { message?: string } } };
-            const message = requestError.response?.data?.message || 'Error al iniciar sesion';
+            const message = requestError.response?.data?.message || 'Error al iniciar sesión';
             if (String(message).toLowerCase().includes('2fa')) {
                 setRequiresTwoFactor(true);
             }
@@ -42,7 +42,7 @@ export function Login() {
                             A
                         </div>
                         <h1 className="font-display text-2xl font-bold text-gray-900">Bienvenido de vuelta</h1>
-                        <p className="text-gray-500 text-sm mt-1">Inicia sesion en tu cuenta</p>
+                        <p className="text-gray-500 text-sm mt-1">Inicia sesión en tu cuenta</p>
                     </div>
 
                     {error && (
@@ -109,7 +109,7 @@ export function Login() {
                             </div>
                         )}
                         <button type="submit" disabled={loading} className="btn-primary w-full">
-                            {loading ? 'Ingresando...' : 'Iniciar sesion'}
+                            {loading ? 'Ingresando...' : 'Iniciar sesión'}
                         </button>
                     </form>
 

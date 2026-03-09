@@ -431,7 +431,7 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
         await this.whatsAppOutboundService.sendTextMessage({
             to: payload.businessWhatsapp,
             text: [
-                `Alerta AquiTaDo: detectamos una resena negativa para ${payload.businessName}.`,
+                `Alerta AquiTaDo: detectamos una reseña negativa para ${payload.businessName}.`,
                 `Resumen IA: ${payload.summary}`,
                 `Resena: ${payload.reviewId}`,
             ].join('\n'),

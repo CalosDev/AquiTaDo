@@ -525,7 +525,7 @@ export class CrmService {
         });
 
         if (!business) {
-            throw new NotFoundException('Negocio no encontrado en la organizacion activa');
+            throw new NotFoundException('Negocio no encontrado en la organización activa');
         }
 
         if (dto.customerUserId) {
@@ -550,7 +550,7 @@ export class CrmService {
             });
 
             if (!conversation) {
-                throw new NotFoundException('Conversacion no encontrada para la organizacion activa');
+                throw new NotFoundException('Conversación no encontrada para la organización activa');
             }
         }
 
@@ -566,7 +566,7 @@ export class CrmService {
             });
 
             if (!booking) {
-                throw new NotFoundException('Reserva no encontrada para la organizacion activa');
+                throw new NotFoundException('Reserva no encontrada para la organización activa');
             }
         }
 

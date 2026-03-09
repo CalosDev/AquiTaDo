@@ -364,7 +364,7 @@ export class AnalyticsService {
 
             return {
                 categoryId: entry.categoryId,
-                categoryName: category?.name ?? 'Sin categoria',
+                categoryName: category?.name ?? 'Sin categoría',
                 categorySlug: category?.slug ?? null,
                 searches: entry._count._all,
                 supplyBusinesses: supply,

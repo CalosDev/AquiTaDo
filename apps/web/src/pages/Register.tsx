@@ -34,27 +34,27 @@ export function Register() {
         }
 
         if (formData.password.length < 8) {
-            setError('La contrasena debe tener al menos 8 caracteres');
+            setError('La contraseña debe tener al menos 8 caracteres');
             return;
         }
 
         if (!/[A-Za-z]/.test(formData.password) || !/\d/.test(formData.password)) {
-            setError('La contrasena debe incluir letras y numeros');
+            setError('La contraseña debe incluir letras y números');
             return;
         }
 
         if (formData.password !== formData.confirmPassword) {
-            setError('La confirmacion de contrasena no coincide');
+            setError('La confirmación de contraseña no coincide');
             return;
         }
 
         if (formData.phone.trim() && !PHONE_REGEX.test(formData.phone.trim())) {
-            setError('El telefono no tiene un formato valido');
+            setError('El teléfono no tiene un formato válido');
             return;
         }
 
         if (!formData.acceptTerms) {
-            setError('Debes aceptar los terminos y la politica de privacidad');
+            setError('Debes aceptar los términos y la política de privacidad');
             return;
         }
 
@@ -85,7 +85,7 @@ export function Register() {
                             A
                         </div>
                         <h1 className="font-display text-2xl font-bold text-gray-900">Crea tu cuenta</h1>
-                        <p className="text-gray-500 text-sm mt-1">Unete a la comunidad AquiTa.do</p>
+                        <p className="text-gray-500 text-sm mt-1">Únete a la comunidad AquiTa.do</p>
                     </div>
 
                     {error && (
@@ -111,7 +111,7 @@ export function Register() {
                         </div>
                         <div>
                             <label htmlFor="register-email" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Correo electronico *
+                                Correo electrónico *
                             </label>
                             <input
                                 id="register-email"
@@ -137,14 +137,14 @@ export function Register() {
                                 })}
                                 className="input-field"
                             >
-                                <option value="">Selecciona una opcion...</option>
+                                <option value="">Selecciona una opción...</option>
                                 <option value="USER">Cliente (descubrir y reservar)</option>
                                 <option value="BUSINESS_OWNER">Negocio (vender y gestionar)</option>
                             </select>
                         </div>
                         <div>
                             <label htmlFor="register-phone" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Telefono (opcional)
+                                Teléfono (opcional)
                             </label>
                             <input
                                 id="register-phone"
@@ -157,7 +157,7 @@ export function Register() {
                         </div>
                         <div>
                             <label htmlFor="register-password" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Contrasena *
+                                Contraseña *
                             </label>
                             <input
                                 id="register-password"
@@ -167,12 +167,12 @@ export function Register() {
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 className="input-field"
-                                placeholder="Minimo 8 caracteres, con letras y numeros"
+                                placeholder="Mínimo 8 caracteres, con letras y números"
                             />
                         </div>
                         <div>
                             <label htmlFor="register-confirm-password" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Confirmar contrasena *
+                                Confirmar contraseña *
                             </label>
                             <input
                                 id="register-confirm-password"
@@ -182,7 +182,7 @@ export function Register() {
                                 value={formData.confirmPassword}
                                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                                 className="input-field"
-                                placeholder="Repite tu contrasena"
+                                placeholder="Repite tu contraseña"
                             />
                         </div>
                         <label className="flex items-start gap-2 text-sm text-gray-600">
@@ -194,7 +194,7 @@ export function Register() {
                                 required
                             />
                             <span>
-                                Acepto los <Link to="/terms" className="text-primary-600 hover:text-primary-700">terminos</Link> y la <Link to="/privacy" className="text-primary-600 hover:text-primary-700">politica de privacidad</Link>.
+                                Acepto los <Link to="/terms" className="text-primary-600 hover:text-primary-700">términos</Link> y la <Link to="/privacy" className="text-primary-600 hover:text-primary-700">política de privacidad</Link>.
                             </span>
                         </label>
                         <button type="submit" disabled={loading} className="btn-primary w-full">
@@ -203,9 +203,9 @@ export function Register() {
                     </form>
 
                     <p className="text-center text-sm text-gray-500 mt-6">
-                        Ya tienes cuenta?{' '}
+                        ¿Ya tienes cuenta?{' '}
                         <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-                            Inicia sesion
+                            Inicia sesión
                         </Link>
                     </p>
                 </div>

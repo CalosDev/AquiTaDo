@@ -56,7 +56,7 @@ export class AuthService {
         });
 
         if (existingUser) {
-            throw new ConflictException('El correo electronico ya esta registrado');
+            throw new ConflictException('El correo electrónico ya está registrado');
         }
 
         const rawRequestedRole = (dto as { role?: unknown }).role;
@@ -65,7 +65,7 @@ export class AuthService {
             && rawRequestedRole !== 'USER'
             && rawRequestedRole !== 'BUSINESS_OWNER'
         ) {
-            throw new BadRequestException('Rol no permitido para registro publico');
+            throw new BadRequestException('Rol no permitido para registro público');
         }
 
         const requestedRole: Role = rawRequestedRole === 'BUSINESS_OWNER' ? 'BUSINESS_OWNER' : 'USER';
@@ -74,7 +74,7 @@ export class AuthService {
         if (requestedPhone && requestedPhone.length > 0) {
             const phoneValidation = await this.integrationsService.validateDominicanPhone(requestedPhone);
             if (!phoneValidation.isValid || !phoneValidation.normalizedPhone) {
-                throw new BadRequestException('El telefono debe ser un numero dominicano valido');
+                throw new BadRequestException('El teléfono debe ser un número dominicano válido');
             }
             normalizedPhone = phoneValidation.normalizedPhone;
         }
@@ -159,7 +159,7 @@ export class AuthService {
             true,
         );
         if (!normalizedToken) {
-            throw new UnauthorizedException('Refresh token invalido');
+            throw new UnauthorizedException('Refresh token inválido');
         }
 
         const payload = this.verifyRefreshToken(normalizedToken);
@@ -184,11 +184,11 @@ export class AuthService {
         });
 
         if (!storedRefreshToken || storedRefreshToken.revokedAt || storedRefreshToken.expiresAt <= new Date()) {
-            throw new UnauthorizedException('Refresh token invalido o expirado');
+            throw new UnauthorizedException('Refresh token inválido o expirado');
         }
 
         if (payload.sub !== storedRefreshToken.userId) {
-            throw new UnauthorizedException('Refresh token invalido');
+            throw new UnauthorizedException('Refresh token inválido');
         }
 
         return this.issueAuthSession(
@@ -220,7 +220,7 @@ export class AuthService {
         }
 
         this.clearRefreshCookie(response);
-        return { message: 'Sesion cerrada' };
+        return { message: 'Sesión cerrada' };
     }
 
     async getTwoFactorStatus(userId: string) {
@@ -314,7 +314,7 @@ export class AuthService {
         }
 
         if (!verifyTotpCode(user.twoFactorPendingSecret, code)) {
-            throw new UnauthorizedException('Codigo 2FA invalido');
+            throw new UnauthorizedException('Código 2FA inválido');
         }
 
         await this.prisma.$transaction(async (tx) => {
@@ -341,7 +341,7 @@ export class AuthService {
 
         return {
             enabled: true,
-            message: '2FA habilitado correctamente. Inicia sesion nuevamente.',
+            message: '2FA habilitado correctamente. Inicia sesión nuevamente.',
         };
     }
 
@@ -365,11 +365,11 @@ export class AuthService {
         }
 
         if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-            throw new BadRequestException('2FA no esta habilitado');
+            throw new BadRequestException('2FA no está habilitado');
         }
 
         if (!verifyTotpCode(user.twoFactorSecret, code)) {
-            throw new UnauthorizedException('Codigo 2FA invalido');
+            throw new UnauthorizedException('Código 2FA inválido');
         }
 
         await this.prisma.$transaction(async (tx) => {
@@ -396,7 +396,7 @@ export class AuthService {
 
         return {
             enabled: false,
-            message: '2FA deshabilitado. Inicia sesion nuevamente.',
+            message: '2FA deshabilitado. Inicia sesión nuevamente.',
         };
     }
 
@@ -499,7 +499,7 @@ export class AuthService {
         try {
             return this.jwtService.verify<AuthTokenPayload>(token, { secret: refreshSecret });
         } catch {
-            throw new UnauthorizedException('Refresh token invalido');
+            throw new UnauthorizedException('Refresh token inválido');
         }
     }
 
@@ -594,7 +594,7 @@ export class AuthService {
         }
 
         if (required) {
-            throw new UnauthorizedException('Refresh token invalido');
+            throw new UnauthorizedException('Refresh token inválido');
         }
 
         return null;
@@ -654,7 +654,7 @@ export class AuthService {
         }
 
         if (!verifyTotpCode(twoFactorSecret, normalizedCode)) {
-            throw new UnauthorizedException('Codigo 2FA invalido');
+            throw new UnauthorizedException('Código 2FA inválido');
         }
     }
 

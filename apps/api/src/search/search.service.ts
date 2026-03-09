@@ -81,7 +81,7 @@ export class SearchService {
         return {
             indexedCount: 0,
             source: 'database',
-            message: 'No se requiere reindexacion: busqueda usa PostgreSQL',
+            message: 'No se requiere reindexación: la búsqueda usa PostgreSQL',
         };
     }
 

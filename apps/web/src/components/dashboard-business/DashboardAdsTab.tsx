@@ -132,7 +132,7 @@ export function DashboardAdsTab({
                 </div>
 
                 <div className="mb-5">
-                    <p className="text-xs text-gray-500 mb-2">Ultimas recargas</p>
+                    <p className="text-xs text-gray-500 mb-2">Últimas recargas</p>
                     <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                         {adsWalletTopups.length > 0 ? adsWalletTopups.slice(0, 8).map((topup) => {
                             const status = resolveAdsWalletTopupStatus(topup.status);

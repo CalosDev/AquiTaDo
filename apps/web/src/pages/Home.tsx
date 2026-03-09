@@ -72,15 +72,15 @@ const INTENT_LINKS = [
 const OPERATING_POINTS = [
     {
         title: 'Descubre mejor',
-        description: 'Filtros por categoria, provincia e intencion para encontrar opciones reales en minutos.',
+        description: 'Filtros por categoría, provincia e intención para encontrar opciones reales en minutos.',
     },
     {
         title: 'Contacta directo',
-        description: 'WhatsApp y contacto directo para convertir descubrimiento en accion inmediata.',
+        description: 'WhatsApp y contacto directo para convertir descubrimiento en acción inmediata.',
     },
     {
         title: 'Opera como SaaS',
-        description: 'Panel de negocio para gestionar perfil, reputacion y crecimiento comercial.',
+        description: 'Panel de negocio para gestionar perfil, reputación y crecimiento comercial.',
     },
 ];
 
@@ -284,7 +284,7 @@ export function Home() {
             setTotalBusinesses(Number(bizRes.data.total || 0));
             setProvinces(provRes.data);
         } catch (error) {
-            setLoadError(getApiErrorMessage(error, 'No se pudo cargar la informacion inicial'));
+            setLoadError(getApiErrorMessage(error, 'No se pudo cargar la información inicial'));
         } finally {
             setLoading(false);
         }
@@ -314,7 +314,7 @@ export function Home() {
                     return;
                 }
                 setRankings([]);
-                setRankingsError(getApiErrorMessage(error, 'No se pudo cargar el ranking de reputacion'));
+                setRankingsError(getApiErrorMessage(error, 'No se pudo cargar el ranking de reputación'));
             })
             .finally(() => {
                 if (active) {
@@ -418,7 +418,7 @@ export function Home() {
                             </h1>
                             <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-blue-100">
                                 AquiTa.do conecta clientes con negocios verificados y entrega herramientas SaaS para operar mejor:
-                                CRM, promociones, reputacion y analitica en una sola plataforma.
+                                CRM, promociones, reputación y analítica en una sola plataforma.
                             </p>
 
                             <div className="mt-5 flex flex-wrap gap-2.5">
@@ -477,7 +477,7 @@ export function Home() {
                                     {loading ? '...' : provinces.length} provincias
                                 </span>
                                 <span className="kpi-chip-soft">
-                                    {loading ? '...' : categories.length} categorias
+                                    {loading ? '...' : categories.length} categorías
                                 </span>
                             </div>
                         </div>
@@ -485,11 +485,11 @@ export function Home() {
                         <div className="lg:col-span-5">
                             <div className="hero-accent-ring p-6 md:p-7 text-white">
                                 <p className="text-xs uppercase tracking-[0.18em] text-blue-200 font-semibold">Radar local</p>
-                                <h2 className="mt-2 font-display text-2xl font-bold">Que esta moviendo el mercado</h2>
+                                <h2 className="mt-2 font-display text-2xl font-bold">Qué está moviendo el mercado</h2>
 
                                 <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div className="hero-metric-card">
-                                        <p className="hero-metric-label">Top categoria</p>
+                                        <p className="hero-metric-label">Top categoría</p>
                                         <p className="hero-metric-value truncate">
                                             {topRadarCategories[0]?.name || 'Cargando'}
                                         </p>
@@ -526,7 +526,7 @@ export function Home() {
                                         </Link>
                                     )) : (
                                         <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-blue-100">
-                                            Cargando categorias destacadas...
+                                            Cargando categorías destacadas...
                                         </div>
                                     )}
                                 </div>
@@ -577,9 +577,9 @@ export function Home() {
                                 value={aiCategoryId}
                                 onChange={(event) => setAiCategoryId(event.target.value)}
                                 className="input-field"
-                                aria-label="Filtrar por categoria"
+                                aria-label="Filtrar por categoría"
                             >
-                                <option value="">Todas las categorias</option>
+                                <option value="">Todas las categorías</option>
                                 {categories.map((category) => (
                                     <option key={category.id} value={category.id}>
                                         {category.name}
@@ -644,7 +644,7 @@ export function Home() {
                 <div className="section-shell p-5 md:p-7">
                     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>
-                            <h2 className="section-title !text-2xl md:!text-3xl">Explora por intencion</h2>
+                            <h2 className="section-title !text-2xl md:!text-3xl">Explora por intención</h2>
                             <p className="section-subtitle">Rutas rapidas para encontrar justo lo que necesitas.</p>
                         </div>
                     </div>
@@ -675,7 +675,7 @@ export function Home() {
                     <div className="section-shell p-6">
                         <div className="flex items-end justify-between gap-4">
                             <div>
-                                <h3 className="font-display text-2xl font-bold text-slate-900">Categorias top en RD</h3>
+                                <h3 className="font-display text-2xl font-bold text-slate-900">Categorías top en RD</h3>
                                 <p className="mt-1 text-sm text-slate-600">Taxonomia local para descubrir negocios dominicanos sin friccion.</p>
                             </div>
                             <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
@@ -740,7 +740,7 @@ export function Home() {
                 <div className="section-shell p-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                         <div>
-                            <h3 className="font-display text-2xl font-bold text-slate-900">Ranking de reputacion</h3>
+                            <h3 className="font-display text-2xl font-bold text-slate-900">Ranking de reputación</h3>
                             <p className="mt-1 text-sm text-slate-600">
                                 Negocios verificados con mejor desempeno por provincia.
                             </p>
@@ -751,7 +751,7 @@ export function Home() {
                             className="input-field text-sm max-w-xs"
                             aria-label="Filtrar ranking por provincia"
                         >
-                            <option value="">Toda Republica Dominicana</option>
+                            <option value="">Toda República Dominicana</option>
                             {provinces.map((province) => (
                                 <option key={province.id} value={province.id}>
                                     {province.name}
@@ -776,7 +776,7 @@ export function Home() {
                             ))}
                         </div>
                     ) : rankings.length === 0 ? (
-                        <p className="mt-5 text-sm text-slate-500">Aun no hay ranking disponible para ese filtro.</p>
+                        <p className="mt-5 text-sm text-slate-500">Aún no hay ranking disponible para ese filtro.</p>
                     ) : (
                         <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
                             {rankings.map((item) => (
@@ -791,7 +791,7 @@ export function Home() {
                                             <p className="text-sm font-semibold text-primary-700">#{item.rank}</p>
                                             <p className="font-display text-lg font-semibold text-slate-900">{item.name}</p>
                                             <p className="text-xs text-slate-500">
-                                                {item.city?.name || item.province?.name || 'Republica Dominicana'}
+                                                {item.city?.name || item.province?.name || 'República Dominicana'}
                                             </p>
                                         </div>
                                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${reputationTierClass(item.reputation.tier)}`}>
@@ -803,7 +803,7 @@ export function Home() {
                                         <span>
                                             Rating {item.reputation.averageRating > 0 ? item.reputation.averageRating.toFixed(1) : '0.0'}
                                         </span>
-                                        <span>{item.reputation.reviewCount} resenas</span>
+                                        <span>{item.reputation.reviewCount} reseñas</span>
                                     </div>
                                 </Link>
                             ))}
@@ -823,8 +823,8 @@ export function Home() {
 
                 {recentBusinesses.length === 0 ? (
                     <div className="section-shell mt-6 p-10 text-center">
-                        <p className="font-display text-2xl font-semibold text-slate-800">Aun no hay negocios registrados.</p>
-                        <p className="mt-2 text-sm text-slate-600">Se el primero en posicionar tu marca local.</p>
+                        <p className="font-display text-2xl font-semibold text-slate-800">Aún no hay negocios registrados.</p>
+                        <p className="mt-2 text-sm text-slate-600">Sé el primero en posicionar tu marca local.</p>
                         <Link to={registerBusinessPath} className="btn-primary mt-5 inline-flex">{registerBusinessLabel}</Link>
                     </div>
                 ) : (
@@ -903,7 +903,7 @@ export function Home() {
                             {registerBusinessLabel}
                         </Link>
                         <Link to="/businesses" className="btn-secondary !bg-white/90 !text-primary-800 hover:!bg-white">
-                            Ver directorio publico
+                            Ver directorio público
                         </Link>
                     </div>
                 </div>

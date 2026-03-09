@@ -22,7 +22,7 @@ export function About() {
             <section className="card p-7 md:p-10">
                 <span className="chip mb-4">Conoce AquiTa.do</span>
                 <h1 className="font-display text-3xl md:text-4xl font-bold text-slate-900">
-                    Un ecosistema local para negocios y clientes en Republica Dominicana
+                    Un ecosistema local para negocios y clientes en República Dominicana
                 </h1>
                 <p className="mt-4 text-slate-600 max-w-4xl leading-relaxed">
                     AquiTa.do conecta discovery, confianza y conversion en una sola plataforma.
@@ -37,7 +37,7 @@ export function About() {
                         El proyecto
                     </h2>
                     <p className="text-slate-600 leading-relaxed">
-                        Nacimos con una vision clara: construir una plataforma profesional para el
+                        Nacimos con una visión clara: construir una plataforma profesional para el
                         mercado dominicano, enfocada en resultados reales para los negocios.
                         Combinamos directorio inteligente, SaaS operativo y canales de conversion
                         (como WhatsApp) para que la plataforma sea util todos los dias.
@@ -45,7 +45,7 @@ export function About() {
                     <div className="mt-5 space-y-2 text-sm text-slate-700">
                         <p><strong>Mision:</strong> digitalizar y escalar el comercio local.</p>
                         <p><strong>Enfoque:</strong> performance, confianza y conversion.</p>
-                        <p><strong>Mercado inicial:</strong> Republica Dominicana.</p>
+                        <p><strong>Mercado inicial:</strong> República Dominicana.</p>
                     </div>
                 </article>
 
@@ -55,7 +55,7 @@ export function About() {
                     </h2>
                     <p className="text-slate-600 leading-relaxed">
                         Somos un equipo orientado a producto y ejecucion. Priorizamos calidad,
-                        estabilidad y crecimiento sostenible, con un estandar tecnico alineado a
+                        estabilidad y crecimiento sostenible, con un estándar técnico alineado a
                         plataformas SaaS modernas.
                     </p>
                     <div className="mt-5 space-y-3">

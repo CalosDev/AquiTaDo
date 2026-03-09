@@ -32,7 +32,7 @@ export class CircuitBreakerService {
 
         if (state.openedUntil > now) {
             throw new ServiceUnavailableException(
-                `El servicio externo "${key}" esta temporalmente protegido por circuit breaker`,
+                `El servicio externo "${key}" está temporalmente protegido por circuit breaker`,
             );
         }
 
@@ -57,7 +57,7 @@ export class CircuitBreakerService {
                     `Circuit breaker opened for "${key}" during ${this.cooldownMs}ms`,
                 );
                 throw new ServiceUnavailableException(
-                    `El servicio externo "${key}" no esta disponible temporalmente`,
+                    `El servicio externo "${key}" no está disponible temporalmente`,
                 );
             }
 

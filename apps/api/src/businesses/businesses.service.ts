@@ -152,7 +152,7 @@ export class BusinessesService {
         const contactPhone = dto.contactPhone.trim();
         const phoneValidation = await this.integrationsService.validateDominicanPhone(contactPhone);
         if (!phoneValidation.isValid || !phoneValidation.normalizedPhone) {
-            throw new BadRequestException('El telefono de contacto no es valido para Republica Dominicana');
+            throw new BadRequestException('El teléfono de contacto no es válido para República Dominicana');
         }
         const normalizedPhone = phoneValidation.normalizedPhone;
         const preferredChannel = dto.preferredChannel?.trim().toUpperCase() || null;
@@ -179,7 +179,7 @@ export class BusinessesService {
 
         if (recentDuplicate) {
             throw new BadRequestException(
-                'Ya existe una solicitud reciente con este telefono. Intenta nuevamente en unos minutos.',
+                'Ya existe una solicitud reciente con este teléfono. Intenta nuevamente en unos minutos.',
             );
         }
 
@@ -484,7 +484,7 @@ export class BusinessesService {
 
                 if (organizationId) {
                     if (!organizationRole) {
-                        throw new ForbiddenException('No tienes permisos para crear negocios en esta organizacion');
+                        throw new ForbiddenException('No tienes permisos para crear negocios en esta organización');
                     }
 
                     if (organizationRole === 'STAFF') {
@@ -701,7 +701,7 @@ export class BusinessesService {
 
         if (userRole !== 'ADMIN') {
             if (!organizationId) {
-                throw new ForbiddenException('Debes seleccionar una organizacion activa');
+                throw new ForbiddenException('Debes seleccionar una organización activa');
             }
 
             if (business.organizationId !== organizationId) {
@@ -908,7 +908,7 @@ export class BusinessesService {
             } else {
                 const validation = await this.integrationsService.validateDominicanPhone(trimmedPhone);
                 if (!validation.isValid || !validation.normalizedPhone) {
-                    throw new BadRequestException('El telefono del negocio no es valido para Republica Dominicana');
+                    throw new BadRequestException('El teléfono del negocio no es válido para República Dominicana');
                 }
                 result.phone = validation.normalizedPhone;
             }
@@ -921,7 +921,7 @@ export class BusinessesService {
             } else {
                 const validation = await this.integrationsService.validateDominicanPhone(trimmedWhatsApp);
                 if (!validation.isValid || !validation.normalizedPhone) {
-                    throw new BadRequestException('El WhatsApp del negocio no es valido para Republica Dominicana');
+                    throw new BadRequestException('El WhatsApp del negocio no es válido para República Dominicana');
                 }
                 result.whatsapp = validation.normalizedPhone;
             }

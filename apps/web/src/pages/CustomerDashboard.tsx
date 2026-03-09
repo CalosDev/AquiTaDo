@@ -199,7 +199,7 @@ export function CustomerDashboard() {
                         </Link>
                     </div>
                     {favorites.length === 0 ? (
-                        <p className="text-sm text-gray-500">Aun no has guardado negocios.</p>
+                        <p className="text-sm text-gray-500">Aún no has guardado negocios.</p>
                     ) : (
                         <div className="space-y-3">
                             {favorites.map((favorite) => (

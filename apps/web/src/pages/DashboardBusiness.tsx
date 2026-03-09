@@ -136,7 +136,7 @@ export function DashboardBusiness() {
             });
         } catch (error) {
             const message = getApiErrorMessage(error, 'No se pudo cargar el panel del negocio');
-            if (message.toLowerCase().includes('organizacion activa') || message.toLowerCase().includes('organización activa')) {
+            if (message.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').includes('organizacion activa')) {
                 setBusinesses([]);
                 setMetrics(null);
                 setSelectedBusinessId('');
@@ -176,7 +176,7 @@ export function DashboardBusiness() {
                 }),
             );
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificacion documental'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificación documental'));
         }
     }, []);
 
@@ -224,7 +224,7 @@ export function DashboardBusiness() {
             const uploadPayload = (uploadRes.data || {}) as { fileUrl?: string; url?: string };
             const fileUrl = uploadPayload.fileUrl || uploadPayload.url;
             if (!fileUrl) {
-                throw new Error('No se recibio URL del archivo');
+                throw new Error('No se recibió la URL del archivo');
             }
 
             await verificationApi.submitDocument({
@@ -235,7 +235,7 @@ export function DashboardBusiness() {
 
             setSelectedFile(null);
             await loadVerificationData(selectedBusinessId);
-            setSuccessMessage('Documento enviado para revision');
+            setSuccessMessage('Documento enviado para revisión');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo subir el documento'));
         } finally {
@@ -257,9 +257,9 @@ export function DashboardBusiness() {
                 notes: verificationNotes.trim() || undefined,
             });
             await loadVerificationData(selectedBusinessId);
-            setSuccessMessage('Solicitud de verificacion enviada');
+            setSuccessMessage('Solicitud de verificación enviada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificacion'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificación'));
         } finally {
             setSaving(false);
         }
@@ -288,7 +288,7 @@ export function DashboardBusiness() {
                 <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Resumen de rendimiento</h1>
                 <p className="text-blue-100 mt-2 max-w-2xl">
-                    Vista simplificada enfocada en analitica base y verificacion documental.
+                    Vista simplificada enfocada en analítica base y verificación documental.
                 </p>
 
                 <div className="mt-5 role-kpi-grid">
@@ -301,7 +301,7 @@ export function DashboardBusiness() {
                         <p className="role-kpi-value">{totals.views ?? 0}</p>
                     </article>
                     <article className="role-kpi-card">
-                        <p className="role-kpi-label">Conversion</p>
+                        <p className="role-kpi-label">Conversión</p>
                         <p className="role-kpi-value">{totals.conversionRate ?? 0}%</p>
                     </article>
                     <article className="role-kpi-card">
@@ -344,14 +344,14 @@ export function DashboardBusiness() {
                     <p className="text-sm uppercase tracking-wide text-primary-700 font-semibold">Primer paso</p>
                     <h2 className="font-display text-2xl font-bold text-gray-900 mt-2">Registra tu primer negocio</h2>
                     <p className="text-gray-600 mt-2 max-w-2xl">
-                        Tu panel de negocio se activa despues de crear el primer negocio. En ese proceso se prepara tu organizacion interna y la verificacion documental.
+                        Tu panel de negocio se activa después de crear el primer negocio. En ese proceso se prepara tu organización interna y la verificación documental.
                     </p>
                     <div className="mt-5 flex flex-wrap gap-3">
                         <Link className="btn-primary" to="/register-business">
                             Registrar negocio ahora
                         </Link>
                         <Link className="btn-secondary" to="/businesses">
-                            Ver directorio publico
+                            Ver directorio público
                         </Link>
                     </div>
                 </section>
@@ -382,7 +382,7 @@ export function DashboardBusiness() {
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.clicks ?? 0}</p>
                 </article>
                 <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversion</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversión</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.conversionRate ?? 0}%</p>
                 </article>
                 <article className="panel-premium p-5">
@@ -405,7 +405,7 @@ export function DashboardBusiness() {
                         )}
                     </div>
                     {businesses.length === 0 ? (
-                        <p className="text-sm text-gray-500">Aun no tienes negocios creados.</p>
+                        <p className="text-sm text-gray-500">Aún no tienes negocios creados.</p>
                     ) : (
                         <div className="space-y-2">
                             {businesses.map((business) => (
@@ -421,7 +421,7 @@ export function DashboardBusiness() {
                                 >
                                     <p className="font-medium text-gray-900">{business.name}</p>
                                     <p className="text-xs text-gray-500 mt-1">
-                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificacion'}
+                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificación'}
                                     </p>
                                 </button>
                             ))}
@@ -431,7 +431,7 @@ export function DashboardBusiness() {
 
                 <article className="card p-6 lg:col-span-2 space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Verificacion documental</h2>
+                        <h2 className="font-display text-xl font-bold text-gray-900">Verificación documental</h2>
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getStatusClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
                             {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
                         </span>
@@ -442,7 +442,7 @@ export function DashboardBusiness() {
                             Negocio seleccionado: <strong>{selectedBusiness.name}</strong>
                         </p>
                     ) : (
-                        <p className="text-sm text-gray-500">Selecciona un negocio para gestionar su verificacion.</p>
+                        <p className="text-sm text-gray-500">Selecciona un negocio para gestionar su verificación.</p>
                     )}
 
                     {verificationStatus?.verificationSubmittedAt && (
@@ -470,10 +470,10 @@ export function DashboardBusiness() {
                                 onChange={(event) => setDocumentType(event.target.value as VerificationDocument['documentType'])}
                                 disabled={!selectedBusinessId || saving}
                             >
-                                <option value="ID_CARD">Cedula</option>
+                                <option value="ID_CARD">Cédula</option>
                                 <option value="TAX_CERTIFICATE">RNC</option>
                                 <option value="BUSINESS_LICENSE">Licencia comercial</option>
-                                <option value="ADDRESS_PROOF">Comprobante de direccion</option>
+                                <option value="ADDRESS_PROOF">Comprobante de dirección</option>
                                 <option value="SELFIE">Selfie</option>
                                 <option value="OTHER">Otro</option>
                             </select>
@@ -491,11 +491,11 @@ export function DashboardBusiness() {
                     </form>
 
                     <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-                        <h3 className="font-semibold text-gray-900">Enviar solicitud de revision</h3>
+                        <h3 className="font-semibold text-gray-900">Enviar solicitud de revisión</h3>
                         <textarea
                             className="input-field text-sm"
                             rows={3}
-                            placeholder="Notas para el equipo de verificacion (opcional)"
+                            placeholder="Notas para el equipo de verificación (opcional)"
                             value={verificationNotes}
                             onChange={(event) => setVerificationNotes(event.target.value)}
                             disabled={!selectedBusinessId || saving}
@@ -506,14 +506,14 @@ export function DashboardBusiness() {
                             onClick={() => void handleSubmitBusinessVerification()}
                             disabled={!selectedBusinessId || saving}
                         >
-                            {saving ? 'Enviando...' : 'Solicitar verificacion'}
+                            {saving ? 'Enviando...' : 'Solicitar verificación'}
                         </button>
                     </div>
 
                     <div className="rounded-xl border border-gray-100 p-4">
                         <h3 className="font-semibold text-gray-900 mb-3">Historial de documentos</h3>
                         {documents.length === 0 ? (
-                            <p className="text-sm text-gray-500">Todavia no has subido documentos.</p>
+                            <p className="text-sm text-gray-500">Todavía no has subido documentos.</p>
                         ) : (
                             <div className="space-y-2">
                                 {documents.map((document) => (

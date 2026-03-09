@@ -8,29 +8,29 @@ import { applySeoMeta } from '../seo/meta';
 function resolveRouteSeo(pathname: string): { title: string; description: string; noindex?: boolean } {
     if (pathname === '/') {
         return {
-            title: 'AquiTa.do | Negocios Locales en Republica Dominicana',
-            description: 'Directorio inteligente de negocios locales en Republica Dominicana. Descubre restaurantes, tiendas, servicios y promociones.',
+            title: 'AquiTa.do | Negocios Locales en República Dominicana',
+            description: 'Directorio inteligente de negocios locales en República Dominicana. Descubre restaurantes, tiendas, servicios y promociones.',
         };
     }
 
     if (pathname === '/businesses') {
         return {
             title: 'Explorar Negocios | AquiTa.do',
-            description: 'Busca negocios por categoria, provincia y nombre. Encuentra opciones verificadas cerca de ti.',
+            description: 'Busca negocios por categoría, provincia y nombre. Encuentra opciones verificadas cerca de ti.',
         };
     }
 
     if (pathname.startsWith('/businesses/')) {
         return {
             title: 'Detalle de Negocio | AquiTa.do',
-            description: 'Consulta horarios, contacto, ubicacion y resenas del negocio.',
+            description: 'Consulta horarios, contacto, ubicación y reseñas del negocio.',
         };
     }
 
     if (pathname === '/login') {
         return {
-            title: 'Iniciar Sesion | AquiTa.do',
-            description: 'Inicia sesion para gestionar tu cuenta, reseñas y operaciones de negocio.',
+            title: 'Iniciar Sesión | AquiTa.do',
+            description: 'Inicia sesión para gestionar tu cuenta, reseñas y operaciones de negocio.',
             noindex: true,
         };
     }
@@ -46,7 +46,7 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
     if (pathname === '/register-business') {
         return {
             title: 'Registrar Negocio | AquiTa.do',
-            description: 'Registra tu negocio local y aumenta tu visibilidad en Republica Dominicana.',
+            description: 'Registra tu negocio local y aumenta tu visibilidad en República Dominicana.',
             noindex: true,
         };
     }
@@ -54,7 +54,7 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
     if (pathname === '/dashboard') {
         return {
             title: 'Dashboard Negocio | AquiTa.do',
-            description: 'Panel SaaS para gestionar promociones, reservas y analiticas.',
+            description: 'Panel SaaS para gestionar promociones, reservas y analíticas.',
             noindex: true,
         };
     }
@@ -62,7 +62,7 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
     if (pathname === '/admin') {
         return {
             title: 'Panel Admin | AquiTa.do',
-            description: 'Administracion interna y operaciones de plataforma.',
+            description: 'Administración interna y operaciones de plataforma.',
             noindex: true,
         };
     }
@@ -70,15 +70,15 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
     if (pathname === '/profile') {
         return {
             title: 'Perfil | AquiTa.do',
-            description: 'Gestiona tu informacion de usuario y preferencias.',
+            description: 'Gestiona tu información de usuario y preferencias.',
             noindex: true,
         };
     }
 
     if (pathname === '/terms') {
         return {
-            title: 'Terminos y Condiciones | AquiTa.do',
-            description: 'Consulta los terminos y condiciones de uso de AquiTa.do.',
+            title: 'Términos y Condiciones | AquiTa.do',
+            description: 'Consulta los términos y condiciones de uso de AquiTa.do.',
         };
     }
 
@@ -92,13 +92,13 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
     if (pathname === '/about') {
         return {
             title: 'Sobre AquiTa.do | Proyecto y Equipo',
-            description: 'Conoce la vision del proyecto AquiTa.do y el equipo que construye la plataforma para Republica Dominicana.',
+            description: 'Conoce la visión del proyecto AquiTa.do y el equipo que construye la plataforma para República Dominicana.',
         };
     }
 
     return {
         title: 'AquiTa.do',
-        description: 'Plataforma local de descubrimiento, SaaS y marketplace para negocios en Republica Dominicana.',
+        description: 'Plataforma local de descubrimiento, SaaS y marketplace para negocios en República Dominicana.',
     };
 }
 

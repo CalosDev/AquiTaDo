@@ -370,7 +370,7 @@ describe('BusinessesController (e2e)', () => {
             .delete(`/api/businesses/${businessId}`)
             .set('Authorization', `Bearer ${adminToken}`)
             .send({
-                reason: 'Incumplimiento de politicas de la plataforma.',
+                reason: 'Incumplimiento de políticas de la plataforma.',
             })
             .expect(200);
 
@@ -451,10 +451,10 @@ describe('BusinessesController (e2e)', () => {
             .expect(200);
 
         const leadPayload = {
-            contactName: 'Cliente Publico',
+            contactName: 'Cliente Público',
             contactPhone: '+1 (809) 555-0000',
             contactEmail: 'cliente-publico@example.com',
-            message: 'Necesito una cotizacion para hoy',
+            message: 'Necesito una cotización para hoy',
             preferredChannel: 'WHATSAPP',
         };
 
@@ -479,7 +479,7 @@ describe('BusinessesController (e2e)', () => {
 
         expect(duplicatedLead.body).toMatchObject({
             statusCode: 400,
-            message: 'Ya existe una solicitud reciente con este telefono. Intenta nuevamente en unos minutos.',
+            message: 'Ya existe una solicitud reciente con este teléfono. Intenta nuevamente en unos minutos.',
         });
     });
 });

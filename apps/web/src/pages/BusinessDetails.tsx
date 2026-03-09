@@ -566,7 +566,7 @@ export function BusinessDetails() {
     const handleReviewSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!isAuthenticated || !isCustomerRole) {
-            setReviewErrorMessage('Solo usuarios clientes pueden dejar resenas');
+            setReviewErrorMessage('Solo los usuarios clientes pueden dejar reseñas');
             return;
         }
         if (!business?.id) return;
@@ -581,9 +581,9 @@ export function BusinessDetails() {
             });
             setReviewForm({ rating: 5, comment: '' });
             await loadBusiness();
-            setReviewSuccessMessage('Resena publicada correctamente');
+            setReviewSuccessMessage('Reseña publicada correctamente');
         } catch (error) {
-            setReviewErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la resena'));
+            setReviewErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la reseña'));
         } finally {
             setSubmittingReview(false);
         }
@@ -759,7 +759,7 @@ export function BusinessDetails() {
         }
 
         if (!publicLeadForm.contactName.trim() || !publicLeadForm.contactPhone.trim() || !publicLeadForm.message.trim()) {
-            setPublicLeadErrorMessage('Nombre, telefono y mensaje son obligatorios');
+            setPublicLeadErrorMessage('Nombre, teléfono y mensaje son obligatorios');
             return;
         }
 
@@ -781,7 +781,7 @@ export function BusinessDetails() {
                 contactEmail: '',
                 message: '',
             });
-            setPublicLeadSuccessMessage('Solicitud enviada. Te contactaran pronto.');
+            setPublicLeadSuccessMessage('Solicitud enviada. Te contactarán pronto.');
             void analyticsApi.trackGrowthEvent({
                 eventType: 'CONTACT_CLICK',
                 businessId: business.id,
@@ -1050,7 +1050,7 @@ export function BusinessDetails() {
                                 </div>
                                 <h1 className="font-display text-3xl md:text-4xl font-bold text-gray-900 leading-tight">{business.name}</h1>
                                 <p className="text-gray-500 mt-2 flex items-center gap-1">
-                                    Direccion: {business.address}
+                                    Dirección: {business.address}
                                     {business.province && ` - ${business.province.name}`}
                                     {business.city && `, ${business.city.name}`}
                                 </p>
@@ -1058,7 +1058,7 @@ export function BusinessDetails() {
                             {averageRating && (
                                 <div className="text-center bg-accent-50 border border-accent-100 px-4 py-2 rounded-xl md:min-w-[110px]">
                                     <div className="text-2xl font-bold text-accent-600">* {averageRating}</div>
-                                    <div className="text-xs text-gray-500">{business._count?.reviews} resenas</div>
+                                    <div className="text-xs text-gray-500">{business._count?.reviews} reseñas</div>
                                 </div>
                             )}
                         </div>
@@ -1191,7 +1191,7 @@ export function BusinessDetails() {
                                 </div>
                             ) : (
                                 <p className="mt-3 text-xs text-gray-600">
-                                    Inicia sesion como usuario para registrar check-ins y ganar puntos.
+                                    Inicia sesión como usuario para registrar check-ins y ganar puntos.
                                 </p>
                             )}
                             </div>
@@ -1215,7 +1215,7 @@ export function BusinessDetails() {
                     {/* Map */}
                     {openStreetMapEmbedUrl && (
                         <div className="panel-premium p-6">
-                            <h2 className="font-display font-semibold text-gray-900 mb-3">Ubicacion</h2>
+                            <h2 className="font-display font-semibold text-gray-900 mb-3">Ubicación</h2>
                             <div className="h-64 bg-gray-100 rounded-xl flex items-center justify-center">
                                 <iframe
                                     width="100%"
@@ -1223,7 +1223,7 @@ export function BusinessDetails() {
                                     style={{ border: 0, borderRadius: '0.75rem' }}
                                     loading="lazy"
                                     src={openStreetMapEmbedUrl}
-                                    title={`Mapa de ubicacion de ${business.name}`}
+                                    title={`Mapa de ubicación de ${business.name}`}
                                     allowFullScreen
                                 ></iframe>
                             </div>
@@ -1299,7 +1299,7 @@ export function BusinessDetails() {
                                         >
                                             <p className="font-medium text-gray-900">{nearbyBusiness.name}</p>
                                             <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                                {nearbyBusiness.address || 'Direccion no disponible'}
+                                                {nearbyBusiness.address || 'Dirección no disponible'}
                                             </p>
                                             {distanceLabel ? (
                                                 <p className="text-xs text-primary-700 mt-2">{distanceLabel}</p>
@@ -1322,13 +1322,13 @@ export function BusinessDetails() {
                         {/* Review Form */}
                         {!isAuthenticated && (
                             <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
-                                Inicia sesion para dejar tu resena. <Link to="/login" className="underline font-medium">Ir a login</Link>
+                                Inicia sesión para dejar tu reseña. <Link to="/login" className="underline font-medium">Ir a login</Link>
                             </div>
                         )}
 
                         {isAuthenticated && !isCustomerRole && (
                             <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                                Las resenas estan habilitadas para cuentas tipo cliente.
+                                Las reseñas están habilitadas para cuentas tipo cliente.
                             </div>
                         )}
 
@@ -1383,7 +1383,7 @@ export function BusinessDetails() {
                         <div className="space-y-4">
                             {reviewsLoading ? (
                                 <p className="text-gray-600 text-sm text-center py-4">
-                                    Cargando resenas...
+                                    Cargando reseñas...
                                 </p>
                             ) : visibleReviews.map((review) => (
                                 <div key={review.id} className="p-4 border border-gray-100 rounded-xl bg-white">
@@ -1405,7 +1405,7 @@ export function BusinessDetails() {
                             ))}
                             {!reviewsLoading && visibleReviews.length === 0 && (
                                 <p className="text-gray-600 text-sm text-center py-4">
-                                    Aun no hay resenas. Se el primero en opinar!
+                                    Aún no hay reseñas. Sé el primero en opinar.
                                 </p>
                             )}
                         </div>
@@ -1461,7 +1461,7 @@ export function BusinessDetails() {
                         </div>
                         <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-slate-700">Reputacion oficial</span>
+                                <span className="text-xs font-semibold text-slate-700">Reputación oficial</span>
                                 {reputationLoading ? (
                                     <span className="text-[11px] text-slate-500">Cargando...</span>
                                 ) : reputationProfile ? (
@@ -1509,7 +1509,7 @@ export function BusinessDetails() {
                                 </div>
                             ) : (
                                 <p className="text-xs text-slate-500">
-                                    Perfil de reputacion aun no disponible para este negocio.
+                                    Perfil de reputación aún no disponible para este negocio.
                                 </p>
                             )}
                         </div>
@@ -1523,7 +1523,7 @@ export function BusinessDetails() {
                                     >
                                         <span className="text-lg">Tel</span>
                                         <div>
-                                            <div className="text-xs text-gray-600">Telefono</div>
+                                            <div className="text-xs text-gray-600">Teléfono</div>
                                             <div className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{business.phone}</div>
                                         </div>
                                     </a>
@@ -1531,7 +1531,7 @@ export function BusinessDetails() {
                                     <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
                                         <span className="text-lg">Tel</span>
                                         <div>
-                                            <div className="text-xs text-gray-600">Telefono</div>
+                                            <div className="text-xs text-gray-600">Teléfono</div>
                                             <div className="text-sm text-gray-700">{business.phone}</div>
                                         </div>
                                     </div>
@@ -1570,7 +1570,7 @@ export function BusinessDetails() {
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
                                 <span className="text-lg">Dir</span>
                                 <div>
-                                    <div className="text-xs text-gray-600">Direccion</div>
+                                    <div className="text-xs text-gray-600">Dirección</div>
                                     <div className="text-sm text-gray-700">{business.address}</div>
                                 </div>
                             </div>
@@ -1580,12 +1580,12 @@ export function BusinessDetails() {
                             {hasOperatorRole && (
                                 <div className="mb-6 space-y-3">
                                     <h3 className="font-display font-semibold text-gray-900">
-                                        {isAdminRole ? 'Herramientas de moderacion' : 'Herramientas de gestion'}
+                                        {isAdminRole ? 'Herramientas de moderación' : 'Herramientas de gestión'}
                                     </h3>
                                     <p className="text-sm text-slate-700">
                                         {isAdminRole
                                             ? 'Gestiona verificaciones, calidad de datos y cumplimiento desde el panel administrativo.'
-                                            : 'Gestiona tu operacion comercial desde tu panel de negocio.'}
+                                            : 'Gestiona tu operación comercial desde tu panel de negocio.'}
                                     </p>
                                     <Link
                                         to={isAdminRole ? '/admin' : '/dashboard'}
@@ -1663,7 +1663,7 @@ export function BusinessDetails() {
                             )}
                             {showBookings && isAuthenticated && isCustomerRole && !canBookThisBusiness && (
                                 <div className="mb-6 rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm text-slate-700">
-                                    Este negocio no gestiona reservas en linea. Usa los canales de contacto disponibles para coordinar.
+                                    Este negocio no gestiona reservas en línea. Usa los canales de contacto disponibles para coordinar.
                                 </div>
                             )}
                             {showMessaging && (
@@ -1687,7 +1687,7 @@ export function BusinessDetails() {
                                             />
                                             <input
                                                 className="input-field text-sm"
-                                                placeholder="Tu telefono"
+                                                placeholder="Tu teléfono"
                                                 value={publicLeadForm.contactPhone}
                                                 onChange={(event) =>
                                                     setPublicLeadForm((previous) => ({
@@ -1724,10 +1724,10 @@ export function BusinessDetails() {
                                                 className="btn-primary text-sm w-full"
                                                 disabled={submittingPublicLead}
                                             >
-                                                {submittingPublicLead ? 'Enviando...' : 'Solicitar cotizacion sin cuenta'}
+                                                {submittingPublicLead ? 'Enviando...' : 'Solicitar cotización sin cuenta'}
                                             </button>
                                             <p className="text-xs text-gray-500">
-                                                Ya tienes cuenta? <Link to="/login" className="underline font-medium">Inicia sesion</Link>
+                                                ¿Ya tienes cuenta? <Link to="/login" className="underline font-medium">Inicia sesión</Link>
                                             </p>
                                         </form>
                                     )}

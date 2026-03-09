@@ -219,7 +219,7 @@ export function Profile() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <div>
                     <h1 className="font-display text-3xl font-bold text-gray-900">Mi Perfil</h1>
-                    <p className="text-sm text-gray-500">Vista personalizada segun tu rol en la plataforma.</p>
+                    <p className="text-sm text-gray-500">Vista personalizada según tu rol en la plataforma.</p>
                 </div>
                 {payload?.profileType && (
                     <span className={`text-xs px-3 py-1 rounded-full font-semibold ${getRoleBadge(payload.profileType)}`}>
@@ -259,7 +259,7 @@ export function Profile() {
                                 <input
                                     className="input-field text-sm"
                                     type="tel"
-                                    placeholder="Telefono"
+                                    placeholder="Teléfono"
                                     value={form.phone}
                                     onChange={(event) => setForm((previous) => ({ ...previous, phone: event.target.value }))}
                                 />
@@ -296,7 +296,7 @@ export function Profile() {
                                 </div>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
-                                <p>Resenas publicadas: <strong className="text-gray-900">{payload.userProfile.reviewCount}</strong></p>
+                                <p>Reseñas publicadas: <strong className="text-gray-900">{payload.userProfile.reviewCount}</strong></p>
                                 <p>Reservas creadas: <strong className="text-gray-900">{payload.userProfile.bookingCount}</strong></p>
                                 <p>Creado: <strong className="text-gray-900">{formatDateTime(payload.user.createdAt)}</strong></p>
                             </div>
@@ -305,7 +305,7 @@ export function Profile() {
 
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         <div className="card p-5">
-                            <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis resenas</h3>
+                            <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis reseñas</h3>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                                 {payload.userProfile.recentReviews.length > 0 ? payload.userProfile.recentReviews.map((review) => (
                                     <div key={review.id} className="rounded-xl border border-gray-100 p-3">
@@ -317,7 +317,7 @@ export function Profile() {
                                         <p className="text-sm text-gray-700 mt-1">{review.comment?.trim() || '(Sin comentario)'}</p>
                                     </div>
                                 )) : (
-                                    <p className="text-sm text-gray-500">Aun no tienes resenas publicadas.</p>
+                                    <p className="text-sm text-gray-500">Aún no tienes reseñas publicadas.</p>
                                 )}
                             </div>
                         </div>
@@ -335,11 +335,11 @@ export function Profile() {
                                         <p className="text-sm text-gray-700 mt-1">
                                             Cotizado: {formatMoney(booking.quotedAmount, booking.currency)}
                                             {' · '}
-                                            Deposito: {formatMoney(booking.depositAmount, booking.currency)}
+                                            Depósito: {formatMoney(booking.depositAmount, booking.currency)}
                                         </p>
                                     </div>
                                 )) : (
-                                    <p className="text-sm text-gray-500">Aun no tienes reservas registradas.</p>
+                                    <p className="text-sm text-gray-500">Aún no tienes reservas registradas.</p>
                                 )}
                             </div>
                         </div>
@@ -367,7 +367,7 @@ export function Profile() {
                                                     <p className="text-xs text-gray-500">
                                                         {business.verified ? 'Verificado' : business.verificationStatus}
                                                         {' · '}
-                                                        {business._count.reviews} resenas
+                                                        {business._count.reviews} reseñas
                                                         {' · '}
                                                         {business._count.bookings} reservas
                                                     </p>
@@ -387,7 +387,7 @@ export function Profile() {
                             <div className="card p-5">
                                 <h3 className="font-display text-lg font-semibold text-gray-900 mb-2">Seguridad de administrador</h3>
                                 <p className="text-sm text-gray-600 mb-4">
-                                    La configuracion de 2FA y controles de sesion admin se gestiona en una pantalla dedicada.
+                                    La configuración de 2FA y controles de sesión de admin se gestiona en una pantalla dedicada.
                                 </p>
                                 <Link to="/security" className="btn-secondary text-sm">
                                     Ir a Seguridad
@@ -410,7 +410,7 @@ export function Profile() {
                                         <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalBusinesses}</p>
                                     </div>
                                     <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                                        <p className="text-xs text-gray-500">Resenas</p>
+                                        <p className="text-xs text-gray-500">Reseñas</p>
                                         <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalReviews}</p>
                                     </div>
                                     <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
@@ -426,7 +426,7 @@ export function Profile() {
 
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                                 <div className="card p-5">
-                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Resenas en riesgo</h4>
+                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Reseñas en riesgo</h4>
                                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                         {payload.adminProfile.flaggedReviews.length > 0 ? payload.adminProfile.flaggedReviews.map((review) => (
                                             <div key={review.id} className="rounded-xl border border-gray-100 p-3">
@@ -438,13 +438,13 @@ export function Profile() {
                                                 ) : null}
                                             </div>
                                         )) : (
-                                            <p className="text-sm text-gray-500">No hay resenas en riesgo.</p>
+                                            <p className="text-sm text-gray-500">No hay reseñas en riesgo.</p>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="card p-5">
-                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Ultimas organizaciones</h4>
+                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Últimas organizaciones</h4>
                                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                         {payload.adminProfile.latestOrganizations.length > 0 ? payload.adminProfile.latestOrganizations.map((organization) => (
                                             <div key={organization.id} className="rounded-xl border border-gray-100 p-3">

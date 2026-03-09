@@ -534,7 +534,7 @@ export class VerificationService {
             await this.notificationsQueueService.enqueueVerificationAlert(result.notificationPayload);
         } catch (error) {
             this.logger.warn(
-                `No se pudo encolar alerta de verificacion para negocio "${businessId}" (${error instanceof Error ? error.message : String(error)})`,
+                `No se pudo encolar la alerta de verificación para el negocio "${businessId}" (${error instanceof Error ? error.message : String(error)})`,
             );
         }
 

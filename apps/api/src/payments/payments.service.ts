@@ -315,7 +315,7 @@ export class PaymentsService {
                     },
                     data: {
                         status: 'CANCELED',
-                        failureReason: 'Checkout reemplazado por nueva sesion',
+                        failureReason: 'Checkout reemplazado por una nueva sesión',
                     },
                 });
             }
@@ -459,7 +459,7 @@ export class PaymentsService {
         } catch (error) {
             const failureReason = error instanceof Error
                 ? error.message.slice(0, 255)
-                : 'No se pudo crear sesion de pago';
+                : 'No se pudo crear la sesión de pago';
 
             await this.prisma.$transaction(async (tx) => {
                 await tx.payment.updateMany({
@@ -1003,7 +1003,7 @@ export class PaymentsService {
             },
             data: {
                 status: 'CANCELED',
-                failureReason: 'Sesion de pago expirada',
+                failureReason: 'Sesión de pago expirada',
                 metadata: this.asJson(session),
             },
         });
@@ -1251,7 +1251,7 @@ export class PaymentsService {
                 },
                 data: {
                     status: 'CANCELED',
-                    failureReason: 'Sesion de pago expirada',
+                    failureReason: 'Sesión de pago expirada',
                     metadata: this.mergeJsonObject(payment?.metadata, {
                         paymentType: 'BOOKING_PAYMENT',
                         checkoutSessionId: session.id,

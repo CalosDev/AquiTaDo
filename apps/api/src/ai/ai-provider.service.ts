@@ -455,7 +455,7 @@ export class AiProviderService {
             providerLine,
             statusLine,
             actionLine,
-            reason ? `Detalle tecnico: ${reason}` : '',
+            reason ? `Detalle técnico: ${reason}` : '',
             '',
             `Contexto aplicado: ${systemPrompt.slice(0, 140)}...`,
         ].filter((line) => line.length > 0).join('\n');

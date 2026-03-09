@@ -59,7 +59,7 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
     'con-delivery': {
         label: 'Negocios con delivery',
         feature: 'delivery',
-        description: 'Encuentra negocios que ofrecen delivery en Republica Dominicana.',
+        description: 'Encuentra negocios que ofrecen delivery en República Dominicana.',
     },
     'pet-friendly': {
         label: 'Negocios pet friendly',
@@ -74,7 +74,7 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
     'con-reservas': {
         label: 'Negocios con reservaciones',
         feature: 'reservaciones',
-        description: 'Compara negocios que aceptan reservaciones en linea o por WhatsApp.',
+        description: 'Compara negocios que aceptan reservaciones en línea o por WhatsApp.',
     },
     accesibles: {
         label: 'Negocios accesibles',
@@ -461,20 +461,20 @@ export function BusinessesList() {
             : activeCategory && activeProvince
             ? `${activeCategory.name} en ${activeProvince.name}`
             : activeCategory
-                ? `${activeCategory.name} en Republica Dominicana`
+                ? `${activeCategory.name} en República Dominicana`
                 : activeProvince
                     ? `Negocios en ${activeProvince.name}`
-                    : 'Directorio de negocios en Republica Dominicana';
+                    : 'Directorio de negocios en República Dominicana';
 
         const descriptionBase = activeIntent
-            ? `${activeIntent.description} Contacta por WhatsApp o telefono desde AquiTa.do.`
+            ? `${activeIntent.description} Contacta por WhatsApp o teléfono desde AquiTa.do.`
             : activeCategory && activeProvince
             ? `Descubre ${activeCategory.name.toLowerCase()} en ${activeProvince.name}. Compara opciones locales, contacta por WhatsApp y reserva en AquiTa.do.`
             : activeCategory
-                ? `Explora ${activeCategory.name.toLowerCase()} en Republica Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
+                ? `Explora ${activeCategory.name.toLowerCase()} en República Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
                 : activeProvince
                     ? `Encuentra negocios locales en ${activeProvince.name}. Descubre perfiles verificados, reseñas y canales de contacto.`
-                    : 'Explora negocios locales en Republica Dominicana. Filtra por categoria y provincia para encontrar opciones verificadas.';
+                    : 'Explora negocios locales en República Dominicana. Filtra por categoría y provincia para encontrar opciones verificadas.';
 
         applySeoMeta({
             title: `${headingBase} | AquiTa.do`,

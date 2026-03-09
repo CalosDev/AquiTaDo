@@ -190,7 +190,7 @@ export class CreatePublicLeadDto {
     @IsNotEmpty()
     @MaxLength(30)
     @Matches(/^[0-9+\-\s()]{7,30}$/, {
-        message: 'El telefono debe contener solo numeros y simbolos validos',
+        message: 'El teléfono debe contener solo números y símbolos válidos',
     })
     contactPhone!: string;
 

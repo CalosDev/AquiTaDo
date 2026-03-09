@@ -30,10 +30,10 @@ type RegisterStep = 1 | 2 | 3 | 4;
 const BOOKING_FEATURE_CANONICAL = 'reservaciones';
 
 const STEP_TITLES: Array<{ step: RegisterStep; title: string; subtitle: string }> = [
-    { step: 1, title: 'Informacion', subtitle: 'Nombre y propuesta' },
-    { step: 2, title: 'Contacto', subtitle: 'Telefono y WhatsApp' },
-    { step: 3, title: 'Ubicacion', subtitle: 'Direccion y mapa' },
-    { step: 4, title: 'Categorias y servicios', subtitle: 'Donde apareceras y como operas' },
+    { step: 1, title: 'Información', subtitle: 'Nombre y propuesta' },
+    { step: 2, title: 'Contacto', subtitle: 'Teléfono y WhatsApp' },
+    { step: 3, title: 'Ubicación', subtitle: 'Dirección y mapa' },
+    { step: 4, title: 'Categorías y servicios', subtitle: 'Dónde aparecerás y cómo operas' },
 ];
 
 const TOTAL_STEPS = STEP_TITLES.length;
@@ -97,7 +97,7 @@ export function RegisterBusiness() {
             setFeatures(featRes.data || []);
             setProvinces(provRes.data || []);
         } catch (err: unknown) {
-            setError(getApiErrorMessage(err, 'No se pudieron cargar categorias y provincias'));
+            setError(getApiErrorMessage(err, 'No se pudieron cargar categorías y provincias'));
         } finally {
             setLoadingData(false);
         }
@@ -142,7 +142,7 @@ export function RegisterBusiness() {
 
         if (step === 3) {
             if (!formData.address.trim()) {
-                return 'La direccion es obligatoria';
+                return 'La dirección es obligatoria';
             }
             if (!formData.provinceId) {
                 return 'Debes seleccionar una provincia';
@@ -150,7 +150,7 @@ export function RegisterBusiness() {
         }
 
         if (step === 4 && formData.categoryIds.length === 0) {
-            return 'Selecciona al menos una categoria para publicar el negocio';
+            return 'Selecciona al menos una categoría para publicar el negocio';
         }
 
         return null;
@@ -199,7 +199,7 @@ export function RegisterBusiness() {
                 setLocating(false);
             },
             () => {
-                setError('No se pudo obtener la ubicacion actual');
+                setError('No se pudo obtener la ubicación actual');
                 setLocating(false);
             },
             { enableHighAccuracy: true, timeout: 12000 },
@@ -353,7 +353,7 @@ export function RegisterBusiness() {
                                 setFormData((previous) => ({ ...previous, description: event.target.value }))
                             }
                             className="input-field"
-                            placeholder="Describe claramente que vendes, en que zona operas y que te diferencia"
+                            placeholder="Describe claramente qué vendes, en qué zona operas y qué te diferencia"
                         />
                         <p className="mt-1 text-xs text-gray-500">
                             Mientras mas clara sea la descripcion, mejor posicionara en resultados.
@@ -368,7 +368,7 @@ export function RegisterBusiness() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="register-business-phone" className="text-sm font-medium text-gray-700 mb-1 block">
-                            Telefono
+                            Teléfono
                         </label>
                         <input
                             id="register-business-phone"
@@ -408,7 +408,7 @@ export function RegisterBusiness() {
                 <div className="space-y-4">
                     <div>
                         <label htmlFor="register-business-address" className="text-sm font-medium text-gray-700 mb-1 block">
-                            Direccion *
+                            Dirección *
                         </label>
                         <input
                             id="register-business-address"
@@ -472,7 +472,7 @@ export function RegisterBusiness() {
                     <div className="rounded-xl border border-primary-100 bg-primary-50/50 p-3">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <p className="text-xs text-gray-700">
-                                Puedes cargar coordenadas automaticas para mejorar la precision en busquedas cercanas.
+                                Puedes cargar coordenadas automáticas para mejorar la precisión en búsquedas cercanas.
                             </p>
                             <button
                                 type="button"
@@ -480,7 +480,7 @@ export function RegisterBusiness() {
                                 disabled={locating}
                                 className="text-xs px-3 py-2 rounded-lg border border-primary-300 text-primary-700 hover:bg-primary-100 disabled:opacity-60"
                             >
-                                {locating ? 'Obteniendo...' : 'Usar ubicacion actual'}
+                                {locating ? 'Obteniendo...' : 'Usar ubicación actual'}
                             </button>
                         </div>
                     </div>
@@ -526,7 +526,7 @@ export function RegisterBusiness() {
         return (
             <div className="space-y-4">
                 <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Selecciona una o varias categorias *</h3>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Selecciona una o varias categorías *</h3>
                     <div className="flex flex-wrap gap-2">
                         {categories.map((category) => (
                             <button
@@ -588,7 +588,7 @@ export function RegisterBusiness() {
                 </div>
 
                 <div className="rounded-xl border border-gray-100 bg-white p-4">
-                    <h3 className="font-medium text-gray-900 mb-2">Imagenes del negocio (opcional)</h3>
+                    <h3 className="font-medium text-gray-900 mb-2">Imágenes del negocio (opcional)</h3>
                     <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
@@ -597,7 +597,7 @@ export function RegisterBusiness() {
                         className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-primary-700 hover:file:bg-primary-100"
                     />
                     <p className="mt-2 text-xs text-gray-500">
-                        Hasta 5 imagenes. Formatos permitidos: JPG, PNG o WEBP (max. 5MB c/u).
+                        Hasta 5 imágenes. Formatos permitidos: JPG, PNG o WEBP (max. 5MB c/u).
                     </p>
                     {selectedImages.length > 0 && (
                         <ul className="mt-3 space-y-1 text-xs text-gray-600">

@@ -72,7 +72,7 @@ export class UploadsService {
             }
 
             if (organizationRole === 'STAFF') {
-                throw new ForbiddenException('No tienes permisos para subir imagenes a este negocio');
+                throw new ForbiddenException('No tienes permisos para subir imágenes a este negocio');
             }
         }
 
@@ -89,7 +89,7 @@ export class UploadsService {
             imageCount >= maxImagesPerBusiness
         ) {
             throw new BadRequestException(
-                `El negocio ya tiene el maximo de ${maxImagesPerBusiness} imagenes para su plan`,
+                `El negocio ya tiene el máximo de ${maxImagesPerBusiness} imágenes para su plan`,
             );
         }
 
@@ -375,7 +375,7 @@ export class UploadsService {
     private resolveS3Bucket(): string {
         const bucket = this.configService.get<string>('STORAGE_S3_BUCKET')?.trim();
         if (!bucket) {
-            throw new BadRequestException('STORAGE_S3_BUCKET no esta configurado');
+            throw new BadRequestException('STORAGE_S3_BUCKET no está configurado');
         }
         return bucket;
     }

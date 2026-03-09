@@ -554,7 +554,7 @@ export function AdminDashboard() {
                 return reports[0]?.id ?? null;
             });
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificacion y data layer'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar verificación y data layer'));
             setMarketInsights(null);
             setGrowthInsights(null);
         } finally {
@@ -689,7 +689,7 @@ export function AdminDashboard() {
             await loadData();
             setSuccessMessage('Categoria creada correctamente');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la categoria'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear la categoría'));
         } finally {
             setProcessingId(null);
         }
@@ -731,7 +731,7 @@ export function AdminDashboard() {
             cancelCategoryEdit();
             setSuccessMessage('Categoria actualizada correctamente');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la categoria'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la categoría'));
         } finally {
             setProcessingId(null);
         }
@@ -750,7 +750,7 @@ export function AdminDashboard() {
             }
             setSuccessMessage('Categoria eliminada correctamente');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar la categoria'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar la categoría'));
         } finally {
             setProcessingId(null);
             setConfirmDeleteCategoryId(null);
@@ -777,13 +777,13 @@ export function AdminDashboard() {
             await verificationApi.reviewBusinessAdmin(businessId, {
                 status,
                 notes: status === 'VERIFIED'
-                    ? 'Verificacion aprobada por equipo admin'
-                    : 'Revision administrativa',
+                    ? 'Verificación aprobada por el equipo admin'
+                    : 'Revisión administrativa',
             });
             await Promise.all([loadData(), loadVerificationData()]);
-            setSuccessMessage('Revision de verificacion actualizada');
+            setSuccessMessage('Revisión de verificación actualizada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la verificacion'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la verificación'));
         } finally {
             setProcessingId(null);
         }
@@ -820,17 +820,17 @@ export function AdminDashboard() {
             await reviewApi.moderate(reviewId, {
                 status,
                 reason: status === 'APPROVED'
-                    ? 'Aprobada por equipo de moderacion'
+                    ? 'Aprobada por el equipo de moderación'
                     : 'Mantenida en cola por riesgo',
             });
             await Promise.all([loadData(), loadVerificationData()]);
             setSuccessMessage(
                 status === 'APPROVED'
-                    ? 'Resena aprobada y publicada'
-                    : 'Resena mantenida como sospechosa',
+                    ? 'Reseña aprobada y publicada'
+                    : 'Reseña mantenida como sospechosa',
             );
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la resena'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la reseña'));
         } finally {
             setProcessingId(null);
         }
@@ -847,7 +847,7 @@ export function AdminDashboard() {
             await verificationApi.reviewDocumentAdmin(documentId, {
                 status,
                 rejectionReason: status === 'REJECTED'
-                    ? 'Documento rechazado por moderacion administrativa'
+                    ? 'Documento rechazado por moderación administrativa'
                     : undefined,
             });
             await loadVerificationData();
@@ -874,9 +874,9 @@ export function AdminDashboard() {
                 ...current,
                 [reviewId]: payload,
             }));
-            setSuccessMessage('Analisis IA generado para la resena');
+            setSuccessMessage('Análisis de IA generado para la reseña');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo analizar la resena con IA'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo analizar la reseña con IA'));
         } finally {
             setAnalyzingReviewId(null);
         }
@@ -884,7 +884,7 @@ export function AdminDashboard() {
 
     const tabs = [
         { key: 'businesses', label: 'Negocios', icon: 'N' },
-        { key: 'categories', label: 'Categorias', icon: 'C' },
+        { key: 'categories', label: 'Categorías', icon: 'C' },
         { key: 'verification', label: 'KYC + Data Layer', icon: 'K' },
         { key: 'observability', label: 'Observabilidad', icon: 'O' },
     ] as const;
@@ -896,7 +896,7 @@ export function AdminDashboard() {
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-200 font-semibold">Panel Admin</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Control de plataforma</h1>
                 <p className="text-slate-200 mt-2 max-w-2xl">
-                    Gestion de negocios, categorias, moderacion de contenido y salud operativa.
+                    Gestión de negocios, categorías, moderación de contenido y salud operativa.
                 </p>
 
                 <div className="mt-5 role-kpi-grid !xl:grid-cols-4">
@@ -913,14 +913,14 @@ export function AdminDashboard() {
                         <p className="role-kpi-value">{businessStatusSummary.pending}</p>
                     </article>
                     <article className="role-kpi-card">
-                        <p className="role-kpi-label">Categorias</p>
+                        <p className="role-kpi-label">Categorías</p>
                         <p className="role-kpi-value">{categories.length}</p>
                     </article>
                 </div>
             </section>
 
             <p className="text-gray-500 mb-8">
-                Gestion de negocios, categorias, moderacion y observabilidad en un solo panel.
+                Gestión de negocios, categorías, moderación y observabilidad en un solo panel.
             </p>
 
             {errorMessage && (
@@ -980,7 +980,7 @@ export function AdminDashboard() {
                                             value={businessSearch}
                                             onChange={(event) => setBusinessSearch(event.target.value)}
                                             className="input-field text-sm sm:w-80"
-                                            placeholder="Buscar por negocio, propietario, organizacion o provincia"
+                                            placeholder="Buscar por negocio, propietario, organización o provincia"
                                         />
                                         <select
                                             value={businessStatusFilter}
@@ -1185,7 +1185,7 @@ export function AdminDashboard() {
                     {activeTab === 'categories' && (
                         <div className="space-y-4">
                             <div className="card p-5">
-                                <h3 className="font-display font-semibold mb-3">Crear categoria</h3>
+                                <h3 className="font-display font-semibold mb-3">Crear categoría</h3>
                                 <form onSubmit={handleCreateCategory} className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                     <input
                                         type="text"
@@ -1238,7 +1238,7 @@ export function AdminDashboard() {
                             </div>
 
                             <div className="card p-5">
-                                <h3 className="font-display font-semibold mb-3">Categorias actuales</h3>
+                                <h3 className="font-display font-semibold mb-3">Categorías actuales</h3>
                                 <div className="space-y-3">
                                     {categories.map((category) => (
                                         <div
@@ -1365,7 +1365,7 @@ export function AdminDashboard() {
                         <div className="space-y-4">
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                    <h3 className="font-display font-semibold">Cola unificada de moderacion</h3>
+                                    <h3 className="font-display font-semibold">Cola unificada de moderación</h3>
                                     <span className="text-xs rounded-full px-2 py-0.5 bg-primary-50 text-primary-700">
                                         {moderationQueue.length} items
                                     </span>
@@ -1494,7 +1494,7 @@ export function AdminDashboard() {
 
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                    <h3 className="font-display font-semibold">Moderacion automatica: resenas sospechosas</h3>
+                                    <h3 className="font-display font-semibold">Moderación automática: reseñas sospechosas</h3>
                                     <span className="text-xs rounded-full px-2 py-0.5 bg-red-100 text-red-700">
                                         {flaggedReviews.length} en cola
                                     </span>
@@ -1555,7 +1555,7 @@ export function AdminDashboard() {
                                                         {' '}({(reviewAiInsights[review.id].score * 100).toFixed(0)}%)
                                                     </p>
                                                     {reviewAiInsights[review.id].isNegative ? (
-                                                        <p className="text-red-700 mt-1 font-medium">Alerta: resena negativa detectada.</p>
+                                                        <p className="text-red-700 mt-1 font-medium">Alerta: reseña negativa detectada.</p>
                                                     ) : null}
                                                     {reviewAiInsights[review.id].summary ? (
                                                         <p className="mt-1">{reviewAiInsights[review.id].summary}</p>
@@ -1564,7 +1564,7 @@ export function AdminDashboard() {
                                             ) : null}
                                         </div>
                                     )) : (
-                                        <p className="text-sm text-gray-500">No hay resenas sospechosas en este momento.</p>
+                                        <p className="text-sm text-gray-500">No hay reseñas sospechosas en este momento.</p>
                                     )}
                                 </div>
                             </div>
@@ -1609,7 +1609,7 @@ export function AdminDashboard() {
 
                                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                             <div className="rounded-xl border border-gray-100 p-3">
-                                                <h4 className="font-medium text-gray-900 mb-2">Top categorias buscadas</h4>
+                                                <h4 className="font-medium text-gray-900 mb-2">Top categorías buscadas</h4>
                                                 <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                                                     {growthInsights?.topSearchedCategories?.length ? growthInsights.topSearchedCategories.slice(0, 8).map((item) => (
                                                         <div key={`${item.categoryId || 'none'}-${item.categoryName}`} className="flex items-center justify-between text-sm">
@@ -1617,7 +1617,7 @@ export function AdminDashboard() {
                                                             <span className="text-gray-900 font-medium">{item.searches}</span>
                                                         </div>
                                                     )) : (
-                                                        <p className="text-sm text-gray-500">Sin datos de categorias.</p>
+                                                        <p className="text-sm text-gray-500">Sin datos de categorías.</p>
                                                     )}
                                                 </div>
                                             </div>

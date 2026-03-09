@@ -28,7 +28,7 @@ export class RegisterDto {
     @MinLength(8)
     @MaxLength(128)
     @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
-        message: 'La contrasena debe incluir letras y numeros',
+        message: 'La contraseña debe incluir letras y números',
     })
     password!: string;
 
@@ -36,7 +36,7 @@ export class RegisterDto {
     @IsOptional()
     @IsString()
     @Matches(/^[0-9+()\-\s]{7,20}$/, {
-        message: 'El telefono no tiene un formato valido',
+        message: 'El teléfono no tiene un formato válido',
     })
     phone?: string;
 

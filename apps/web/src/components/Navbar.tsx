@@ -144,7 +144,7 @@ export function Navbar() {
                         <span className="chip !px-2.5 !py-0.5 !text-[10px]">Hecho en RD</span>
                         <span>Directorio local + SaaS para negocios</span>
                     </div>
-                    <span className="text-primary-700">Santo Domingo, Republica Dominicana</span>
+                    <span className="text-primary-700">Santo Domingo, República Dominicana</span>
                 </div>
             </div>
 
@@ -276,7 +276,7 @@ export function Navbar() {
                                         onMouseEnter={() => preloadRouteChunk('/login')}
                                         onFocus={() => preloadRouteChunk('/login')}
                                     >
-                                        Iniciar Sesion
+                                        Iniciar Sesión
                                     </Link>
                                     <Link
                                         to="/register"
@@ -445,7 +445,7 @@ export function Navbar() {
                                             onFocus={() => preloadRouteChunk('/login')}
                                             onClick={() => setMenuOpen(false)}
                                         >
-                                            Iniciar Sesion
+                                            Iniciar Sesión
                                         </Link>
                                         <Link
                                             to="/register"

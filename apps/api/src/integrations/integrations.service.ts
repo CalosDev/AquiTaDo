@@ -92,7 +92,7 @@ export class IntegrationsService {
             return null;
         }
 
-        const queryParts = [address, input.city?.trim(), input.province?.trim(), 'Republica Dominicana']
+        const queryParts = [address, input.city?.trim(), input.province?.trim(), 'República Dominicana']
             .filter((part): part is string => !!part && part.length > 0);
 
         const query = queryParts.join(', ');
@@ -155,7 +155,7 @@ export class IntegrationsService {
                 countryCode: null,
                 carrier: null,
                 lineType: null,
-                reason: 'Formato invalido para numero dominicano',
+                reason: 'Formato inválido para número dominicano',
             };
         }
 
@@ -192,7 +192,7 @@ export class IntegrationsService {
                 `Veriphone validation failed (${error instanceof Error ? error.message : String(error)})`,
             );
             if (this.veriphoneStrictMode) {
-                throw new ServiceUnavailableException('No se pudo validar el numero telefonico');
+                throw new ServiceUnavailableException('No se pudo validar el número telefónico');
             }
             result = {
                 isValid: true,
@@ -350,7 +350,7 @@ export class IntegrationsService {
                 countryCode: providerCountryCode,
                 carrier: typeof payload.carrier === 'string' ? payload.carrier.trim() : null,
                 lineType: typeof payload.phone_type === 'string' ? payload.phone_type.trim() : null,
-                reason: isValid ? null : 'Proveedor reporta telefono invalido para RD',
+                reason: isValid ? null : 'El proveedor reporta un teléfono inválido para RD',
             };
         } catch (error) {
             success = false;

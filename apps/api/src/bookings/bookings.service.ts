@@ -128,7 +128,7 @@ export class BookingsService {
         );
         if (!canAcceptBookings) {
             throw new BadRequestException(
-                'Este negocio no gestiona reservas en linea. Contactalo por WhatsApp o mensaje directo.',
+                'Este negocio no gestiona reservas en línea. Contáctalo por WhatsApp o mensaje directo.',
             );
         }
 

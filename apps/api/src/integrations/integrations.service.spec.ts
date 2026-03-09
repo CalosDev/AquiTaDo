@@ -118,7 +118,7 @@ describe('IntegrationsService', () => {
                     {
                         lat: '18.4719',
                         lon: '-69.8923',
-                        display_name: 'Santo Domingo, Distrito Nacional, Republica Dominicana',
+                        display_name: 'Santo Domingo, Distrito Nacional, República Dominicana',
                     },
                 ]),
             );
@@ -132,7 +132,7 @@ describe('IntegrationsService', () => {
         expect(result).toEqual({
             latitude: 18.4719,
             longitude: -69.8923,
-            formattedAddress: 'Santo Domingo, Distrito Nacional, Republica Dominicana',
+            formattedAddress: 'Santo Domingo, Distrito Nacional, República Dominicana',
             confidence: null,
             provider: 'nominatim',
         });
@@ -168,7 +168,7 @@ describe('IntegrationsService', () => {
                     {
                         geometry: { coordinates: [-70.0, 18.5] },
                         properties: {
-                            formatted: 'Santiago, Republica Dominicana',
+                            formatted: 'Santiago, República Dominicana',
                             rank: { confidence: 0.91 },
                         },
                     },
@@ -204,18 +204,18 @@ describe('IntegrationsService', () => {
                 {
                     lat: '18.4700',
                     lon: '-69.9000',
-                    display_name: 'Santo Domingo, Republica Dominicana',
+                    display_name: 'Santo Domingo, República Dominicana',
                 },
             ]),
         );
         vi.stubGlobal('fetch', fetchMock);
 
         const first = await service.geocodeDominicanAddress({
-            address: 'Direccion Uno',
+            address: 'Dirección Uno',
             city: 'Santo Domingo',
         });
         const second = await service.geocodeDominicanAddress({
-            address: 'Direccion Dos',
+            address: 'Dirección Dos',
             city: 'Santo Domingo',
         });
 

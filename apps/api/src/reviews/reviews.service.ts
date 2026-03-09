@@ -44,7 +44,7 @@ export class ReviewsService {
         }
 
         if (!business.verified) {
-            throw new BadRequestException('No puedes resenar un negocio no verificado');
+            throw new BadRequestException('No puedes reseñar un negocio no verificado');
         }
 
         const recentReviewsCount = await this.prisma.review.count({
@@ -57,7 +57,7 @@ export class ReviewsService {
         });
 
         if (recentReviewsCount >= 8) {
-            throw new BadRequestException('Has alcanzado el limite temporal de resenas. Intenta mas tarde.');
+            throw new BadRequestException('Has alcanzado el límite temporal de reseñas. Intenta más tarde.');
         }
 
         const existingReview = await this.prisma.review.findFirst({
@@ -68,7 +68,7 @@ export class ReviewsService {
         });
 
         if (existingReview) {
-            throw new BadRequestException('Ya has dejado una resena para este negocio');
+            throw new BadRequestException('Ya has dejado una reseña para este negocio');
         }
 
         const moderation = await this.resolveModerationDecision(
@@ -108,7 +108,7 @@ export class ReviewsService {
                 error instanceof Prisma.PrismaClientKnownRequestError &&
                 error.code === 'P2002'
             ) {
-                throw new BadRequestException('Ya has dejado una resena para este negocio');
+                throw new BadRequestException('Ya has dejado una reseña para este negocio');
             }
 
             if (
@@ -297,7 +297,7 @@ export class ReviewsService {
             ]);
 
             if (ratingOnlyBurst >= 5) {
-                reasons.push('Patron masivo de resenas sin comentario');
+                reasons.push('Patrón masivo de reseñas sin comentario');
             }
 
             if (extremeRatingBurst >= 4) {
@@ -310,7 +310,7 @@ export class ReviewsService {
         }
 
         if (/(.)\1{5,}/.test(comment)) {
-            reasons.push('Patron repetitivo sospechoso');
+            reasons.push('Patrón repetitivo sospechoso');
         }
 
         const uppercaseRatio = comment.replace(/[^A-Z]/g, '').length / comment.replace(/\s/g, '').length;
@@ -348,7 +348,7 @@ export class ReviewsService {
         if (comment.length >= 40) {
             const repeatedToken = /\b([a-z0-9]{3,})\b(?:\s+\1\b){2,}/i.test(normalizedCommentCompacted);
             if (repeatedToken) {
-                reasons.push('Repeticion anomala de terminos');
+                reasons.push('Repetición anómala de términos');
             }
         }
 
@@ -406,7 +406,7 @@ export class ReviewsService {
         }
 
         if (userReviewBurst >= 5) {
-            reasons.push('Actividad de resenas inusual');
+            reasons.push('Actividad de reseñas inusual');
         }
 
         if (normalizedCommentCompacted) {
@@ -424,7 +424,7 @@ export class ReviewsService {
                 },
             });
             if (coordinatedCommentCount >= 2) {
-                reasons.push('Patron coordinado de comentario');
+                reasons.push('Patrón coordinado de comentario');
             }
         }
 
@@ -464,7 +464,7 @@ export class ReviewsService {
             await this.aiService.markReviewSentimentAlerted(reviewId);
         } catch (error) {
             this.logger.warn(
-                `No se pudo procesar sentimiento para resena "${reviewId}" (${error instanceof Error ? error.message : String(error)})`,
+                `No se pudo procesar el sentimiento para la reseña "${reviewId}" (${error instanceof Error ? error.message : String(error)})`,
             );
         }
     }

@@ -299,7 +299,7 @@ export class MarketDataService {
             throw new BadRequestException('provinceId no corresponde a una provincia valida');
         }
         if (categoryId && !category) {
-            throw new BadRequestException('categoryId no corresponde a una categoria valida');
+            throw new BadRequestException('categoryId no corresponde a una categoría válida');
         }
 
         const baseAgenda = await this.getDominicanCommercialAgenda({

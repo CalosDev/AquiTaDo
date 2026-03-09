@@ -64,7 +64,7 @@ export class UsersService {
             } else {
                 const validation = await this.integrationsService.validateDominicanPhone(phone);
                 if (!validation.isValid || !validation.normalizedPhone) {
-                    throw new BadRequestException('El telefono debe ser un numero dominicano valido');
+                    throw new BadRequestException('El teléfono debe ser un número dominicano válido');
                 }
                 normalizedPhone = validation.normalizedPhone;
             }

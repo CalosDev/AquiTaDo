@@ -93,7 +93,7 @@ export class AiService {
         const context = matches
             .map((entry, index) => (
                 `${index + 1}. ${entry.name}\n` +
-                `Direccion: ${entry.address}\n` +
+                `Dirección: ${entry.address}\n` +
                 `WhatsApp: ${entry.whatsapp ?? 'No disponible'}\n` +
                 `Perfil: ${entry.link}\n` +
                 `Afinidad: ${entry.score}`
@@ -125,7 +125,7 @@ export class AiService {
                 'Negocios recuperados:',
                 context || 'No se recuperaron negocios relevantes.',
                 '',
-                'Genera una respuesta util con recomendaciones priorizadas y siguiente accion.',
+                'Genera una respuesta útil con recomendaciones priorizadas y siguiente acción.',
             ].join('\n'),
         });
         const answer = this.isProviderFallbackMessage(rawAnswer)
@@ -232,7 +232,7 @@ export class AiService {
         }
 
         if (!business.aiAutoResponderEnabled) {
-            throw new BadRequestException('El auto-respondedor IA no esta habilitado para este negocio');
+            throw new BadRequestException('El auto-respondedor IA no está habilitado para este negocio');
         }
 
         const categories = business.categories.map((entry) => entry.category.name).join(', ');
@@ -244,7 +244,7 @@ export class AiService {
             'Responde en tono cordial, concreto y orientado a cerrar reserva o compra.',
             'Si no tienes un dato, dilo de forma transparente y sugiere contacto directo.',
             customPrompt ? `Instrucciones del negocio: ${customPrompt}` : '',
-            `Datos del negocio: nombre=${business.name}; direccion=${business.address}; descripcion=${business.description}; telefono=${business.phone ?? 'n/a'}; whatsapp=${business.whatsapp ?? 'n/a'}; categorias=${categories || 'n/a'}; facilidades=${features || 'n/a'}.`,
+            `Datos del negocio: nombre=${business.name}; dirección=${business.address}; descripción=${business.description}; teléfono=${business.phone ?? 'n/a'}; whatsapp=${business.whatsapp ?? 'n/a'}; categorías=${categories || 'n/a'}; facilidades=${features || 'n/a'}.`,
         ]);
 
         const reply = await this.aiProviderService.generateChatCompletion({
@@ -252,7 +252,7 @@ export class AiService {
             userPrompt: [
                 `Cliente: ${customerName?.trim() || 'Cliente sin nombre'}`,
                 `Mensaje: ${userMessage.trim()}`,
-                'Responde maximo en 4 lineas y cierra con una llamada a la accion.',
+                'Responde máximo en 4 líneas y cierra con una llamada a la acción.',
             ].join('\n'),
         });
 
@@ -386,7 +386,7 @@ export class AiService {
         if (review.comment?.trim()) {
             const rawAnalysis = await this.aiProviderService.generateChatCompletion({
                 systemPrompt: buildDominicanProfessionalPrompt([
-                    'Analiza sentimiento de resenas para negocios locales.',
+                    'Analiza el sentimiento de reseñas para negocios locales.',
                     'Devuelve JSON estricto con keys: sentiment, score, summary.',
                     'sentiment debe ser POSITIVE, NEUTRAL o NEGATIVE.',
                     'score entre -1 y 1.',
@@ -489,7 +489,7 @@ export class AiService {
     private buildNoMatchesResponse(query: string): string {
         return [
             `No encontre coincidencias directas para "${query}".`,
-            'Prueba ampliando la busqueda (sin categoria/provincia) o usando otra palabra clave.',
+            'Prueba ampliando la búsqueda (sin categoría/provincia) o usando otra palabra clave.',
             'Ejemplos: "tecnologia", "automotriz", "salones", "farmacia".',
         ].join('\n');
     }
@@ -507,7 +507,7 @@ export class AiService {
             `Resultados para "${query}":`,
             recommendations,
             '',
-            'Te puedo ayudar a refinar por provincia, categoria o servicio especifico.',
+            'Te puedo ayudar a refinar por provincia, categoría o servicio específico.',
         ].join('\n');
     }
 

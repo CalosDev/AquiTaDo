@@ -43,7 +43,7 @@ export function Footer() {
                                     Aqui<span className="text-accent-400">Ta</span>.do
                                 </p>
                                 <p className="text-xs uppercase tracking-wide text-primary-200">
-                                    SuperApp local para Republica Dominicana
+                                    SuperApp local para República Dominicana
                                 </p>
                             </div>
                         </Link>

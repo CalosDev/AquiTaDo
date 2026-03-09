@@ -102,7 +102,7 @@ export function DashboardVerificationTab({
                         <option value="ID_CARD">Cedula/ID</option>
                         <option value="TAX_CERTIFICATE">RNC/Certificado fiscal</option>
                         <option value="BUSINESS_LICENSE">Licencia comercial</option>
-                        <option value="ADDRESS_PROOF">Comprobante direccion</option>
+                        <option value="ADDRESS_PROOF">Comprobante de dirección</option>
                         <option value="SELFIE">Selfie validacion</option>
                         <option value="OTHER">Otro</option>
                     </select>
@@ -128,7 +128,7 @@ export function DashboardVerificationTab({
                     <textarea
                         className="input-field text-sm"
                         rows={3}
-                        placeholder="Notas de revision (opcional)"
+                        placeholder="Notas de revisión (opcional)"
                         value={verificationForm.notes}
                         onChange={(event) =>
                             setVerificationForm((previous) => ({
@@ -143,7 +143,7 @@ export function DashboardVerificationTab({
                         disabled={submittingBusinessVerification || !selectedVerificationBusinessId}
                         onClick={() => void handleSubmitBusinessVerification()}
                     >
-                        {submittingBusinessVerification ? 'Enviando...' : 'Enviar a revision'}
+                        {submittingBusinessVerification ? 'Enviando...' : 'Enviar a revisión'}
                     </button>
                 </div>
             </div>
@@ -151,7 +151,7 @@ export function DashboardVerificationTab({
             <div className="card p-5 xl:col-span-2">
                 <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Estado y documentos</h3>
                 {verificationLoading ? (
-                    <p className="text-sm text-gray-500">Cargando informacion de verificacion...</p>
+                    <p className="text-sm text-gray-500">Cargando información de verificación...</p>
                 ) : (
                     <div className="space-y-4">
                         {verificationStatus ? (

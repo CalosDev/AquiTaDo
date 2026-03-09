@@ -79,7 +79,7 @@ export function AdminSecurity() {
             setCode('');
             setSetup(null);
             await loadStatus();
-            setSuccessMessage('2FA habilitado. Cierra sesion y vuelve a entrar para aplicar el cambio.');
+            setSuccessMessage('2FA habilitado. Cierra sesión y vuelve a entrar para aplicar el cambio.');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo habilitar 2FA'));
         } finally {
@@ -96,7 +96,7 @@ export function AdminSecurity() {
             setCode('');
             setSetup(null);
             await loadStatus();
-            setSuccessMessage('2FA deshabilitado. Cierra sesion y vuelve a entrar para aplicar el cambio.');
+            setSuccessMessage('2FA deshabilitado. Cierra sesión y vuelve a entrar para aplicar el cambio.');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo deshabilitar 2FA'));
         } finally {
@@ -114,7 +114,7 @@ export function AdminSecurity() {
                 <div className="card p-6">
                     <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">Acceso restringido</h1>
                     <p className="text-sm text-gray-600">
-                        Esta seccion solo esta disponible para administradores de plataforma.
+                        Esta sección solo está disponible para administradores de plataforma.
                     </p>
                     <div className="mt-4">
                         <Link to="/" className="btn-secondary text-sm">Volver al inicio</Link>
@@ -128,7 +128,7 @@ export function AdminSecurity() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="mb-6">
                 <h1 className="font-display text-3xl font-bold text-gray-900">Seguridad de Administrador</h1>
-                <p className="text-sm text-gray-500 mt-1">Gestion de segundo factor (2FA) y acceso reforzado de cuenta admin.</p>
+                <p className="text-sm text-gray-500 mt-1">Gestión de segundo factor (2FA) y acceso reforzado de cuenta admin.</p>
             </div>
 
             {errorMessage && (
@@ -239,7 +239,7 @@ export function AdminSecurity() {
                         <div className="card p-5">
                             <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Deshabilitar 2FA</h2>
                             <p className="text-sm text-gray-600 mb-3">
-                                Solo deshabilita 2FA en casos de recuperacion. Esta accion reduce seguridad.
+                                Solo deshabilita 2FA en casos de recuperación. Esta acción reduce seguridad.
                             </p>
                             <label htmlFor="totp-code-disable" className="block text-xs font-semibold text-gray-700 mb-1">
                                 Codigo actual de 6 digitos
@@ -265,12 +265,12 @@ export function AdminSecurity() {
                     )}
 
                     <div className="card p-5">
-                        <h2 className="font-display text-lg font-semibold text-gray-900 mb-2">Aplicar cambios de sesion</h2>
+                        <h2 className="font-display text-lg font-semibold text-gray-900 mb-2">Aplicar cambios de sesión</h2>
                         <p className="text-sm text-gray-600 mb-3">
-                            Para cerrar sesiones anteriores y aplicar politicas de admin, vuelve a iniciar sesion.
+                            Para cerrar sesiones anteriores y aplicar políticas de admin, vuelve a iniciar sesión.
                         </p>
                         <button type="button" onClick={handleLogout} className="btn-secondary text-sm">
-                            Cerrar sesion ahora
+                            Cerrar sesión ahora
                         </button>
                     </div>
                 </div>
