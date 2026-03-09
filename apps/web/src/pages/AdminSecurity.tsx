@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { ChangePasswordCard } from '../components/ChangePasswordCard';
 import { useAuth } from '../context/useAuth';
 import { formatDateTimeDo } from '../lib/market';
 
@@ -61,10 +62,10 @@ export function AdminSecurity() {
         try {
             const response = await authApi.setupTwoFactor();
             setSetup(response.data as TwoFactorSetup);
-            setSuccessMessage('Escanea el QR con tu app autenticadora y luego confirma con el codigo de 6 digitos.');
+            setSuccessMessage('Escanea el QR con tu app autenticadora y luego confirma con el código de 6 dígitos.');
             await loadStatus();
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar la configuracion 2FA'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar la configuración 2FA'));
         } finally {
             setSaving(false);
         }
@@ -149,6 +150,11 @@ export function AdminSecurity() {
                 </div>
             ) : (
                 <div className="space-y-6">
+                    <ChangePasswordCard
+                        title="Cambiar contraseña admin"
+                        description="Rota tu credencial principal antes de abrir la plataforma al público. Al guardar, cerraremos tu sesión para obligar un nuevo login."
+                    />
+
                     <div className="card p-5">
                         <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Estado actual</h2>
                         <div className="space-y-2 text-sm text-gray-700">
@@ -165,9 +171,9 @@ export function AdminSecurity() {
                                 </p>
                             )}
                             <p>
-                                Politica requerida para admins:{' '}
+                                Política requerida para admins:{' '}
                                 <strong className={status?.required ? 'text-emerald-700' : 'text-amber-700'}>
-                                    {status?.required ? 'Si' : 'No'}
+                                    {status?.required ? 'Sí' : 'No'}
                                 </strong>
                             </p>
                         </div>
@@ -192,7 +198,7 @@ export function AdminSecurity() {
                                         {qrUrl ? (
                                             <img
                                                 src={qrUrl}
-                                                alt="QR de configuracion 2FA"
+                                                alt="QR de configuración 2FA"
                                                 className="h-52 w-52 rounded-xl border border-primary-200 bg-white p-2"
                                                 loading="lazy"
                                             />
@@ -209,7 +215,7 @@ export function AdminSecurity() {
                                         </a>
                                         <div className="mt-4">
                                             <label htmlFor="totp-code-enable" className="block text-xs font-semibold text-gray-700 mb-1">
-                                                Codigo de 6 digitos
+                                                Código de 6 dígitos
                                             </label>
                                             <input
                                                 id="totp-code-enable"
@@ -242,7 +248,7 @@ export function AdminSecurity() {
                                 Solo deshabilita 2FA en casos de recuperación. Esta acción reduce seguridad.
                             </p>
                             <label htmlFor="totp-code-disable" className="block text-xs font-semibold text-gray-700 mb-1">
-                                Codigo actual de 6 digitos
+                                Código actual de 6 dígitos
                             </label>
                             <input
                                 id="totp-code-disable"

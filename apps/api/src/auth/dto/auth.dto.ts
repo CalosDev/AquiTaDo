@@ -10,6 +10,8 @@ import {
     MinLength,
 } from 'class-validator';
 
+const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[A-Za-z])(?=.*\d).+$/;
+
 export class RegisterDto {
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     @IsString()
@@ -27,7 +29,7 @@ export class RegisterDto {
     @IsString()
     @MinLength(8)
     @MaxLength(128)
-    @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
+    @Matches(PASSWORD_COMPLEXITY_REGEX, {
         message: 'La contraseña debe incluir letras y números',
     })
     password!: string;
@@ -56,9 +58,23 @@ export class LoginDto {
     @IsOptional()
     @IsString()
     @Matches(/^\d{6}$/, {
-        message: 'El codigo 2FA debe tener 6 digitos',
+        message: 'El código 2FA debe tener 6 dígitos',
     })
     twoFactorCode?: string;
+}
+
+export class ChangePasswordDto {
+    @IsString()
+    @IsNotEmpty()
+    currentPassword!: string;
+
+    @IsString()
+    @MinLength(8)
+    @MaxLength(128)
+    @Matches(PASSWORD_COMPLEXITY_REGEX, {
+        message: 'La contraseña debe incluir letras y números',
+    })
+    newPassword!: string;
 }
 
 export class RefreshTokenDto {
@@ -72,7 +88,7 @@ export class TwoFactorCodeDto {
     @IsString()
     @IsNotEmpty()
     @Matches(/^\d{6}$/, {
-        message: 'El codigo 2FA debe tener 6 digitos',
+        message: 'El código 2FA debe tener 6 dígitos',
     })
     code!: string;
 }

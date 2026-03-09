@@ -208,4 +208,60 @@ describe('AuthController (e2e)', () => {
         expect(refreshResponse.headers['set-cookie']).toBeDefined();
         expect(String(refreshResponse.headers['set-cookie']?.[0] ?? '')).toContain('aquita_refresh_token=');
     });
+
+    it('changes password, revokes refresh token, and rejects the previous password', async () => {
+        const payload = makeRegisterPayload('change-password');
+
+        const registerResponse = await request(app.getHttpServer())
+            .post('/api/auth/register')
+            .send(payload)
+            .expect(201);
+
+        const accessToken = String(registerResponse.body.accessToken);
+        const rawCookieHeader = registerResponse.headers['set-cookie'];
+        const cookieHeader = Array.isArray(rawCookieHeader)
+            ? rawCookieHeader
+            : rawCookieHeader
+                ? [String(rawCookieHeader)]
+                : [];
+        const refreshCookie = cookieHeader.find((cookie) =>
+            cookie.startsWith('aquita_refresh_token='),
+        );
+
+        expect(refreshCookie).toBeDefined();
+
+        const changePasswordResponse = await request(app.getHttpServer())
+            .post('/api/auth/change-password')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({
+                currentPassword: payload.password,
+                newPassword: 'Password456',
+            })
+            .expect(200);
+
+        expect(String(changePasswordResponse.body.message)).toContain('Contraseña');
+        expect(String(changePasswordResponse.headers['set-cookie']?.[0] ?? '')).toContain('aquita_refresh_token=');
+
+        await request(app.getHttpServer())
+            .post('/api/auth/login')
+            .send({
+                email: payload.email,
+                password: payload.password,
+            })
+            .expect(401);
+
+        await request(app.getHttpServer())
+            .post('/api/auth/login')
+            .send({
+                email: payload.email,
+                password: 'Password456',
+            })
+            .expect(200);
+
+        await request(app.getHttpServer())
+            .post('/api/auth/refresh')
+            .set('Cookie', [refreshCookie as string])
+            .send({})
+            .expect(401);
+    });
 });

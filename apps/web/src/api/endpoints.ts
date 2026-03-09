@@ -41,6 +41,8 @@ export const authApi = {
         api.post('/auth/login', data),
     refresh: () => api.post('/auth/refresh', {}),
     logout: () => api.post('/auth/logout', {}),
+    changePassword: (data: { currentPassword: string; newPassword: string }) =>
+        api.post('/auth/change-password', data),
     getProfile: () => api.get('/users/me'),
     getTwoFactorStatus: () => api.get('/auth/2fa/status'),
     setupTwoFactor: () => api.post('/auth/2fa/setup', {}),

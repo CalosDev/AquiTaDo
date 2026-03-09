@@ -1,14 +1,21 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 
 export function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [formData, setFormData] = useState({ email: '', password: '', twoFactorCode: '' });
     const [error, setError] = useState('');
     const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
     const [loading, setLoading] = useState(false);
+    const notice =
+        typeof location.state === 'object'
+        && location.state !== null
+        && typeof (location.state as { notice?: unknown }).notice === 'string'
+            ? (location.state as { notice: string }).notice
+            : '';
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,6 +52,12 @@ export function Login() {
                         <p className="text-gray-500 text-sm mt-1">Inicia sesión en tu cuenta</p>
                     </div>
 
+                    {notice && (
+                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl p-3 mb-6">
+                            {notice}
+                        </div>
+                    )}
+
                     {error && (
                         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-3 mb-6">
                             {error}
@@ -54,7 +67,7 @@ export function Login() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label htmlFor="login-email" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Correo electronico
+                                Correo electrónico
                             </label>
                             <input
                                 id="login-email"
@@ -70,7 +83,7 @@ export function Login() {
                         </div>
                         <div>
                             <label htmlFor="login-password" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Contrasena
+                                Contraseña
                             </label>
                             <input
                                 id="login-password"
@@ -87,7 +100,7 @@ export function Login() {
                         {requiresTwoFactor && (
                             <div>
                                 <label htmlFor="login-2fa" className="text-sm font-medium text-gray-700 mb-1 block">
-                                    Codigo 2FA (6 digitos)
+                                    Código 2FA (6 dígitos)
                                 </label>
                                 <input
                                     id="login-2fa"
@@ -114,9 +127,9 @@ export function Login() {
                     </form>
 
                     <p className="text-center text-sm text-gray-500 mt-6">
-                        No tienes cuenta?{' '}
+                        ¿No tienes cuenta?{' '}
                         <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                            Registrate
+                            Regístrate
                         </Link>
                     </p>
                 </div>

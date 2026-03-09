@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usersApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { ChangePasswordCard } from '../components/ChangePasswordCard';
 import { useAuth } from '../context/useAuth';
 import { formatCurrencyDo, formatDateTimeDo } from '../lib/market';
 
@@ -302,6 +303,11 @@ export function Profile() {
                             </div>
                         </div>
                     </div>
+
+                    <ChangePasswordCard
+                        title="Cambiar contraseña"
+                        description="Actualiza tu contraseña de acceso. Al guardar, cerraremos tu sesión para que entres nuevamente con la nueva clave."
+                    />
 
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         <div className="card p-5">

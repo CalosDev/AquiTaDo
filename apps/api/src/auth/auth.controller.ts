@@ -1,7 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Inject, Req, Res, UseGuards, Get } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto, TwoFactorCodeDto } from './dto/auth.dto';
+import { ChangePasswordDto, RegisterDto, LoginDto, RefreshTokenDto, TwoFactorCodeDto } from './dto/auth.dto';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -54,6 +54,18 @@ export class AuthController {
         @Res({ passthrough: true }) response: Response,
     ) {
         return this.authService.logout(dto.refreshToken, request, response);
+    }
+
+    @Post('change-password')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard)
+    @Throttle({ default: { limit: 6, ttl: 60_000 } })
+    async changePassword(
+        @CurrentUser('id') userId: string,
+        @Body() dto: ChangePasswordDto,
+        @Res({ passthrough: true }) response: Response,
+    ) {
+        return this.authService.changePassword(userId, dto, response);
     }
 
     @Get('2fa/status')

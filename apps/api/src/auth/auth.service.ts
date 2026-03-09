@@ -13,7 +13,7 @@ import * as bcrypt from 'bcryptjs';
 import { CookieOptions, Request, Response } from 'express';
 import { Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
 import { IntegrationsService } from '../integrations/integrations.service';
 import {
     buildTotpOtpauthUrl,
@@ -113,12 +113,12 @@ export class AuthService {
         });
 
         if (!user) {
-            throw new UnauthorizedException('Credenciales invalidas');
+            throw new UnauthorizedException('Credenciales inválidas');
         }
 
         const isPasswordValid = await bcrypt.compare(dto.password, user.password);
         if (!isPasswordValid) {
-            throw new UnauthorizedException('Credenciales invalidas');
+            throw new UnauthorizedException('Credenciales inválidas');
         }
 
         this.assertAdminSecondFactor(user.role, user.twoFactorEnabled, user.twoFactorSecret, dto.twoFactorCode);
@@ -223,6 +223,53 @@ export class AuthService {
         return { message: 'Sesión cerrada' };
     }
 
+    async changePassword(userId: string, dto: ChangePasswordDto, response: Response) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                password: true,
+            },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('Usuario no autenticado');
+        }
+
+        const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, user.password);
+        if (!isCurrentPasswordValid) {
+            throw new UnauthorizedException('La contraseña actual no es correcta');
+        }
+
+        if (dto.currentPassword === dto.newPassword) {
+            throw new BadRequestException('La nueva contraseña debe ser diferente a la actual');
+        }
+
+        const hashedPassword = await bcrypt.hash(dto.newPassword, 12);
+
+        await this.prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: user.id },
+                data: {
+                    password: hashedPassword,
+                },
+            });
+
+            await tx.refreshToken.updateMany({
+                where: {
+                    userId: user.id,
+                    revokedAt: null,
+                },
+                data: {
+                    revokedAt: new Date(),
+                },
+            });
+        });
+
+        this.clearRefreshCookie(response);
+        return { message: 'Contraseña actualizada. Inicia sesión nuevamente.' };
+    }
+
     async getTwoFactorStatus(userId: string) {
         const user = await this.prisma.user.findUnique({
             where: { id: userId },
@@ -310,7 +357,7 @@ export class AuthService {
         }
 
         if (!user.twoFactorPendingSecret) {
-            throw new BadRequestException('No hay configuracion 2FA pendiente');
+            throw new BadRequestException('No hay configuración 2FA pendiente');
         }
 
         if (!verifyTotpCode(user.twoFactorPendingSecret, code)) {
@@ -650,7 +697,7 @@ export class AuthService {
 
         const normalizedCode = twoFactorCode?.trim();
         if (!normalizedCode) {
-            throw new UnauthorizedException('Se requiere codigo 2FA para cuentas admin');
+            throw new UnauthorizedException('Se requiere código 2FA para cuentas admin');
         }
 
         if (!verifyTotpCode(twoFactorSecret, normalizedCode)) {
