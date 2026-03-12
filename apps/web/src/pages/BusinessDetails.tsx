@@ -175,6 +175,20 @@ function normalizeText(value: string): string {
         .trim();
 }
 
+function getDisplayInitial(value: string | undefined): string {
+    const normalized = value?.trim() ?? '';
+    if (!normalized) {
+        return '?';
+    }
+
+    return normalized.charAt(0).toUpperCase();
+}
+
+function renderStars(rating: number): string {
+    const normalized = Math.max(0, Math.min(5, Math.round(rating)));
+    return `${'★'.repeat(normalized)}${'☆'.repeat(5 - normalized)}`;
+}
+
 const BOOKING_FEATURE_CANONICAL = 'reservaciones';
 
 function businessSupportsBooking(features?: { feature: { name: string } }[]): boolean {
@@ -238,6 +252,7 @@ export function BusinessDetails() {
     const [listProcessing, setListProcessing] = useState(false);
     const [favoriteInfoMessage, setFavoriteInfoMessage] = useState('');
     const [favoriteErrorMessage, setFavoriteErrorMessage] = useState('');
+    const [shareFeedback, setShareFeedback] = useState('');
     const [checkInStats, setCheckInStats] = useState<CheckInStats | null>(null);
     const [checkInStatsLoading, setCheckInStatsLoading] = useState(false);
     const [checkInProcessing, setCheckInProcessing] = useState(false);
@@ -575,6 +590,18 @@ export function BusinessDetails() {
         };
     }, [business?.id, business?.latitude, business?.longitude]);
 
+    useEffect(() => {
+        if (!shareFeedback) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setShareFeedback('');
+        }, 2800);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [shareFeedback]);
+
     const handleReviewSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!isAuthenticated || !isCustomerRole) {
@@ -659,11 +686,22 @@ export function BusinessDetails() {
         ? new Date(business.createdAt).getFullYear()
         : null;
     const currentImage = business?.images?.[activeImage] ?? business?.images?.[0];
+    const coverImage = business?.images?.find((image) => image.isCover) ?? currentImage;
     const priceRangeLabel = businessPriceRangeLabel(business?.priceRange);
+    const displayLocation = [
+        business?.address,
+        business?.sector?.name,
+        business?.city?.name,
+        business?.province?.name,
+    ].filter(Boolean).join(' · ');
+    const reviewStarsLabel = averageRatingNumber ? renderStars(averageRatingNumber) : null;
+    const todayDayOfWeek = new Date().getDay();
     const hoursByDay = BUSINESS_DAY_OPTIONS.map((day) => ({
         ...day,
         schedule: business?.hours?.find((entry) => entry.dayOfWeek === day.dayOfWeek) ?? null,
     }));
+    const profileCompleteness = Math.max(0, Math.min(100, business?.profileCompletenessScore ?? 0));
+    const hasBusinessHours = Boolean(business?.hours && business.hours.length > 0);
     const mapCoordinates =
         typeof business?.latitude === 'number' && typeof business?.longitude === 'number'
             ? {
@@ -720,6 +758,44 @@ export function BusinessDetails() {
             source: 'business-details',
             channel: 'phone',
         });
+    };
+
+    const handleShare = async () => {
+        if (!business) {
+            return;
+        }
+
+        const shareUrl = typeof window !== 'undefined'
+            ? window.location.href
+            : `https://aquitado.vercel.app/businesses/${business.slug || business.id}`;
+
+        try {
+            if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+                await navigator.share({
+                    title: business.name,
+                    text: `Mira ${business.name} en AquiTa.do`,
+                    url: shareUrl,
+                });
+                setShareFeedback('Enlace compartido');
+                return;
+            }
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                return;
+            }
+        }
+
+        try {
+            if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(shareUrl);
+                setShareFeedback('Enlace copiado');
+                return;
+            }
+        } catch {
+            // Fallback handled below.
+        }
+
+        setShareFeedback('No se pudo compartir desde este navegador');
     };
 
     const openWhatsApp = async () => {
@@ -1014,16 +1090,74 @@ export function BusinessDetails() {
                 <div className="lg:col-span-2 space-y-6">
                     {/* Image Gallery */}
                     <div className="panel-premium overflow-hidden">
-                        <div className="h-72 md:h-96 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
-                            {currentImage ? (
+                        <div className="relative h-[320px] md:h-[380px] bg-gradient-to-br from-primary-900 via-primary-700 to-accent-700">
+                            {coverImage ? (
                                 <OptimizedImage
-                                    src={currentImage.url}
+                                    src={coverImage.url}
                                     alt={business.name}
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
-                                <span className="text-7xl">NEG</span>
+                                <div className="flex h-full items-center justify-center text-8xl font-display font-bold text-white/20">
+                                    {getDisplayInitial(business.name)}
+                                </div>
                             )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/35 to-transparent"></div>
+                            <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
+                                <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+                                    <div className="max-w-3xl">
+                                        <div className="mb-3 flex flex-wrap gap-2">
+                                            {business.verified && (
+                                                <span className="rounded-full bg-green-700 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+                                                    Verificado
+                                                </span>
+                                            )}
+                                            {business.openNow !== null && business.openNow !== undefined && (
+                                                <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                                                    business.openNow
+                                                        ? 'bg-white text-green-700'
+                                                        : 'bg-white/15 text-white ring-1 ring-white/20'
+                                                }`}>
+                                                    {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
+                                                </span>
+                                            )}
+                                            {business.categories?.slice(0, 2).map((entry) => (
+                                                <span
+                                                    key={entry.category.name}
+                                                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm"
+                                                >
+                                                    {entry.category.icon ? `${entry.category.icon} ` : ''}
+                                                    {entry.category.parent?.name ? `${entry.category.parent.name} / ` : ''}
+                                                    {entry.category.name}
+                                                </span>
+                                            ))}
+                                            {priceRangeLabel && (
+                                                <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm">
+                                                    {priceRangeLabel}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight text-white md:text-5xl">
+                                            {business.name}
+                                        </h1>
+                                        <p className="mt-3 text-sm text-white/80">{displayLocation}</p>
+                                        {business.todayHoursLabel && (
+                                            <p className="mt-1 text-sm text-white/75">Hoy: {business.todayHoursLabel}</p>
+                                        )}
+                                    </div>
+                                    {averageRating && (
+                                        <div className="w-fit rounded-2xl bg-amber-500 px-5 py-4 text-center text-white shadow-lg shadow-amber-900/30">
+                                            <div className="font-display text-4xl font-bold leading-none">{averageRating}</div>
+                                            {reviewStarsLabel && (
+                                                <div className="mt-1 text-xs tracking-[0.22em] text-white/90">{reviewStarsLabel}</div>
+                                            )}
+                                            <div className="mt-1 text-[11px] font-medium text-white/80">
+                                                {reviewCount} reseña{reviewCount === 1 ? '' : 's'}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                         {business.images.length > 1 && (
                             <div className="flex gap-2 p-3 overflow-x-auto">
@@ -1049,6 +1183,60 @@ export function BusinessDetails() {
 
                     {/* Info */}
                     <div className="panel-premium p-6 md:p-7">
+                        <div className="mb-6 flex flex-wrap gap-3">
+                            {isAuthenticated && isCustomerRole ? (
+                                <button
+                                    type="button"
+                                    onClick={() => void handleToggleFavorite()}
+                                    disabled={favoriteProcessing || favoriteLoading}
+                                    className={`btn-primary text-sm ${isFavorite ? '!bg-primary-700' : ''}`}
+                                >
+                                    {favoriteProcessing
+                                        ? 'Guardando...'
+                                        : isFavorite
+                                            ? 'Guardado en favoritos'
+                                            : 'Guardar en favoritos'}
+                                </button>
+                            ) : (
+                                <Link to={isAuthenticated ? '/profile' : '/login'} className="btn-primary text-sm">
+                                    Guardar en favoritos
+                                </Link>
+                            )}
+                            {googleMapsDirectionsUrl && (
+                                <a
+                                    href={googleMapsDirectionsUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn-secondary text-sm"
+                                >
+                                    Como llegar
+                                </a>
+                            )}
+                            <button type="button" className="btn-secondary text-sm" onClick={() => void handleShare()}>
+                                Compartir
+                            </button>
+                        </div>
+
+                        {(favoriteInfoMessage || favoriteErrorMessage || shareFeedback) && (
+                            <div className="mb-4 flex flex-wrap gap-2 text-xs">
+                                {favoriteInfoMessage ? (
+                                    <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 font-medium text-green-700">
+                                        {favoriteInfoMessage}
+                                    </span>
+                                ) : null}
+                                {favoriteErrorMessage ? (
+                                    <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 font-medium text-red-700">
+                                        {favoriteErrorMessage}
+                                    </span>
+                                ) : null}
+                                {shareFeedback ? (
+                                    <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 font-medium text-primary-700">
+                                        {shareFeedback}
+                                    </span>
+                                ) : null}
+                            </div>
+                        )}
+
                         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-4">
                             <div>
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -1079,7 +1267,8 @@ export function BusinessDetails() {
                                         ))}
                                     </div>
                                 </div>
-                                <h1 className="font-display text-3xl md:text-4xl font-bold text-gray-900 leading-tight">{business.name}</h1>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Resumen del negocio</p>
+                                <h2 className="mt-2 font-display text-2xl font-bold text-gray-900 leading-tight md:text-3xl">{business.name}</h2>
                                 <p className="text-gray-500 mt-2 flex items-center gap-1">
                                     Dirección: {business.address}
                                     {business.province && ` - ${business.province.name}`}
@@ -1098,33 +1287,19 @@ export function BusinessDetails() {
                             )}
                         </div>
 
-                        <p className="text-gray-700 leading-relaxed whitespace-pre-line">{business.description}</p>
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-5 py-4">
+                            <p className="text-sm leading-7 text-emerald-950 whitespace-pre-line">{business.description}</p>
+                            {memberSinceYear && Number.isFinite(memberSinceYear) && (
+                                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                                    En AquiTa.do desde {memberSinceYear}
+                                </p>
+                            )}
+                        </div>
 
                         {isAuthenticated && isCustomerRole && (
                             <div className="mt-5 rounded-xl border border-primary-100 p-4 bg-primary-50/30 space-y-3">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => void handleToggleFavorite()}
-                                        disabled={favoriteProcessing || favoriteLoading}
-                                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                                            isFavorite
-                                                ? 'bg-primary-600 text-white'
-                                                : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
-                                        }`}
-                                    >
-                                        {favoriteProcessing
-                                            ? 'Guardando...'
-                                            : isFavorite
-                                                ? 'Guardado en favoritos'
-                                                : 'Guardar en favoritos'}
-                                    </button>
-                                    {favoriteInfoMessage && (
-                                        <span className="text-xs text-green-700">{favoriteInfoMessage}</span>
-                                    )}
-                                    {favoriteErrorMessage && (
-                                        <span className="text-xs text-red-700">{favoriteErrorMessage}</span>
-                                    )}
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Organiza este negocio en tus listas
                                 </div>
 
                                 {favoriteLists.length > 0 ? (
@@ -1235,11 +1410,14 @@ export function BusinessDetails() {
                         {/* Features */}
                         {business.features && business.features.length > 0 && (
                             <div className="mt-6">
-                                <h2 className="font-display font-semibold text-gray-900 mb-3">Caracteristicas</h2>
+                                <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Caracteristicas</h2>
                                 <div className="flex flex-wrap gap-2">
                                     {business.features.map((bf, i) => (
-                                        <span key={i} className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-700">
-                                            + {bf.feature.name}
+                                        <span
+                                            key={i}
+                                            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700"
+                                        >
+                                            {bf.feature.name}
                                         </span>
                                     ))}
                                 </div>
@@ -1249,111 +1427,189 @@ export function BusinessDetails() {
 
                     {/* Map */}
                     {openStreetMapEmbedUrl && (
-                        <div className="panel-premium p-6">
-                            <h2 className="font-display font-semibold text-gray-900 mb-3">Ubicación</h2>
-                            <div className="h-64 bg-gray-100 rounded-xl flex items-center justify-center">
-                                <iframe
-                                    width="100%"
-                                    height="100%"
-                                    style={{ border: 0, borderRadius: '0.75rem' }}
-                                    loading="lazy"
-                                    src={openStreetMapEmbedUrl}
-                                    title={`Mapa de ubicación de ${business.name}`}
-                                    allowFullScreen
-                                ></iframe>
+                        <div className="panel-premium overflow-hidden">
+                            <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Ubicacion</p>
+                                    <h2 className="mt-2 font-display text-2xl font-semibold text-slate-900">Ubicacion del negocio</h2>
+                                    <p className="mt-1 text-sm text-slate-600">{displayLocation || business.address}</p>
+                                </div>
+                                {googleMapsDirectionsUrl && (
+                                    <a
+                                        href={googleMapsDirectionsUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                    >
+                                        Ver en Google Maps
+                                    </a>
+                                )}
                             </div>
-                            {googleMapsDirectionsUrl && (
-                                <a
-                                    href={googleMapsDirectionsUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="mt-3 inline-flex text-sm font-medium text-primary-700 hover:text-primary-800 underline underline-offset-2"
-                                >
-                                    Ver ruta en Google Maps
-                                </a>
-                            )}
+                            <div className="px-6 pb-6 pt-5">
+                                <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50">
+                                    <div className="h-72 bg-gray-100">
+                                        <iframe
+                                            width="100%"
+                                            height="100%"
+                                            style={{ border: 0 }}
+                                            loading="lazy"
+                                            src={openStreetMapEmbedUrl}
+                                            title={`Mapa de ubicación de ${business.name}`}
+                                            allowFullScreen
+                                        ></iframe>
+                                    </div>
+                                    <div className="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                                        <span className="min-w-0 truncate">{displayLocation || business.address}</span>
+                                        {googleMapsDirectionsUrl && (
+                                            <a
+                                                href={googleMapsDirectionsUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="font-medium text-emerald-700 transition-colors hover:text-emerald-800"
+                                            >
+                                                Abrir ruta
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     <div className="panel-premium p-6">
-                        <h2 className="font-display font-semibold text-gray-900 mb-4">Ofertas activas</h2>
-                        {promotionsLoading ? (
-                            <p className="text-sm text-gray-500">Cargando promociones...</p>
-                        ) : publicPromotions.length > 0 ? (
-                            <div className="space-y-3">
-                                {publicPromotions.map((promotion) => (
-                                    <div key={promotion.id} className="rounded-xl border border-gray-100 bg-white p-4">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <p className="font-semibold text-gray-900">{promotion.title}</p>
-                                            <span className="text-xs rounded-full bg-primary-50 text-primary-700 px-2 py-1">
-                                                {promotion.discountType === 'PERCENTAGE'
-                                                    ? `${Number(promotion.discountValue)}% OFF`
-                                                    : `${formatCurrencyDop(Number(promotion.discountValue))} OFF`}
-                                            </span>
-                                        </div>
-                                        {promotion.description ? (
-                                            <p className="text-sm text-gray-600 mt-1">{promotion.description}</p>
-                                        ) : null}
-                                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                                            {promotion.couponCode ? (
-                                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
-                                                    Cupon: {promotion.couponCode}
-                                                </span>
-                                            ) : null}
-                                            {promotion.isFlashOffer ? (
-                                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">
-                                                    Flash
-                                                </span>
-                                            ) : null}
-                                            <span>Vence: {new Date(promotion.endsAt).toLocaleDateString('es-DO')}</span>
-                                        </div>
-                                    </div>
-                                ))}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Promociones</p>
+                                <h2 className="mt-2 font-display text-2xl font-semibold text-slate-900">Ofertas activas</h2>
                             </div>
-                        ) : (
-                            <p className="text-sm text-gray-500">Este negocio no tiene promociones activas.</p>
-                        )}
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                                {publicPromotions.length} activa{publicPromotions.length === 1 ? '' : 's'}
+                            </span>
+                        </div>
+                        <div className="mt-5">
+                            {promotionsLoading ? (
+                                <p className="text-sm text-slate-500">Cargando promociones...</p>
+                            ) : publicPromotions.length > 0 ? (
+                                <div className="space-y-3">
+                                    {publicPromotions.map((promotion) => (
+                                        <div key={promotion.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <p className="font-semibold text-slate-900">{promotion.title}</p>
+                                                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                                    {promotion.discountType === 'PERCENTAGE'
+                                                        ? `${Number(promotion.discountValue)}% OFF`
+                                                        : `${formatCurrencyDop(Number(promotion.discountValue))} OFF`}
+                                                </span>
+                                            </div>
+                                            {promotion.description ? (
+                                                <p className="mt-2 text-sm leading-6 text-slate-600">{promotion.description}</p>
+                                            ) : null}
+                                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                                {promotion.couponCode ? (
+                                                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700">
+                                                        Cupon: {promotion.couponCode}
+                                                    </span>
+                                                ) : null}
+                                                {promotion.isFlashOffer ? (
+                                                    <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-red-700">
+                                                        Flash
+                                                    </span>
+                                                ) : null}
+                                                <span>Vence: {new Date(promotion.endsAt).toLocaleDateString('es-DO')}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-10 text-center">
+                                    <div className="text-3xl">🏷️</div>
+                                    <p className="mt-3 text-sm font-medium text-slate-700">
+                                        Este negocio no tiene promociones activas ahora mismo.
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Cuando haya nuevas ofertas, apareceran aqui.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        </div>
                     </div>
 
                     <div className="panel-premium p-6">
-                        <h2 className="font-display font-semibold text-gray-900 mb-4">Negocios cerca de aqui</h2>
-                        {nearbyLoading ? (
-                            <p className="text-sm text-gray-500">Cargando negocios cercanos...</p>
-                        ) : nearbyBusinesses.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {nearbyBusinesses.map((nearbyBusiness) => {
-                                    const parsedDistance = Number(nearbyBusiness.distance);
-                                    const distanceLabel = Number.isFinite(parsedDistance)
-                                        ? `${parsedDistance.toFixed(1)} km`
-                                        : null;
-                                    return (
-                                        <Link
-                                            key={nearbyBusiness.id}
-                                            to={`/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`}
-                                            className="rounded-xl border border-gray-100 bg-white p-3 hover:border-primary-200 hover:bg-primary-50/40 transition-colors"
-                                        >
-                                            <p className="font-medium text-gray-900">{nearbyBusiness.name}</p>
-                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                                {nearbyBusiness.address || 'Dirección no disponible'}
-                                            </p>
-                                            {distanceLabel ? (
-                                                <p className="text-xs text-primary-700 mt-2">{distanceLabel}</p>
-                                            ) : null}
-                                        </Link>
-                                    );
-                                })}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Exploracion cercana</p>
+                                <h2 className="mt-2 font-display text-2xl font-semibold text-slate-900">Negocios cerca de aqui</h2>
                             </div>
-                        ) : (
-                            <p className="text-sm text-gray-500">No hay resultados cercanos para mostrar.</p>
-                        )}
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                                {nearbyBusinesses.length} resultado{nearbyBusinesses.length === 1 ? '' : 's'}
+                            </span>
+                        </div>
+                        <div className="mt-5">
+                            {nearbyLoading ? (
+                                <p className="text-sm text-slate-500">Cargando negocios cercanos...</p>
+                            ) : nearbyBusinesses.length > 0 ? (
+                                <div className="space-y-3">
+                                    {nearbyBusinesses.map((nearbyBusiness) => {
+                                        const parsedDistance = Number(nearbyBusiness.distance);
+                                        const distanceLabel = Number.isFinite(parsedDistance)
+                                            ? `${parsedDistance.toFixed(1)} km`
+                                            : null;
+                                        return (
+                                            <Link
+                                                key={nearbyBusiness.id}
+                                                to={`/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`}
+                                                className="group flex items-center gap-4 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-4 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40"
+                                            >
+                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-sm font-semibold text-emerald-700">
+                                                    {getDisplayInitial(nearbyBusiness.name)}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate font-semibold text-slate-900 transition-colors group-hover:text-emerald-700">
+                                                        {nearbyBusiness.name}
+                                                    </p>
+                                                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                                                        {nearbyBusiness.address || 'Direccion no disponible'}
+                                                    </p>
+                                                </div>
+                                                {distanceLabel ? (
+                                                    <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                                        {distanceLabel}
+                                                    </span>
+                                                ) : null}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-500">No hay resultados cercanos para mostrar.</p>
+                            )}
+                        </div>
                     </div>
 
                     {/* Reviews */}
                     <div className="panel-premium p-6">
-                        <h2 className="font-display font-semibold text-gray-900 mb-4">
-                            Resenas ({reviewCount})
-                        </h2>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Resenas</p>
+                                <h2 className="mt-2 font-display text-2xl font-semibold text-slate-900">
+                                    Opiniones ({reviewCount})
+                                </h2>
+                            </div>
+                            {averageRatingNumber ? (
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-amber-900">
+                                    <div className="font-display text-2xl font-semibold leading-none">{averageRating}</div>
+                                    {reviewStarsLabel ? (
+                                        <div className="mt-1 text-[11px] tracking-[0.18em] text-amber-500">{reviewStarsLabel}</div>
+                                    ) : null}
+                                    <div className="mt-1 text-[11px] font-medium text-amber-700">
+                                        {reviewCount} reseña{reviewCount === 1 ? '' : 's'}
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
 
+                        <div className="mt-5">
                         {/* Review Form */}
                         {!isAuthenticated && (
                             <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
@@ -1368,19 +1624,20 @@ export function BusinessDetails() {
                         )}
 
                         {isAuthenticated && isCustomerRole && (
-                            <form onSubmit={handleReviewSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                            <form onSubmit={handleReviewSubmit} className="mb-6 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <span className="text-sm font-medium text-gray-600">Tu calificacion:</span>
-                                    <div className="flex gap-1">
+                                    <span className="text-sm font-medium text-slate-600">Tu calificacion:</span>
+                                    <div className="flex gap-1.5">
                                         {[1, 2, 3, 4, 5].map((star) => (
                                             <button
                                                 key={star}
                                                 type="button"
                                                 onClick={() => setReviewForm({ ...reviewForm, rating: star })}
-                                                className={`text-2xl transition-transform hover:scale-110 ${star <= reviewForm.rating ? 'text-yellow-400' : 'text-gray-300'
+                                                aria-label={`Seleccionar ${star} estrellas`}
+                                                className={`text-[1.75rem] leading-none transition-transform hover:scale-110 ${star <= reviewForm.rating ? 'text-amber-400' : 'text-slate-300'
                                                     }`}
                                             >
-                                                *
+                                                ★
                                             </button>
                                         ))}
                                     </div>
@@ -1389,27 +1646,27 @@ export function BusinessDetails() {
                                     value={reviewForm.comment}
                                     onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
                                     placeholder="Escribe tu experiencia..."
-                                    className="input-field text-sm mb-3"
-                                    rows={3}
+                                    className="input-field mt-1 text-sm"
+                                    rows={4}
                                 />
                                 <button
                                     type="submit"
                                     disabled={submittingReview}
-                                    className="btn-primary text-sm"
+                                    className="btn-primary mt-4 text-sm"
                                 >
-                                    {submittingReview ? 'Enviando...' : 'Enviar Resena'}
+                                    {submittingReview ? 'Enviando...' : 'Enviar reseña'}
                                 </button>
                             </form>
                         )}
 
                         {reviewErrorMessage && (
-                            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            <div className="mb-4 rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                                 {reviewErrorMessage}
                             </div>
                         )}
 
                         {reviewSuccessMessage && (
-                            <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                            <div className="mb-4 rounded-[1.25rem] border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                                 {reviewSuccessMessage}
                             </div>
                         )}
@@ -1417,103 +1674,126 @@ export function BusinessDetails() {
                         {/* Reviews List */}
                         <div className="space-y-4">
                             {reviewsLoading ? (
-                                <p className="text-gray-600 text-sm text-center py-4">
+                                <p className="py-4 text-center text-sm text-slate-500">
                                     Cargando reseñas...
                                 </p>
                             ) : visibleReviews.map((review) => (
-                                <div key={review.id} className="p-4 border border-gray-100 rounded-xl bg-white">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div>
-                                            <span className="font-semibold text-gray-900">{review.user.name}</span>
-                                            <div className="flex gap-0.5 mt-0.5">
-                                                {Array.from({ length: 5 }, (_, i) => (
-                                                    <span key={i} className={`text-sm ${i < review.rating ? 'text-yellow-400' : 'text-gray-200'}`}>*</span>
-                                                ))}
+                                <article key={review.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-5">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-semibold text-white">
+                                                {getDisplayInitial(review.user.name)}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="truncate font-semibold text-slate-900">{review.user.name}</p>
+                                                <div className="mt-1 text-xs tracking-[0.18em] text-amber-500">
+                                                    {renderStars(review.rating)}
+                                                </div>
                                             </div>
                                         </div>
-                                        <span className="text-xs text-gray-500">
+                                        <span className="shrink-0 text-xs text-slate-500">
                                             {new Date(review.createdAt).toLocaleDateString('es-DO')}
                                         </span>
                                     </div>
-                                    {review.comment && <p className="text-sm text-gray-600">{review.comment}</p>}
-                                </div>
+                                    {review.comment ? (
+                                        <p className="mt-4 text-sm leading-6 text-slate-700">{review.comment}</p>
+                                    ) : (
+                                        <p className="mt-4 text-sm leading-6 text-slate-500">Sin comentario adicional.</p>
+                                    )}
+                                </article>
                             ))}
                             {!reviewsLoading && visibleReviews.length === 0 && (
-                                <p className="text-gray-600 text-sm text-center py-4">
+                                <p className="py-4 text-center text-sm text-slate-500">
                                     Aún no hay reseñas. Sé el primero en opinar.
                                 </p>
                             )}
                         </div>
                     </div>
+                    </div>
                 </div>
 
                 {/* Sidebar - Contact */}
                 <div className="space-y-6">
-                    <div className="panel-premium p-6 lg:sticky lg:top-24 border-t-4 border-accent-600">
-                        <h2 className="font-display font-semibold text-gray-900 mb-4">Contacto</h2>
-                        <div className="flex flex-wrap gap-2 mb-4">
+                    <div className="panel-premium overflow-hidden lg:sticky lg:top-24">
+                        <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700 px-6 py-6 text-white">
+                        <div className="flex flex-col gap-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">Contacto</p>
+                                <h2 className="mt-2 font-display text-3xl font-semibold text-white">Confianza y contacto</h2>
+                            </div>
+                            {priceRangeLabel && (
+                                <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
+                                    {priceRangeLabel}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
                             {business.verified && (
-                                <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
+                                <span className="rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-medium text-white">
                                     Verificado
                                 </span>
                             )}
                             {updatedLabel && (
-                                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                                <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-medium text-white/85">
                                     {updatedLabel}
                                 </span>
                             )}
                             {memberSinceYear && Number.isFinite(memberSinceYear) && (
-                                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                                <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-medium text-white/85">
                                     En AquiTa.do desde {memberSinceYear}
                                 </span>
                             )}
                         </div>
-                        <div className="mb-4 rounded-xl border border-primary-100 bg-primary-50/40 px-3 py-2">
-                            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                                <span className="font-semibold text-gray-700">Indice de confianza</span>
+                        <div className="rounded-[1.25rem] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm">
+                            <div className="mb-2 flex items-center justify-between text-xs text-white/75">
+                                <span className="font-semibold text-white/85">Indice de confianza</span>
                                 <span className={`font-semibold ${
                                     trust.level === 'ALTA'
-                                        ? 'text-green-700'
+                                        ? 'text-emerald-100'
                                         : trust.level === 'MEDIA'
-                                            ? 'text-amber-700'
-                                            : 'text-red-700'
+                                            ? 'text-amber-200'
+                                            : 'text-rose-200'
                                 }`}>
                                     {trust.score}/100
                                 </span>
                             </div>
-                            <div className="h-2 rounded-full bg-white border border-primary-100 overflow-hidden">
+                            <div className="h-2 rounded-full bg-white/15 overflow-hidden">
                                 <div
                                     className={`h-full ${
                                         trust.level === 'ALTA'
-                                            ? 'bg-green-500'
+                                            ? 'bg-emerald-300'
                                             : trust.level === 'MEDIA'
-                                                ? 'bg-amber-500'
-                                                : 'bg-red-500'
+                                                ? 'bg-amber-300'
+                                                : 'bg-rose-300'
                                     }`}
                                     style={{ width: `${trust.score}%` }}
                                 />
                             </div>
                         </div>
-                        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-slate-700">Reputación oficial</span>
+                        </div>
+                        </div>
+                        <div className="px-6 pb-6 pt-5">
+                        <div className="mb-4 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Reputacion oficial</span>
                                 {reputationLoading ? (
                                     <span className="text-[11px] text-slate-500">Cargando...</span>
                                 ) : reputationProfile ? (
-                                    <span className="text-[11px] rounded-full bg-white border border-slate-200 px-2 py-0.5 font-semibold text-slate-700">
+                                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                                         Tier {tierLabel(reputationProfile.business.reputationTier)}
                                     </span>
                                 ) : null}
                             </div>
                             {reputationProfile ? (
-                                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-                                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                <div className="grid grid-cols-2 gap-3 text-xs text-slate-600">
+                                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
                                         <p className="text-[10px] uppercase tracking-wide text-slate-500">Score</p>
                                         <p className="text-sm font-semibold text-slate-900">
                                             {reputationProfile.business.reputationScore.toFixed(1)}
                                         </p>
                                     </div>
-                                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
                                         <p className="text-[10px] uppercase tracking-wide text-slate-500">Rating</p>
                                         <p className="text-sm font-semibold text-slate-900">
                                             {reputationProfile.metrics.averageRating > 0
@@ -1521,30 +1801,24 @@ export function BusinessDetails() {
                                                 : '0.0'}
                                         </p>
                                     </div>
-                                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
                                         <p className="text-[10px] uppercase tracking-wide text-slate-500">Resenas</p>
                                         <p className="text-sm font-semibold text-slate-900">
                                             {reputationProfile.metrics.reviewCount}
                                         </p>
                                     </div>
                                     {showBookings && (
-                                        <div className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
                                             <p className="text-[10px] uppercase tracking-wide text-slate-500">Reservas completadas</p>
                                             <p className="text-sm font-semibold text-slate-900">
                                                 {reputationProfile.metrics.bookings.completed}
                                             </p>
                                         </div>
                                     )}
-                                    <div className="col-span-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5">
-                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Volumen transaccional</p>
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            {formatCurrencyDop(reputationProfile.metrics.grossRevenue)}
-                                        </p>
-                                    </div>
                                 </div>
                             ) : (
                                 <p className="text-xs text-slate-500">
-                                    Perfil de reputación aún no disponible para este negocio.
+                                    Perfil de reputacion aun no disponible para este negocio.
                                 </p>
                             )}
                         </div>
@@ -1657,23 +1931,34 @@ export function BusinessDetails() {
                                     </div>
                                 </div>
                             )}
-                            {business.hours && business.hours.length > 0 && (
-                                <div className="rounded-xl border border-gray-200 bg-white p-3">
-                                    <div className="flex items-center justify-between gap-2 mb-2">
-                                        <div className="text-xs text-gray-600">Horarios</div>
+                            {business.whatsapp && canUseCustomerContactFlows && (
+                                <button
+                                    type="button"
+                                    onClick={() => void openWhatsApp()}
+                                    className="w-full rounded-[1.25rem] bg-green-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-600"
+                                >
+                                    Chatear ahora por WhatsApp
+                                </button>
+                            )}
+                            {hasBusinessHours && (
+                                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
+                                    <div className="mb-3 flex items-center justify-between gap-2">
+                                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Horario</div>
                                         {business.openNow !== null && business.openNow !== undefined ? (
-                                            <span className={`text-[11px] font-medium ${
-                                                business.openNow ? 'text-green-700' : 'text-gray-500'
+                                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                                business.openNow
+                                                    ? 'bg-emerald-50 text-emerald-700'
+                                                    : 'bg-slate-100 text-slate-500'
                                             }`}>
                                                 {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
                                             </span>
                                         ) : null}
                                     </div>
-                                    <div className="space-y-1.5">
+                                    <div className="space-y-2">
                                         {hoursByDay.map((day) => (
-                                            <div key={day.dayOfWeek} className="flex items-center justify-between gap-3 text-sm">
-                                                <span className="text-gray-600">{day.label}</span>
-                                                <span className="text-gray-900">
+                                            <div key={day.dayOfWeek} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 text-sm last:border-b-0 last:pb-0">
+                                                <span className={`${day.dayOfWeek === todayDayOfWeek ? 'font-semibold text-emerald-700' : 'text-slate-600'}`}>{day.label}</span>
+                                                <span className={`${day.dayOfWeek === todayDayOfWeek ? 'font-semibold text-emerald-700' : 'text-slate-900'}`}>
                                                     {day.schedule?.closed
                                                         ? 'Cerrado'
                                                         : formatHoursRange(day.schedule?.opensAt, day.schedule?.closesAt) || 'Sin horario'}
@@ -1684,16 +1969,16 @@ export function BusinessDetails() {
                                 </div>
                             )}
                             {business.profileCompletenessScore !== undefined && (
-                                <div className="rounded-xl border border-gray-200 bg-white p-3">
-                                    <div className="text-xs text-gray-600">Calidad de ficha</div>
-                                    <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+                                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
+                                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Calidad de ficha</div>
+                                    <div className="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
                                         <div
-                                            className="h-full bg-primary-600"
-                                            style={{ width: `${Math.max(0, Math.min(100, business.profileCompletenessScore))}%` }}
+                                            className="h-full bg-gradient-to-r from-emerald-600 to-amber-400"
+                                            style={{ width: `${profileCompleteness}%` }}
                                         />
                                     </div>
-                                    <div className="mt-2 text-sm text-gray-700">
-                                        {business.profileCompletenessScore}% completado
+                                    <div className="mt-2 text-sm text-slate-700">
+                                        {profileCompleteness}% completado
                                     </div>
                                 </div>
                             )}
