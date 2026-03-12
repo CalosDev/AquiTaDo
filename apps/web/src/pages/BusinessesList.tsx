@@ -80,6 +80,11 @@ interface SponsoredPlacement {
     };
 }
 
+function getDisplayInitial(name: string): string {
+    const trimmed = name.trim();
+    return trimmed ? trimmed.charAt(0).toUpperCase() : 'N';
+}
+
 const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; description: string }> = {
     'con-delivery': {
         label: 'Negocios con delivery',
@@ -195,6 +200,52 @@ export function BusinessesList() {
         () => (intentSlug ? INTENT_FEATURE_MAP[intentSlug] || null : null),
         [intentSlug],
     );
+    const listingHeading = useMemo(() => {
+        if (activeIntent) {
+            return activeIntent.label;
+        }
+        if (activeCity && activeCategory) {
+            return `${activeCategory.name} en ${activeCity.name}`;
+        }
+        if (activeCity) {
+            return `Negocios en ${activeCity.name}`;
+        }
+        if (activeCategory && activeProvince) {
+            return `${activeCategory.name} en ${activeProvince.name}`;
+        }
+        if (activeCategory) {
+            return activeCategory.name;
+        }
+        if (activeProvince) {
+            return `Negocios en ${activeProvince.name}`;
+        }
+        return 'Negocios';
+    }, [activeCategory, activeCity, activeIntent, activeProvince]);
+    const activeFilterChips = useMemo(() => {
+        const chips: string[] = [];
+        if (currentSearch) chips.push(`Busqueda: ${currentSearch}`);
+        if (activeCategory) chips.push(`Categoria: ${activeCategory.name}`);
+        if (activeProvince) chips.push(`Provincia: ${activeProvince.name}`);
+        if (activeCity) chips.push(`Ciudad: ${activeCity.name}`);
+        if (activeSector) chips.push(`Sector: ${activeSector.name}`);
+        if (currentFeature) chips.push(`Servicio: ${currentFeature}`);
+        if (currentOpenNow) chips.push('Abiertos ahora');
+        return chips;
+    }, [activeCategory, activeCity, activeProvince, activeSector, currentFeature, currentOpenNow, currentSearch]);
+    const resultsSummary = useMemo(() => {
+        const segments = [`${total} resultado${total === 1 ? '' : 's'}`];
+        if (activeSector) {
+            segments.push(`en ${activeSector.name}`);
+        } else if (activeCity) {
+            segments.push(`en ${activeCity.name}`);
+        } else if (activeProvince) {
+            segments.push(`en ${activeProvince.name}`);
+        }
+        if (currentOpenNow) {
+            segments.push('solo abiertos ahora');
+        }
+        return segments.join(' • ');
+    }, [activeCity, activeProvince, activeSector, currentOpenNow, total]);
     const seoCanonicalPath = useMemo(() => {
         if (intentSlug) {
             return `/negocios/intencion/${intentSlug}`;
@@ -678,17 +729,35 @@ export function BusinessesList() {
 
             <div className="flex flex-col lg:flex-row gap-6 xl:gap-8">
                 {/* Filters Sidebar */}
-                <aside className="lg:w-72 shrink-0">
-                    <div className="card p-6 lg:sticky lg:top-24">
-                        <p className="font-display font-bold text-lg mb-4">Filtros</p>
+                <aside className="lg:w-80 shrink-0">
+                    <div className="card overflow-hidden lg:sticky lg:top-24">
+                        <div className="bg-gradient-to-br from-slate-950 via-primary-950 to-primary-900 px-6 py-6 text-white">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/65">Discovery local</p>
+                            <p className="mt-2 font-display text-3xl font-bold text-white">Filtra mejor</p>
+                            <p className="mt-2 text-sm leading-6 text-white/75">
+                                {activeFilterChips.length > 0
+                                    ? `${activeFilterChips.length} filtro${activeFilterChips.length === 1 ? '' : 's'} activo${activeFilterChips.length === 1 ? '' : 's'}.`
+                                    : 'Ajusta ubicacion, categoria y disponibilidad sin salir del flujo de discovery.'}
+                            </p>
+                        </div>
+                        <div className="space-y-5 p-6">
+                            {activeFilterChips.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {activeFilterChips.map((chip) => (
+                                        <span key={chip} className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+                                            {chip}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : null}
 
                         {/* Search */}
-                        <div className="mb-5">
+                        <div>
                             <label htmlFor="businesses-search" className="text-sm font-medium text-gray-600 mb-1.5 block">Buscar</label>
                             <input
                                 id="businesses-search"
                                 type="text"
-                                placeholder="Nombre o descripción..."
+                                placeholder="Nombre o descripcion"
                                 value={searchInput}
                                 onChange={(e) => setSearchInput(e.target.value)}
                                 className="input-field text-sm"
@@ -696,15 +765,15 @@ export function BusinessesList() {
                         </div>
 
                         {/* Category */}
-                        <div className="mb-5">
-                            <label htmlFor="businesses-category" className="text-sm font-medium text-gray-600 mb-1.5 block">Categoría</label>
+                        <div>
+                            <label htmlFor="businesses-category" className="text-sm font-medium text-gray-600 mb-1.5 block">Categoria</label>
                             <select
                                 id="businesses-category"
                                 value={currentCategory}
                                 onChange={(e) => updateFilter('categoryId', e.target.value)}
                                 className="input-field text-sm"
                             >
-                                <option value="">Todas las categorías</option>
+                                <option value="">Todas las categorias</option>
                                 {categoryOptions.map((cat) => (
                                     <option key={cat.id} value={cat.id}>
                                         {cat.parent?.name ? `${cat.parent.name} / ` : ''}{cat.icon} {cat.name}
@@ -713,43 +782,45 @@ export function BusinessesList() {
                             </select>
                         </div>
 
-                        {/* Province */}
-                        <div className="mb-5">
-                            <label htmlFor="businesses-province" className="text-sm font-medium text-gray-600 mb-1.5 block">Provincia</label>
-                            <select
-                                id="businesses-province"
-                                value={currentProvince}
-                                onChange={(e) => updateFilter('provinceId', e.target.value)}
-                                className="input-field text-sm"
-                            >
-                                <option value="">Todas las provincias</option>
-                                {provinces.map((prov) => (
-                                    <option key={prov.id} value={prov.id}>
-                                        {prov.name}
-                                    </option>
-                                ))}
-                            </select>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                            {/* Province */}
+                            <div>
+                                <label htmlFor="businesses-province" className="text-sm font-medium text-gray-600 mb-1.5 block">Provincia</label>
+                                <select
+                                    id="businesses-province"
+                                    value={currentProvince}
+                                    onChange={(e) => updateFilter('provinceId', e.target.value)}
+                                    className="input-field text-sm"
+                                >
+                                    <option value="">Todas las provincias</option>
+                                    {provinces.map((prov) => (
+                                        <option key={prov.id} value={prov.id}>
+                                            {prov.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label htmlFor="businesses-city" className="text-sm font-medium text-gray-600 mb-1.5 block">Ciudad</label>
+                                <select
+                                    id="businesses-city"
+                                    value={currentCity}
+                                    onChange={(e) => updateFilter('cityId', e.target.value)}
+                                    disabled={!currentProvince}
+                                    className="input-field text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                                >
+                                    <option value="">{currentProvince ? 'Todas las ciudades' : 'Selecciona una provincia'}</option>
+                                    {cities.map((city) => (
+                                        <option key={city.id} value={city.id}>
+                                            {city.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
-                        <div className="mb-5">
-                            <label htmlFor="businesses-city" className="text-sm font-medium text-gray-600 mb-1.5 block">Ciudad</label>
-                            <select
-                                id="businesses-city"
-                                value={currentCity}
-                                onChange={(e) => updateFilter('cityId', e.target.value)}
-                                disabled={!currentProvince}
-                                className="input-field text-sm disabled:bg-gray-50 disabled:text-gray-400"
-                            >
-                                <option value="">{currentProvince ? 'Todas las ciudades' : 'Selecciona una provincia'}</option>
-                                {cities.map((city) => (
-                                    <option key={city.id} value={city.id}>
-                                        {city.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="mb-5">
+                        <div>
                             <label htmlFor="businesses-sector" className="text-sm font-medium text-gray-600 mb-1.5 block">Sector</label>
                             <select
                                 id="businesses-sector"
@@ -767,8 +838,8 @@ export function BusinessesList() {
                             </select>
                         </div>
 
-                        <div className="mb-5">
-                            <label htmlFor="businesses-feature" className="text-sm font-medium text-gray-600 mb-1.5 block">Intencion / servicio</label>
+                        <div>
+                            <label htmlFor="businesses-feature" className="text-sm font-medium text-gray-600 mb-1.5 block">Servicio o intencion</label>
                             <input
                                 id="businesses-feature"
                                 type="text"
@@ -779,7 +850,7 @@ export function BusinessesList() {
                             />
                         </div>
 
-                        <label className="mb-5 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
+                        <label className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm font-medium text-emerald-900">
                             <input
                                 type="checkbox"
                                 checked={currentOpenNow}
@@ -797,37 +868,37 @@ export function BusinessesList() {
                                 }
                                 setSearchParams({});
                             }}
-                            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                            className="text-left text-sm text-primary-600 hover:text-primary-700 font-medium"
                         >
                             Limpiar filtros
                         </button>
+                        </div>
                     </div>
                 </aside>
 
                 {/* Results */}
                 <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center mb-6">
-                        <div>
-                            <h1 className="font-display text-2xl font-bold text-gray-900">
-                                {activeIntent
-                                    ? activeIntent.label
-                                    : activeCity && activeCategory
-                                        ? `${activeCategory.name} en ${activeCity.name}`
-                                        : activeCity
-                                            ? `Negocios en ${activeCity.name}`
-                                    : activeCategory && activeProvince
-                                    ? `${activeCategory.name} en ${activeProvince.name}`
-                                    : activeCategory
-                                        ? activeCategory.name
-                                        : activeProvince
-                                            ? `Negocios en ${activeProvince.name}`
-                                            : 'Negocios'}
-                            </h1>
-                            <p className="text-sm text-gray-500">
-                                {total} resultados encontrados
-                                {activeSector ? ` en ${activeSector.name}` : ''}
-                                {currentOpenNow ? ' . Solo abiertos ahora.' : ''}
-                            </p>
+                    <div className="mb-6 rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5 shadow-sm">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Resultados</p>
+                                <h1 className="mt-2 font-display text-3xl font-bold text-slate-900">{listingHeading}</h1>
+                                <p className="mt-2 text-sm text-slate-500">{resultsSummary}</p>
+                            </div>
+                            {activeFilterChips.length > 0 ? (
+                                <div className="flex flex-wrap gap-2 lg:max-w-md lg:justify-end">
+                                    {activeFilterChips.slice(0, 4).map((chip) => (
+                                        <span key={chip} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                                            {chip}
+                                        </span>
+                                    ))}
+                                    {activeFilterChips.length > 4 ? (
+                                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                                            +{activeFilterChips.length - 4} mas
+                                        </span>
+                                    ) : null}
+                                </div>
+                            ) : null}
                         </div>
                     </div>
 
@@ -883,6 +954,11 @@ export function BusinessesList() {
                                 {businesses.map((biz) => {
                                     const trust = trustByBusinessId.get(biz.id);
                                     const businessPath = `/businesses/${biz.slug || biz.id}`;
+                                    const primaryCategory = biz.categories?.[0]?.category ?? null;
+                                    const secondaryCategory = biz.categories?.[1]?.category ?? null;
+                                    const reviewCount = biz._count?.reviews ?? 0;
+                                    const locationLabel = [biz.sector?.name, biz.city?.name || biz.province?.name].filter(Boolean).join(' - ');
+                                    const priceLabel = businessPriceRangeLabel(biz.priceRange);
 
                                     return (
                                     <Link
@@ -893,31 +969,41 @@ export function BusinessesList() {
                                         }}
                                         onMouseEnter={() => preloadRouteChunk(businessPath)}
                                         onFocus={() => preloadRouteChunk(businessPath)}
-                                        className="card hover-lift group"
+                                        className="card group overflow-hidden hover-lift"
                                     >
-                                        <div className="h-40 bg-gradient-to-br from-primary-50 to-accent-50 flex items-center justify-center">
+                                        <div className="relative h-44 bg-gradient-to-br from-primary-50 to-accent-50">
                                             {biz.images?.[0] ? (
                                                 <OptimizedImage
                                                     src={biz.images[0].url}
                                                     alt={biz.name}
-                                                    className="w-full h-full object-cover"
+                                                    className="h-full w-full object-cover"
                                                     loading="lazy"
                                                     decoding="async"
                                                 />
                                             ) : (
-                                                <span className="text-4xl">🏪</span>
-                                            )}
-                                        </div>
-                                        <div className="p-4">
-                                            <div className="flex items-start justify-between gap-2 mb-2">
-                                                <div className="flex gap-1.5">
-                                                    {biz.categories?.slice(0, 2).map((bc, i) => (
-                                                        <span key={i} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full font-medium">
-                                                            {bc.category.icon} {bc.category.parent?.name ? `${bc.category.parent.name} / ` : ''}{bc.category.name}
-                                                        </span>
-                                                    ))}
+                                                <div className="flex h-full items-center justify-center text-4xl font-display font-bold text-primary-200">
+                                                    {getDisplayInitial(biz.name)}
                                                 </div>
-                                                {isAuthenticated && isCustomerRole && (
+                                            )}
+                                            <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {biz.verified ? (
+                                                        <span className="rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-700">
+                                                            Verificado
+                                                        </span>
+                                                    ) : null}
+                                                    {biz.openNow !== null && biz.openNow !== undefined ? (
+                                                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                                                            biz.openNow
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : 'bg-slate-100 text-slate-600'
+                                                        }`}>
+                                                            {biz.openNow ? 'Abierto' : 'Cerrado'}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+
+                                                {isAuthenticated && isCustomerRole ? (
                                                     <button
                                                         type="button"
                                                         onClick={(event) => void handleToggleFavorite(event, biz.id)}
@@ -927,10 +1013,10 @@ export function BusinessesList() {
                                                                 ? `Quitar ${biz.name} de favoritos`
                                                                 : `Guardar ${biz.name} en favoritos`
                                                         }
-                                                        className={`text-xs px-2 py-1 rounded-lg border transition-colors ${
+                                                        className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
                                                             favoriteBusinessIds.has(biz.id)
-                                                                ? 'bg-primary-600 text-white border-primary-600'
-                                                                : 'bg-white text-gray-500 border-gray-200 hover:border-primary-300'
+                                                                ? 'border-primary-600 bg-primary-600 text-white'
+                                                                : 'border-white/80 bg-white/90 text-slate-600 hover:border-primary-300'
                                                         }`}
                                                     >
                                                         {favoriteProcessingId === biz.id
@@ -939,70 +1025,84 @@ export function BusinessesList() {
                                                                 ? 'Guardado'
                                                                 : 'Guardar'}
                                                     </button>
-                                                )}
+                                                ) : null}
                                             </div>
-                                            <h2 className="font-display font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                                                {biz.name}
-                                            </h2>
-                                            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                                📍 {biz.province?.name || biz.address}
-                                            </p>
-                                            {(biz.city?.name || biz.sector?.name) ? (
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    {[biz.city?.name, biz.sector?.name].filter(Boolean).join(', ')}
-                                                </p>
-                                            ) : null}
-                                            <div className="mt-2 flex flex-wrap gap-1.5">
-                                                {biz.openNow !== null && biz.openNow !== undefined && (
-                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                                        biz.openNow
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-gray-100 text-gray-600'
+                                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/10 to-transparent p-4">
+                                                <div className="flex items-end justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        {primaryCategory ? (
+                                                            <p className="truncate text-xs font-medium text-white/80">
+                                                                {primaryCategory.parent?.name ? `${primaryCategory.parent.name} / ` : ''}{primaryCategory.name}
+                                                            </p>
+                                                        ) : null}
+                                                        <h2 className="truncate font-display text-xl font-semibold text-white group-hover:text-primary-100">
+                                                            {biz.name}
+                                                        </h2>
+                                                    </div>
+                                                    {priceLabel ? (
+                                                        <span className="shrink-0 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-slate-700">
+                                                            {priceLabel}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3 p-4">
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
+                                                <span>{reviewCount} resenas</span>
+                                                {trust ? (
+                                                    <span className={`rounded-full px-2.5 py-1 font-semibold ${
+                                                        trust.level === 'ALTA'
+                                                            ? 'bg-emerald-50 text-emerald-700'
+                                                            : trust.level === 'MEDIA'
+                                                                ? 'bg-amber-50 text-amber-700'
+                                                                : 'bg-red-50 text-red-700'
                                                     }`}>
-                                                        {biz.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
+                                                        Confianza {trust.score}/100
                                                     </span>
-                                                )}
+                                                ) : null}
                                                 {biz.distanceKm ? (
-                                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                                                    <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
                                                         {biz.distanceKm.toFixed(1)} km
                                                     </span>
                                                 ) : null}
-                                                {biz.priceRange ? (
-                                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                                                        {businessPriceRangeLabel(biz.priceRange)}
+                                            </div>
+                                            {locationLabel ? (
+                                                <p className="text-xs text-slate-500">{locationLabel}</p>
+                                            ) : (
+                                                <p className="text-xs text-slate-500">{biz.province?.name || biz.address}</p>
+                                            )}
+
+                                            <p className="line-clamp-2 text-sm leading-6 text-slate-600">{biz.description}</p>
+
+                                            <div className="flex flex-wrap gap-2">
+                                                {secondaryCategory ? (
+                                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                                        {secondaryCategory.name}
+                                                    </span>
+                                                ) : null}
+                                                {biz.todayHoursLabel ? (
+                                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                                        Hoy: {biz.todayHoursLabel}
+                                                    </span>
+                                                ) : null}
+                                                {biz.profileCompletenessScore !== undefined ? (
+                                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                                        Ficha {biz.profileCompletenessScore}% completa
                                                     </span>
                                                 ) : null}
                                             </div>
-                                            {trust ? (
-                                                <span className={`mt-1 inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                                    trust.level === 'ALTA'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : trust.level === 'MEDIA'
-                                                            ? 'bg-amber-100 text-amber-700'
-                                                            : 'bg-red-100 text-red-700'
-                                                }`}>
-                                                    Confianza {trust.score}/100
-                                                </span>
-                                            ) : null}
-                                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">{biz.description}</p>
-                                            {biz.todayHoursLabel ? (
-                                                <p className="text-xs text-gray-500 mt-2">Hoy: {biz.todayHoursLabel}</p>
-                                            ) : null}
-                                            {biz.profileCompletenessScore !== undefined ? (
-                                                <p className="text-[11px] text-gray-500 mt-1">
-                                                    Ficha {biz.profileCompletenessScore}% completa
-                                                </p>
-                                            ) : null}
                                         </div>
                                     </Link>
                                     );
                                 })}
                                 </div>
                                 <div className="xl:sticky xl:top-24 self-start space-y-3">
-                                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                                        <h2 className="font-display text-lg font-semibold text-gray-900">Mapa de resultados</h2>
-                                        <p className="mt-1 text-sm text-gray-500">
-                                            Usa el mapa para validar cercanÃ­a y densidad por zona.
+                                    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Contexto geografico</p>
+                                        <h2 className="mt-2 font-display text-xl font-semibold text-slate-900">Mapa de resultados</h2>
+                                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                                            Valida cercania, cobertura por zona y concentracion del catalogo antes de abrir una ficha.
                                         </p>
                                     </div>
                                     <BusinessesMap businesses={businesses} />
