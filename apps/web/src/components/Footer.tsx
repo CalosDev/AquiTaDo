@@ -43,18 +43,18 @@ export function Footer() {
                                     Aqui<span className="text-accent-400">Ta</span>.do
                                 </p>
                                 <p className="text-xs uppercase tracking-wide text-primary-200">
-                                    SuperApp local para República Dominicana
+                                    Discovery local para Republica Dominicana
                                 </p>
                             </div>
                         </Link>
                         <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">
-                            Descubre negocios confiables, reserva servicios y conecta por WhatsApp
-                            en una sola plataforma pensada para el mercado dominicano.
+                            Descubre negocios confiables con mejor contexto por zona,
+                            categoria y senales de confianza en una plataforma pensada para el mercado dominicano.
                         </p>
                         <div className="mt-5 flex flex-wrap gap-2">
                             <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Discovery</span>
-                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">SaaS</span>
-                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Marketplace</span>
+                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Geografia RD</span>
+                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Confianza</span>
                         </div>
                     </div>
 
@@ -93,7 +93,7 @@ export function Footer() {
                             <li>Santo Domingo, RD</li>
                         </ul>
                         <p className="mt-4 text-xs leading-relaxed text-slate-400">
-                            Disponible para expansion regional en Latinoamerica.
+                            Enfocado hoy en Republica Dominicana.
                         </p>
                     </div>
                 </div>

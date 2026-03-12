@@ -142,7 +142,7 @@ export function Navbar() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     <div className="flex items-center gap-3">
                         <span className="chip !px-2.5 !py-0.5 !text-[10px]">Hecho en RD</span>
-                        <span>Directorio local + SaaS para negocios</span>
+                        <span>Discovery local de negocios en RD</span>
                     </div>
                     <span className="text-primary-700">Santo Domingo, República Dominicana</span>
                 </div>
@@ -163,7 +163,7 @@ export function Navbar() {
                                     Aqui<span className="text-accent-600">Ta</span>.do
                                 </p>
                                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Mercado local inteligente
+                                    Negocios locales en RD
                                 </p>
                             </div>
                         </Link>
