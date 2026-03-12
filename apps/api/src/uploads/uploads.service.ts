@@ -6,6 +6,7 @@ import * as path from 'path';
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationRole } from '../generated/prisma/client';
+import { UpdateBusinessImageDto } from './dto/update-business-image.dto';
 
 type StorageProvider = 'local' | 's3';
 type StoredAsset = {
@@ -105,6 +106,9 @@ export class UploadsService {
                 data: {
                     url: storedAsset.url,
                     businessId,
+                    sortOrder: imageCount,
+                    isCover: imageCount === 0,
+                    type: imageCount === 0 ? 'COVER' : 'GALLERY',
                 },
             });
         } catch (error) {
@@ -210,6 +214,77 @@ export class UploadsService {
         });
 
         return { message: 'Imagen eliminada exitosamente' };
+    }
+
+    async updateBusinessImageMetadata(
+        imageId: string,
+        dto: UpdateBusinessImageDto,
+        _userId: string,
+        userRole: string,
+        organizationId: string,
+        organizationRole: OrganizationRole,
+    ) {
+        const image = await this.prisma.businessImage.findUnique({
+            where: { id: imageId },
+            include: {
+                business: {
+                    select: { id: true, organizationId: true },
+                },
+            },
+        });
+
+        if (!image) {
+            throw new NotFoundException('Imagen no encontrada');
+        }
+
+        if (userRole !== 'ADMIN') {
+            if (image.business.organizationId !== organizationId) {
+                throw new NotFoundException('Imagen no encontrada');
+            }
+
+            if (organizationRole === 'STAFF') {
+                throw new ForbiddenException('No tienes permisos para editar esta imagen');
+            }
+        }
+
+        const normalizedCaption = dto.caption === undefined
+            ? undefined
+            : dto.caption.trim().length > 0
+                ? dto.caption.trim()
+                : null;
+        const nextType = dto.type ?? undefined;
+        const shouldPromoteCover = dto.isCover === true || nextType === 'COVER';
+
+        return this.prisma.$transaction(async (tx) => {
+            if (shouldPromoteCover) {
+                await tx.businessImage.updateMany({
+                    where: {
+                        businessId: image.business.id,
+                        id: {
+                            not: imageId,
+                        },
+                    },
+                    data: {
+                        isCover: false,
+                        type: 'GALLERY',
+                    },
+                });
+            }
+
+            return tx.businessImage.update({
+                where: { id: imageId },
+                data: {
+                    caption: normalizedCaption,
+                    sortOrder: dto.sortOrder,
+                    isCover: shouldPromoteCover
+                        ? true
+                        : dto.isCover === false
+                            ? false
+                            : undefined,
+                    type: nextType,
+                },
+            });
+        });
     }
 
     private async storeBusinessImageAsset(

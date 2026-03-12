@@ -12,6 +12,7 @@ let categoriesCache: CachedRequest | null = null;
 let featuresCache: CachedRequest | null = null;
 let provincesCache: CachedRequest | null = null;
 const citiesCacheByProvince = new Map<string, CachedRequest>();
+const sectorsCacheByCity = new Map<string, CachedRequest>();
 
 function resolveCachedRequest<T>(
     cacheEntry: CachedRequest<T> | null,
@@ -64,6 +65,8 @@ export const businessApi = {
     getMine: () => api.get('/businesses/my'),
     getAllAdmin: (params?: Record<string, string | number | boolean>) =>
         api.get('/businesses/admin/all', { params }),
+    getCatalogQuality: (params?: { limit?: number }) =>
+        api.get('/businesses/admin/catalog-quality', { params }),
     getByIdentifier: (identifier: string) => api.get(`/businesses/${identifier}`),
     getById: (id: string) => api.get(`/businesses/${id}`),
     getBySlug: (slug: string) => api.get(`/businesses/${slug}`),
@@ -80,7 +83,7 @@ export const businessApi = {
     create: (data: Record<string, unknown>) => api.post('/businesses', data),
     update: (id: string, data: Record<string, unknown>) => api.put(`/businesses/${id}`, data),
     delete: (id: string, data: { reason: string }) => api.delete(`/businesses/${id}`, { data }),
-    getNearby: (params: { lat: number; lng: number; radius?: number }) =>
+    getNearby: (params: { lat: number; lng: number; radius?: number; categoryId?: string; sectorId?: string }) =>
         api.get('/businesses/nearby', { params }),
     verify: (id: string) => api.put(`/businesses/${id}/verify`),
 };
@@ -94,12 +97,12 @@ export const categoryApi = {
         );
         return categoriesCache.promise;
     },
-    create: (data: { name: string; slug: string; icon?: string }) =>
+    create: (data: { name: string; slug: string; icon?: string; parentId?: string }) =>
         api.post('/categories', data).then((response) => {
             categoriesCache = null;
             return response;
         }),
-    update: (id: string, data: { name?: string; slug?: string; icon?: string }) =>
+    update: (id: string, data: { name?: string; slug?: string; icon?: string; parentId?: string | null }) =>
         api.put(`/categories/${id}`, data).then((response) => {
             categoriesCache = null;
             return response;
@@ -138,6 +141,14 @@ export const locationApi = {
         citiesCacheByProvince.set(provinceId, cached);
         return cached.promise;
     },
+    getSectors: (cityId: string) => {
+        const cached = resolveCachedRequest(
+            sectorsCacheByCity.get(cityId) ?? null,
+            () => api.get(`/cities/${cityId}/sectors`),
+        );
+        sectorsCacheByCity.set(cityId, cached);
+        return cached.promise;
+    },
 };
 
 // ---- Reviews ----
@@ -165,6 +176,15 @@ export const uploadApi = {
     },
     deleteBusinessImage: (imageId: string) =>
         api.delete(`/upload/business-image/${imageId}`),
+    updateBusinessImage: (
+        imageId: string,
+        data: {
+            caption?: string | null;
+            sortOrder?: number;
+            isCover?: boolean;
+            type?: 'COVER' | 'GALLERY' | 'MENU' | 'INTERIOR' | 'EXTERIOR';
+        },
+    ) => api.patch(`/upload/business-image/${imageId}`, data),
 };
 
 // ---- Organizations ----

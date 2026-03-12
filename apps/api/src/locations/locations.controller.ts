@@ -25,4 +25,10 @@ export class LocationsController {
     async findAllCities() {
         return this.locationsService.findAllCities();
     }
+
+    @Get('cities/:id/sectors')
+    @Header('Cache-Control', 'public, max-age=600, stale-while-revalidate=1200')
+    async findSectorsByCity(@Param('id', new ParseUUIDPipe()) cityId: string) {
+        return this.locationsService.findSectorsByCity(cityId);
+    }
 }

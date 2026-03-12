@@ -20,6 +20,9 @@ interface Business {
     verified: boolean;
     verificationStatus: BusinessVerificationState;
     createdAt: string;
+    profileCompletenessScore?: number;
+    missingCoreFields?: string[];
+    openNow?: boolean | null;
     owner?: { name: string };
     organization?: { id: string; name: string; slug: string };
     province?: { id: string; name: string; slug: string };
@@ -31,7 +34,36 @@ interface Category {
     name: string;
     slug: string;
     icon?: string;
+    parentId?: string | null;
+    parent?: { id: string; name: string } | null;
+    children?: Array<{ id: string; name: string }>;
     _count?: { businesses: number };
+}
+
+interface CatalogQualitySnapshot {
+    totalBusinesses: number;
+    incompleteCount: number;
+    duplicateClusterCount: number;
+    incompleteBusinesses: Array<{
+        id: string;
+        slug: string;
+        name: string;
+        profileCompletenessScore: number;
+        missingCoreFields: string[];
+        city?: { name: string } | null;
+        province?: { name: string } | null;
+    }>;
+    duplicateCandidates: Array<{
+        key: string;
+        reasons: string[];
+        businesses: Array<{
+            id: string;
+            slug: string;
+            name: string;
+            city?: { name: string } | null;
+            province?: { name: string } | null;
+        }>;
+    }>;
 }
 
 interface PendingVerificationBusiness {
@@ -257,12 +289,14 @@ type CategoryForm = {
     name: string;
     slug: string;
     icon: string;
+    parentId: string;
 };
 
 const EMPTY_CATEGORY_FORM: CategoryForm = {
     name: '',
     slug: '',
     icon: '',
+    parentId: '',
 };
 const DELETE_CONFIRMATION_TEXT = 'ELIMINAR';
 const EMPTY_OBSERVABILITY_SUMMARY: ObservabilitySummary = {
@@ -404,7 +438,9 @@ function toSlug(value: string): string {
 export function AdminDashboard() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'verification' | 'observability'>('businesses');
+    const [catalogQuality, setCatalogQuality] = useState<CatalogQualitySnapshot | null>(null);
+    const [catalogQualityLoading, setCatalogQualityLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'catalog' | 'verification' | 'observability'>('businesses');
     const [businessSearch, setBusinessSearch] = useState('');
     const [businessStatusFilter, setBusinessStatusFilter] = useState<'ALL' | 'VERIFIED' | 'PENDING' | 'SUSPENDED' | 'REJECTED'>('ALL');
     const [loading, setLoading] = useState(true);
@@ -499,6 +535,10 @@ export function AdminDashboard() {
             );
         });
     }, [businessSearch, businessStatusFilter, businesses]);
+    const parentCategoryOptions = useMemo(
+        () => categories.filter((category) => !category.parentId),
+        [categories],
+    );
 
     const loadData = useCallback(async () => {
         setErrorMessage('');
@@ -613,6 +653,27 @@ export function AdminDashboard() {
         }
     }, []);
 
+    const loadCatalogQuality = useCallback(async () => {
+        setCatalogQualityLoading(true);
+        setErrorMessage('');
+
+        try {
+            const response = await businessApi.getCatalogQuality({ limit: 25 });
+            setCatalogQuality((response.data || null) as CatalogQualitySnapshot | null);
+        } catch (error) {
+            setCatalogQuality(null);
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la calidad del catalogo'));
+        } finally {
+            setCatalogQualityLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'catalog') {
+            void loadCatalogQuality();
+        }
+    }, [activeTab, loadCatalogQuality]);
+
     const loadOperationalHealth = useCallback(async () => {
         setOperationalHealthLoading(true);
         try {
@@ -684,6 +745,7 @@ export function AdminDashboard() {
                 name: newCategoryForm.name.trim(),
                 slug,
                 icon: newCategoryForm.icon.trim() || undefined,
+                parentId: newCategoryForm.parentId || undefined,
             });
             setNewCategoryForm(EMPTY_CATEGORY_FORM);
             await loadData();
@@ -701,6 +763,7 @@ export function AdminDashboard() {
             name: category.name,
             slug: category.slug,
             icon: category.icon || '',
+            parentId: category.parentId || '',
         });
         setErrorMessage('');
         setSuccessMessage('');
@@ -726,6 +789,7 @@ export function AdminDashboard() {
                 name: editingCategoryForm.name.trim(),
                 slug: toSlug(editingCategoryForm.slug.trim()),
                 icon: editingCategoryForm.icon.trim() || undefined,
+                parentId: editingCategoryForm.parentId || null,
             });
             await loadData();
             cancelCategoryEdit();
@@ -885,6 +949,7 @@ export function AdminDashboard() {
     const tabs = [
         { key: 'businesses', label: 'Negocios', icon: 'N' },
         { key: 'categories', label: 'Categorías', icon: 'C' },
+        { key: 'catalog', label: 'Catalogo', icon: 'Q' },
         { key: 'verification', label: 'KYC + Data Layer', icon: 'K' },
         { key: 'observability', label: 'Observabilidad', icon: 'O' },
     ] as const;
@@ -1186,7 +1251,7 @@ export function AdminDashboard() {
                         <div className="space-y-4">
                             <div className="card p-5">
                                 <h3 className="font-display font-semibold mb-3">Crear categoría</h3>
-                                <form onSubmit={handleCreateCategory} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <form onSubmit={handleCreateCategory} className="grid grid-cols-1 md:grid-cols-5 gap-3">
                                     <input
                                         type="text"
                                         className="input-field text-sm"
@@ -1227,6 +1292,23 @@ export function AdminDashboard() {
                                             }))
                                         }
                                     />
+                                    <select
+                                        className="input-field text-sm"
+                                        value={newCategoryForm.parentId}
+                                        onChange={(event) =>
+                                            setNewCategoryForm((prev) => ({
+                                                ...prev,
+                                                parentId: event.target.value,
+                                            }))
+                                        }
+                                    >
+                                        <option value="">Categoria padre (opcional)</option>
+                                        {parentCategoryOptions.map((category) => (
+                                            <option key={category.id} value={category.id}>
+                                                {category.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                     <button
                                         type="submit"
                                         className="btn-primary text-sm"
@@ -1246,7 +1328,7 @@ export function AdminDashboard() {
                                             className="p-3 rounded-xl border border-gray-100 bg-gray-50"
                                         >
                                             {editingCategoryId === category.id ? (
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                                                     <input
                                                         type="text"
                                                         className="input-field text-sm"
@@ -1280,6 +1362,25 @@ export function AdminDashboard() {
                                                             }))
                                                         }
                                                     />
+                                                    <select
+                                                        className="input-field text-sm"
+                                                        value={editingCategoryForm.parentId}
+                                                        onChange={(event) =>
+                                                            setEditingCategoryForm((prev) => ({
+                                                                ...prev,
+                                                                parentId: event.target.value,
+                                                            }))
+                                                        }
+                                                    >
+                                                        <option value="">Sin padre</option>
+                                                        {parentCategoryOptions
+                                                            .filter((option) => option.id !== category.id)
+                                                            .map((option) => (
+                                                                <option key={option.id} value={option.id}>
+                                                                    {option.name}
+                                                                </option>
+                                                            ))}
+                                                    </select>
                                                     <div className="flex gap-2">
                                                         <button
                                                             type="button"
@@ -1304,14 +1405,24 @@ export function AdminDashboard() {
                                                 <div className="flex items-center justify-between gap-4">
                                                     <div className="flex items-center gap-2 text-sm">
                                                         <span>{category.icon || '[icon]'}</span>
-                                                        <span className="font-medium text-gray-800">
-                                                            {category.name}
-                                                        </span>
-                                                        <span className="text-gray-400">({category.slug})</span>
-                                                        <span className="text-xs text-gray-500">
-                                                            {category._count?.businesses || 0} negocios
-                                                        </span>
-                                                    </div>
+                                                         <span className="font-medium text-gray-800">
+                                                             {category.name}
+                                                         </span>
+                                                         {category.parent?.name ? (
+                                                             <span className="text-xs rounded-full bg-primary-50 px-2 py-0.5 text-primary-700">
+                                                                 {category.parent.name}
+                                                             </span>
+                                                         ) : null}
+                                                         <span className="text-gray-400">({category.slug})</span>
+                                                         <span className="text-xs text-gray-500">
+                                                             {category._count?.businesses || 0} negocios
+                                                         </span>
+                                                         {category.children && category.children.length > 0 ? (
+                                                             <span className="text-xs text-gray-500">
+                                                                 {category.children.length} subcategorias
+                                                             </span>
+                                                         ) : null}
+                                                     </div>
                                                     <div className="flex gap-2">
                                                         <button
                                                             type="button"
@@ -1356,6 +1467,113 @@ export function AdminDashboard() {
                                             )}
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'catalog' && (
+                        <div className="space-y-4">
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-display font-semibold text-gray-900">Curacion del catalogo</h3>
+                                        <p className="text-sm text-gray-600 mt-1">
+                                            Prioriza perfiles incompletos y posibles duplicados antes de seguir creciendo el catalogo.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary text-sm"
+                                        onClick={() => void loadCatalogQuality()}
+                                        disabled={catalogQualityLoading}
+                                    >
+                                        {catalogQualityLoading ? 'Actualizando...' : 'Actualizar calidad'}
+                                    </button>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                        <p className="text-xs text-gray-500">Negocios auditados</p>
+                                        <p className="mt-1 text-2xl font-semibold text-gray-900">{catalogQuality?.totalBusinesses ?? 0}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
+                                        <p className="text-xs text-amber-700">Perfiles incompletos</p>
+                                        <p className="mt-1 text-2xl font-semibold text-amber-900">{catalogQuality?.incompleteCount ?? 0}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+                                        <p className="text-xs text-red-700">Clusters duplicados</p>
+                                        <p className="mt-1 text-2xl font-semibold text-red-900">{catalogQuality?.duplicateClusterCount ?? 0}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                <div className="card p-5">
+                                    <h3 className="font-display font-semibold mb-3">Perfiles incompletos</h3>
+                                    <div className="space-y-3">
+                                        {catalogQualityLoading ? (
+                                            <p className="text-sm text-gray-500">Cargando perfiles...</p>
+                                        ) : (catalogQuality?.incompleteBusinesses ?? []).length > 0 ? (
+                                            catalogQuality?.incompleteBusinesses.map((business) => (
+                                                <div key={business.id} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <p className="font-medium text-gray-900">{business.name}</p>
+                                                            <p className="text-xs text-gray-500">
+                                                                {[business.city?.name, business.province?.name].filter(Boolean).join(', ') || 'Ubicacion pendiente'}
+                                                            </p>
+                                                        </div>
+                                                        <span className="text-xs rounded-full bg-white px-2 py-1 text-gray-600 border border-gray-200">
+                                                            {business.profileCompletenessScore}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-3 flex flex-wrap gap-2">
+                                                        {business.missingCoreFields.map((field) => (
+                                                            <span key={`${business.id}-${field}`} className="text-[11px] rounded-full bg-amber-100 px-2 py-1 text-amber-800">
+                                                                {field}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">No hay perfiles incompletos en la muestra actual.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="card p-5">
+                                    <h3 className="font-display font-semibold mb-3">Posibles duplicados</h3>
+                                    <div className="space-y-3">
+                                        {catalogQualityLoading ? (
+                                            <p className="text-sm text-gray-500">Buscando duplicados...</p>
+                                        ) : (catalogQuality?.duplicateCandidates ?? []).length > 0 ? (
+                                            catalogQuality?.duplicateCandidates.map((cluster) => (
+                                                <div key={cluster.key} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                                    <div className="flex flex-wrap gap-2 mb-2">
+                                                        {cluster.reasons.map((reason) => (
+                                                            <span key={`${cluster.key}-${reason}`} className="text-[11px] rounded-full bg-red-100 px-2 py-1 text-red-800">
+                                                                {reason}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {cluster.businesses.map((business) => (
+                                                            <div key={business.id} className="rounded-lg border border-white bg-white px-3 py-2">
+                                                                <p className="text-sm font-medium text-gray-900">{business.name}</p>
+                                                                <p className="text-xs text-gray-500">
+                                                                    {[business.city?.name, business.province?.name].filter(Boolean).join(', ') || 'Ubicacion pendiente'}
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">No hay duplicados detectados en la muestra actual.</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -46,10 +46,41 @@ export class LocationsService {
     }
 
     async findCitiesByProvince(provinceId: string) {
-        return this.prisma.city.findMany({
+        const cities = await this.prisma.city.findMany({
             where: { provinceId },
             orderBy: { name: 'asc' },
+            include: {
+                _count: {
+                    select: { sectors: true },
+                },
+            },
         });
+
+        const groupedBusinessCounts = await this.prisma.business.groupBy({
+            by: ['cityId'],
+            where: {
+                deletedAt: null,
+                verified: true,
+                cityId: {
+                    in: cities.map((city) => city.id),
+                },
+            },
+            _count: {
+                _all: true,
+            },
+        });
+
+        const businessCountByCityId = new Map(
+            groupedBusinessCounts.map((row) => [row.cityId, row._count._all]),
+        );
+
+        return cities.map((city) => ({
+            ...city,
+            _count: {
+                sectors: city._count.sectors,
+                businesses: businessCountByCityId.get(city.id) ?? 0,
+            },
+        }));
     }
 
     async findAllCities() {
@@ -57,5 +88,37 @@ export class LocationsService {
             orderBy: { name: 'asc' },
             include: { province: true },
         });
+    }
+
+    async findSectorsByCity(cityId: string) {
+        const sectors = await this.prisma.sector.findMany({
+            where: { cityId },
+            orderBy: { name: 'asc' },
+        });
+
+        const groupedBusinessCounts = await this.prisma.business.groupBy({
+            by: ['sectorId'],
+            where: {
+                deletedAt: null,
+                verified: true,
+                sectorId: {
+                    in: sectors.map((sector) => sector.id),
+                },
+            },
+            _count: {
+                _all: true,
+            },
+        });
+
+        const businessCountBySectorId = new Map(
+            groupedBusinessCounts.map((row) => [row.sectorId, row._count._all]),
+        );
+
+        return sectors.map((sector) => ({
+            ...sector,
+            _count: {
+                businesses: businessCountBySectorId.get(sector.id) ?? 0,
+            },
+        }));
     }
 }

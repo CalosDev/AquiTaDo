@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { analyticsApi, businessApi, verificationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { useOrganization } from '../context/useOrganization';
-import { formatCurrencyDo, formatDateTimeDo } from '../lib/market';
+import { formatDateTimeDo } from '../lib/market';
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
 
@@ -13,6 +13,9 @@ interface BusinessItem {
     name: string;
     verified?: boolean;
     verificationStatus?: VerificationStatus;
+    profileCompletenessScore?: number;
+    missingCoreFields?: string[];
+    openNow?: boolean | null;
 }
 
 interface DashboardMetrics {
@@ -114,6 +117,10 @@ export function DashboardBusiness() {
     const needsFirstBusinessSetup = !organizationLoading && !activeOrganizationId && !hasOrganizations;
 
     const totals = metrics?.totals ?? {};
+    const completeProfiles = useMemo(
+        () => businesses.filter((business) => (business.profileCompletenessScore ?? 0) >= 80).length,
+        [businesses],
+    );
 
     const loadDashboard = useCallback(async () => {
         setLoading(true);
@@ -176,7 +183,7 @@ export function DashboardBusiness() {
                 }),
             );
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificación documental'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificaciÃ³n documental'));
         }
     }, []);
 
@@ -224,7 +231,7 @@ export function DashboardBusiness() {
             const uploadPayload = (uploadRes.data || {}) as { fileUrl?: string; url?: string };
             const fileUrl = uploadPayload.fileUrl || uploadPayload.url;
             if (!fileUrl) {
-                throw new Error('No se recibió la URL del archivo');
+                throw new Error('No se recibiÃ³ la URL del archivo');
             }
 
             await verificationApi.submitDocument({
@@ -235,7 +242,7 @@ export function DashboardBusiness() {
 
             setSelectedFile(null);
             await loadVerificationData(selectedBusinessId);
-            setSuccessMessage('Documento enviado para revisión');
+            setSuccessMessage('Documento enviado para revisiÃ³n');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo subir el documento'));
         } finally {
@@ -257,9 +264,9 @@ export function DashboardBusiness() {
                 notes: verificationNotes.trim() || undefined,
             });
             await loadVerificationData(selectedBusinessId);
-            setSuccessMessage('Solicitud de verificación enviada');
+            setSuccessMessage('Solicitud de verificaciÃ³n enviada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificación'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificaciÃ³n'));
         } finally {
             setSaving(false);
         }
@@ -286,9 +293,9 @@ export function DashboardBusiness() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6 animate-fade-in">
             <section className="role-hero role-hero-owner">
                 <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
-                <h1 className="font-display text-3xl font-bold text-white mt-2">Resumen de rendimiento</h1>
+                <h1 className="font-display text-3xl font-bold text-white mt-2">Estado del catalogo y visibilidad</h1>
                 <p className="text-blue-100 mt-2 max-w-2xl">
-                    Vista simplificada enfocada en analítica base y verificación documental.
+                    Vista enfocada en calidad de ficha, visibilidad organica y verificacion documental.
                 </p>
 
                 <div className="mt-5 role-kpi-grid">
@@ -301,13 +308,13 @@ export function DashboardBusiness() {
                         <p className="role-kpi-value">{totals.views ?? 0}</p>
                     </article>
                     <article className="role-kpi-card">
-                        <p className="role-kpi-label">Conversión</p>
+                        <p className="role-kpi-label">ConversiÃ³n</p>
                         <p className="role-kpi-value">{totals.conversionRate ?? 0}%</p>
                     </article>
                     <article className="role-kpi-card">
-                        <p className="role-kpi-label">Ingresos</p>
+                        <p className="role-kpi-label">Perfiles fuertes</p>
                         <p className="mt-1 font-display text-xl font-bold text-white">
-                            {formatCurrencyDo(totals.grossRevenue ?? 0)}
+                            {completeProfiles}
                         </p>
                     </article>
                 </div>
@@ -344,14 +351,14 @@ export function DashboardBusiness() {
                     <p className="text-sm uppercase tracking-wide text-primary-700 font-semibold">Primer paso</p>
                     <h2 className="font-display text-2xl font-bold text-gray-900 mt-2">Registra tu primer negocio</h2>
                     <p className="text-gray-600 mt-2 max-w-2xl">
-                        Tu panel de negocio se activa después de crear el primer negocio. En ese proceso se prepara tu organización interna y la verificación documental.
+                        Tu panel de negocio se activa despuÃ©s de crear el primer negocio. En ese proceso se prepara tu organizaciÃ³n interna y la verificaciÃ³n documental.
                     </p>
                     <div className="mt-5 flex flex-wrap gap-3">
                         <Link className="btn-primary" to="/register-business">
                             Registrar negocio ahora
                         </Link>
                         <Link className="btn-secondary" to="/businesses">
-                            Ver directorio público
+                            Ver directorio pÃºblico
                         </Link>
                     </div>
                 </section>
@@ -382,12 +389,14 @@ export function DashboardBusiness() {
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.clicks ?? 0}</p>
                 </article>
                 <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversión</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">ConversiÃ³n</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.conversionRate ?? 0}%</p>
                 </article>
                 <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ingresos</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">{formatCurrencyDo(totals.grossRevenue ?? 0)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Abiertos ahora</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-2">
+                        {businesses.filter((business) => business.openNow).length}
+                    </p>
                 </article>
             </section>
 
@@ -405,7 +414,7 @@ export function DashboardBusiness() {
                         )}
                     </div>
                     {businesses.length === 0 ? (
-                        <p className="text-sm text-gray-500">Aún no tienes negocios creados.</p>
+                        <p className="text-sm text-gray-500">AÃºn no tienes negocios creados.</p>
                     ) : (
                         <div className="space-y-2">
                             {businesses.map((business) => (
@@ -421,8 +430,27 @@ export function DashboardBusiness() {
                                 >
                                     <p className="font-medium text-gray-900">{business.name}</p>
                                     <p className="text-xs text-gray-500 mt-1">
-                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificación'}
+                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificaciÃ³n'}
                                     </p>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        <span className="text-[11px] rounded-full bg-primary-50 px-2 py-1 text-primary-700">
+                                            Ficha {business.profileCompletenessScore ?? 0}%
+                                        </span>
+                                        {business.openNow !== null && business.openNow !== undefined ? (
+                                            <span className={`text-[11px] rounded-full px-2 py-1 ${
+                                                business.openNow
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-gray-100 text-gray-600'
+                                            }`}>
+                                                {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    {business.missingCoreFields && business.missingCoreFields.length > 0 ? (
+                                        <p className="mt-2 text-[11px] text-amber-700">
+                                            Faltan: {business.missingCoreFields.slice(0, 3).join(', ')}
+                                        </p>
+                                    ) : null}
                                 </button>
                             ))}
                         </div>
@@ -431,7 +459,7 @@ export function DashboardBusiness() {
 
                 <article className="card p-6 lg:col-span-2 space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Verificación documental</h2>
+                        <h2 className="font-display text-xl font-bold text-gray-900">VerificaciÃ³n documental</h2>
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getStatusClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
                             {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
                         </span>
@@ -442,7 +470,7 @@ export function DashboardBusiness() {
                             Negocio seleccionado: <strong>{selectedBusiness.name}</strong>
                         </p>
                     ) : (
-                        <p className="text-sm text-gray-500">Selecciona un negocio para gestionar su verificación.</p>
+                        <p className="text-sm text-gray-500">Selecciona un negocio para gestionar su verificaciÃ³n.</p>
                     )}
 
                     {verificationStatus?.verificationSubmittedAt && (
@@ -470,10 +498,10 @@ export function DashboardBusiness() {
                                 onChange={(event) => setDocumentType(event.target.value as VerificationDocument['documentType'])}
                                 disabled={!selectedBusinessId || saving}
                             >
-                                <option value="ID_CARD">Cédula</option>
+                                <option value="ID_CARD">CÃ©dula</option>
                                 <option value="TAX_CERTIFICATE">RNC</option>
                                 <option value="BUSINESS_LICENSE">Licencia comercial</option>
-                                <option value="ADDRESS_PROOF">Comprobante de dirección</option>
+                                <option value="ADDRESS_PROOF">Comprobante de direcciÃ³n</option>
                                 <option value="SELFIE">Selfie</option>
                                 <option value="OTHER">Otro</option>
                             </select>
@@ -491,11 +519,11 @@ export function DashboardBusiness() {
                     </form>
 
                     <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-                        <h3 className="font-semibold text-gray-900">Enviar solicitud de revisión</h3>
+                        <h3 className="font-semibold text-gray-900">Enviar solicitud de revisiÃ³n</h3>
                         <textarea
                             className="input-field text-sm"
                             rows={3}
-                            placeholder="Notas para el equipo de verificación (opcional)"
+                            placeholder="Notas para el equipo de verificaciÃ³n (opcional)"
                             value={verificationNotes}
                             onChange={(event) => setVerificationNotes(event.target.value)}
                             disabled={!selectedBusinessId || saving}
@@ -506,14 +534,14 @@ export function DashboardBusiness() {
                             onClick={() => void handleSubmitBusinessVerification()}
                             disabled={!selectedBusinessId || saving}
                         >
-                            {saving ? 'Enviando...' : 'Solicitar verificación'}
+                            {saving ? 'Enviando...' : 'Solicitar verificaciÃ³n'}
                         </button>
                     </div>
 
                     <div className="rounded-xl border border-gray-100 p-4">
                         <h3 className="font-semibold text-gray-900 mb-3">Historial de documentos</h3>
                         {documents.length === 0 ? (
-                            <p className="text-sm text-gray-500">Todavía no has subido documentos.</p>
+                            <p className="text-sm text-gray-500">TodavÃ­a no has subido documentos.</p>
                         ) : (
                             <div className="space-y-2">
                                 {documents.map((document) => (

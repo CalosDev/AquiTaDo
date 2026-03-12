@@ -17,6 +17,7 @@ import {
     BusinessQueryDto,
     NearbyQueryDto,
     CreatePublicLeadDto,
+    BusinessHourInputDto,
 } from './dto/business.dto';
 import slugify from 'slugify';
 import { getOrganizationPlanLimits } from '../organizations/organization-plan-limits';
@@ -26,12 +27,17 @@ import { hashedCacheKey } from '../cache/cache-key';
 import { DomainEventsService } from '../core/events/domain-events.service';
 import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { SearchService } from '../search/search.service';
+import {
+    buildTodayBusinessHoursLabel,
+    calculateBusinessProfileCompletenessScore,
+    isBusinessOpenNow,
+    listMissingBusinessProfileFields,
+} from './business-profile';
 
 @Injectable()
 export class BusinessesService {
     private readonly logger = new Logger(BusinessesService.name);
-    private static readonly PUBLIC_LIST_CACHE_PREFIX = 'public:businesses:list';
-    private static readonly NEARBY_CACHE_PREFIX = 'public:businesses:nearby';
     private static readonly DETAIL_ID_CACHE_PREFIX = 'public:businesses:detail:id';
     private static readonly DETAIL_SLUG_CACHE_PREFIX = 'public:businesses:detail:slug';
 
@@ -48,6 +54,8 @@ export class BusinessesService {
         private readonly notificationsQueueService: NotificationsQueueService,
         @Inject(IntegrationsService)
         private readonly integrationsService: IntegrationsService,
+        @Inject(SearchService)
+        private readonly searchService: SearchService,
     ) { }
     private readonly uploadsRoot = path.resolve(process.cwd(), 'uploads');
 
@@ -62,17 +70,27 @@ export class BusinessesService {
             select: { id: true, name: true, slug: true },
         },
         city: {
-            select: { id: true, name: true },
+            select: { id: true, name: true, slug: true },
+        },
+        sector: {
+            select: { id: true, name: true, slug: true },
         },
         categories: {
             include: {
                 category: {
-                    select: { id: true, name: true, slug: true, icon: true },
+                    select: { id: true, name: true, slug: true, icon: true, parentId: true },
                 },
             },
         },
         images: {
-            orderBy: { id: Prisma.SortOrder.asc },
+            orderBy: [
+                { isCover: Prisma.SortOrder.desc },
+                { sortOrder: Prisma.SortOrder.asc },
+                { id: Prisma.SortOrder.asc },
+            ],
+        },
+        hours: {
+            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
         },
         features: {
             include: {
@@ -92,6 +110,9 @@ export class BusinessesService {
         slug: true,
         description: true,
         address: true,
+        priceRange: true,
+        latitude: true,
+        longitude: true,
         verified: true,
         reputationScore: true,
         verificationStatus: true,
@@ -99,19 +120,35 @@ export class BusinessesService {
             select: { id: true, name: true, slug: true },
         },
         city: {
-            select: { id: true, name: true },
+            select: { id: true, name: true, slug: true },
+        },
+        sector: {
+            select: { id: true, name: true, slug: true },
         },
         categories: {
             select: {
                 category: {
-                    select: { id: true, name: true, slug: true, icon: true },
+                    select: { id: true, name: true, slug: true, icon: true, parentId: true },
                 },
             },
         },
         images: {
-            select: { id: true, url: true },
-            orderBy: { id: Prisma.SortOrder.asc },
+            select: { id: true, url: true, isCover: true, caption: true, type: true },
+            orderBy: [
+                { isCover: Prisma.SortOrder.desc },
+                { sortOrder: Prisma.SortOrder.asc },
+                { id: Prisma.SortOrder.asc },
+            ],
             take: 1,
+        },
+        hours: {
+            select: {
+                dayOfWeek: true,
+                opensAt: true,
+                closesAt: true,
+                closed: true,
+            },
+            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
         },
         _count: {
             select: { reviews: true },
@@ -269,6 +306,9 @@ export class BusinessesService {
         verified: true,
         verificationStatus: true,
         createdAt: true,
+        phone: true,
+        website: true,
+        email: true,
         owner: {
             select: { id: true, name: true },
         },
@@ -278,17 +318,36 @@ export class BusinessesService {
         province: {
             select: { id: true, name: true, slug: true },
         },
+        city: {
+            select: { id: true, name: true, slug: true },
+        },
+        sector: {
+            select: { id: true, name: true, slug: true },
+        },
         categories: {
             select: {
                 category: {
-                    select: { id: true, name: true, slug: true, icon: true },
+                    select: { id: true, name: true, slug: true, icon: true, parentId: true },
                 },
             },
         },
         images: {
-            select: { id: true, url: true },
-            orderBy: { id: Prisma.SortOrder.asc },
+            select: { id: true, url: true, isCover: true },
+            orderBy: [
+                { isCover: Prisma.SortOrder.desc },
+                { sortOrder: Prisma.SortOrder.asc },
+                { id: Prisma.SortOrder.asc },
+            ],
             take: 1,
+        },
+        hours: {
+            select: {
+                dayOfWeek: true,
+                opensAt: true,
+                closesAt: true,
+                closed: true,
+            },
+            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
         },
         _count: {
             select: { reviews: true },
@@ -301,42 +360,246 @@ export class BusinessesService {
         slug: true,
         verified: true,
         verificationStatus: true,
+        city: {
+            select: { id: true, name: true, slug: true },
+        },
+        sector: {
+            select: { id: true, name: true, slug: true },
+        },
+        categories: {
+            select: {
+                category: {
+                    select: { id: true, name: true, slug: true, parentId: true },
+                },
+            },
+        },
+        images: {
+            select: { id: true, url: true, isCover: true },
+            orderBy: [
+                { isCover: Prisma.SortOrder.desc },
+                { sortOrder: Prisma.SortOrder.asc },
+                { id: Prisma.SortOrder.asc },
+            ],
+            take: 1,
+        },
+        hours: {
+            select: {
+                dayOfWeek: true,
+                opensAt: true,
+                closesAt: true,
+                closed: true,
+            },
+            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
+        },
+        phone: true,
+        website: true,
+        email: true,
+        latitude: true,
+        longitude: true,
         _count: {
             select: { reviews: true },
         },
     };
 
-    async findAll(query: BusinessQueryDto) {
-        const normalizedQuery = this.normalizePublicListQuery(query);
-        const cacheKey = hashedCacheKey(BusinessesService.PUBLIC_LIST_CACHE_PREFIX, normalizedQuery);
-        return this.redisService.rememberJsonStaleWhileRevalidate(cacheKey, 45, 300, async () => {
-            const { page, limit, skip } = this.resolvePagination(
-                normalizedQuery.page,
-                normalizedQuery.limit,
-                12,
-                24,
-            );
-            const where = await this.buildWhere(normalizedQuery, false);
+    private readonly catalogQualitySelect = {
+        id: true,
+        name: true,
+        slug: true,
+        verified: true,
+        createdAt: true,
+        phone: true,
+        website: true,
+        email: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        province: {
+            select: { id: true, name: true, slug: true },
+        },
+        city: {
+            select: { id: true, name: true, slug: true },
+        },
+        sector: {
+            select: { id: true, name: true, slug: true },
+        },
+        categories: {
+            select: {
+                category: {
+                    select: { id: true, name: true, slug: true, parentId: true },
+                },
+            },
+        },
+        images: {
+            select: { id: true, url: true, isCover: true },
+            orderBy: [
+                { isCover: Prisma.SortOrder.desc },
+                { sortOrder: Prisma.SortOrder.asc },
+                { id: Prisma.SortOrder.asc },
+            ],
+        },
+        hours: {
+            select: {
+                dayOfWeek: true,
+                opensAt: true,
+                closesAt: true,
+                closed: true,
+            },
+            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
+        },
+    };
 
-            const [data, total] = await Promise.all([
-                this.prisma.business.findMany({
-                    where,
-                    select: this.publicListSelect,
-                    skip,
-                    take: limit,
-                    orderBy: { createdAt: 'desc' },
-                }),
-                this.prisma.business.count({ where }),
-            ]);
+    private decorateBusinessProfile<T extends Record<string, any>>(business: T): T & {
+        profileCompletenessScore: number;
+        missingCoreFields: string[];
+        openNow: boolean | null;
+        todayHoursLabel: string | null;
+    } {
+        const profileCompletenessScore = calculateBusinessProfileCompletenessScore(business);
+        return {
+            ...business,
+            profileCompletenessScore,
+            missingCoreFields: listMissingBusinessProfileFields(business),
+            openNow: isBusinessOpenNow(business.hours),
+            todayHoursLabel: buildTodayBusinessHoursLabel(business.hours),
+        };
+    }
 
-            return {
-                data,
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            };
-        });
+    private decorateBusinessProfiles<T extends Record<string, any>>(businesses: T[]) {
+        return businesses.map((business) => this.decorateBusinessProfile(business));
+    }
+
+    private normalizeOptionalText(value?: string | null): string | null | undefined {
+        if (value === undefined) {
+            return undefined;
+        }
+
+        if (value === null) {
+            return null;
+        }
+
+        const normalized = value.trim();
+        return normalized.length > 0 ? normalized : null;
+    }
+
+    private normalizeOptionalEmail(value?: string | null): string | null | undefined {
+        if (value === undefined) {
+            return undefined;
+        }
+
+        if (value === null) {
+            return null;
+        }
+
+        const normalized = value.trim().toLowerCase();
+        return normalized.length > 0 ? normalized : null;
+    }
+
+    private normalizeBusinessHours(hours?: BusinessHourInputDto[]) {
+        if (!hours) {
+            return undefined;
+        }
+
+        const normalized = hours
+            .map((entry) => ({
+                dayOfWeek: entry.dayOfWeek,
+                opensAt: this.normalizeOptionalText(entry.opensAt) ?? null,
+                closesAt: this.normalizeOptionalText(entry.closesAt) ?? null,
+                closed: Boolean(entry.closed),
+            }))
+            .sort((left, right) => left.dayOfWeek - right.dayOfWeek);
+
+        const uniqueDays = new Set<number>();
+        for (const entry of normalized) {
+            if (uniqueDays.has(entry.dayOfWeek)) {
+                throw new BadRequestException('No puedes enviar horarios duplicados para el mismo dia');
+            }
+            uniqueDays.add(entry.dayOfWeek);
+
+            if (entry.closed) {
+                entry.opensAt = null;
+                entry.closesAt = null;
+                continue;
+            }
+
+            if (!entry.opensAt || !entry.closesAt) {
+                throw new BadRequestException('Cada horario abierto debe incluir apertura y cierre');
+            }
+        }
+
+        return normalized;
+    }
+
+    private findDuplicateCandidates(
+        businesses: Array<Record<string, any> & { profileCompletenessScore: number; missingCoreFields: string[] }>,
+    ) {
+        const candidates = new Map<string, {
+            key: string;
+            reasons: Set<string>;
+            businesses: Array<Record<string, any>>;
+        }>();
+        const phoneGroups = new Map<string, Array<Record<string, any>>>();
+        const nameLocationGroups = new Map<string, Array<Record<string, any>>>();
+
+        for (const business of businesses) {
+            const normalizedPhone = String(business.phone ?? '').replace(/\D/g, '');
+            if (normalizedPhone.length >= 7) {
+                const group = phoneGroups.get(normalizedPhone) ?? [];
+                group.push(business);
+                phoneGroups.set(normalizedPhone, group);
+            }
+
+            const normalizedName = String(business.name ?? '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim()
+                .toLowerCase();
+            const cityKey = String(business.city?.id ?? business.province?.id ?? '');
+            if (normalizedName && cityKey) {
+                const compositeKey = `${normalizedName}::${cityKey}`;
+                const group = nameLocationGroups.get(compositeKey) ?? [];
+                group.push(business);
+                nameLocationGroups.set(compositeKey, group);
+            }
+        }
+
+        const registerGroups = (groups: Iterable<Array<Record<string, any>>>, reason: string) => {
+            for (const group of groups) {
+                if (group.length < 2) {
+                    continue;
+                }
+
+                const key = group
+                    .map((entry) => String(entry.id))
+                    .sort()
+                    .join(':');
+
+                const existing = candidates.get(key) ?? {
+                    key,
+                    reasons: new Set<string>(),
+                    businesses: group,
+                };
+                existing.reasons.add(reason);
+                candidates.set(key, existing);
+            }
+        };
+
+        registerGroups(phoneGroups.values(), 'telefono_compartido');
+        registerGroups(nameLocationGroups.values(), 'nombre_y_ciudad_similares');
+
+        return [...candidates.values()]
+            .map((entry) => ({
+                key: entry.key,
+                reasons: [...entry.reasons],
+                businesses: entry.businesses,
+            }))
+            .sort((left, right) => right.businesses.length - left.businesses.length);
+    }
+
+    async findAll(
+        query: BusinessQueryDto,
+        trackingContext?: { visitorId?: string; sessionId?: string; source?: string | null },
+    ) {
+        return this.searchService.listPublicBusinesses(query, trackingContext);
     }
 
     async findAllAdmin(query: BusinessQueryDto) {
@@ -355,8 +618,10 @@ export class BusinessesService {
             this.prisma.business.count({ where }),
         ]);
 
+        const decoratedData = this.decorateBusinessProfiles(data as Record<string, any>[]);
+
         return {
-            data,
+            data: decoratedData,
             total,
             page,
             limit,
@@ -365,7 +630,7 @@ export class BusinessesService {
     }
 
     async findMine(_userId: string, _userRole: string, organizationId: string) {
-        return this.prisma.business.findMany({
+        const businesses = await this.prisma.business.findMany({
             where: {
                 organizationId,
                 deletedAt: null,
@@ -373,6 +638,7 @@ export class BusinessesService {
             select: this.mineListSelect,
             orderBy: { createdAt: 'desc' },
         });
+        return this.decorateBusinessProfiles(businesses as Record<string, any>[]);
     }
 
     async findById(
@@ -388,7 +654,7 @@ export class BusinessesService {
                 if (!publicBusiness) {
                     throw new NotFoundException('Negocio no encontrado');
                 }
-                return publicBusiness;
+                return this.decorateBusinessProfile(publicBusiness as Record<string, any>);
             });
         }
 
@@ -411,7 +677,7 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        return business;
+        return this.decorateBusinessProfile(business as Record<string, any>);
     }
 
     async findBySlug(
@@ -427,7 +693,7 @@ export class BusinessesService {
                 if (!publicBusiness) {
                     throw new NotFoundException('Negocio no encontrado');
                 }
-                return publicBusiness;
+                return this.decorateBusinessProfile(publicBusiness as Record<string, any>);
             });
         }
 
@@ -450,7 +716,7 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        return business;
+        return this.decorateBusinessProfile(business as Record<string, any>);
     }
     async create(
         dto: CreateBusinessDto,
@@ -468,7 +734,13 @@ export class BusinessesService {
         const slug = await this.generateUniqueSlug(baseSlug);
         const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
+        const hours = this.normalizeBusinessHours(dto.hours);
         const contactChannels = await this.normalizeBusinessContactChannels(dto.phone, dto.whatsapp);
+        const website = this.normalizeOptionalText(dto.website) ?? null;
+        const email = this.normalizeOptionalEmail(dto.email) ?? null;
+        const instagramUrl = this.normalizeOptionalText(dto.instagramUrl) ?? null;
+        const facebookUrl = this.normalizeOptionalText(dto.facebookUrl) ?? null;
+        const tiktokUrl = this.normalizeOptionalText(dto.tiktokUrl) ?? null;
         const coordinates = await this.resolveCoordinatesForBusiness({
             address: dto.address,
             provinceId: dto.provinceId,
@@ -480,6 +752,7 @@ export class BusinessesService {
         try {
             const createdBusiness = await this.prisma.$transaction(async (tx) => {
                 await this.assertCityBelongsToProvince(tx, dto.provinceId, dto.cityId);
+                await this.assertSectorBelongsToCity(tx, dto.cityId, dto.sectorId);
                 const effectiveOrganizationId = organizationId ?? await this.ensureOwnerOrganization(tx, userId);
 
                 if (organizationId) {
@@ -501,9 +774,16 @@ export class BusinessesService {
                         description: dto.description,
                         phone: contactChannels.phone,
                         whatsapp: contactChannels.whatsapp,
+                        website,
+                        email,
+                        instagramUrl,
+                        facebookUrl,
+                        tiktokUrl,
+                        priceRange: dto.priceRange,
                         address: dto.address,
                         provinceId: dto.provinceId,
                         cityId: dto.cityId,
+                        sectorId: dto.sectorId,
                         latitude: coordinates.latitude,
                         longitude: coordinates.longitude,
                         ownerId: userId,
@@ -519,6 +799,16 @@ export class BusinessesService {
                             ? {
                                 create: featureIds.map((featureId) => ({
                                     featureId,
+                                })),
+                            }
+                            : undefined,
+                        hours: hours
+                            ? {
+                                create: hours.map((entry) => ({
+                                    dayOfWeek: entry.dayOfWeek,
+                                    opensAt: entry.opensAt,
+                                    closesAt: entry.closesAt,
+                                    closed: entry.closed,
                                 })),
                             }
                             : undefined,
@@ -538,7 +828,7 @@ export class BusinessesService {
 
             this.publishBusinessChangedEvent(createdBusiness.id, createdBusiness.slug, 'created');
 
-            return createdBusiness;
+            return this.decorateBusinessProfile(createdBusiness as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -556,7 +846,18 @@ export class BusinessesService {
         this.assertCoordinatePair(dto.latitude, dto.longitude);
         const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
+        const hours = this.normalizeBusinessHours(dto.hours);
         const contactChannels = await this.normalizeBusinessContactChannels(dto.phone, dto.whatsapp);
+        const normalizedWebsite = this.normalizeOptionalText(dto.website);
+        const normalizedEmail = this.normalizeOptionalEmail(dto.email);
+        const normalizedInstagramUrl = this.normalizeOptionalText(dto.instagramUrl);
+        const normalizedFacebookUrl = this.normalizeOptionalText(dto.facebookUrl);
+        const normalizedTiktokUrl = this.normalizeOptionalText(dto.tiktokUrl);
+        const nextSectorIdForUpdate = dto.sectorId !== undefined
+            ? dto.sectorId
+            : dto.cityId !== undefined
+                ? null
+                : undefined;
 
         const existingBusiness = await this.prisma.business.findUnique({
             where: { id },
@@ -564,6 +865,7 @@ export class BusinessesService {
                 id: true,
                 provinceId: true,
                 cityId: true,
+                sectorId: true,
                 address: true,
                 latitude: true,
                 longitude: true,
@@ -603,6 +905,7 @@ export class BusinessesService {
                         organizationId: true,
                         provinceId: true,
                         cityId: true,
+                        sectorId: true,
                         latitude: true,
                         longitude: true,
                     },
@@ -622,7 +925,13 @@ export class BusinessesService {
 
                 const normalizedTargetProvinceId = dto.provinceId ?? business.provinceId;
                 const normalizedTargetCityId = dto.cityId ?? business.cityId ?? undefined;
+                const normalizedTargetSectorId = dto.sectorId !== undefined
+                    ? dto.sectorId
+                    : dto.cityId !== undefined
+                        ? undefined
+                        : business.sectorId ?? undefined;
                 await this.assertCityBelongsToProvince(tx, normalizedTargetProvinceId, normalizedTargetCityId);
+                await this.assertSectorBelongsToCity(tx, normalizedTargetCityId, normalizedTargetSectorId);
 
                 if (categoryIds) {
                     await tx.businessCategory.deleteMany({ where: { businessId: id } });
@@ -632,6 +941,10 @@ export class BusinessesService {
                     await tx.businessFeature.deleteMany({ where: { businessId: id } });
                 }
 
+                if (hours) {
+                    await tx.businessHour.deleteMany({ where: { businessId: id } });
+                }
+
                 const updatedBusiness = await tx.business.update({
                     where: { id },
                     data: {
@@ -639,9 +952,16 @@ export class BusinessesService {
                         description: dto.description,
                         phone: contactChannels.phone,
                         whatsapp: contactChannels.whatsapp,
+                        website: normalizedWebsite,
+                        email: normalizedEmail,
+                        instagramUrl: normalizedInstagramUrl,
+                        facebookUrl: normalizedFacebookUrl,
+                        tiktokUrl: normalizedTiktokUrl,
+                        priceRange: dto.priceRange,
                         address: dto.address,
                         provinceId: dto.provinceId,
                         cityId: dto.cityId,
+                        sectorId: nextSectorIdForUpdate,
                         latitude: dto.latitude ?? geocodedCoordinates.latitude,
                         longitude: dto.longitude ?? geocodedCoordinates.longitude,
                         categories: categoryIds
@@ -658,6 +978,16 @@ export class BusinessesService {
                                 })),
                             }
                             : undefined,
+                        hours: hours
+                            ? {
+                                create: hours.map((entry) => ({
+                                    dayOfWeek: entry.dayOfWeek,
+                                    opensAt: entry.opensAt,
+                                    closesAt: entry.closesAt,
+                                    closed: entry.closed,
+                                })),
+                            }
+                            : undefined,
                     },
                     include: this.fullInclude,
                 });
@@ -671,7 +1001,7 @@ export class BusinessesService {
 
             this.publishBusinessChangedEvent(updatedBusiness.id, updatedBusiness.slug, 'updated');
 
-            return updatedBusiness;
+            return this.decorateBusinessProfile(updatedBusiness as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -806,61 +1136,12 @@ export class BusinessesService {
     }
 
     async findNearby(query: NearbyQueryDto) {
-        const cacheKey = hashedCacheKey(BusinessesService.NEARBY_CACHE_PREFIX, query);
-        return this.redisService.rememberJson(cacheKey, 60, async () => {
-            const radius = query.radius || 5;
-            const earthRadiusKm = 6371;
-            const latDelta = radius / 111;
-            const cosLat = Math.cos((query.lat * Math.PI) / 180);
-            const safeCosLat = Math.abs(cosLat) < 0.01 ? 0.01 : cosLat;
-            const lngDelta = radius / (111 * safeCosLat);
-            const minLat = query.lat - latDelta;
-            const maxLat = query.lat + latDelta;
-            const minLng = query.lng - lngDelta;
-            const maxLng = query.lng + lngDelta;
-
-            // Haversine formula using raw SQL for optimal PostgreSQL performance
-            const businesses = await this.prisma.$queryRaw`
-      SELECT 
-        b.*,
-        (
-          ${earthRadiusKm} * acos(
-            LEAST(
-              1.0,
-              GREATEST(
-                -1.0,
-                cos(radians(${query.lat})) * cos(radians(b.latitude)) *
-                cos(radians(b.longitude) - radians(${query.lng})) +
-                sin(radians(${query.lat})) * sin(radians(b.latitude))
-              )
-            )
-          )
-        ) AS distance
-      FROM businesses b
-      WHERE b.verified = true
-        AND b."deletedAt" IS NULL
-        AND b.latitude IS NOT NULL
-        AND b.longitude IS NOT NULL
-        AND b.latitude BETWEEN ${minLat} AND ${maxLat}
-        AND b.longitude BETWEEN ${minLng} AND ${maxLng}
-        AND (
-          ${earthRadiusKm} * acos(
-            LEAST(
-              1.0,
-              GREATEST(
-                -1.0,
-                cos(radians(${query.lat})) * cos(radians(b.latitude)) *
-                cos(radians(b.longitude) - radians(${query.lng})) +
-                sin(radians(${query.lat})) * sin(radians(b.latitude))
-              )
-            )
-          )
-        ) <= ${radius}
-      ORDER BY distance ASC
-      LIMIT 50
-    `;
-
-            return businesses;
+        return this.searchService.findNearbyBusinesses({
+            lat: query.lat,
+            lng: query.lng,
+            radiusKm: query.radius,
+            limit: query.limit,
+            categoryId: query.categoryId,
         });
     }
 
@@ -880,7 +1161,7 @@ export class BusinessesService {
             await this.reputationService.recalculateBusinessReputation(id);
             this.publishBusinessChangedEvent(id, business.slug, 'verified');
 
-            return business;
+            return this.decorateBusinessProfile(business as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -969,6 +1250,38 @@ export class BusinessesService {
         return {
             latitude: geocoded.latitude,
             longitude: geocoded.longitude,
+        };
+    }
+
+    async getCatalogQuality(limit = 25) {
+        const safeLimit = Math.min(Math.max(limit, 1), 100);
+        const businesses = await this.prisma.business.findMany({
+            where: {
+                deletedAt: null,
+            },
+            select: this.catalogQualitySelect,
+            orderBy: { createdAt: 'desc' },
+            take: 500,
+        });
+
+        const decoratedBusinesses = this.decorateBusinessProfiles(businesses as Record<string, any>[]);
+        const incompleteBusinesses = decoratedBusinesses
+            .filter((business) => business.profileCompletenessScore < 80)
+            .sort((left, right) => left.profileCompletenessScore - right.profileCompletenessScore)
+            .slice(0, safeLimit);
+        const duplicateCandidates = this.findDuplicateCandidates(decoratedBusinesses).slice(0, safeLimit);
+
+        return {
+            summary: {
+                totalBusinesses: decoratedBusinesses.length,
+                incompleteBusinesses: decoratedBusinesses.filter((business) => business.profileCompletenessScore < 80).length,
+                duplicateCandidates: duplicateCandidates.length,
+                missingSector: decoratedBusinesses.filter((business) => !business.sector).length,
+                missingCoordinates: decoratedBusinesses.filter((business) =>
+                    typeof business.latitude !== 'number' || typeof business.longitude !== 'number').length,
+            },
+            incompleteBusinesses,
+            duplicateCandidates,
         };
     }
 
@@ -1345,18 +1658,18 @@ export class BusinessesService {
             ];
         }
 
-        if (query.categoryId) {
-            where.categories = {
-                some: { categoryId: query.categoryId },
-            };
-        } else if (query.categorySlug) {
+        const categoryIds = await this.resolveCategoryFilterIds(query.categoryId, query.categorySlug);
+        if (categoryIds.length > 0) {
             where.categories = {
                 some: {
-                    category: {
-                        slug: query.categorySlug,
+                    categoryId: {
+                        in: categoryIds,
                     },
                 },
             };
+        } else if (query.categoryId || query.categorySlug) {
+            where.id = '__no_category_match__';
+            return where;
         }
 
         if (query.provinceId) {
@@ -1369,6 +1682,10 @@ export class BusinessesService {
 
         if (query.cityId) {
             where.cityId = query.cityId;
+        }
+
+        if (query.sectorId) {
+            where.sectorId = query.sectorId;
         }
 
         const normalizedFeature = query.feature?.trim();
@@ -1415,6 +1732,28 @@ export class BusinessesService {
         return rows.map((row) => row.id);
     }
 
+    private async resolveCategoryFilterIds(categoryId?: string, categorySlug?: string): Promise<string[]> {
+        if (!categoryId && !categorySlug) {
+            return [];
+        }
+
+        const category = await this.prisma.category.findFirst({
+            where: categoryId ? { id: categoryId } : { slug: categorySlug },
+            select: { id: true },
+        });
+
+        if (!category) {
+            return [];
+        }
+
+        const children = await this.prisma.category.findMany({
+            where: { parentId: category.id },
+            select: { id: true },
+        });
+
+        return [category.id, ...children.map((entry) => entry.id)];
+    }
+
     private resolvePagination(
         rawPage: number | undefined,
         rawLimit: number | undefined,
@@ -1449,6 +1788,29 @@ export class BusinessesService {
 
         if (!city || city.provinceId !== provinceId) {
             throw new BadRequestException('La ciudad seleccionada no pertenece a la provincia indicada');
+        }
+    }
+
+    private async assertSectorBelongsToCity(
+        tx: Prisma.TransactionClient,
+        cityId?: string,
+        sectorId?: string,
+    ): Promise<void> {
+        if (!sectorId) {
+            return;
+        }
+
+        if (!cityId) {
+            throw new BadRequestException('Debes seleccionar una ciudad antes de asignar un sector');
+        }
+
+        const sector = await tx.sector.findUnique({
+            where: { id: sectorId },
+            select: { cityId: true },
+        });
+
+        if (!sector || sector.cityId !== cityId) {
+            throw new BadRequestException('El sector seleccionado no pertenece a la ciudad indicada');
         }
     }
 

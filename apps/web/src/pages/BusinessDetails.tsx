@@ -6,6 +6,7 @@ import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
+import { BUSINESS_DAY_OPTIONS, businessPriceRangeLabel, formatHoursRange, type BusinessHourEntry } from '../lib/businessProfile';
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { featureFlags } from '../config/features';
@@ -19,16 +20,27 @@ interface Business {
     description: string;
     phone?: string;
     whatsapp?: string;
+    website?: string | null;
+    email?: string | null;
+    instagramUrl?: string | null;
+    facebookUrl?: string | null;
+    tiktokUrl?: string | null;
+    priceRange?: string | null;
     address: string;
     latitude?: number;
     longitude?: number;
     verified: boolean;
+    openNow?: boolean | null;
+    todayHoursLabel?: string | null;
+    profileCompletenessScore?: number;
     reputationScore?: number | string | null;
     province?: { name: string };
     city?: { name: string };
-    images: { id: string; url: string }[];
-    categories?: { category: { name: string; icon?: string } }[];
+    sector?: { name: string } | null;
+    images: Array<{ id: string; url: string; caption?: string | null; isCover?: boolean; type?: string }>;
+    categories?: { category: { name: string; icon?: string; parent?: { name: string } | null } }[];
     features?: { feature: { name: string } }[];
+    hours?: BusinessHourEntry[];
     reviews?: { id: string; rating: number; comment?: string; user: { name: string }; createdAt: string }[];
     _count?: { reviews: number };
     owner?: { name: string };
@@ -647,6 +659,11 @@ export function BusinessDetails() {
         ? new Date(business.createdAt).getFullYear()
         : null;
     const currentImage = business?.images?.[activeImage] ?? business?.images?.[0];
+    const priceRangeLabel = businessPriceRangeLabel(business?.priceRange);
+    const hoursByDay = BUSINESS_DAY_OPTIONS.map((day) => ({
+        ...day,
+        schedule: business?.hours?.find((entry) => entry.dayOfWeek === day.dayOfWeek) ?? null,
+    }));
     const mapCoordinates =
         typeof business?.latitude === 'number' && typeof business?.longitude === 'number'
             ? {
@@ -1040,10 +1057,24 @@ export function BusinessDetails() {
                                             OK Verificado
                                         </span>
                                     )}
+                                    {business.openNow !== null && business.openNow !== undefined && (
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                                            business.openNow
+                                                ? 'bg-green-100 text-green-700 border-green-200'
+                                                : 'bg-gray-100 text-gray-600 border-gray-200'
+                                        }`}>
+                                            {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
+                                        </span>
+                                    )}
+                                    {priceRangeLabel && (
+                                        <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full font-medium border border-gray-200">
+                                            {priceRangeLabel}
+                                        </span>
+                                    )}
                                     <div className="flex flex-wrap gap-1">
                                         {business.categories?.map((bc, i) => (
                                             <span key={i} className="bg-primary-50 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                                                {bc.category.icon} {bc.category.name}
+                                                {bc.category.icon} {bc.category.parent?.name ? `${bc.category.parent.name} / ` : ''}{bc.category.name}
                                             </span>
                                         ))}
                                     </div>
@@ -1053,7 +1084,11 @@ export function BusinessDetails() {
                                     Dirección: {business.address}
                                     {business.province && ` - ${business.province.name}`}
                                     {business.city && `, ${business.city.name}`}
+                                    {business.sector && `, ${business.sector.name}`}
                                 </p>
+                                {business.todayHoursLabel && (
+                                    <p className="text-sm text-gray-500 mt-1">Hoy: {business.todayHoursLabel}</p>
+                                )}
                             </div>
                             {averageRating && (
                                 <div className="text-center bg-accent-50 border border-accent-100 px-4 py-2 rounded-xl md:min-w-[110px]">
@@ -1574,6 +1609,94 @@ export function BusinessDetails() {
                                     <div className="text-sm text-gray-700">{business.address}</div>
                                 </div>
                             </div>
+                            {business.website && (
+                                <a
+                                    href={business.website}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-200 hover:border-primary-200 transition-colors"
+                                >
+                                    <span className="text-lg">Web</span>
+                                    <div>
+                                        <div className="text-xs text-gray-600">Website</div>
+                                        <div className="text-sm text-primary-700 break-all">{business.website}</div>
+                                    </div>
+                                </a>
+                            )}
+                            {business.email && (
+                                <a
+                                    href={`mailto:${business.email}`}
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-200 hover:border-primary-200 transition-colors"
+                                >
+                                    <span className="text-lg">Mail</span>
+                                    <div>
+                                        <div className="text-xs text-gray-600">Email</div>
+                                        <div className="text-sm text-primary-700 break-all">{business.email}</div>
+                                    </div>
+                                </a>
+                            )}
+                            {(business.instagramUrl || business.facebookUrl || business.tiktokUrl) && (
+                                <div className="rounded-xl border border-gray-200 bg-white p-3">
+                                    <div className="text-xs text-gray-600 mb-2">Redes sociales</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {business.instagramUrl && (
+                                            <a href={business.instagramUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs">
+                                                Instagram
+                                            </a>
+                                        )}
+                                        {business.facebookUrl && (
+                                            <a href={business.facebookUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs">
+                                                Facebook
+                                            </a>
+                                        )}
+                                        {business.tiktokUrl && (
+                                            <a href={business.tiktokUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs">
+                                                TikTok
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {business.hours && business.hours.length > 0 && (
+                                <div className="rounded-xl border border-gray-200 bg-white p-3">
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                        <div className="text-xs text-gray-600">Horarios</div>
+                                        {business.openNow !== null && business.openNow !== undefined ? (
+                                            <span className={`text-[11px] font-medium ${
+                                                business.openNow ? 'text-green-700' : 'text-gray-500'
+                                            }`}>
+                                                {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {hoursByDay.map((day) => (
+                                            <div key={day.dayOfWeek} className="flex items-center justify-between gap-3 text-sm">
+                                                <span className="text-gray-600">{day.label}</span>
+                                                <span className="text-gray-900">
+                                                    {day.schedule?.closed
+                                                        ? 'Cerrado'
+                                                        : formatHoursRange(day.schedule?.opensAt, day.schedule?.closesAt) || 'Sin horario'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {business.profileCompletenessScore !== undefined && (
+                                <div className="rounded-xl border border-gray-200 bg-white p-3">
+                                    <div className="text-xs text-gray-600">Calidad de ficha</div>
+                                    <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+                                        <div
+                                            className="h-full bg-primary-600"
+                                            style={{ width: `${Math.max(0, Math.min(100, business.profileCompletenessScore))}%` }}
+                                        />
+                                    </div>
+                                    <div className="mt-2 text-sm text-gray-700">
+                                        {business.profileCompletenessScore}% completado
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-6 border-t border-gray-100 pt-6">

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
     IsString,
     IsNotEmpty,
@@ -9,11 +10,45 @@ import {
     IsEmail,
     Matches,
     IsIn,
+    IsUrl,
     MaxLength,
     MinLength,
     Min,
     Max,
+    ValidateNested,
 } from 'class-validator';
+
+const URL_OPTIONS = {
+    require_protocol: true,
+    protocols: ['http', 'https'],
+};
+
+const BUSINESS_PRICE_RANGES = ['BUDGET', 'MODERATE', 'PREMIUM', 'LUXURY'] as const;
+
+export class BusinessHourInputDto {
+    @IsNumber()
+    @Min(0)
+    @Max(6)
+    dayOfWeek!: number;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{2}:\d{2}$/, {
+        message: 'opensAt debe usar formato HH:mm',
+    })
+    opensAt?: string;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{2}:\d{2}$/, {
+        message: 'closesAt debe usar formato HH:mm',
+    })
+    closesAt?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    closed?: boolean;
+}
 
 export class CreateBusinessDto {
     @IsString()
@@ -34,6 +69,35 @@ export class CreateBusinessDto {
     @IsString()
     whatsapp?: string;
 
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    website?: string;
+
+    @IsOptional()
+    @IsEmail()
+    @MaxLength(160)
+    email?: string;
+
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    instagramUrl?: string;
+
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    facebookUrl?: string;
+
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    tiktokUrl?: string;
+
+    @IsOptional()
+    @IsIn(BUSINESS_PRICE_RANGES)
+    priceRange?: 'BUDGET' | 'MODERATE' | 'PREMIUM' | 'LUXURY';
+
     @IsString()
     @IsNotEmpty()
     @MaxLength(500)
@@ -47,6 +111,10 @@ export class CreateBusinessDto {
     @IsOptional()
     @IsUUID()
     cityId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    sectorId?: string;
 
     @IsOptional()
     @IsNumber()
@@ -69,6 +137,12 @@ export class CreateBusinessDto {
     @IsArray()
     @IsUUID('all', { each: true })
     featureIds?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => BusinessHourInputDto)
+    hours?: BusinessHourInputDto[];
 }
 
 export class UpdateBusinessDto {
@@ -91,6 +165,35 @@ export class UpdateBusinessDto {
     whatsapp?: string;
 
     @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    website?: string;
+
+    @IsOptional()
+    @IsEmail()
+    @MaxLength(160)
+    email?: string;
+
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    instagramUrl?: string;
+
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    facebookUrl?: string;
+
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    tiktokUrl?: string;
+
+    @IsOptional()
+    @IsIn(BUSINESS_PRICE_RANGES)
+    priceRange?: 'BUDGET' | 'MODERATE' | 'PREMIUM' | 'LUXURY';
+
+    @IsOptional()
     @IsString()
     @MaxLength(500)
     address?: string;
@@ -102,6 +205,10 @@ export class UpdateBusinessDto {
     @IsOptional()
     @IsUUID()
     cityId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    sectorId?: string;
 
     @IsOptional()
     @IsNumber()
@@ -124,6 +231,12 @@ export class UpdateBusinessDto {
     @IsArray()
     @IsUUID('all', { each: true })
     featureIds?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => BusinessHourInputDto)
+    hours?: BusinessHourInputDto[];
 }
 
 export class BusinessQueryDto {
@@ -160,11 +273,39 @@ export class BusinessQueryDto {
     cityId?: string;
 
     @IsOptional()
+    @IsUUID()
+    sectorId?: string;
+
+    @IsOptional()
     @IsString()
     @MaxLength(80)
     feature?: string;
 
     @IsOptional()
+    @Type(() => Boolean)
+    @IsBoolean()
+    openNow?: boolean;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(-90)
+    @Max(90)
+    latitude?: number;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(-180)
+    @Max(180)
+    longitude?: number;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(0.1)
+    @Max(100)
+    radiusKm?: number;
+
+    @IsOptional()
+    @Type(() => Boolean)
     @IsBoolean()
     verified?: boolean;
 
@@ -227,6 +368,20 @@ export class NearbyQueryDto {
     @Min(1)
     @Max(50)
     radius?: number;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    @Max(100)
+    limit?: number;
+
+    @IsOptional()
+    @IsUUID()
+    categoryId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    sectorId?: string;
 }
 
 export class DeleteBusinessDto {
@@ -238,4 +393,12 @@ export class DeleteBusinessDto {
         message: 'El motivo de eliminacion es obligatorio',
     })
     reason!: string;
+}
+
+export class CatalogQualityQueryDto {
+    @IsOptional()
+    @IsNumber()
+    @Min(1)
+    @Max(100)
+    limit?: number;
 }

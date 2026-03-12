@@ -127,6 +127,21 @@ enum BusinessVerificationStatus {
   SUSPENDED
 }
 
+enum BusinessPriceRange {
+  BUDGET
+  MODERATE
+  PREMIUM
+  LUXURY
+}
+
+enum BusinessImageType {
+  COVER
+  GALLERY
+  MENU
+  INTERIOR
+  EXTERIOR
+}
+
 enum VerificationDocumentType {
   ID_CARD
   TAX_CERTIFICATE
@@ -288,6 +303,12 @@ model Business {
   description             String                     @db.Text
   phone                   String?                    @db.VarChar(20)
   whatsapp                String?                    @db.VarChar(20)
+  website                 String?                    @db.VarChar(255)
+  email                   String?                    @db.VarChar(160)
+  instagramUrl            String?                    @db.VarChar(255)
+  facebookUrl             String?                    @db.VarChar(255)
+  tiktokUrl               String?                    @db.VarChar(255)
+  priceRange              BusinessPriceRange?
   address                 String                     @db.VarChar(500)
   latitude                Float?
   longitude               Float?
@@ -316,8 +337,11 @@ model Business {
   province       Province     @relation(fields: [provinceId], references: [id])
   cityId         String?
   city           City?        @relation(fields: [cityId], references: [id])
+  sectorId       String?
+  sector         Sector?      @relation(fields: [sectorId], references: [id])
 
   categories            BusinessCategory[]
+  hours                 BusinessHour[]
   images                BusinessImage[]
   reviews               Review[]
   features              BusinessFeature[]
@@ -349,6 +373,7 @@ model Business {
   @@index([verified])
   @@index([verified, createdAt])
   @@index([provinceId, verified, createdAt])
+  @@index([cityId, sectorId])
   @@index([verificationStatus, createdAt])
   @@index([provinceId, reputationScore])
   @@index([reputationTier, reputationScore])
@@ -573,15 +598,19 @@ model AuditLog {
 }
 
 model Category {
-  id   String  @id @default(uuid())
-  name String  @unique @db.VarChar(100)
-  slug String  @unique @db.VarChar(120)
-  icon String? @db.VarChar(10)
+  id       String    @id @default(uuid())
+  name     String    @unique @db.VarChar(100)
+  slug     String    @unique @db.VarChar(120)
+  icon     String?   @db.VarChar(10)
+  parentId String?
+  parent   Category? @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
 
   businesses          BusinessCategory[]
   adCampaignsTargeted AdCampaign[]       @relation("AdCampaignTargetCategory")
   growthEvents        GrowthEvent[]
 
+  @@index([parentId])
   @@index([slug])
   @@map("categories")
 }
@@ -647,13 +676,18 @@ model CheckIn {
 }
 
 model BusinessImage {
-  id  String @id @default(uuid())
-  url String @db.VarChar(500)
+  id       String            @id @default(uuid())
+  url      String            @db.VarChar(500)
+  caption  String?           @db.VarChar(160)
+  sortOrder Int              @default(0)
+  isCover  Boolean           @default(false)
+  type     BusinessImageType @default(GALLERY)
 
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
+  @@index([businessId, isCover, sortOrder])
   @@map("business_images")
 }
 
@@ -674,16 +708,50 @@ model Province {
 model City {
   id   String @id @default(uuid())
   name String @db.VarChar(100)
+  slug String @db.VarChar(120)
 
   provinceId String
   province   Province @relation(fields: [provinceId], references: [id])
 
-  businesses Business[]
+  businesses   Business[]
+  sectors      Sector[]
   growthEvents GrowthEvent[]
 
   @@unique([provinceId, name])
+  @@unique([provinceId, slug])
   @@index([provinceId])
   @@map("cities")
+}
+
+model Sector {
+  id   String @id @default(uuid())
+  name String @db.VarChar(120)
+  slug String @db.VarChar(140)
+
+  cityId String
+  city   City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+
+  businesses Business[]
+
+  @@unique([cityId, name])
+  @@unique([cityId, slug])
+  @@index([cityId])
+  @@map("sectors")
+}
+
+model BusinessHour {
+  id       String  @id @default(uuid())
+  dayOfWeek Int     @db.SmallInt
+  opensAt  String? @db.VarChar(5)
+  closesAt String? @db.VarChar(5)
+  closed   Boolean @default(false)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, dayOfWeek])
+  @@index([businessId, dayOfWeek])
+  @@map("business_hours")
 }
 
 model Feature {

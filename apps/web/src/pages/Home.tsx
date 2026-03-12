@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { getApiErrorMessage } from '../api/error';
@@ -79,8 +79,8 @@ const OPERATING_POINTS = [
         description: 'WhatsApp y contacto directo para convertir descubrimiento en acción inmediata.',
     },
     {
-        title: 'Opera como SaaS',
-        description: 'Panel de negocio para gestionar perfil, reputación y crecimiento comercial.',
+        title: 'Decide con confianza',
+        description: 'Perfiles con mejor contexto para comparar opciones y elegir mas rapido.',
     },
 ];
 
@@ -414,17 +414,17 @@ export function Home() {
                             </div>
                             <h1 className="mt-5 font-display text-4xl sm:text-5xl xl:text-6xl font-extrabold leading-tight text-white">
                                 Descubre negocios reales
-                                <span className="block text-accent-300">y haz crecer tu marca en RD</span>
+                                <span className="block text-accent-300">por zona, categoria y confianza en RD</span>
                             </h1>
                             <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-blue-100">
-                                AquiTa.do conecta clientes con negocios verificados y entrega herramientas SaaS para operar mejor:
-                                CRM, promociones, reputación y analítica en una sola plataforma.
+                                AquiTa.do te ayuda a encontrar negocios locales utiles, comparables y confiables en Republica Dominicana,
+                                con mejor contexto por categoria, ubicacion y calidad de ficha.
                             </p>
 
                             <div className="mt-5 flex flex-wrap gap-2.5">
                                 <span className="chip !border-white/30 !bg-white/10 !text-white">Enfocado 100% en RD</span>
-                                <span className="chip !border-white/30 !bg-white/10 !text-white">Directorio + SaaS</span>
-                                <span className="chip !border-white/30 !bg-white/10 !text-white">Listo para escalar</span>
+                                <span className="chip !border-white/30 !bg-white/10 !text-white">Discovery por ubicacion</span>
+                                <span className="chip !border-white/30 !bg-white/10 !text-white">Catalogo confiable</span>
                             </div>
 
                             <div className="mt-6 flex flex-wrap gap-3">
@@ -539,7 +539,7 @@ export function Home() {
                                             : 'Santo Domingo, Santiago y mas'}
                                     </p>
                                     <p className="mt-1 text-sm text-blue-100">
-                                        Pensado para el contexto local dominicano y preparado para escalar.
+                                        Pensado para el contexto local dominicano y para decidir mejor.
                                     </p>
                                 </div>
 
@@ -824,7 +824,7 @@ export function Home() {
                 {recentBusinesses.length === 0 ? (
                     <div className="section-shell mt-6 p-10 text-center">
                         <p className="font-display text-2xl font-semibold text-slate-800">Aún no hay negocios registrados.</p>
-                        <p className="mt-2 text-sm text-slate-600">Sé el primero en posicionar tu marca local.</p>
+                        <p className="mt-2 text-sm text-slate-600">Aporta la primera ficha util para esa zona o categoria.</p>
                         <Link to={registerBusinessPath} className="btn-primary mt-5 inline-flex">{registerBusinessLabel}</Link>
                     </div>
                 ) : (
@@ -875,7 +875,7 @@ export function Home() {
                 <div className="section-shell p-6 md:p-8">
                     <h2 className="section-title !text-3xl">Por que AquiTa.do es diferente</h2>
                     <p className="section-subtitle mt-2">
-                        No es solo un listado: es una plataforma operativa para clientes y negocios.
+                        No es solo un listado: prioriza contexto local, fichas utiles y senales de confianza.
                     </p>
                     <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                         {OPERATING_POINTS.map((point) => (
@@ -895,8 +895,7 @@ export function Home() {
                         Lleva tu negocio del barrio al siguiente nivel
                     </h2>
                     <p className="mt-4 text-base md:text-lg text-blue-100 max-w-2xl mx-auto">
-                        Crea tu perfil, recibe contactos, activa promociones y opera tu embudo de ventas
-                        desde un solo dashboard.
+                        Crea una ficha mas completa, mejora tu visibilidad local y ayuda a que mas personas te encuentren.
                     </p>
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                         <Link to={registerBusinessPath} className="btn-accent inline-flex text-base md:text-lg px-8">

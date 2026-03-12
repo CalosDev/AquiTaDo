@@ -15,9 +15,15 @@ function parseBooleanFlag(rawValue: string | undefined, defaultValue: boolean): 
 }
 
 export const featureFlags = {
-    aiConcierge: parseBooleanFlag(import.meta.env.VITE_FEATURE_AI_CONCIERGE, false),
-    sponsoredAds: parseBooleanFlag(import.meta.env.VITE_FEATURE_SPONSORED_ADS, false),
-    bookings: parseBooleanFlag(import.meta.env.VITE_FEATURE_BOOKINGS, false),
-    checkins: parseBooleanFlag(import.meta.env.VITE_FEATURE_CHECKINS, false),
-    messaging: parseBooleanFlag(import.meta.env.VITE_FEATURE_MESSAGING, false),
+    discoveryCoreMode: parseBooleanFlag(import.meta.env.VITE_DISCOVERY_CORE_MODE, true),
+    aiConcierge: !parseBooleanFlag(import.meta.env.VITE_DISCOVERY_CORE_MODE, true)
+        && parseBooleanFlag(import.meta.env.VITE_FEATURE_AI_CONCIERGE, false),
+    sponsoredAds: !parseBooleanFlag(import.meta.env.VITE_DISCOVERY_CORE_MODE, true)
+        && parseBooleanFlag(import.meta.env.VITE_FEATURE_SPONSORED_ADS, false),
+    bookings: !parseBooleanFlag(import.meta.env.VITE_DISCOVERY_CORE_MODE, true)
+        && parseBooleanFlag(import.meta.env.VITE_FEATURE_BOOKINGS, false),
+    checkins: !parseBooleanFlag(import.meta.env.VITE_DISCOVERY_CORE_MODE, true)
+        && parseBooleanFlag(import.meta.env.VITE_FEATURE_CHECKINS, false),
+    messaging: !parseBooleanFlag(import.meta.env.VITE_DISCOVERY_CORE_MODE, true)
+        && parseBooleanFlag(import.meta.env.VITE_FEATURE_MESSAGING, false),
 } as const;

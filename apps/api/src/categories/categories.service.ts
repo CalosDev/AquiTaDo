@@ -18,24 +18,61 @@ export class CategoriesService {
 
     async findAll() {
         const categories = await this.prisma.category.findMany({
-            orderBy: { name: 'asc' },
+            orderBy: [
+                { parentId: 'asc' },
+                { name: 'asc' },
+            ],
+            include: {
+                parent: {
+                    select: { id: true, name: true, slug: true },
+                },
+                children: {
+                    select: { id: true, name: true, slug: true, icon: true },
+                    orderBy: { name: 'asc' },
+                },
+            },
         });
 
         const publicBusinessCountByCategoryId = await this.resolvePublicBusinessCountByCategoryId(
             categories.map((category) => category.id),
         );
 
-        return categories.map((category) => ({
-            ...category,
-            _count: {
-                businesses: publicBusinessCountByCategoryId.get(category.id) ?? 0,
-            },
-        }));
+        const childrenByParentId = new Map<string, string[]>();
+        for (const category of categories) {
+            if (!category.parentId) {
+                continue;
+            }
+            const existing = childrenByParentId.get(category.parentId) ?? [];
+            existing.push(category.id);
+            childrenByParentId.set(category.parentId, existing);
+        }
+
+        return categories.map((category) => {
+            const directCount = publicBusinessCountByCategoryId.get(category.id) ?? 0;
+            const descendantCount = (childrenByParentId.get(category.id) ?? [])
+                .reduce((accumulator, childId) => accumulator + (publicBusinessCountByCategoryId.get(childId) ?? 0), 0);
+
+            return {
+                ...category,
+                _count: {
+                    businesses: directCount + descendantCount,
+                },
+            };
+        });
     }
 
     async findById(id: string) {
         const category = await this.prisma.category.findUnique({
             where: { id },
+            include: {
+                parent: {
+                    select: { id: true, name: true, slug: true },
+                },
+                children: {
+                    select: { id: true, name: true, slug: true, icon: true },
+                    orderBy: { name: 'asc' },
+                },
+            },
         });
 
         if (!category) {
@@ -54,6 +91,7 @@ export class CategoriesService {
 
     async create(data: CreateCategoryDto) {
         try {
+            await this.assertValidParentReference(data.parentId);
             return await this.prisma.category.create({ data });
         } catch (error) {
             this.handlePrismaError(error);
@@ -63,6 +101,7 @@ export class CategoriesService {
 
     async update(id: string, data: UpdateCategoryDto) {
         try {
+            await this.assertValidParentReference(data.parentId, id);
             return await this.prisma.category.update({
                 where: { id },
                 data,
@@ -75,6 +114,12 @@ export class CategoriesService {
 
     async delete(id: string) {
         try {
+            const childrenCount = await this.prisma.category.count({
+                where: { parentId: id },
+            });
+            if (childrenCount > 0) {
+                throw new BadRequestException('No se puede eliminar una categoria padre con subcategorias activas');
+            }
             await this.prisma.category.delete({ where: { id } });
         } catch (error) {
             this.handlePrismaError(error);
@@ -123,5 +168,28 @@ export class CategoriesService {
         return new Map(
             grouped.map((row) => [row.categoryId, row._count._all]),
         );
+    }
+
+    private async assertValidParentReference(parentId?: string, categoryId?: string): Promise<void> {
+        if (!parentId) {
+            return;
+        }
+
+        if (categoryId && parentId === categoryId) {
+            throw new BadRequestException('Una categoria no puede ser hija de si misma');
+        }
+
+        const parent = await this.prisma.category.findUnique({
+            where: { id: parentId },
+            select: { id: true, parentId: true },
+        });
+
+        if (!parent) {
+            throw new BadRequestException('La categoria padre no existe');
+        }
+
+        if (parent.parentId) {
+            throw new BadRequestException('Solo se permite una taxonomia de dos niveles');
+        }
     }
 }

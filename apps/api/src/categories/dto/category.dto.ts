@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -20,6 +20,10 @@ export class CreateCategoryDto {
     @IsString()
     @MaxLength(10)
     icon?: string;
+
+    @IsOptional()
+    @IsUUID()
+    parentId?: string;
 }
 
 export class UpdateCategoryDto {
@@ -40,4 +44,8 @@ export class UpdateCategoryDto {
     @IsString()
     @MaxLength(10)
     icon?: string;
+
+    @IsOptional()
+    @IsUUID()
+    parentId?: string;
 }

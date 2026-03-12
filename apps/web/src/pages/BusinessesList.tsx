@@ -2,9 +2,11 @@ import { startTransition, useCallback, useEffect, useMemo, useState } from 'reac
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationApi } from '../api/endpoints';
+import { BusinessesMap } from '../components/BusinessesMap';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
+import { businessPriceRangeLabel } from '../lib/businessProfile';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { preloadRouteChunk } from '../routes/preload';
@@ -17,10 +19,20 @@ interface Business {
     description: string;
     address: string;
     verified: boolean;
+    openNow?: boolean | null;
+    todayHoursLabel?: string | null;
+    profileCompletenessScore?: number;
+    latitude?: number | null;
+    longitude?: number | null;
+    priceRange?: string | null;
     reputationScore?: number | string | null;
+    relevanceScore?: number | null;
+    distanceKm?: number | null;
     province?: { name: string };
+    city?: { name: string } | null;
+    sector?: { id: string; name: string } | null;
     images: { url: string }[];
-    categories?: { category: { name: string; icon?: string } }[];
+    categories?: { category: { name: string; icon?: string; parent?: { name: string } | null } }[];
     _count?: { reviews: number };
 }
 
@@ -29,12 +41,25 @@ interface Category {
     name: string;
     slug: string;
     icon?: string;
+    parentId?: string | null;
+    parent?: { id: string; name: string } | null;
+    children?: Array<{ id: string }>;
 }
 
 interface Province {
     id: string;
     name: string;
     slug: string;
+}
+
+interface City {
+    id: string;
+    name: string;
+}
+
+interface Sector {
+    id: string;
+    name: string;
 }
 
 interface SponsoredPlacement {
@@ -121,6 +146,8 @@ export function BusinessesList() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
+    const [cities, setCities] = useState<City[]>([]);
+    const [sectors, setSectors] = useState<Sector[]>([]);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [sponsoredPlacements, setSponsoredPlacements] = useState<SponsoredPlacement[]>([]);
@@ -133,7 +160,10 @@ export function BusinessesList() {
     const currentSearch = searchParams.get('search') || '';
     const currentCategory = searchParams.get('categoryId') || '';
     const currentProvince = searchParams.get('provinceId') || '';
+    const currentCity = searchParams.get('cityId') || '';
+    const currentSector = searchParams.get('sectorId') || '';
     const currentFeature = searchParams.get('feature') || '';
+    const currentOpenNow = searchParams.get('openNow') === 'true';
     const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
     const currentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
     const [searchInput, setSearchInput] = useState(currentSearch);
@@ -148,6 +178,18 @@ export function BusinessesList() {
     const activeProvince = useMemo(
         () => provinces.find((province) => province.slug === provinceSlug || province.id === currentProvince) || null,
         [provinces, provinceSlug, currentProvince],
+    );
+    const activeCity = useMemo(
+        () => cities.find((city) => city.id === currentCity) || null,
+        [cities, currentCity],
+    );
+    const activeSector = useMemo(
+        () => sectors.find((sector) => sector.id === currentSector) || null,
+        [sectors, currentSector],
+    );
+    const categoryOptions = useMemo(
+        () => categories.filter((category) => !category.children || category.children.length === 0),
+        [categories],
     );
     const activeIntent = useMemo(
         () => (intentSlug ? INTENT_FEATURE_MAP[intentSlug] || null : null),
@@ -274,7 +316,7 @@ export function BusinessesList() {
         setLoading(true);
         setLoadError('');
         try {
-            const params: Record<string, string | number> = { page: currentPage, limit: 12 };
+            const params: Record<string, string | number | boolean> = { page: currentPage, limit: 12 };
             if (currentSearch) params.search = currentSearch;
             if (currentCategory) {
                 params.categoryId = currentCategory;
@@ -286,7 +328,10 @@ export function BusinessesList() {
             } else if (provinceSlug) {
                 params.provinceSlug = provinceSlug;
             }
+            if (currentCity) params.cityId = currentCity;
+            if (currentSector) params.sectorId = currentSector;
             if (currentFeature) params.feature = currentFeature;
+            if (currentOpenNow) params.openNow = true;
 
             const businessesRes = await businessApi.getAll(params);
             const sponsoredRes = showSponsoredAds
@@ -306,7 +351,7 @@ export function BusinessesList() {
         } finally {
             setLoading(false);
         }
-    }, [categorySlug, currentCategory, currentFeature, currentPage, currentProvince, currentSearch, provinceSlug, showSponsoredAds]);
+    }, [categorySlug, currentCategory, currentCity, currentFeature, currentOpenNow, currentPage, currentProvince, currentSearch, currentSector, provinceSlug, showSponsoredAds]);
 
     useEffect(() => {
         void loadBusinesses();
@@ -356,6 +401,7 @@ export function BusinessesList() {
             businessId,
             categoryId: currentCategory || undefined,
             provinceId: currentProvince || undefined,
+            cityId: currentCity || undefined,
             visitorId: getOrCreateVisitorId(),
             sessionId: getOrCreateSessionId(),
             searchQuery: currentSearch || undefined,
@@ -363,9 +409,11 @@ export function BusinessesList() {
                 source,
                 page: currentPage,
                 feature: currentFeature || undefined,
+                sectorId: currentSector || undefined,
+                openNow: currentOpenNow,
             },
         }).catch(() => undefined);
-    }, [currentCategory, currentFeature, currentPage, currentProvince, currentSearch]);
+    }, [currentCategory, currentCity, currentFeature, currentOpenNow, currentPage, currentProvince, currentSearch, currentSector]);
 
     const updateFilter = useCallback((
         key: string,
@@ -407,6 +455,10 @@ export function BusinessesList() {
                     params.delete(key);
                 }
 
+                if (key === 'provinceId' && params.has('cityId')) {
+                    params.delete('cityId');
+                }
+
                 if (options.resetPage ?? true) {
                     params.set('page', '1');
                 }
@@ -415,6 +467,78 @@ export function BusinessesList() {
             });
         });
     }, [setSearchParams, categorySlug, provinceSlug, intentSlug, searchParams, navigate]);
+
+    useEffect(() => {
+        if (!currentProvince) {
+            setCities([]);
+            setSectors([]);
+            if (currentCity) {
+                updateFilter('cityId', '');
+            }
+            if (currentSector) {
+                updateFilter('sectorId', '');
+            }
+            return;
+        }
+
+        let active = true;
+        void locationApi.getCities(currentProvince)
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+
+                const nextCities = (response.data || []) as City[];
+                setCities(nextCities);
+
+                if (currentCity && !nextCities.some((city) => city.id === currentCity)) {
+                    updateFilter('cityId', '');
+                }
+            })
+            .catch(() => {
+                if (active) {
+                    setCities([]);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [currentProvince, currentCity, currentSector, updateFilter]);
+
+    useEffect(() => {
+        if (!currentCity) {
+            setSectors([]);
+            if (currentSector) {
+                updateFilter('sectorId', '');
+            }
+            return;
+        }
+
+        let active = true;
+        void locationApi.getSectors(currentCity)
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+
+                const nextSectors = (response.data || []) as Sector[];
+                setSectors(nextSectors);
+
+                if (currentSector && !nextSectors.some((sector) => sector.id === currentSector)) {
+                    updateFilter('sectorId', '');
+                }
+            })
+            .catch(() => {
+                if (active) {
+                    setSectors([]);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [currentCity, currentSector, updateFilter]);
 
     const handleToggleFavorite = async (event: React.MouseEvent<HTMLButtonElement>, businessId: string) => {
         event.preventDefault();
@@ -581,9 +705,9 @@ export function BusinessesList() {
                                 className="input-field text-sm"
                             >
                                 <option value="">Todas las categorías</option>
-                                {categories.map((cat) => (
+                                {categoryOptions.map((cat) => (
                                     <option key={cat.id} value={cat.id}>
-                                        {cat.icon} {cat.name}
+                                        {cat.parent?.name ? `${cat.parent.name} / ` : ''}{cat.icon} {cat.name}
                                     </option>
                                 ))}
                             </select>
@@ -608,6 +732,42 @@ export function BusinessesList() {
                         </div>
 
                         <div className="mb-5">
+                            <label htmlFor="businesses-city" className="text-sm font-medium text-gray-600 mb-1.5 block">Ciudad</label>
+                            <select
+                                id="businesses-city"
+                                value={currentCity}
+                                onChange={(e) => updateFilter('cityId', e.target.value)}
+                                disabled={!currentProvince}
+                                className="input-field text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                            >
+                                <option value="">{currentProvince ? 'Todas las ciudades' : 'Selecciona una provincia'}</option>
+                                {cities.map((city) => (
+                                    <option key={city.id} value={city.id}>
+                                        {city.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mb-5">
+                            <label htmlFor="businesses-sector" className="text-sm font-medium text-gray-600 mb-1.5 block">Sector</label>
+                            <select
+                                id="businesses-sector"
+                                value={currentSector}
+                                onChange={(e) => updateFilter('sectorId', e.target.value)}
+                                disabled={!currentCity || sectors.length === 0}
+                                className="input-field text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                            >
+                                <option value="">{currentCity ? 'Todos los sectores' : 'Selecciona una ciudad'}</option>
+                                {sectors.map((sector) => (
+                                    <option key={sector.id} value={sector.id}>
+                                        {sector.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mb-5">
                             <label htmlFor="businesses-feature" className="text-sm font-medium text-gray-600 mb-1.5 block">Intencion / servicio</label>
                             <input
                                 id="businesses-feature"
@@ -618,6 +778,15 @@ export function BusinessesList() {
                                 className="input-field text-sm"
                             />
                         </div>
+
+                        <label className="mb-5 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={currentOpenNow}
+                                onChange={(event) => updateFilter('openNow', event.target.checked ? 'true' : '')}
+                            />
+                            Mostrar solo negocios abiertos ahora
+                        </label>
 
                         <button
                             onClick={() => {
@@ -642,6 +811,10 @@ export function BusinessesList() {
                             <h1 className="font-display text-2xl font-bold text-gray-900">
                                 {activeIntent
                                     ? activeIntent.label
+                                    : activeCity && activeCategory
+                                        ? `${activeCategory.name} en ${activeCity.name}`
+                                        : activeCity
+                                            ? `Negocios en ${activeCity.name}`
                                     : activeCategory && activeProvince
                                     ? `${activeCategory.name} en ${activeProvince.name}`
                                     : activeCategory
@@ -650,7 +823,11 @@ export function BusinessesList() {
                                             ? `Negocios en ${activeProvince.name}`
                                             : 'Negocios'}
                             </h1>
-                            <p className="text-sm text-gray-500">{total} resultados encontrados</p>
+                            <p className="text-sm text-gray-500">
+                                {total} resultados encontrados
+                                {activeSector ? ` en ${activeSector.name}` : ''}
+                                {currentOpenNow ? ' . Solo abiertos ahora.' : ''}
+                            </p>
                         </div>
                     </div>
 
@@ -701,7 +878,8 @@ export function BusinessesList() {
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 {businesses.map((biz) => {
                                     const trust = trustByBusinessId.get(biz.id);
                                     const businessPath = `/businesses/${biz.slug || biz.id}`;
@@ -735,7 +913,7 @@ export function BusinessesList() {
                                                 <div className="flex gap-1.5">
                                                     {biz.categories?.slice(0, 2).map((bc, i) => (
                                                         <span key={i} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full font-medium">
-                                                            {bc.category.icon} {bc.category.name}
+                                                            {bc.category.icon} {bc.category.parent?.name ? `${bc.category.parent.name} / ` : ''}{bc.category.name}
                                                         </span>
                                                     ))}
                                                 </div>
@@ -769,6 +947,32 @@ export function BusinessesList() {
                                             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                                 📍 {biz.province?.name || biz.address}
                                             </p>
+                                            {(biz.city?.name || biz.sector?.name) ? (
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {[biz.city?.name, biz.sector?.name].filter(Boolean).join(', ')}
+                                                </p>
+                                            ) : null}
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                {biz.openNow !== null && biz.openNow !== undefined && (
+                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                                        biz.openNow
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-gray-100 text-gray-600'
+                                                    }`}>
+                                                        {biz.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
+                                                    </span>
+                                                )}
+                                                {biz.distanceKm ? (
+                                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                                                        {biz.distanceKm.toFixed(1)} km
+                                                    </span>
+                                                ) : null}
+                                                {biz.priceRange ? (
+                                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                                        {businessPriceRangeLabel(biz.priceRange)}
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                             {trust ? (
                                                 <span className={`mt-1 inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                                                     trust.level === 'ALTA'
@@ -781,10 +985,28 @@ export function BusinessesList() {
                                                 </span>
                                             ) : null}
                                             <p className="text-sm text-gray-600 mt-2 line-clamp-2">{biz.description}</p>
+                                            {biz.todayHoursLabel ? (
+                                                <p className="text-xs text-gray-500 mt-2">Hoy: {biz.todayHoursLabel}</p>
+                                            ) : null}
+                                            {biz.profileCompletenessScore !== undefined ? (
+                                                <p className="text-[11px] text-gray-500 mt-1">
+                                                    Ficha {biz.profileCompletenessScore}% completa
+                                                </p>
+                                            ) : null}
                                         </div>
                                     </Link>
                                     );
                                 })}
+                                </div>
+                                <div className="xl:sticky xl:top-24 self-start space-y-3">
+                                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                        <h2 className="font-display text-lg font-semibold text-gray-900">Mapa de resultados</h2>
+                                        <p className="mt-1 text-sm text-gray-500">
+                                            Usa el mapa para validar cercanÃ­a y densidad por zona.
+                                        </p>
+                                    </div>
+                                    <BusinessesMap businesses={businesses} />
+                                </div>
                             </div>
 
                             {/* Pagination */}

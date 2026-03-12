@@ -2,12 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { BusinessHoursEditor } from '../components/BusinessHoursEditor';
 import { OptimizedImage } from '../components/OptimizedImage';
+import {
+    BUSINESS_PRICE_RANGE_OPTIONS,
+    businessPriceRangeLabel,
+    createDefaultBusinessHours,
+    mergeBusinessHours,
+    type BusinessHourEntry,
+} from '../lib/businessProfile';
 
 interface Category {
     id: string;
     name: string;
     icon?: string;
+    parentId?: string | null;
+    parent?: { id: string; name: string } | null;
+    children?: Array<{ id: string }>;
 }
 
 interface Feature {
@@ -25,6 +36,20 @@ interface City {
     name: string;
 }
 
+interface Sector {
+    id: string;
+    name: string;
+}
+
+interface BusinessImage {
+    id: string;
+    url: string;
+    caption?: string | null;
+    sortOrder?: number;
+    isCover?: boolean;
+    type?: 'COVER' | 'GALLERY' | 'MENU' | 'INTERIOR' | 'EXTERIOR';
+}
+
 interface BusinessDetail {
     id: string;
     slug: string;
@@ -32,14 +57,23 @@ interface BusinessDetail {
     description: string;
     phone?: string | null;
     whatsapp?: string | null;
+    website?: string | null;
+    email?: string | null;
+    instagramUrl?: string | null;
+    facebookUrl?: string | null;
+    tiktokUrl?: string | null;
+    priceRange?: string | null;
     address: string;
     latitude?: number | null;
     longitude?: number | null;
     province?: { id: string; name: string } | null;
     city?: { id: string; name: string } | null;
-    categories?: Array<{ category: { id: string; name: string; icon?: string } }>;
+    sector?: { id: string; name: string } | null;
+    categories?: Array<{ category: { id: string; name: string; icon?: string; parent?: { name: string } | null } }>;
     features?: Array<{ feature: { id: string; name: string } }>;
-    images?: Array<{ id: string; url: string }>;
+    images?: BusinessImage[];
+    hours?: BusinessHourEntry[];
+    profileCompletenessScore?: number;
 }
 
 interface EditFormData {
@@ -47,13 +81,21 @@ interface EditFormData {
     description: string;
     phone: string;
     whatsapp: string;
+    website: string;
+    email: string;
+    instagramUrl: string;
+    facebookUrl: string;
+    tiktokUrl: string;
+    priceRange: string;
     address: string;
     provinceId: string;
     cityId: string;
+    sectorId: string;
     latitude: string;
     longitude: string;
     categoryIds: string[];
     featureIds: string[];
+    hours: BusinessHourEntry[];
 }
 
 const EMPTY_FORM: EditFormData = {
@@ -61,13 +103,21 @@ const EMPTY_FORM: EditFormData = {
     description: '',
     phone: '',
     whatsapp: '',
+    website: '',
+    email: '',
+    instagramUrl: '',
+    facebookUrl: '',
+    tiktokUrl: '',
+    priceRange: '',
     address: '',
     provinceId: '',
     cityId: '',
+    sectorId: '',
     latitude: '',
     longitude: '',
     categoryIds: [],
     featureIds: [],
+    hours: createDefaultBusinessHours(),
 };
 
 export function EditBusiness() {
@@ -78,6 +128,7 @@ export function EditBusiness() {
     const [features, setFeatures] = useState<Feature[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [cities, setCities] = useState<City[]>([]);
+    const [sectors, setSectors] = useState<Sector[]>([]);
     const [formData, setFormData] = useState<EditFormData>(EMPTY_FORM);
     const [initialProvinceId, setInitialProvinceId] = useState('');
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -90,6 +141,10 @@ export function EditBusiness() {
     const selectedCategorySet = useMemo(
         () => new Set(formData.categoryIds),
         [formData.categoryIds],
+    );
+    const categoryOptions = useMemo(
+        () => categories.filter((category) => !category.children || category.children.length === 0),
+        [categories],
     );
     const selectedFeatureSet = useMemo(
         () => new Set(formData.featureIds),
@@ -106,6 +161,20 @@ export function EditBusiness() {
             setCities((response.data || []) as City[]);
         } catch {
             setCities([]);
+        }
+    }, []);
+
+    const loadSectors = useCallback(async (cityId: string) => {
+        if (!cityId) {
+            setSectors([]);
+            return;
+        }
+
+        try {
+            const response = await locationApi.getSectors(cityId);
+            setSectors((response.data || []) as Sector[]);
+        } catch {
+            setSectors([]);
         }
     }, []);
 
@@ -140,13 +209,21 @@ export function EditBusiness() {
                 description: payload.description || '',
                 phone: payload.phone || '',
                 whatsapp: payload.whatsapp || '',
+                website: payload.website || '',
+                email: payload.email || '',
+                instagramUrl: payload.instagramUrl || '',
+                facebookUrl: payload.facebookUrl || '',
+                tiktokUrl: payload.tiktokUrl || '',
+                priceRange: payload.priceRange || '',
                 address: payload.address || '',
                 provinceId: payload.province?.id || '',
                 cityId: payload.city?.id || '',
+                sectorId: payload.sector?.id || '',
                 latitude: typeof payload.latitude === 'number' ? String(payload.latitude) : '',
                 longitude: typeof payload.longitude === 'number' ? String(payload.longitude) : '',
                 categoryIds: (payload.categories || []).map((entry) => entry.category.id),
                 featureIds: (payload.features || []).map((entry) => entry.feature.id),
+                hours: mergeBusinessHours(payload.hours),
             };
 
             setBusiness(payload);
@@ -161,13 +238,19 @@ export function EditBusiness() {
             } else {
                 setCities([]);
             }
+
+            if (nextForm.cityId) {
+                await loadSectors(nextForm.cityId);
+            } else {
+                setSectors([]);
+            }
         } catch (error) {
             setBusiness(null);
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la edición del negocio'));
         } finally {
             setLoading(false);
         }
-    }, [businessId, loadCities]);
+    }, [businessId, loadCities, loadSectors]);
 
     useEffect(() => {
         void loadData();
@@ -176,10 +259,20 @@ export function EditBusiness() {
     useEffect(() => {
         if (!formData.provinceId) {
             setCities([]);
+            setSectors([]);
             return;
         }
         void loadCities(formData.provinceId);
     }, [formData.provinceId, loadCities]);
+
+    useEffect(() => {
+        if (!formData.cityId) {
+            setSectors([]);
+            return;
+        }
+
+        void loadSectors(formData.cityId);
+    }, [formData.cityId, loadSectors]);
 
     const toggleCategory = (categoryId: string) => {
         setFormData((previous) => {
@@ -254,6 +347,30 @@ export function EditBusiness() {
         }
     };
 
+    const handleUpdateImageMetadata = async (
+        imageId: string,
+        data: {
+            caption?: string | null;
+            sortOrder?: number;
+            isCover?: boolean;
+            type?: 'COVER' | 'GALLERY' | 'MENU' | 'INTERIOR' | 'EXTERIOR';
+        },
+    ) => {
+        setSaving(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await uploadApi.updateBusinessImage(imageId, data);
+            await loadData();
+            setSuccessMessage('Metadata de imagen actualizada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar la imagen'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const validateForm = (): string | null => {
         if (formData.name.trim().length < 3) {
             return 'El nombre debe tener al menos 3 caracteres';
@@ -272,6 +389,9 @@ export function EditBusiness() {
         }
         if (formData.provinceId !== initialProvinceId && !formData.cityId) {
             return 'Si cambias la provincia, selecciona una ciudad para completar la actualizacion';
+        }
+        if (formData.cityId && sectors.length > 0 && !formData.sectorId) {
+            return 'Selecciona un sector para mejorar la ubicacion del negocio';
         }
         if (formData.latitude.trim()) {
             const latitude = Number.parseFloat(formData.latitude);
@@ -313,6 +433,12 @@ export function EditBusiness() {
                 provinceId: formData.provinceId,
                 categoryIds: formData.categoryIds,
                 featureIds: formData.featureIds,
+                hours: formData.hours.map((entry) => ({
+                    dayOfWeek: entry.dayOfWeek,
+                    opensAt: entry.closed ? undefined : entry.opensAt,
+                    closesAt: entry.closed ? undefined : entry.closesAt,
+                    closed: entry.closed,
+                })),
             };
 
             if (formData.phone.trim()) {
@@ -321,8 +447,29 @@ export function EditBusiness() {
             if (formData.whatsapp.trim()) {
                 payload.whatsapp = formData.whatsapp.trim();
             }
+            if (formData.website.trim()) {
+                payload.website = formData.website.trim();
+            }
+            if (formData.email.trim()) {
+                payload.email = formData.email.trim();
+            }
+            if (formData.instagramUrl.trim()) {
+                payload.instagramUrl = formData.instagramUrl.trim();
+            }
+            if (formData.facebookUrl.trim()) {
+                payload.facebookUrl = formData.facebookUrl.trim();
+            }
+            if (formData.tiktokUrl.trim()) {
+                payload.tiktokUrl = formData.tiktokUrl.trim();
+            }
+            if (formData.priceRange) {
+                payload.priceRange = formData.priceRange;
+            }
             if (formData.cityId) {
                 payload.cityId = formData.cityId;
+            }
+            if (formData.sectorId) {
+                payload.sectorId = formData.sectorId;
             }
             if (formData.latitude.trim()) {
                 payload.latitude = Number.parseFloat(formData.latitude);
@@ -475,6 +622,96 @@ export function EditBusiness() {
                             }
                         />
                     </div>
+                    <div>
+                        <label htmlFor="edit-business-website" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Website
+                        </label>
+                        <input
+                            id="edit-business-website"
+                            type="url"
+                            className="input-field"
+                            value={formData.website}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, website: event.target.value }))
+                            }
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="edit-business-email" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Email
+                        </label>
+                        <input
+                            id="edit-business-email"
+                            type="email"
+                            className="input-field"
+                            value={formData.email}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, email: event.target.value }))
+                            }
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="edit-business-instagram" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Instagram
+                        </label>
+                        <input
+                            id="edit-business-instagram"
+                            type="url"
+                            className="input-field"
+                            value={formData.instagramUrl}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, instagramUrl: event.target.value }))
+                            }
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="edit-business-facebook" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Facebook
+                        </label>
+                        <input
+                            id="edit-business-facebook"
+                            type="url"
+                            className="input-field"
+                            value={formData.facebookUrl}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, facebookUrl: event.target.value }))
+                            }
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="edit-business-tiktok" className="text-sm font-medium text-gray-700 mb-1 block">
+                            TikTok
+                        </label>
+                        <input
+                            id="edit-business-tiktok"
+                            type="url"
+                            className="input-field"
+                            value={formData.tiktokUrl}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, tiktokUrl: event.target.value }))
+                            }
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="edit-business-price-range" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Rango de precio
+                        </label>
+                        <select
+                            id="edit-business-price-range"
+                            className="input-field"
+                            value={formData.priceRange}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, priceRange: event.target.value }))
+                            }
+                        >
+                            <option value="">Sin definir</option>
+                            {BUSINESS_PRICE_RANGE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="md:col-span-2">
                         <label htmlFor="edit-business-address" className="text-sm font-medium text-gray-700 mb-1 block">
                             Dirección *
@@ -501,6 +738,7 @@ export function EditBusiness() {
                                     ...previous,
                                     provinceId: event.target.value,
                                     cityId: '',
+                                    sectorId: '',
                                 }))
                             }
                         >
@@ -521,7 +759,11 @@ export function EditBusiness() {
                             className="input-field"
                             value={formData.cityId}
                             onChange={(event) =>
-                                setFormData((previous) => ({ ...previous, cityId: event.target.value }))
+                                setFormData((previous) => ({
+                                    ...previous,
+                                    cityId: event.target.value,
+                                    sectorId: '',
+                                }))
                             }
                             disabled={!formData.provinceId}
                         >
@@ -529,6 +771,27 @@ export function EditBusiness() {
                             {cities.map((city) => (
                                 <option key={city.id} value={city.id}>
                                     {city.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="edit-business-sector" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Sector o barrio
+                        </label>
+                        <select
+                            id="edit-business-sector"
+                            className="input-field"
+                            value={formData.sectorId}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, sectorId: event.target.value }))
+                            }
+                            disabled={!formData.cityId || sectors.length === 0}
+                        >
+                            <option value="">{formData.cityId ? 'Seleccionar...' : 'Primero elige una ciudad'}</option>
+                            {sectors.map((sector) => (
+                                <option key={sector.id} value={sector.id}>
+                                    {sector.name}
                                 </option>
                             ))}
                         </select>
@@ -568,7 +831,7 @@ export function EditBusiness() {
                 <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">Categorías *</p>
                     <div className="flex flex-wrap gap-2">
-                        {categories.map((category) => (
+                        {categoryOptions.map((category) => (
                             <button
                                 key={category.id}
                                 type="button"
@@ -580,6 +843,7 @@ export function EditBusiness() {
                                 }`}
                             >
                                 {category.icon ? `${category.icon} ` : ''}
+                                {category.parent?.name ? `${category.parent.name} / ` : ''}
                                 {category.name}
                             </button>
                         ))}
@@ -609,6 +873,27 @@ export function EditBusiness() {
                     </p>
                 </div>
 
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                        <div>
+                            <h2 className="font-display text-lg font-semibold text-gray-900">Horarios del negocio</h2>
+                            <p className="text-sm text-gray-600">
+                                La ficha pÃºblica y el filtro abierto ahora dependen de estos horarios.
+                            </p>
+                        </div>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200">
+                            Completitud: {business.profileCompletenessScore ?? 0}%
+                        </span>
+                    </div>
+                    <BusinessHoursEditor
+                        hours={formData.hours}
+                        onChange={(hours) => setFormData((previous) => ({ ...previous, hours }))}
+                    />
+                    <p className="mt-3 text-xs text-gray-500">
+                        Precio actual: {businessPriceRangeLabel(formData.priceRange) || 'Sin definir'}.
+                    </p>
+                </div>
+
                 <div className="space-y-4 rounded-xl border border-gray-100 p-4">
                     <div>
                         <h2 className="font-display text-lg font-semibold text-gray-900">Imágenes del negocio</h2>
@@ -630,12 +915,75 @@ export function EditBusiness() {
                                             decoding="async"
                                         />
                                     </div>
-                                    <div className="p-2">
+                                    <div className="p-3 space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${
+                                                image.isCover
+                                                    ? 'bg-primary-100 text-primary-700'
+                                                    : 'bg-gray-100 text-gray-600'
+                                            }`}>
+                                                {image.isCover ? 'Portada' : (image.type || 'GALLERY')}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                className="text-xs font-medium text-primary-700 hover:text-primary-800"
+                                                onClick={() => void handleUpdateImageMetadata(image.id, { isCover: true, type: 'COVER' })}
+                                                disabled={saving || image.isCover}
+                                            >
+                                                {image.isCover ? 'Principal' : 'Hacer portada'}
+                                            </button>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            className="input-field text-xs"
+                                            placeholder="Caption corto"
+                                            defaultValue={image.caption || ''}
+                                            onBlur={(event) => {
+                                                const nextCaption = event.target.value.trim();
+                                                if ((image.caption || '') !== nextCaption) {
+                                                    void handleUpdateImageMetadata(image.id, {
+                                                        caption: nextCaption || null,
+                                                    });
+                                                }
+                                            }}
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="input-field text-xs"
+                                                defaultValue={image.sortOrder ?? 0}
+                                                onBlur={(event) => {
+                                                    const nextSortOrder = Number.parseInt(event.target.value, 10);
+                                                    if (Number.isFinite(nextSortOrder) && nextSortOrder !== (image.sortOrder ?? 0)) {
+                                                        void handleUpdateImageMetadata(image.id, { sortOrder: nextSortOrder });
+                                                    }
+                                                }}
+                                            />
+                                            <select
+                                                className="input-field text-xs"
+                                                value={image.type || 'GALLERY'}
+                                                onChange={(event) => {
+                                                    const nextType = event.target.value as 'COVER' | 'GALLERY' | 'MENU' | 'INTERIOR' | 'EXTERIOR';
+                                                    void handleUpdateImageMetadata(image.id, {
+                                                        type: nextType,
+                                                        isCover: nextType === 'COVER',
+                                                    });
+                                                }}
+                                                disabled={saving}
+                                            >
+                                                <option value="GALLERY">Galeria</option>
+                                                <option value="MENU">Menu</option>
+                                                <option value="INTERIOR">Interior</option>
+                                                <option value="EXTERIOR">Exterior</option>
+                                                <option value="COVER">Portada</option>
+                                            </select>
+                                        </div>
                                         <button
                                             type="button"
                                             className="w-full rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"
                                             onClick={() => void handleDeleteImage(image.id)}
-                                            disabled={deletingImageId === image.id}
+                                            disabled={deletingImageId === image.id || saving}
                                         >
                                             {deletingImageId === image.id ? 'Eliminando...' : 'Eliminar'}
                                         </button>

@@ -2,13 +2,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
+import { BusinessHoursEditor } from '../components/BusinessHoursEditor';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
+import {
+    BUSINESS_PRICE_RANGE_OPTIONS,
+    businessPriceRangeLabel,
+    createDefaultBusinessHours,
+    type BusinessHourEntry,
+} from '../lib/businessProfile';
 
 interface Category {
     id: string;
     name: string;
     icon?: string;
+    parentId?: string | null;
+    parent?: { id: string; name: string } | null;
+    children?: Array<{ id: string }>;
 }
 
 interface Feature {
@@ -22,6 +32,11 @@ interface Province {
 }
 
 interface City {
+    id: string;
+    name: string;
+}
+
+interface Sector {
     id: string;
     name: string;
 }
@@ -47,6 +62,7 @@ export function RegisterBusiness() {
     const [features, setFeatures] = useState<Feature[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
     const [cities, setCities] = useState<City[]>([]);
+    const [sectors, setSectors] = useState<Sector[]>([]);
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadingData, setLoadingData] = useState(true);
@@ -58,18 +74,30 @@ export function RegisterBusiness() {
         description: '',
         phone: '',
         whatsapp: '',
+        website: '',
+        email: '',
+        instagramUrl: '',
+        facebookUrl: '',
+        tiktokUrl: '',
+        priceRange: '',
         address: '',
         provinceId: '',
         cityId: '',
+        sectorId: '',
         latitude: '',
         longitude: '',
         categoryIds: [] as string[],
         featureIds: [] as string[],
+        hours: createDefaultBusinessHours() as BusinessHourEntry[],
     });
 
     const progressPercentage = useMemo(
         () => Math.round((currentStep / TOTAL_STEPS) * 100),
         [currentStep],
+    );
+    const categoryOptions = useMemo(
+        () => categories.filter((category) => !category.children || category.children.length === 0),
+        [categories],
     );
 
     useEffect(() => {
@@ -79,11 +107,22 @@ export function RegisterBusiness() {
     useEffect(() => {
         if (!formData.provinceId) {
             setCities([]);
-            setFormData((previous) => ({ ...previous, cityId: '' }));
+            setSectors([]);
+            setFormData((previous) => ({ ...previous, cityId: '', sectorId: '' }));
             return;
         }
         void loadCities(formData.provinceId);
     }, [formData.provinceId]);
+
+    useEffect(() => {
+        if (!formData.cityId) {
+            setSectors([]);
+            setFormData((previous) => ({ ...previous, sectorId: '' }));
+            return;
+        }
+
+        void loadSectors(formData.cityId);
+    }, [formData.cityId]);
 
     const loadFormData = async () => {
         setLoadingData(true);
@@ -109,6 +148,15 @@ export function RegisterBusiness() {
             setCities(res.data || []);
         } catch (err: unknown) {
             setError(getApiErrorMessage(err, 'No se pudieron cargar las ciudades'));
+        }
+    };
+
+    const loadSectors = async (cityId: string) => {
+        try {
+            const res = await locationApi.getSectors(cityId);
+            setSectors(res.data || []);
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, 'No se pudieron cargar los sectores'));
         }
     };
 
@@ -146,6 +194,9 @@ export function RegisterBusiness() {
             }
             if (!formData.provinceId) {
                 return 'Debes seleccionar una provincia';
+            }
+            if (formData.cityId && sectors.length > 0 && !formData.sectorId) {
+                return 'Selecciona un sector para mejorar el discovery local';
             }
         }
 
@@ -242,11 +293,24 @@ export function RegisterBusiness() {
                 address: formData.address.trim(),
                 provinceId: formData.provinceId,
                 categoryIds: formData.categoryIds,
+                hours: formData.hours.map((entry) => ({
+                    dayOfWeek: entry.dayOfWeek,
+                    opensAt: entry.closed ? undefined : entry.opensAt,
+                    closesAt: entry.closed ? undefined : entry.closesAt,
+                    closed: entry.closed,
+                })),
             };
 
             if (formData.phone.trim()) payload.phone = formData.phone.trim();
             if (formData.whatsapp.trim()) payload.whatsapp = formData.whatsapp.trim();
+            if (formData.website.trim()) payload.website = formData.website.trim();
+            if (formData.email.trim()) payload.email = formData.email.trim();
+            if (formData.instagramUrl.trim()) payload.instagramUrl = formData.instagramUrl.trim();
+            if (formData.facebookUrl.trim()) payload.facebookUrl = formData.facebookUrl.trim();
+            if (formData.tiktokUrl.trim()) payload.tiktokUrl = formData.tiktokUrl.trim();
+            if (formData.priceRange) payload.priceRange = formData.priceRange;
             if (formData.cityId) payload.cityId = formData.cityId;
+            if (formData.sectorId) payload.sectorId = formData.sectorId;
             if (formData.featureIds.length > 0) payload.featureIds = formData.featureIds;
 
             if (formData.latitude.trim()) {
@@ -396,8 +460,103 @@ export function RegisterBusiness() {
                             placeholder="+1 809-555-0000"
                         />
                     </div>
+                    <div>
+                        <label htmlFor="register-business-website" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Website
+                        </label>
+                        <input
+                            id="register-business-website"
+                            type="url"
+                            value={formData.website}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, website: event.target.value }))
+                            }
+                            className="input-field"
+                            placeholder="https://negocio.do"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="register-business-email" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Email
+                        </label>
+                        <input
+                            id="register-business-email"
+                            type="email"
+                            value={formData.email}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, email: event.target.value }))
+                            }
+                            className="input-field"
+                            placeholder="hola@negocio.do"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="register-business-price-range" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Rango de precio
+                        </label>
+                        <select
+                            id="register-business-price-range"
+                            value={formData.priceRange}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, priceRange: event.target.value }))
+                            }
+                            className="input-field"
+                        >
+                            <option value="">Sin definir</option>
+                            {BUSINESS_PRICE_RANGE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="register-business-instagram" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Instagram
+                        </label>
+                        <input
+                            id="register-business-instagram"
+                            type="url"
+                            value={formData.instagramUrl}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, instagramUrl: event.target.value }))
+                            }
+                            className="input-field"
+                            placeholder="https://instagram.com/tu-negocio"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="register-business-facebook" className="text-sm font-medium text-gray-700 mb-1 block">
+                            Facebook
+                        </label>
+                        <input
+                            id="register-business-facebook"
+                            type="url"
+                            value={formData.facebookUrl}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, facebookUrl: event.target.value }))
+                            }
+                            className="input-field"
+                            placeholder="https://facebook.com/tu-negocio"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="register-business-tiktok" className="text-sm font-medium text-gray-700 mb-1 block">
+                            TikTok
+                        </label>
+                        <input
+                            id="register-business-tiktok"
+                            type="url"
+                            value={formData.tiktokUrl}
+                            onChange={(event) =>
+                                setFormData((previous) => ({ ...previous, tiktokUrl: event.target.value }))
+                            }
+                            className="input-field"
+                            placeholder="https://tiktok.com/@tu-negocio"
+                        />
+                    </div>
                     <p className="sm:col-span-2 text-xs text-gray-500">
-                        Recomendado: completa al menos WhatsApp para mejorar conversiones.
+                        Completa al menos WhatsApp, website o email para que la ficha sea util desde el primer dia.
                     </p>
                 </div>
             );
@@ -434,6 +593,7 @@ export function RegisterBusiness() {
                                         ...previous,
                                         provinceId: event.target.value,
                                         cityId: '',
+                                        sectorId: '',
                                     }))
                                 }
                                 className="input-field"
@@ -454,7 +614,11 @@ export function RegisterBusiness() {
                                 id="register-business-city"
                                 value={formData.cityId}
                                 onChange={(event) =>
-                                    setFormData((previous) => ({ ...previous, cityId: event.target.value }))
+                                    setFormData((previous) => ({
+                                        ...previous,
+                                        cityId: event.target.value,
+                                        sectorId: '',
+                                    }))
                                 }
                                 className="input-field"
                                 disabled={!formData.provinceId}
@@ -466,6 +630,30 @@ export function RegisterBusiness() {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label htmlFor="register-business-sector" className="text-sm font-medium text-gray-700 mb-1 block">
+                                Sector o barrio
+                            </label>
+                            <select
+                                id="register-business-sector"
+                                value={formData.sectorId}
+                                onChange={(event) =>
+                                    setFormData((previous) => ({ ...previous, sectorId: event.target.value }))
+                                }
+                                className="input-field"
+                                disabled={!formData.cityId || sectors.length === 0}
+                            >
+                                <option value="">{formData.cityId ? 'Seleccionar...' : 'Primero elige una ciudad'}</option>
+                                {sectors.map((sector) => (
+                                    <option key={sector.id} value={sector.id}>
+                                        {sector.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Esta granularidad mejora discovery por zona y resultados cercanos.
+                            </p>
                         </div>
                     </div>
 
@@ -528,7 +716,7 @@ export function RegisterBusiness() {
                 <div>
                     <h3 className="text-sm font-medium text-gray-700 mb-2">Selecciona una o varias categorías *</h3>
                     <div className="flex flex-wrap gap-2">
-                        {categories.map((category) => (
+                        {categoryOptions.map((category) => (
                             <button
                                 key={category.id}
                                 type="button"
@@ -540,6 +728,7 @@ export function RegisterBusiness() {
                                 }`}
                             >
                                 {category.icon ? `${category.icon} ` : ''}
+                                {category.parent?.name ? `${category.parent.name} / ` : ''}
                                 {category.name}
                             </button>
                         ))}
@@ -573,12 +762,26 @@ export function RegisterBusiness() {
                 </div>
 
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <h3 className="font-medium text-gray-900 mb-2">Horarios</h3>
+                    <p className="mb-3 text-xs text-gray-500">
+                        Define horarios reales. Esta informaciÃ³n alimenta filtros como "abierto ahora".
+                    </p>
+                    <BusinessHoursEditor
+                        hours={formData.hours}
+                        onChange={(hours) => setFormData((previous) => ({ ...previous, hours }))}
+                    />
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                     <h3 className="font-medium text-gray-900 mb-2">Resumen antes de publicar</h3>
                     <ul className="text-sm text-gray-600 space-y-1">
                         <li><strong>Nombre:</strong> {formData.name || 'Sin definir'}</li>
                         <li><strong>Provincia:</strong> {provinces.find((province) => province.id === formData.provinceId)?.name || 'Sin definir'}</li>
                         <li><strong>Ciudad:</strong> {cities.find((city) => city.id === formData.cityId)?.name || 'Sin definir'}</li>
+                        <li><strong>Sector:</strong> {sectors.find((sector) => sector.id === formData.sectorId)?.name || 'Sin definir'}</li>
                         <li><strong>Contacto:</strong> {formData.whatsapp || formData.phone || 'Sin definir'}</li>
+                        <li><strong>Website:</strong> {formData.website || 'Sin definir'}</li>
+                        <li><strong>Precio:</strong> {businessPriceRangeLabel(formData.priceRange) || 'Sin definir'}</li>
                         <li><strong>Reservas:</strong> {features
                             .filter((feature) => formData.featureIds.includes(feature.id))
                             .some((feature) => feature.name.trim().toLowerCase() === BOOKING_FEATURE_CANONICAL)

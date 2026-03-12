@@ -1,5 +1,5 @@
 import {
-    Controller, Get, Post, Put, Delete, Body, Param, ParseUUIDPipe, Query, UseGuards, Inject,
+    Controller, Get, Post, Put, Delete, Body, Param, ParseUUIDPipe, Query, UseGuards, Inject, Headers,
 } from '@nestjs/common';
 import { isUUID } from 'class-validator';
 import { BusinessesService } from './businesses.service';
@@ -10,6 +10,7 @@ import {
     NearbyQueryDto,
     CreatePublicLeadDto,
     DeleteBusinessDto,
+    CatalogQualityQueryDto,
 } from './dto/business.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -37,8 +38,16 @@ export class BusinessesController {
 
     @Get()
     @PublicCache({ maxAgeSeconds: 45, staleWhileRevalidateSeconds: 300 })
-    async findAll(@Query() query: BusinessQueryDto) {
-        return this.businessesService.findAll(query);
+    async findAll(
+        @Query() query: BusinessQueryDto,
+        @Headers('x-visitor-id') visitorId?: string,
+        @Headers('x-session-id') sessionId?: string,
+    ) {
+        return this.businessesService.findAll(query, {
+            visitorId,
+            sessionId,
+            source: 'api.businesses.list',
+        });
     }
 
     @Get('nearby')
@@ -63,6 +72,13 @@ export class BusinessesController {
     @Roles('ADMIN')
     async findAllAdmin(@Query() query: BusinessQueryDto) {
         return this.businessesService.findAllAdmin(query);
+    }
+
+    @Get('admin/catalog-quality')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async getCatalogQuality(@Query() query: CatalogQualityQueryDto) {
+        return this.businessesService.getCatalogQuality(query.limit);
     }
 
     @Get(':identifier')

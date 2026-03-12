@@ -275,6 +275,52 @@ async function main() {
     }
     console.log(`✅ ${dominicanLocalCategories.length} Dominican local categories ensured`);
 
+    const additionalDominicanLocalCategories = [
+        { name: 'Pica Pollos', slug: 'pica-pollos', icon: 'PP' },
+        { name: 'Talleres', slug: 'talleres', icon: 'TL' },
+        { name: 'Consultorios', slug: 'consultorios', icon: 'CS' },
+        { name: 'Mini Markets', slug: 'mini-markets', icon: 'MM' },
+    ];
+
+    for (const category of additionalDominicanLocalCategories) {
+        await prisma.category.upsert({
+            where: { slug: category.slug },
+            update: {
+                name: category.name,
+                icon: category.icon,
+            },
+            create: category,
+        });
+    }
+    console.log(`âœ… ${additionalDominicanLocalCategories.length} additional local categories ensured`);
+
+    const categoryParentAssignments = [
+        { parentSlug: 'restaurantes', childSlug: 'colmados' },
+        { parentSlug: 'restaurantes', childSlug: 'pica-pollos' },
+        { parentSlug: 'salud', childSlug: 'farmacias' },
+        { parentSlug: 'salud', childSlug: 'consultorios' },
+        { parentSlug: 'belleza', childSlug: 'salones-barberias' },
+        { parentSlug: 'construccion', childSlug: 'ferreterias' },
+        { parentSlug: 'automotriz', childSlug: 'talleres' },
+        { parentSlug: 'tiendas', childSlug: 'mini-markets' },
+    ] as const;
+
+    for (const assignment of categoryParentAssignments) {
+        const parent = await prisma.category.findUnique({
+            where: { slug: assignment.parentSlug },
+            select: { id: true },
+        });
+        if (!parent) {
+            continue;
+        }
+
+        await prisma.category.update({
+            where: { slug: assignment.childSlug },
+            data: { parentId: parent.id },
+        });
+    }
+    console.log(`âœ… ${categoryParentAssignments.length} category parent relationships ensured`);
+
     // Create provinces
     const provincesFromApi = await loadProvincesFromAdministrativeDivisionsDb();
     const provinces = provincesFromApi ?? [...PROVINCES_FALLBACK];
@@ -315,13 +361,85 @@ async function main() {
                             name: cityName,
                         },
                     },
-                    update: {},
-                    create: { name: cityName, provinceId },
+                    update: { slug: toSlug(cityName) },
+                    create: { name: cityName, slug: toSlug(cityName), provinceId },
                 });
             }
         }
     }
     console.log('✅ Cities created');
+
+    const sectorsData: Array<{ provinceName: string; cityName: string; sectors: string[] }> = [
+        {
+            provinceName: 'Distrito Nacional',
+            cityName: 'Santo Domingo de GuzmÃ¡n',
+            sectors: ['Piantini', 'Naco', 'Gazcue', 'Zona Colonial', 'Bella Vista'],
+        },
+        {
+            provinceName: 'Santo Domingo',
+            cityName: 'Santo Domingo Este',
+            sectors: ['Ensanche Ozama', 'Los Mina', 'Alma Rosa', 'Ciudad Juan Bosch'],
+        },
+        {
+            provinceName: 'Santo Domingo',
+            cityName: 'Santo Domingo Oeste',
+            sectors: ['Herrera', 'Las Caobas', 'Buenos Aires de Herrera'],
+        },
+        {
+            provinceName: 'Santiago',
+            cityName: 'Santiago de los Caballeros',
+            sectors: ['Los Jardines Metropolitanos', 'Pontezuela', 'Cerros de Gurabo', 'Bella Vista'],
+        },
+        {
+            provinceName: 'La Altagracia',
+            cityName: 'Punta Cana',
+            sectors: ['Bavaro', 'Veron', 'Cap Cana', 'Cocotal'],
+        },
+        {
+            provinceName: 'Puerto Plata',
+            cityName: 'Cabarete',
+            sectors: ['El Callejon', 'ProCab', 'Encuentro'],
+        },
+    ];
+
+    for (const sectorGroup of sectorsData) {
+        const provinceId = createdProvincesBySlug[toSlug(sectorGroup.provinceName)];
+        if (!provinceId) {
+            continue;
+        }
+
+        const city = await prisma.city.findUnique({
+            where: {
+                provinceId_name: {
+                    provinceId,
+                    name: sectorGroup.cityName,
+                },
+            },
+            select: { id: true },
+        });
+
+        if (!city) {
+            continue;
+        }
+
+        for (const sectorName of sectorGroup.sectors) {
+            await prisma.sector.upsert({
+                where: {
+                    cityId_name: {
+                        cityId: city.id,
+                        name: sectorName,
+                    },
+                },
+                update: { slug: toSlug(sectorName) },
+                create: {
+                    cityId: city.id,
+                    name: sectorName,
+                    slug: toSlug(sectorName),
+                },
+            });
+        }
+    }
+    console.log(`âœ… ${sectorsData.length} city sector groups created`);
 
     // Create features
     const features = [

@@ -1,5 +1,5 @@
 import {
-    Controller, Post, Delete, UseGuards, UseInterceptors,
+    Controller, Post, Delete, Patch, UseGuards, UseInterceptors,
     UploadedFile, Body, Param, ParseUUIDPipe, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator, Inject,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -7,6 +7,7 @@ import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UploadBusinessImageDto } from './dto/upload-business-image.dto';
+import { UpdateBusinessImageDto } from './dto/update-business-image.dto';
 import { CurrentOrganization } from '../organizations/decorators/current-organization.decorator';
 import { OrgRoles } from '../organizations/decorators/org-roles.decorator';
 import { OrgContextGuard } from '../organizations/guards/org-context.guard';
@@ -62,6 +63,27 @@ export class UploadsController {
     ) {
         return this.uploadsService.deleteBusinessImage(
             imageId,
+            userId,
+            userRole,
+            organizationId,
+            organizationRole,
+        );
+    }
+
+    @Patch('business-image/:imageId')
+    @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+    @OrgRoles('OWNER', 'MANAGER')
+    async updateBusinessImage(
+        @Param('imageId', new ParseUUIDPipe()) imageId: string,
+        @Body() dto: UpdateBusinessImageDto,
+        @CurrentUser('id') userId: string,
+        @CurrentUser('role') userRole: string,
+        @CurrentOrganization('organizationId') organizationId: string,
+        @CurrentOrganization('organizationRole') organizationRole: OrganizationRole,
+    ) {
+        return this.uploadsService.updateBusinessImageMetadata(
+            imageId,
+            dto,
             userId,
             userRole,
             organizationId,
