@@ -20,6 +20,7 @@ interface AuthContextType {
     refreshToken: string | null;
     loading: boolean;
     login: (email: string, password: string, twoFactorCode?: string) => Promise<void>;
+    loginWithGoogle: (idToken: string, role?: 'USER' | 'BUSINESS_OWNER', twoFactorCode?: string) => Promise<void>;
     register: (
         name: string,
         email: string,
@@ -162,6 +163,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const loginWithGoogle = async (
+        idToken: string,
+        role?: 'USER' | 'BUSINESS_OWNER',
+        twoFactorCode?: string,
+    ) => {
+        const response = await authApi.loginWithGoogle({ idToken, role, twoFactorCode });
+        const { accessToken, user: userData } = response.data;
+        applySession({
+            accessToken,
+            user: userData,
+        });
+    };
+
     const register = async (
         name: string,
         email: string,
@@ -194,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 refreshToken: null,
                 loading,
                 login,
+                loginWithGoogle,
                 register,
                 refreshProfile,
                 logout,

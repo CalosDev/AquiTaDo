@@ -10,6 +10,8 @@ const CustomerDashboard = lazy(async () => ({ default: (await pageLoaders.custom
 const BusinessesList = lazy(async () => ({ default: (await pageLoaders.businessesList()).BusinessesList }));
 const BusinessDetails = lazy(async () => ({ default: (await pageLoaders.businessDetails()).BusinessDetails }));
 const Login = lazy(async () => ({ default: (await pageLoaders.login()).Login }));
+const ForgotPassword = lazy(async () => ({ default: (await pageLoaders.forgotPassword()).ForgotPassword }));
+const ResetPassword = lazy(async () => ({ default: (await pageLoaders.resetPassword()).ResetPassword }));
 const Register = lazy(async () => ({ default: (await pageLoaders.register()).Register }));
 const RegisterBusiness = lazy(async () => ({ default: (await pageLoaders.registerBusiness()).RegisterBusiness }));
 const EditBusiness = lazy(async () => ({ default: (await pageLoaders.editBusiness()).EditBusiness }));
@@ -53,6 +55,8 @@ export function AppRouter() {
                     <Route path="/negocios/:provinceSlug/:categorySlug" element={<BusinessesList />} />
                     <Route path="/businesses/:slug" element={<BusinessDetails />} />
                     <Route path="/login" element={<Login />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />

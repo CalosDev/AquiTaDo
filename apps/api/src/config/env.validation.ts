@@ -114,12 +114,16 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     if (config.JWT_REFRESH_TTL_ADMIN_DAYS !== undefined) {
         assertPositiveInteger(config, 'JWT_REFRESH_TTL_ADMIN_DAYS');
     }
+    if (config.AUTH_PASSWORD_RESET_TTL_MINUTES !== undefined) {
+        assertPositiveInteger(config, 'AUTH_PASSWORD_RESET_TTL_MINUTES');
+    }
 
     assertNonEmptyString(config, 'JWT_ACCESS_TTL_ADMIN');
     assertNonEmptyString(config, 'TOTP_ISSUER');
     assertNonEmptyString(config, 'AUTH_REFRESH_COOKIE_NAME');
     assertNonEmptyString(config, 'AUTH_REFRESH_COOKIE_PATH');
     assertBooleanLike(config, 'AUTH_REFRESH_COOKIE_SECURE');
+    assertBooleanLike(config, 'AUTH_DEBUG_RESET_TOKENS');
     assertInSet(config, 'AUTH_REFRESH_COOKIE_SAMESITE', ['lax', 'strict', 'none']);
     assertInSet(config, 'STORAGE_PROVIDER', ['local', 's3']);
     assertBooleanLike(config, 'STORAGE_S3_FORCE_PATH_STYLE');
@@ -162,6 +166,10 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertValidUrl(config, 'WHATSAPP_GRAPH_BASE_URL', ['http:', 'https:']);
 
     assertNonEmptyString(config, 'BULLMQ_PREFIX');
+    assertNonEmptyString(config, 'GOOGLE_OAUTH_CLIENT_ID');
+    assertNonEmptyString(config, 'RESEND_API_KEY');
+    assertNonEmptyString(config, 'RESEND_FROM_EMAIL');
+    assertNonEmptyString(config, 'RESEND_REPLY_TO_EMAIL');
     assertBooleanLike(config, 'SECURITY_TRUST_PROXY');
     assertBooleanLike(config, 'JSON_API_RESPONSE_ENABLED');
     assertBooleanLike(config, 'WHATSAPP_ENABLED');

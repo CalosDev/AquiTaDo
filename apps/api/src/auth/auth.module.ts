@@ -6,11 +6,13 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { IntegrationsModule } from '../integrations/integrations.module';
+import { ObservabilityModule } from '../observability/observability.module';
 
 @Module({
     imports: [
         PassportModule.register({ defaultStrategy: 'jwt' }),
         IntegrationsModule,
+        ObservabilityModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],
             inject: [ConfigService],

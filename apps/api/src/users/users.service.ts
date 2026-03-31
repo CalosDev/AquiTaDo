@@ -55,7 +55,6 @@ export class UsersService {
 
         const name = dto.name?.trim();
         const phone = dto.phone?.trim();
-        const avatarUrl = dto.avatarUrl?.trim();
         let normalizedPhone: string | null | undefined;
 
         if (phone !== undefined) {
@@ -75,7 +74,6 @@ export class UsersService {
             data: {
                 ...(name !== undefined ? { name } : {}),
                 ...(normalizedPhone !== undefined ? { phone: normalizedPhone } : {}),
-                ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
             },
             select: this.userSelect,
         });

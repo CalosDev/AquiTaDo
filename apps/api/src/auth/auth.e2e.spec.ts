@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -17,11 +17,23 @@ function makeRegisterPayload(seed: string) {
     };
 }
 
+function mockJsonResponse(payload: unknown, status = 200): Response {
+    return {
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => payload,
+    } as unknown as Response;
+}
+
 describe('AuthController (e2e)', () => {
     let app: INestApplication;
     let prisma: PrismaService;
 
     beforeAll(async () => {
+        process.env.AUTH_DEBUG_RESET_TOKENS = 'true';
+        process.env.GOOGLE_OAUTH_CLIENT_ID = 'google-client-id.apps.googleusercontent.com';
+        process.env.THROTTLE_LIMIT = '1000';
+
         const moduleRef = await Test.createTestingModule({
             imports: [AppModule],
         }).compile();
@@ -39,6 +51,11 @@ describe('AuthController (e2e)', () => {
         await app.init();
 
         prisma = app.get(PrismaService);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     beforeEach(async () => {
@@ -239,7 +256,7 @@ describe('AuthController (e2e)', () => {
             })
             .expect(200);
 
-        expect(String(changePasswordResponse.body.message)).toContain('Contraseña');
+        expect(String(changePasswordResponse.body.message)).toContain('Contrasena');
         expect(String(changePasswordResponse.headers['set-cookie']?.[0] ?? '')).toContain('aquita_refresh_token=');
 
         await request(app.getHttpServer())
@@ -263,5 +280,184 @@ describe('AuthController (e2e)', () => {
             .set('Cookie', [refreshCookie as string])
             .send({})
             .expect(401);
+    });
+
+    it('returns a generic response for forgot password and exposes debug data for known users', async () => {
+        const payload = makeRegisterPayload('forgot-password');
+
+        await request(app.getHttpServer())
+            .post('/api/auth/register')
+            .send(payload)
+            .expect(201);
+
+        const existingUserResponse = await request(app.getHttpServer())
+            .post('/api/auth/forgot-password')
+            .send({ email: payload.email })
+            .expect(200);
+
+        expect(existingUserResponse.body).toMatchObject({
+            message: expect.stringContaining('Si el correo existe'),
+        });
+        expect(typeof existingUserResponse.body.debugResetToken).toBe('string');
+        expect(existingUserResponse.body.debugResetToken.length).toBeGreaterThan(20);
+        expect(String(existingUserResponse.body.debugResetUrl)).toContain('/reset-password?token=');
+
+        const unknownUserResponse = await request(app.getHttpServer())
+            .post('/api/auth/forgot-password')
+            .send({ email: 'missing-user@e2e.aquita.local' })
+            .expect(200);
+
+        expect(unknownUserResponse.body).toEqual({
+            message: existingUserResponse.body.message,
+        });
+    });
+
+    it('resets the password, rejects the old password, and invalidates the token after one use', async () => {
+        const payload = makeRegisterPayload('reset-password');
+
+        await request(app.getHttpServer())
+            .post('/api/auth/register')
+            .send(payload)
+            .expect(201);
+
+        const forgotPasswordResponse = await request(app.getHttpServer())
+            .post('/api/auth/forgot-password')
+            .send({ email: payload.email })
+            .expect(200);
+
+        const resetToken = String(forgotPasswordResponse.body.debugResetToken || '');
+        expect(resetToken.length).toBeGreaterThan(20);
+
+        const resetResponse = await request(app.getHttpServer())
+            .post('/api/auth/reset-password')
+            .send({
+                token: resetToken,
+                newPassword: 'Reset4567',
+            })
+            .expect(200);
+
+        expect(String(resetResponse.body.message)).toContain('Contrasena restablecida');
+
+        await request(app.getHttpServer())
+            .post('/api/auth/login')
+            .send({
+                email: payload.email,
+                password: payload.password,
+            })
+            .expect(401);
+
+        await request(app.getHttpServer())
+            .post('/api/auth/login')
+            .send({
+                email: payload.email,
+                password: 'Reset4567',
+            })
+            .expect(200);
+
+        await request(app.getHttpServer())
+            .post('/api/auth/reset-password')
+            .send({
+                token: resetToken,
+                newPassword: 'Reset5678',
+            })
+            .expect(400);
+    });
+
+    it('creates a new account from a valid Google identity token', async () => {
+        const googleFetchMock = vi.fn().mockResolvedValue(
+            mockJsonResponse({
+                aud: process.env.GOOGLE_OAUTH_CLIENT_ID,
+                email: 'google-user@e2e.aquita.local',
+                email_verified: 'true',
+                iss: 'https://accounts.google.com',
+                name: 'Google User',
+                picture: 'https://example.com/google-user.png',
+                sub: 'google-sub-new-user',
+            }),
+        );
+        vi.stubGlobal('fetch', googleFetchMock);
+
+        const response = await request(app.getHttpServer())
+            .post('/api/auth/google')
+            .send({
+                idToken: 'google-id-token-valid-for-tests-12345',
+            })
+            .expect(200);
+
+        expect(typeof response.body.accessToken).toBe('string');
+        expect(response.body.user).toMatchObject({
+            email: 'google-user@e2e.aquita.local',
+            name: 'Google User',
+            avatarUrl: 'https://example.com/google-user.png',
+            role: 'USER',
+        });
+
+        const persisted = await prisma.user.findUnique({
+            where: { email: 'google-user@e2e.aquita.local' },
+            select: {
+                googleSubject: true,
+                avatarUrl: true,
+            },
+        });
+
+        expect(persisted).toMatchObject({
+            googleSubject: 'google-sub-new-user',
+            avatarUrl: 'https://example.com/google-user.png',
+        });
+        expect(googleFetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('links Google identity to an existing email account and preserves its role', async () => {
+        const seed = `google-link-${Date.now()}`;
+        const existingUser = await prisma.user.create({
+            data: {
+                name: 'Existing Google Link',
+                email: `user-${seed}${E2E_EMAIL_DOMAIN}`,
+                password: 'e2e-not-used-password-hash',
+                role: 'BUSINESS_OWNER',
+            },
+        });
+
+        const googleFetchMock = vi.fn().mockResolvedValue(
+            mockJsonResponse({
+                aud: process.env.GOOGLE_OAUTH_CLIENT_ID,
+                email: existingUser.email,
+                email_verified: 'true',
+                iss: 'accounts.google.com',
+                name: 'Google Link Existing',
+                picture: 'https://example.com/google-link-existing.png',
+                sub: 'google-sub-existing-user',
+            }),
+        );
+        vi.stubGlobal('fetch', googleFetchMock);
+
+        const response = await request(app.getHttpServer())
+            .post('/api/auth/google')
+            .send({
+                idToken: 'google-id-token-existing-user-12345',
+            })
+            .expect(200);
+
+        expect(response.body.user).toMatchObject({
+            id: existingUser.id,
+            email: existingUser.email,
+            role: 'BUSINESS_OWNER',
+            avatarUrl: 'https://example.com/google-link-existing.png',
+        });
+
+        const persisted = await prisma.user.findUnique({
+            where: { id: existingUser.id },
+            select: {
+                googleSubject: true,
+                role: true,
+                avatarUrl: true,
+            },
+        });
+
+        expect(persisted).toMatchObject({
+            googleSubject: 'google-sub-existing-user',
+            role: 'BUSINESS_OWNER',
+            avatarUrl: 'https://example.com/google-link-existing.png',
+        });
     });
 });

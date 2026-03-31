@@ -6,6 +6,7 @@ import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
+import { trackGrowthEvent as trackGrowthSignal } from '../lib/growthTracking';
 import { BUSINESS_DAY_OPTIONS, businessPriceRangeLabel, formatHoursRange, type BusinessHourEntry } from '../lib/businessProfile';
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
@@ -201,6 +202,8 @@ function businessSupportsBooking(features?: { feature: { name: string } }[]): bo
         return normalized === BOOKING_FEATURE_CANONICAL;
     });
 }
+
+type ContactPlacement = 'sidebar_card' | 'sidebar_primary' | 'sticky_mobile' | 'public_lead_form';
 
 export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
@@ -732,17 +735,15 @@ export function BusinessDetails() {
             return;
         }
 
-        void analyticsApi.trackGrowthEvent({
+        void trackGrowthSignal({
             eventType,
             businessId: business.id,
-            visitorId: getOrCreateVisitorId(),
-            sessionId: getOrCreateSessionId(),
             variantKey: contactExperimentVariant,
             metadata,
-        }).catch(() => undefined);
+        });
     };
 
-    const handlePhoneClick = () => {
+    const handlePhoneClick = (placement: ContactPlacement = 'sidebar_card') => {
         if (!business?.id) {
             return;
         }
@@ -757,10 +758,11 @@ export function BusinessDetails() {
         trackContactGrowthEvent('CONTACT_CLICK', {
             source: 'business-details',
             channel: 'phone',
+            placement,
         });
     };
 
-    const handleShare = async () => {
+    const handleShare = async (placement = 'hero_actions') => {
         if (!business) {
             return;
         }
@@ -776,6 +778,15 @@ export function BusinessDetails() {
                     text: `Mira ${business.name} en AquiTa.do`,
                     url: shareUrl,
                 });
+                void trackGrowthSignal({
+                    eventType: 'SHARE_CLICK',
+                    businessId: business.id,
+                    metadata: {
+                        source: 'business-details',
+                        placement,
+                        method: 'native-share',
+                    },
+                });
                 setShareFeedback('Enlace compartido');
                 return;
             }
@@ -788,6 +799,15 @@ export function BusinessDetails() {
         try {
             if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(shareUrl);
+                void trackGrowthSignal({
+                    eventType: 'SHARE_CLICK',
+                    businessId: business.id,
+                    metadata: {
+                        source: 'business-details',
+                        placement,
+                        method: 'clipboard',
+                    },
+                });
                 setShareFeedback('Enlace copiado');
                 return;
             }
@@ -798,7 +818,7 @@ export function BusinessDetails() {
         setShareFeedback('No se pudo compartir desde este navegador');
     };
 
-    const openWhatsApp = async () => {
+    const openWhatsApp = async (placement: ContactPlacement = 'sidebar_primary') => {
         if (!business?.id || !business.whatsapp) {
             return;
         }
@@ -815,6 +835,7 @@ export function BusinessDetails() {
         trackContactGrowthEvent('CONTACT_CLICK', {
             source: 'business-details',
             channel: 'whatsapp',
+            placement,
         });
 
         try {
@@ -829,6 +850,7 @@ export function BusinessDetails() {
             trackContactGrowthEvent('WHATSAPP_CLICK', {
                 source: 'business-details',
                 channel: 'whatsapp',
+                placement,
                 conversionId: response.data?.conversionId ?? null,
             });
 
@@ -875,15 +897,14 @@ export function BusinessDetails() {
                 message: '',
             });
             setPublicLeadSuccessMessage('Solicitud enviada. Te contactarán pronto.');
-            void analyticsApi.trackGrowthEvent({
+            void trackGrowthSignal({
                 eventType: 'CONTACT_CLICK',
                 businessId: business.id,
-                visitorId: getOrCreateVisitorId(),
-                sessionId: getOrCreateSessionId(),
                 metadata: {
                     source: 'public-lead-form',
+                    placement: 'public_lead_form',
                 },
-            }).catch(() => undefined);
+            });
         } catch (error) {
             setPublicLeadErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud'));
         } finally {
@@ -891,9 +912,12 @@ export function BusinessDetails() {
         }
     };
 
-    const handleWhatsAppClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    const handleWhatsAppClick = (
+        event: React.MouseEvent<HTMLAnchorElement>,
+        placement: ContactPlacement = 'sidebar_card',
+    ) => {
         event.preventDefault();
-        void openWhatsApp();
+        void openWhatsApp(placement);
     };
 
     const handleToggleFavorite = async () => {
@@ -1212,7 +1236,7 @@ export function BusinessDetails() {
                                     Como llegar
                                 </a>
                             )}
-                            <button type="button" className="btn-secondary text-sm" onClick={() => void handleShare()}>
+                            <button type="button" className="btn-secondary text-sm" onClick={() => void handleShare('hero_actions')}>
                                 Compartir
                             </button>
                         </div>
@@ -1827,7 +1851,7 @@ export function BusinessDetails() {
                                 canUseCustomerContactFlows ? (
                                     <a
                                         href={`tel:${business.phone}`}
-                                        onClick={handlePhoneClick}
+                                        onClick={() => handlePhoneClick('sidebar_card')}
                                         className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 border border-primary-100 hover:bg-primary-100 transition-colors hover-lift group"
                                     >
                                         <span className="text-lg">Tel</span>
@@ -1852,7 +1876,7 @@ export function BusinessDetails() {
                                         href={whatsappDirectUrl ?? '#'}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        onClick={handleWhatsAppClick}
+                                        onClick={(event) => handleWhatsAppClick(event, 'sidebar_card')}
                                         className={`flex items-center gap-3 p-3 rounded-xl transition-colors hover-lift group ${contactVariant === 'emphasis'
                                             ? 'bg-green-100 hover:bg-green-200 border border-green-300 shadow-sm'
                                             : 'bg-green-50 hover:bg-green-100 border border-green-100'
@@ -1934,7 +1958,7 @@ export function BusinessDetails() {
                             {business.whatsapp && canUseCustomerContactFlows && (
                                 <button
                                     type="button"
-                                    onClick={() => void openWhatsApp()}
+                                    onClick={() => void openWhatsApp('sidebar_primary')}
                                     className="w-full rounded-[1.25rem] bg-green-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-600"
                                 >
                                     Chatear ahora por WhatsApp
@@ -2213,7 +2237,7 @@ export function BusinessDetails() {
                         {business.phone && (
                             <a
                                 href={`tel:${business.phone}`}
-                                onClick={handlePhoneClick}
+                                onClick={() => handlePhoneClick('sticky_mobile')}
                                 className="flex-1 touch-target rounded-xl bg-primary-600 text-white text-sm font-semibold flex items-center justify-center"
                             >
                                 Llamar
@@ -2222,7 +2246,7 @@ export function BusinessDetails() {
                         {business.whatsapp && (
                             <button
                                 type="button"
-                                onClick={() => void openWhatsApp()}
+                                onClick={() => void openWhatsApp('sticky_mobile')}
                                 className="flex-1 touch-target rounded-xl bg-green-600 text-white text-sm font-semibold"
                             >
                                 WhatsApp

@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
-import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+import { LatLngBounds } from 'leaflet';
+import { useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 type MapBusiness = {
@@ -17,6 +19,10 @@ type MapBusiness = {
 
 type BusinessesMapProps = {
     businesses: MapBusiness[];
+    selectedBusinessId?: string | null;
+    onSelectBusiness?: (businessId: string) => void;
+    onOpenBusiness?: (businessId: string) => void;
+    emptyLabel?: string;
 };
 
 function average(values: number[]): number {
@@ -27,12 +33,23 @@ function average(values: number[]): number {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-export function BusinessesMap({ businesses }: BusinessesMapProps) {
+export function BusinessesMap({
+    businesses,
+    selectedBusinessId = null,
+    onSelectBusiness,
+    onOpenBusiness,
+    emptyLabel,
+}: BusinessesMapProps) {
     const mappableBusinesses = useMemo(
         () => businesses.filter(
             (business) => typeof business.latitude === 'number' && typeof business.longitude === 'number',
         ) as Array<MapBusiness & { latitude: number; longitude: number }>,
         [businesses],
+    );
+
+    const selectedBusiness = useMemo(
+        () => mappableBusinesses.find((business) => business.id === selectedBusinessId) ?? null,
+        [mappableBusinesses, selectedBusinessId],
     );
 
     const center = useMemo(() => {
@@ -49,7 +66,7 @@ export function BusinessesMap({ businesses }: BusinessesMapProps) {
     if (mappableBusinesses.length === 0) {
         return (
             <div className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500">
-                No hay coordenadas suficientes para mostrar este resultado en mapa.
+                {emptyLabel || 'No hay coordenadas suficientes para mostrar este resultado en mapa.'}
             </div>
         );
     }
@@ -62,6 +79,10 @@ export function BusinessesMap({ businesses }: BusinessesMapProps) {
                 scrollWheelZoom={false}
                 className="h-[420px] w-full"
             >
+                <MapViewportSync
+                    businesses={mappableBusinesses}
+                    selectedBusinessId={selectedBusiness?.id ?? null}
+                />
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -70,13 +91,24 @@ export function BusinessesMap({ businesses }: BusinessesMapProps) {
                     <CircleMarker
                         key={business.id}
                         center={[business.latitude, business.longitude]}
-                        radius={10}
+                        radius={business.id === selectedBusiness?.id ? 12 : 9}
                         pathOptions={{
-                            color: business.verified ? '#0f766e' : '#475569',
-                            fillColor: business.openNow ? '#16a34a' : '#0284c7',
-                            fillOpacity: 0.8,
-                            weight: 2,
+                            color: business.id === selectedBusiness?.id
+                                ? '#1d4ed8'
+                                : business.verified
+                                    ? '#0f766e'
+                                    : '#475569',
+                            fillColor: business.id === selectedBusiness?.id
+                                ? '#60a5fa'
+                                : business.openNow
+                                    ? '#16a34a'
+                                    : '#0284c7',
+                            fillOpacity: business.id === selectedBusiness?.id ? 0.95 : 0.8,
+                            weight: business.id === selectedBusiness?.id ? 3 : 2,
                         }}
+                        eventHandlers={onSelectBusiness ? {
+                            click: () => onSelectBusiness(business.id),
+                        } : undefined}
                     >
                         <Popup>
                             <div className="space-y-1">
@@ -93,12 +125,13 @@ export function BusinessesMap({ businesses }: BusinessesMapProps) {
                                         {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
                                     </p>
                                 ) : null}
-                                <a
-                                    href={`/businesses/${business.slug || business.id}`}
+                                <Link
+                                    to={`/businesses/${business.slug || business.id}`}
+                                    onClick={() => onOpenBusiness?.(business.id)}
                                     className="inline-flex text-xs font-medium text-primary-700 underline underline-offset-2"
                                 >
                                     Ver negocio
-                                </a>
+                                </Link>
                             </div>
                         </Popup>
                     </CircleMarker>
@@ -106,4 +139,47 @@ export function BusinessesMap({ businesses }: BusinessesMapProps) {
             </MapContainer>
         </div>
     );
+}
+
+function MapViewportSync({
+    businesses,
+    selectedBusinessId,
+}: {
+    businesses: Array<MapBusiness & { latitude: number; longitude: number }>;
+    selectedBusinessId?: string | null;
+}) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (businesses.length === 0) {
+            return;
+        }
+
+        const selectedBusiness = selectedBusinessId
+            ? businesses.find((business) => business.id === selectedBusinessId)
+            : null;
+
+        if (selectedBusiness) {
+            map.flyTo([selectedBusiness.latitude, selectedBusiness.longitude], Math.max(map.getZoom(), 14), {
+                animate: true,
+                duration: 0.6,
+            });
+            return;
+        }
+
+        if (businesses.length === 1) {
+            map.setView([businesses[0].latitude, businesses[0].longitude], 14);
+            return;
+        }
+
+        const bounds = new LatLngBounds(
+            businesses.map((business) => [business.latitude, business.longitude] as [number, number]),
+        );
+        map.fitBounds(bounds, {
+            padding: [36, 36],
+            maxZoom: 13,
+        });
+    }, [businesses, map, selectedBusinessId]);
+
+    return null;
 }

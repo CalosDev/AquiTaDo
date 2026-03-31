@@ -117,7 +117,7 @@ interface FlaggedReview {
 
 interface ModerationQueueItem {
     id: string;
-    queueType: 'BUSINESS_VERIFICATION' | 'DOCUMENT_REVIEW' | 'REVIEW_MODERATION';
+    queueType: 'BUSINESS_VERIFICATION' | 'BUSINESS_PREMODERATION' | 'DOCUMENT_REVIEW' | 'REVIEW_MODERATION';
     entityId: string;
     status: string;
     priority: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -132,6 +132,16 @@ interface ModerationQueueItem {
         name: string;
         slug: string;
         riskScore: number;
+    };
+    payload?: {
+        verificationNotes?: string | null;
+        preventiveScore?: number;
+        preventiveSeverity?: 'LOW' | 'MEDIUM' | 'HIGH';
+        preventiveRiskClusters?: string[];
+        preventiveReasons?: string[];
+        preventiveSuggestedActions?: string[];
+        documentType?: string;
+        moderationReason?: string | null;
     };
 }
 
@@ -176,6 +186,16 @@ interface OperationalDashboardSnapshot {
                 errorRatePct: number;
             }>;
         };
+        email?: {
+            status?: 'up' | 'degraded' | 'down';
+            thresholdMs?: number;
+            reason?: string;
+            operations?: Array<{
+                operation: string;
+                p95Ms: number;
+                errorRatePct: number;
+            }>;
+        };
         whatsapp?: {
             status?: 'up' | 'degraded' | 'down';
             thresholdMs?: number;
@@ -185,6 +205,14 @@ interface OperationalDashboardSnapshot {
                 errorRatePct: number;
             }>;
         };
+    };
+    passwordReset?: {
+        providerConfigured?: boolean;
+        requestsLast24h?: number;
+        completionsLast24h?: number;
+        completionRatePct?: number;
+        activeTokens?: number;
+        expiredPendingTokens?: number;
     };
 }
 
@@ -238,6 +266,11 @@ interface MarketInsightsSnapshot {
 }
 
 interface GrowthInsightsSnapshot {
+    range: {
+        days: number;
+        from: string;
+        to: string;
+    };
     topSearchedCategories: Array<{
         categoryId: string | null;
         categoryName: string;
@@ -261,6 +294,81 @@ interface GrowthInsightsSnapshot {
             conversionRate: number;
         };
     };
+    activationMetrics: {
+        shareClicks: number;
+        passwordResetRequests: number;
+        passwordResetCompletions: number;
+        googleAuthSuccesses: number;
+        googleAuthLoginSuccesses: number;
+        googleAuthRegistrationSuccesses: number;
+        stickyPhoneClicks: number;
+        stickyWhatsAppClicks: number;
+        totalWhatsAppClicks: number;
+    };
+    discoveryMetrics: {
+        listingFilterApplies: number;
+        listingSortChanges: number;
+        mapViewChanges: number;
+        listViewChanges: number;
+        mapSelections: number;
+        listingResultClicks: number;
+        sponsoredResultClicks: number;
+    };
+    moderationMetrics: {
+        premoderationFlagged: number;
+        uniqueFlaggedBusinesses: number;
+        premoderationReleased: number;
+        premoderationConfirmed: number;
+        releaseRatePct: number;
+        topReasons: Array<{
+            reason: string;
+            count: number;
+        }>;
+    };
+    onboardingMetrics: {
+        step1Sessions: number;
+        step2Sessions: number;
+        step3Sessions: number;
+        step4Sessions: number;
+        completedSessions: number;
+        completionRatePct: number;
+    };
+    actionableAlerts: Array<{
+        level: 'HIGH' | 'MEDIUM';
+        title: string;
+        description: string;
+        metricKey: string;
+        owner: string;
+        cadence: 'Diario' | 'Semanal';
+        slaHours: number;
+        playbookSection: string;
+        recommendedAction: string;
+    }>;
+    trendComparisons: {
+        comparisonLabel: string;
+        activation: {
+            recoveryCompletionRatePct: TrendMetricSnapshot;
+            passwordResetRequests: TrendMetricSnapshot;
+            googleAuthSuccesses: TrendMetricSnapshot;
+            shareClicks: TrendMetricSnapshot;
+        };
+        discovery: {
+            mapSelectionRatePct: TrendMetricSnapshot;
+            listingResultClicks: TrendMetricSnapshot;
+            mapViewChanges: TrendMetricSnapshot;
+            listingFilterApplies: TrendMetricSnapshot;
+        };
+        moderation: {
+            releaseRatePct: TrendMetricSnapshot;
+            premoderationFlagged: TrendMetricSnapshot;
+            uniqueFlaggedBusinesses: TrendMetricSnapshot;
+        };
+        onboarding: {
+            completionRatePct: TrendMetricSnapshot;
+            step1Sessions: TrendMetricSnapshot;
+            completedSessions: TrendMetricSnapshot;
+        };
+    };
     abTesting: {
         experiment: string;
         winner?: {
@@ -277,6 +385,42 @@ interface GrowthInsightsSnapshot {
         }>;
     };
 }
+
+type TrendDirection = 'up' | 'down' | 'flat';
+
+type TrendMetricSnapshot = {
+    current: number;
+    previous: number;
+    delta: number;
+    direction: TrendDirection;
+};
+
+const OPERATIONS_RHYTHMS = [
+    {
+        cadence: 'Diario',
+        owner: 'Soporte',
+        title: 'Recovery y email',
+        detail: 'Revisar badge Email, Recovery 24h, expirados y alertas con SLA de 24h.',
+    },
+    {
+        cadence: 'Diario',
+        owner: 'Trust & Safety',
+        title: 'Premoderacion',
+        detail: 'Mirar release rate, top razones y casos HIGH antes de abrir mas volumen a KYC.',
+    },
+    {
+        cadence: 'Semanal',
+        owner: 'Growth',
+        title: 'Discovery lista/mapa',
+        detail: 'Comparar seleccion en mapa, CTR a fichas y cambios de filtros contra la ventana previa.',
+    },
+    {
+        cadence: 'Semanal',
+        owner: 'Producto',
+        title: 'Onboarding de negocios',
+        detail: 'Revisar caidas por paso, alertas de friccion y microcopy del paso con mayor abandono.',
+    },
+] as const;
 
 interface MarketReportDetail extends MarketReport {
     summary?: Record<string, unknown> | null;
@@ -348,6 +492,43 @@ function healthStatusClass(status: 'up' | 'degraded' | 'down' | undefined): stri
         return 'bg-amber-100 text-amber-700';
     }
     return 'bg-red-100 text-red-700';
+}
+
+function alertLevelClass(level: 'HIGH' | 'MEDIUM'): string {
+    if (level === 'HIGH') {
+        return 'border-red-200 bg-red-50 text-red-900';
+    }
+
+    return 'border-amber-200 bg-amber-50 text-amber-900';
+}
+
+function trendDirectionClass(direction: TrendDirection): string {
+    if (direction === 'up') {
+        return 'bg-sky-100 text-sky-700';
+    }
+    if (direction === 'down') {
+        return 'bg-slate-200 text-slate-700';
+    }
+    return 'bg-gray-100 text-gray-600';
+}
+
+function formatTrendNumber(value: number, precision = 0): string {
+    const normalized = precision === 0
+        ? Math.round(value).toString()
+        : value.toFixed(precision);
+
+    return normalized
+        .replace(/\.0+$/, '')
+        .replace(/(\.\d*[1-9])0+$/, '$1');
+}
+
+function formatTrendDelta(
+    metric: TrendMetricSnapshot,
+    suffix = '',
+    precision = 0,
+): string {
+    const sign = metric.delta > 0 ? '+' : '';
+    return `${sign}${formatTrendNumber(metric.delta, precision)}${suffix}`;
 }
 
 function sumMetric(metricText: string, metricName: string): number {
@@ -922,6 +1103,33 @@ export function AdminDashboard() {
             );
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo revisar el documento'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleResolvePreventiveModeration = async (
+        businessId: string,
+        decision: 'APPROVE_FOR_KYC' | 'KEEP_BLOCKED',
+    ) => {
+        setProcessingId(businessId);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await verificationApi.resolvePreventiveModerationAdmin(businessId, {
+                decision,
+                notes: decision === 'APPROVE_FOR_KYC'
+                    ? 'Liberado por moderacion preventiva para revision KYC'
+                    : 'Bloqueo preventivo confirmado por revision administrativa',
+            });
+            await loadVerificationData();
+            setSuccessMessage(
+                decision === 'APPROVE_FOR_KYC'
+                    ? 'Negocio liberado para entrar a la cola KYC'
+                    : 'Negocio mantenido en bloqueo preventivo',
+            );
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo resolver la premoderacion'));
         } finally {
             setProcessingId(null);
         }
@@ -1614,6 +1822,79 @@ export function AdminDashboard() {
                                                     </span>
                                                 </div>
                                             </div>
+                                            {item.queueType === 'BUSINESS_PREMODERATION' && item.payload?.preventiveReasons?.length ? (
+                                                <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <p className="font-medium">Revision preventiva requerida</p>
+                                                        {item.payload.preventiveSeverity ? (
+                                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                                                item.payload.preventiveSeverity === 'HIGH'
+                                                                    ? 'bg-red-100 text-red-700'
+                                                                    : item.payload.preventiveSeverity === 'MEDIUM'
+                                                                        ? 'bg-amber-100 text-amber-700'
+                                                                        : 'bg-slate-100 text-slate-700'
+                                                            }`}>
+                                                                {item.payload.preventiveSeverity}
+                                                            </span>
+                                                        ) : null}
+                                                        {item.payload.preventiveScore !== undefined ? (
+                                                            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
+                                                                Score {item.payload.preventiveScore}
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                    <p className="mt-1">
+                                                        {item.payload.preventiveReasons.join(' | ')}
+                                                    </p>
+                                                    {item.payload.preventiveRiskClusters?.length ? (
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {item.payload.preventiveRiskClusters.map((cluster) => (
+                                                                <span key={cluster} className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
+                                                                    {cluster}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : null}
+                                                    {item.payload.preventiveSuggestedActions?.length ? (
+                                                        <div className="mt-2 rounded-lg bg-white/80 px-3 py-2 text-[11px] text-amber-950">
+                                                            <p className="font-medium">Sugerencias para corregir</p>
+                                                            <ul className="mt-1 space-y-1">
+                                                                {item.payload.preventiveSuggestedActions.map((action) => (
+                                                                    <li key={action}>{action}</li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    ) : null}
+                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                        <button
+                                                            type="button"
+                                                            className="btn-primary text-xs"
+                                                            disabled={processingId === item.entityId}
+                                                            onClick={() => void handleResolvePreventiveModeration(item.entityId, 'APPROVE_FOR_KYC')}
+                                                        >
+                                                            Enviar a KYC
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-secondary text-xs"
+                                                            disabled={processingId === item.entityId}
+                                                            onClick={() => void handleResolvePreventiveModeration(item.entityId, 'KEEP_BLOCKED')}
+                                                        >
+                                                            Mantener bloqueo
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {item.queueType === 'BUSINESS_VERIFICATION' && item.payload?.verificationNotes ? (
+                                                <p className="mt-2 text-xs text-gray-600">
+                                                    {item.payload.verificationNotes}
+                                                </p>
+                                            ) : null}
+                                            {item.queueType === 'REVIEW_MODERATION' && item.payload?.moderationReason ? (
+                                                <p className="mt-2 text-xs text-gray-600">
+                                                    {item.payload.moderationReason}
+                                                </p>
+                                            ) : null}
                                             {item.queueType === 'DOCUMENT_REVIEW' ? (
                                                 <div className="flex flex-wrap gap-2 mt-2">
                                                     <button
@@ -1804,6 +2085,134 @@ export function AdminDashboard() {
                                     <p className="text-sm text-gray-500">Cargando insights...</p>
                                 ) : (
                                     <div className="space-y-4">
+                                        {growthInsights?.actionableAlerts?.length ? (
+                                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                                {growthInsights.actionableAlerts.map((alert) => (
+                                                    <div
+                                                        key={`${alert.metricKey}-${alert.title}`}
+                                                        className={`rounded-xl border p-3 ${alertLevelClass(alert.level)}`}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <p className="text-sm font-semibold">{alert.title}</p>
+                                                            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold">
+                                                                {alert.level}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-sm opacity-90">{alert.description}</p>
+                                                        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-medium">
+                                                            <span className="rounded-full bg-white/80 px-2 py-0.5">
+                                                                Owner: {alert.owner}
+                                                            </span>
+                                                            <span className="rounded-full bg-white/80 px-2 py-0.5">
+                                                                SLA: {alert.slaHours}h
+                                                            </span>
+                                                            <span className="rounded-full bg-white/80 px-2 py-0.5">
+                                                                Cadencia: {alert.cadence}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-3 text-xs font-semibold uppercase tracking-wide opacity-70">
+                                                            Playbook: {alert.playbookSection}
+                                                        </p>
+                                                        <p className="mt-1 text-sm opacity-90">
+                                                            Siguiente accion: {alert.recommendedAction}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null}
+
+                                        <div className="rounded-xl border border-gray-100 p-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                                <h4 className="font-medium text-gray-900">Cadencia operativa</h4>
+                                                <span className="text-xs text-gray-500">Rutina sugerida con owners visibles</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                                {OPERATIONS_RHYTHMS.map((item) => (
+                                                    <div key={`${item.cadence}-${item.title}`} className="rounded-xl bg-slate-50 px-3 py-3">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                                                {item.cadence}
+                                                            </span>
+                                                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                                                {item.owner}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-3 text-sm font-semibold text-slate-900">{item.title}</p>
+                                                        <p className="mt-1 text-xs text-slate-600">{item.detail}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {growthInsights?.trendComparisons ? (
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                                    <h4 className="font-medium text-gray-900">Tendencias vs ventana previa</h4>
+                                                    <span className="text-xs text-gray-500">
+                                                        {growthInsights.trendComparisons.comparisonLabel}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                                    <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-xs text-gray-500">Recovery completado</p>
+                                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${trendDirectionClass(growthInsights.trendComparisons.activation.recoveryCompletionRatePct.direction)}`}>
+                                                                {formatTrendDelta(growthInsights.trendComparisons.activation.recoveryCompletionRatePct, ' pp', 2)}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-xl font-semibold text-slate-900">
+                                                            {growthInsights.trendComparisons.activation.recoveryCompletionRatePct.current}%
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            Antes {growthInsights.trendComparisons.activation.recoveryCompletionRatePct.previous}%
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-xs text-gray-500">Seleccion en mapa</p>
+                                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${trendDirectionClass(growthInsights.trendComparisons.discovery.mapSelectionRatePct.direction)}`}>
+                                                                {formatTrendDelta(growthInsights.trendComparisons.discovery.mapSelectionRatePct, ' pp', 2)}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-xl font-semibold text-slate-900">
+                                                            {growthInsights.trendComparisons.discovery.mapSelectionRatePct.current}%
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            Antes {growthInsights.trendComparisons.discovery.mapSelectionRatePct.previous}%
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-xs text-gray-500">Release rate premoderacion</p>
+                                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${trendDirectionClass(growthInsights.trendComparisons.moderation.releaseRatePct.direction)}`}>
+                                                                {formatTrendDelta(growthInsights.trendComparisons.moderation.releaseRatePct, ' pp', 2)}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-xl font-semibold text-slate-900">
+                                                            {growthInsights.trendComparisons.moderation.releaseRatePct.current}%
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            Antes {growthInsights.trendComparisons.moderation.releaseRatePct.previous}%
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-xl bg-slate-50 px-3 py-3">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-xs text-gray-500">Onboarding completado</p>
+                                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${trendDirectionClass(growthInsights.trendComparisons.onboarding.completionRatePct.direction)}`}>
+                                                                {formatTrendDelta(growthInsights.trendComparisons.onboarding.completionRatePct, ' pp', 2)}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-xl font-semibold text-slate-900">
+                                                            {growthInsights.trendComparisons.onboarding.completionRatePct.current}%
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            Antes {growthInsights.trendComparisons.onboarding.completionRatePct.previous}%
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : null}
+
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                             <div className="rounded-xl border border-gray-100 p-3">
                                                 <p className="text-xs text-gray-500">Negocios trackeados</p>
@@ -1821,6 +2230,89 @@ export function AdminDashboard() {
                                                 <p className="text-xs text-gray-500">Search a WhatsApp</p>
                                                 <p className="text-xl font-semibold text-emerald-700">
                                                     {growthInsights?.conversionFunnels.searchToWhatsApp.conversionRate ?? 0}%
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Shares ficha</p>
+                                                <p className="text-xl font-semibold text-slate-900">
+                                                    {growthInsights?.activationMetrics.shareClicks ?? 0}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">Compartidos nativos o copiados</p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Recovery</p>
+                                                <p className="text-xl font-semibold text-slate-900">
+                                                    {growthInsights?.activationMetrics.passwordResetRequests ?? 0}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Completados {growthInsights?.activationMetrics.passwordResetCompletions ?? 0}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Google OAuth</p>
+                                                <p className="text-xl font-semibold text-slate-900">
+                                                    {growthInsights?.activationMetrics.googleAuthSuccesses ?? 0}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Login {growthInsights?.activationMetrics.googleAuthLoginSuccesses ?? 0}
+                                                    {' '}| Registro {growthInsights?.activationMetrics.googleAuthRegistrationSuccesses ?? 0}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">CTA sticky</p>
+                                                <p className="text-xl font-semibold text-slate-900">
+                                                    {(growthInsights?.activationMetrics.stickyPhoneClicks ?? 0)
+                                                        + (growthInsights?.activationMetrics.stickyWhatsAppClicks ?? 0)}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Telefono {growthInsights?.activationMetrics.stickyPhoneClicks ?? 0}
+                                                    {' '}| WhatsApp {growthInsights?.activationMetrics.stickyWhatsAppClicks ?? 0}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Descubrimiento lista/mapa</p>
+                                                <p className="text-xl font-semibold text-slate-900">
+                                                    {(growthInsights?.discoveryMetrics.mapViewChanges ?? 0) + (growthInsights?.discoveryMetrics.listViewChanges ?? 0)}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Mapa {growthInsights?.discoveryMetrics.mapViewChanges ?? 0}
+                                                    {' '}| Lista {growthInsights?.discoveryMetrics.listViewChanges ?? 0}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Filtros y orden</p>
+                                                <p className="text-xl font-semibold text-slate-900">
+                                                    {(growthInsights?.discoveryMetrics.listingFilterApplies ?? 0) + (growthInsights?.discoveryMetrics.listingSortChanges ?? 0)}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Filtros {growthInsights?.discoveryMetrics.listingFilterApplies ?? 0}
+                                                    {' '}| Orden {growthInsights?.discoveryMetrics.listingSortChanges ?? 0}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Premoderacion resuelta</p>
+                                                <p className="text-xl font-semibold text-slate-900">
+                                                    {growthInsights?.moderationMetrics.releaseRatePct ?? 0}%
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Liberados {growthInsights?.moderationMetrics.premoderationReleased ?? 0}
+                                                    {' '}| Confirmados {growthInsights?.moderationMetrics.premoderationConfirmed ?? 0}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <p className="text-xs text-gray-500">Onboarding negocios</p>
+                                                <p className="text-xl font-semibold text-slate-900">
+                                                    {growthInsights?.onboardingMetrics.completionRatePct ?? 0}%
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Inicios {growthInsights?.onboardingMetrics.step1Sessions ?? 0}
+                                                    {' '}| Completados {growthInsights?.onboardingMetrics.completedSessions ?? 0}
                                                 </p>
                                             </div>
                                         </div>
@@ -1855,6 +2347,70 @@ export function AdminDashboard() {
                                                     )) : (
                                                         <p className="text-sm text-gray-500">Sin brechas registradas.</p>
                                                     )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <h4 className="font-medium text-gray-900 mb-2">Uso del listado</h4>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="text-gray-700">Clicks a fichas desde listado</span>
+                                                        <span className="font-medium text-gray-900">{growthInsights?.discoveryMetrics.listingResultClicks ?? 0}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="text-gray-700">Selecciones en mapa</span>
+                                                        <span className="font-medium text-gray-900">{growthInsights?.discoveryMetrics.mapSelections ?? 0}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="text-gray-700">Clicks patrocinados</span>
+                                                        <span className="font-medium text-gray-900">{growthInsights?.discoveryMetrics.sponsoredResultClicks ?? 0}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-xl border border-gray-100 p-3">
+                                                <h4 className="font-medium text-gray-900 mb-2">Top razones de premoderacion</h4>
+                                                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                                                    {growthInsights?.moderationMetrics.topReasons?.length ? growthInsights.moderationMetrics.topReasons.map((item) => (
+                                                        <div key={item.reason} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                                                            <span className="text-gray-700">{item.reason}</span>
+                                                            <span className="font-medium text-gray-900">{item.count}</span>
+                                                        </div>
+                                                    )) : (
+                                                        <p className="text-sm text-gray-500">Sin suficientes eventos de premoderacion todavia.</p>
+                                                    )}
+                                                </div>
+                                                <p className="mt-2 text-xs text-gray-500">
+                                                    Flaggeados {growthInsights?.moderationMetrics.premoderationFlagged ?? 0}
+                                                    {' '}| Negocios unicos {growthInsights?.moderationMetrics.uniqueFlaggedBusinesses ?? 0}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-xl border border-gray-100 p-3">
+                                            <h4 className="font-medium text-gray-900 mb-2">Funnel onboarding de negocios</h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                                                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                                                    <p className="text-xs text-gray-500">Paso 1</p>
+                                                    <p className="text-lg font-semibold text-gray-900">{growthInsights?.onboardingMetrics.step1Sessions ?? 0}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                                                    <p className="text-xs text-gray-500">Paso 2</p>
+                                                    <p className="text-lg font-semibold text-gray-900">{growthInsights?.onboardingMetrics.step2Sessions ?? 0}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                                                    <p className="text-xs text-gray-500">Paso 3</p>
+                                                    <p className="text-lg font-semibold text-gray-900">{growthInsights?.onboardingMetrics.step3Sessions ?? 0}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                                                    <p className="text-xs text-gray-500">Paso 4</p>
+                                                    <p className="text-lg font-semibold text-gray-900">{growthInsights?.onboardingMetrics.step4Sessions ?? 0}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-primary-50 px-3 py-2">
+                                                    <p className="text-xs text-primary-700">Publicados</p>
+                                                    <p className="text-lg font-semibold text-primary-900">{growthInsights?.onboardingMetrics.completedSessions ?? 0}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -2008,12 +2564,15 @@ export function AdminDashboard() {
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.ai?.status)}`}>
                                                 AI {String(operationalHealth.checks?.ai?.status || 'down').toUpperCase()}
                                             </span>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.email?.status)}`}>
+                                                Email {String(operationalHealth.checks?.email?.status || 'down').toUpperCase()}
+                                            </span>
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.whatsapp?.status)}`}>
                                                 WhatsApp {String(operationalHealth.checks?.whatsapp?.status || 'down').toUpperCase()}
                                             </span>
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                             <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                                 <p className="text-xs text-gray-500">Saturacion DB</p>
                                                 <p className="text-xl font-semibold text-gray-900">
@@ -2030,6 +2589,33 @@ export function AdminDashboard() {
                                                 <p className="text-xs text-gray-500">Latencia health</p>
                                                 <p className="text-xl font-semibold text-gray-900">
                                                     {operationalHealth.responseTimeMs ?? 0} ms
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                                <p className="text-xs text-gray-500">Recovery 24h</p>
+                                                <p className="text-xl font-semibold text-gray-900">
+                                                    {operationalHealth.passwordReset?.requestsLast24h ?? 0}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Completados {operationalHealth.passwordReset?.completionsLast24h ?? 0}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                                <p className="text-xs text-gray-500">Rate reset</p>
+                                                <p className="text-xl font-semibold text-gray-900">
+                                                    {operationalHealth.passwordReset?.completionRatePct ?? 0}%
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Activos {operationalHealth.passwordReset?.activeTokens ?? 0}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                                <p className="text-xs text-gray-500">Reset expirados</p>
+                                                <p className="text-xl font-semibold text-gray-900">
+                                                    {operationalHealth.passwordReset?.expiredPendingTokens ?? 0}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Proveedor {operationalHealth.passwordReset?.providerConfigured ? 'configurado' : 'no configurado'}
                                                 </p>
                                             </div>
                                         </div>

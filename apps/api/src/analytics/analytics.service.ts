@@ -17,6 +17,78 @@ import {
     TrackBusinessEventDto,
 } from './dto/analytics.dto';
 
+type GrowthSignalEventRow = {
+    businessId: string | null;
+    eventType: GrowthEventType;
+    sessionId: string | null;
+    metadata: Prisma.JsonValue | null;
+    occurredAt: Date;
+};
+
+type GrowthTrendDirection = 'up' | 'down' | 'flat';
+
+type GrowthTrendMetric = {
+    current: number;
+    previous: number;
+    delta: number;
+    direction: GrowthTrendDirection;
+};
+
+type GrowthActionableAlert = {
+    level: 'HIGH' | 'MEDIUM';
+    title: string;
+    description: string;
+    metricKey: string;
+    owner: string;
+    cadence: 'Diario' | 'Semanal';
+    slaHours: number;
+    playbookSection: string;
+    recommendedAction: string;
+};
+
+type GrowthSignalSummary = {
+    activationMetrics: {
+        shareClicks: number;
+        passwordResetRequests: number;
+        passwordResetCompletions: number;
+        googleAuthSuccesses: number;
+        googleAuthLoginSuccesses: number;
+        googleAuthRegistrationSuccesses: number;
+        stickyPhoneClicks: number;
+        stickyWhatsAppClicks: number;
+        totalWhatsAppClicks: number;
+    };
+    discoveryMetrics: {
+        listingFilterApplies: number;
+        listingSortChanges: number;
+        mapViewChanges: number;
+        listViewChanges: number;
+        mapSelections: number;
+        listingResultClicks: number;
+        sponsoredResultClicks: number;
+    };
+    moderationMetrics: {
+        premoderationFlagged: number;
+        uniqueFlaggedBusinesses: number;
+        premoderationReleased: number;
+        premoderationConfirmed: number;
+        releaseRatePct: number;
+        topReasons: Array<{ reason: string; count: number }>;
+    };
+    onboardingMetrics: {
+        step1Sessions: number;
+        step2Sessions: number;
+        step3Sessions: number;
+        step4Sessions: number;
+        completedSessions: number;
+        completionRatePct: number;
+    };
+    derivedMetrics: {
+        recoveryCompletionRatePct: number;
+        mapSelectionRatePct: number;
+    };
+};
+
 @Injectable()
 export class AnalyticsService {
     private readonly logger = new Logger(AnalyticsService.name);
@@ -184,18 +256,29 @@ export class AnalyticsService {
         const limit = Math.min(Math.max(query.limit ?? 15, 1), 50);
         const now = new Date();
         const rangeStart = this.toDateOnly(new Date(now.getTime() - (normalizedDays - 1) * 86_400_000));
+        const comparisonRangeStart = this.toDateOnly(new Date(rangeStart.getTime() - normalizedDays * 86_400_000));
 
-        const where: Prisma.GrowthEventWhereInput = {
+        const sharedWhere: Prisma.GrowthEventWhereInput = {};
+        if (query.provinceId) {
+            sharedWhere.provinceId = query.provinceId;
+        }
+        if (query.categoryId) {
+            sharedWhere.categoryId = query.categoryId;
+        }
+
+        const currentWhere: Prisma.GrowthEventWhereInput = {
+            ...sharedWhere,
             occurredAt: {
                 gte: rangeStart,
             },
         };
-        if (query.provinceId) {
-            where.provinceId = query.provinceId;
-        }
-        if (query.categoryId) {
-            where.categoryId = query.categoryId;
-        }
+        const previousWhere: Prisma.GrowthEventWhereInput = {
+            ...sharedWhere,
+            occurredAt: {
+                gte: comparisonRangeStart,
+                lt: rangeStart,
+            },
+        };
 
         const [
             categoryDemand,
@@ -205,11 +288,13 @@ export class AnalyticsService {
             whatsappVisitors,
             contactClicksByVariant,
             whatsappClicksByVariant,
+            currentActivationEventRows,
+            previousActivationEventRows,
         ] = await Promise.all([
             this.prisma.growthEvent.groupBy({
                 by: ['categoryId'],
                 where: {
-                    ...where,
+                    ...currentWhere,
                     eventType: GrowthEventType.SEARCH_QUERY,
                     categoryId: { not: null },
                 },
@@ -224,7 +309,7 @@ export class AnalyticsService {
             this.prisma.growthEvent.groupBy({
                 by: ['cityId', 'provinceId'],
                 where: {
-                    ...where,
+                    ...currentWhere,
                     eventType: GrowthEventType.SEARCH_QUERY,
                     cityId: { not: null },
                 },
@@ -239,7 +324,7 @@ export class AnalyticsService {
             this.prisma.growthEvent.groupBy({
                 by: ['provinceId', 'categoryId'],
                 where: {
-                    ...where,
+                    ...currentWhere,
                     eventType: GrowthEventType.SEARCH_QUERY,
                 },
                 _count: { _all: true },
@@ -252,7 +337,7 @@ export class AnalyticsService {
             }),
             this.prisma.growthEvent.findMany({
                 where: {
-                    ...where,
+                    ...currentWhere,
                     eventType: GrowthEventType.SEARCH_QUERY,
                     visitorIdHash: { not: null },
                 },
@@ -261,7 +346,7 @@ export class AnalyticsService {
             }),
             this.prisma.growthEvent.findMany({
                 where: {
-                    ...where,
+                    ...currentWhere,
                     eventType: GrowthEventType.WHATSAPP_CLICK,
                     visitorIdHash: { not: null },
                 },
@@ -271,7 +356,7 @@ export class AnalyticsService {
             this.prisma.growthEvent.groupBy({
                 by: ['variantKey'],
                 where: {
-                    ...where,
+                    ...currentWhere,
                     eventType: GrowthEventType.CONTACT_CLICK,
                     variantKey: { not: null },
                 },
@@ -280,11 +365,73 @@ export class AnalyticsService {
             this.prisma.growthEvent.groupBy({
                 by: ['variantKey'],
                 where: {
-                    ...where,
+                    ...currentWhere,
                     eventType: GrowthEventType.WHATSAPP_CLICK,
                     variantKey: { not: null },
                 },
                 _count: { _all: true },
+            }),
+            this.prisma.growthEvent.findMany({
+                where: {
+                    ...currentWhere,
+                    eventType: {
+                        in: [
+                            GrowthEventType.SEARCH_RESULT_CLICK,
+                            GrowthEventType.CONTACT_CLICK,
+                            GrowthEventType.WHATSAPP_CLICK,
+                            GrowthEventType.SHARE_CLICK,
+                            GrowthEventType.PASSWORD_RESET_REQUEST,
+                            GrowthEventType.PASSWORD_RESET_COMPLETE,
+                            GrowthEventType.GOOGLE_AUTH_SUCCESS,
+                            GrowthEventType.LISTING_FILTER_APPLY,
+                            GrowthEventType.LISTING_VIEW_CHANGE,
+                            GrowthEventType.LISTING_MAP_SELECT,
+                            GrowthEventType.PREMODERATION_FLAGGED,
+                            GrowthEventType.PREMODERATION_RELEASED,
+                            GrowthEventType.PREMODERATION_CONFIRMED,
+                            GrowthEventType.BUSINESS_ONBOARDING_STEP,
+                            GrowthEventType.BUSINESS_ONBOARDING_COMPLETE,
+                        ],
+                    },
+                },
+                select: {
+                    businessId: true,
+                    eventType: true,
+                    sessionId: true,
+                    metadata: true,
+                    occurredAt: true,
+                },
+            }),
+            this.prisma.growthEvent.findMany({
+                where: {
+                    ...previousWhere,
+                    eventType: {
+                        in: [
+                            GrowthEventType.SEARCH_RESULT_CLICK,
+                            GrowthEventType.CONTACT_CLICK,
+                            GrowthEventType.WHATSAPP_CLICK,
+                            GrowthEventType.SHARE_CLICK,
+                            GrowthEventType.PASSWORD_RESET_REQUEST,
+                            GrowthEventType.PASSWORD_RESET_COMPLETE,
+                            GrowthEventType.GOOGLE_AUTH_SUCCESS,
+                            GrowthEventType.LISTING_FILTER_APPLY,
+                            GrowthEventType.LISTING_VIEW_CHANGE,
+                            GrowthEventType.LISTING_MAP_SELECT,
+                            GrowthEventType.PREMODERATION_FLAGGED,
+                            GrowthEventType.PREMODERATION_RELEASED,
+                            GrowthEventType.PREMODERATION_CONFIRMED,
+                            GrowthEventType.BUSINESS_ONBOARDING_STEP,
+                            GrowthEventType.BUSINESS_ONBOARDING_COMPLETE,
+                        ],
+                    },
+                },
+                select: {
+                    businessId: true,
+                    eventType: true,
+                    sessionId: true,
+                    metadata: true,
+                    occurredAt: true,
+                },
             }),
         ]);
 
@@ -456,6 +603,81 @@ export class AnalyticsService {
 
         const uniqueSearchVisitors = searchVisitors.length;
         const uniqueWhatsAppVisitors = whatsappVisitors.length;
+        const currentSignalSummary = this.buildGrowthSignalSummary(
+            currentActivationEventRows,
+            limit,
+        );
+        const previousSignalSummary = this.buildGrowthSignalSummary(
+            previousActivationEventRows,
+            limit,
+        );
+        const {
+            activationMetrics,
+            discoveryMetrics,
+            moderationMetrics,
+            onboardingMetrics,
+            derivedMetrics,
+        } = currentSignalSummary;
+        const actionableAlerts: GrowthActionableAlert[] = [];
+
+        const reviewedPremoderationCount =
+            moderationMetrics.premoderationReleased + moderationMetrics.premoderationConfirmed;
+
+        if (activationMetrics.passwordResetRequests >= 5 && derivedMetrics.recoveryCompletionRatePct < 35) {
+            actionableAlerts.push(this.buildActionableAlert({
+                level: 'MEDIUM',
+                title: 'Recovery con baja finalizacion',
+                description: `Solo ${derivedMetrics.recoveryCompletionRatePct}% de los resets solicitados se completaron en la ventana analizada.`,
+                metricKey: 'password_reset_completion_rate',
+                owner: 'Soporte',
+                cadence: 'Diario',
+                slaHours: 24,
+                playbookSection: 'Recuperacion de contrasena',
+                recommendedAction: 'Validar entregabilidad del correo, expiracion del enlace y uso del link mas reciente.',
+            }));
+        }
+
+        if (reviewedPremoderationCount >= 4 && moderationMetrics.releaseRatePct >= 40) {
+            actionableAlerts.push(this.buildActionableAlert({
+                level: 'HIGH',
+                title: 'Premoderacion con release rate elevado',
+                description: `${moderationMetrics.releaseRatePct}% de los casos revisados terminaron liberados a KYC; conviene revisar scoring y razones.`,
+                metricKey: 'premoderation_release_rate',
+                owner: 'Trust & Safety',
+                cadence: 'Diario',
+                slaHours: 8,
+                playbookSection: 'Premoderacion previa a verificacion',
+                recommendedAction: 'Revisar top razones, falsos positivos y recalibrar scoring antes de liberar mas volumen.',
+            }));
+        }
+
+        if (discoveryMetrics.mapViewChanges >= 8 && derivedMetrics.mapSelectionRatePct < 25) {
+            actionableAlerts.push(this.buildActionableAlert({
+                level: 'MEDIUM',
+                title: 'Mapa abierto con poca seleccion',
+                description: `La vista mapa tuvo ${discoveryMetrics.mapViewChanges} aperturas pero solo ${discoveryMetrics.mapSelections} selecciones (${derivedMetrics.mapSelectionRatePct}%).`,
+                metricKey: 'listing_map_selection_rate',
+                owner: 'Growth',
+                cadence: 'Semanal',
+                slaHours: 72,
+                playbookSection: 'Discovery lista/mapa',
+                recommendedAction: 'Revisar markers, viewport inicial y contraste de las cards destacadas en el mapa.',
+            }));
+        }
+
+        if (onboardingMetrics.step1Sessions >= 5 && onboardingMetrics.completionRatePct < 45) {
+            actionableAlerts.push(this.buildActionableAlert({
+                level: 'HIGH',
+                title: 'Onboarding de negocios con friccion',
+                description: `Solo ${onboardingMetrics.completionRatePct}% de las sesiones que iniciaron el flujo llegaron a publicacion.`,
+                metricKey: 'business_onboarding_completion_rate',
+                owner: 'Producto',
+                cadence: 'Semanal',
+                slaHours: 48,
+                playbookSection: 'Onboarding de negocios',
+                recommendedAction: 'Revisar salto entre pasos, campos abandonados y simplificar copy o microinteracciones en el paso con mayor caida.',
+            }));
+        }
 
         return {
             range: {
@@ -482,6 +704,89 @@ export class AnalyticsService {
                     conversionRate: uniqueSearchVisitors > 0
                         ? Number(((uniqueWhatsAppVisitors / uniqueSearchVisitors) * 100).toFixed(2))
                         : 0,
+                },
+            },
+            activationMetrics,
+            discoveryMetrics,
+            moderationMetrics,
+            onboardingMetrics,
+            actionableAlerts,
+            trendComparisons: {
+                comparisonLabel: `vs ${normalizedDays}d previos`,
+                activation: {
+                    recoveryCompletionRatePct: this.buildTrendMetric(
+                        derivedMetrics.recoveryCompletionRatePct,
+                        previousSignalSummary.derivedMetrics.recoveryCompletionRatePct,
+                    ),
+                    passwordResetRequests: this.buildTrendMetric(
+                        activationMetrics.passwordResetRequests,
+                        previousSignalSummary.activationMetrics.passwordResetRequests,
+                        0,
+                    ),
+                    googleAuthSuccesses: this.buildTrendMetric(
+                        activationMetrics.googleAuthSuccesses,
+                        previousSignalSummary.activationMetrics.googleAuthSuccesses,
+                        0,
+                    ),
+                    shareClicks: this.buildTrendMetric(
+                        activationMetrics.shareClicks,
+                        previousSignalSummary.activationMetrics.shareClicks,
+                        0,
+                    ),
+                },
+                discovery: {
+                    mapSelectionRatePct: this.buildTrendMetric(
+                        derivedMetrics.mapSelectionRatePct,
+                        previousSignalSummary.derivedMetrics.mapSelectionRatePct,
+                    ),
+                    listingResultClicks: this.buildTrendMetric(
+                        discoveryMetrics.listingResultClicks,
+                        previousSignalSummary.discoveryMetrics.listingResultClicks,
+                        0,
+                    ),
+                    mapViewChanges: this.buildTrendMetric(
+                        discoveryMetrics.mapViewChanges,
+                        previousSignalSummary.discoveryMetrics.mapViewChanges,
+                        0,
+                    ),
+                    listingFilterApplies: this.buildTrendMetric(
+                        discoveryMetrics.listingFilterApplies + discoveryMetrics.listingSortChanges,
+                        previousSignalSummary.discoveryMetrics.listingFilterApplies
+                            + previousSignalSummary.discoveryMetrics.listingSortChanges,
+                        0,
+                    ),
+                },
+                moderation: {
+                    releaseRatePct: this.buildTrendMetric(
+                        moderationMetrics.releaseRatePct,
+                        previousSignalSummary.moderationMetrics.releaseRatePct,
+                    ),
+                    premoderationFlagged: this.buildTrendMetric(
+                        moderationMetrics.premoderationFlagged,
+                        previousSignalSummary.moderationMetrics.premoderationFlagged,
+                        0,
+                    ),
+                    uniqueFlaggedBusinesses: this.buildTrendMetric(
+                        moderationMetrics.uniqueFlaggedBusinesses,
+                        previousSignalSummary.moderationMetrics.uniqueFlaggedBusinesses,
+                        0,
+                    ),
+                },
+                onboarding: {
+                    completionRatePct: this.buildTrendMetric(
+                        onboardingMetrics.completionRatePct,
+                        previousSignalSummary.onboardingMetrics.completionRatePct,
+                    ),
+                    step1Sessions: this.buildTrendMetric(
+                        onboardingMetrics.step1Sessions,
+                        previousSignalSummary.onboardingMetrics.step1Sessions,
+                        0,
+                    ),
+                    completedSessions: this.buildTrendMetric(
+                        onboardingMetrics.completedSessions,
+                        previousSignalSummary.onboardingMetrics.completedSessions,
+                        0,
+                    ),
                 },
             },
             abTesting: {
@@ -1439,11 +1744,269 @@ export class AnalyticsService {
         }
     }
 
-    private normalizeDays(days: number): number {
-        if (!Number.isFinite(days)) {
+    private readMetadataString(
+        metadata: Prisma.JsonValue | null,
+        key: string,
+    ): string | null {
+        if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+            return null;
+        }
+
+        const candidate = (metadata as Record<string, Prisma.JsonValue>)[key];
+        return typeof candidate === 'string' ? candidate : null;
+    }
+
+    private readMetadataStringArray(
+        metadata: Prisma.JsonValue | null,
+        key: string,
+    ): string[] {
+        if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+            return [];
+        }
+
+        const candidate = (metadata as Record<string, Prisma.JsonValue>)[key];
+        if (!Array.isArray(candidate)) {
+            return [];
+        }
+
+        return candidate.filter((value): value is string => typeof value === 'string');
+    }
+
+    private readMetadataNumber(
+        metadata: Prisma.JsonValue | null,
+        key: string,
+    ): number | null {
+        if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+            return null;
+        }
+
+        const candidate = (metadata as Record<string, Prisma.JsonValue>)[key];
+        return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
+    }
+
+    private buildGrowthSignalSummary(
+        rows: GrowthSignalEventRow[],
+        limit: number,
+    ): GrowthSignalSummary {
+        const activationMetrics = {
+            shareClicks: 0,
+            passwordResetRequests: 0,
+            passwordResetCompletions: 0,
+            googleAuthSuccesses: 0,
+            googleAuthLoginSuccesses: 0,
+            googleAuthRegistrationSuccesses: 0,
+            stickyPhoneClicks: 0,
+            stickyWhatsAppClicks: 0,
+            totalWhatsAppClicks: 0,
+        };
+        const discoveryMetrics = {
+            listingFilterApplies: 0,
+            listingSortChanges: 0,
+            mapViewChanges: 0,
+            listViewChanges: 0,
+            mapSelections: 0,
+            listingResultClicks: 0,
+            sponsoredResultClicks: 0,
+        };
+        const flaggedBusinessIds = new Set<string>();
+        const moderationReasonCounts = new Map<string, number>();
+        const moderationMetrics = {
+            premoderationFlagged: 0,
+            uniqueFlaggedBusinesses: 0,
+            premoderationReleased: 0,
+            premoderationConfirmed: 0,
+            releaseRatePct: 0,
+            topReasons: [] as Array<{ reason: string; count: number }>,
+        };
+        const onboardingStepSessions = {
+            1: new Set<string>(),
+            2: new Set<string>(),
+            3: new Set<string>(),
+            4: new Set<string>(),
+        };
+        const onboardingCompletionSessions = new Set<string>();
+        const onboardingMetrics = {
+            step1Sessions: 0,
+            step2Sessions: 0,
+            step3Sessions: 0,
+            step4Sessions: 0,
+            completedSessions: 0,
+            completionRatePct: 0,
+        };
+
+        for (const row of rows) {
+            switch (row.eventType) {
+                case GrowthEventType.SEARCH_RESULT_CLICK: {
+                    const source = this.readMetadataString(row.metadata, 'source');
+                    if (source === 'businesses-list' || source === 'listing-map-selected') {
+                        discoveryMetrics.listingResultClicks += 1;
+                    }
+                    if (source === 'sponsored-placement') {
+                        discoveryMetrics.sponsoredResultClicks += 1;
+                    }
+                    break;
+                }
+                case GrowthEventType.SHARE_CLICK:
+                    activationMetrics.shareClicks += 1;
+                    break;
+                case GrowthEventType.PASSWORD_RESET_REQUEST:
+                    activationMetrics.passwordResetRequests += 1;
+                    break;
+                case GrowthEventType.PASSWORD_RESET_COMPLETE:
+                    activationMetrics.passwordResetCompletions += 1;
+                    break;
+                case GrowthEventType.GOOGLE_AUTH_SUCCESS: {
+                    activationMetrics.googleAuthSuccesses += 1;
+                    const intent = this.readMetadataString(row.metadata, 'intent');
+                    if (intent === 'login') {
+                        activationMetrics.googleAuthLoginSuccesses += 1;
+                    } else if (intent === 'register') {
+                        activationMetrics.googleAuthRegistrationSuccesses += 1;
+                    }
+                    break;
+                }
+                case GrowthEventType.CONTACT_CLICK: {
+                    const placement = this.readMetadataString(row.metadata, 'placement');
+                    const channel = this.readMetadataString(row.metadata, 'channel');
+                    if (placement === 'sticky_mobile' && channel === 'phone') {
+                        activationMetrics.stickyPhoneClicks += 1;
+                    }
+                    break;
+                }
+                case GrowthEventType.WHATSAPP_CLICK: {
+                    activationMetrics.totalWhatsAppClicks += 1;
+                    const placement = this.readMetadataString(row.metadata, 'placement');
+                    if (placement === 'sticky_mobile') {
+                        activationMetrics.stickyWhatsAppClicks += 1;
+                    }
+                    break;
+                }
+                case GrowthEventType.LISTING_FILTER_APPLY: {
+                    const filterKey = this.readMetadataString(row.metadata, 'filterKey');
+                    if (filterKey === 'sort') {
+                        discoveryMetrics.listingSortChanges += 1;
+                    } else {
+                        discoveryMetrics.listingFilterApplies += 1;
+                    }
+                    break;
+                }
+                case GrowthEventType.LISTING_VIEW_CHANGE: {
+                    const nextView = this.readMetadataString(row.metadata, 'nextView');
+                    if (nextView === 'map') {
+                        discoveryMetrics.mapViewChanges += 1;
+                    } else if (nextView === 'list') {
+                        discoveryMetrics.listViewChanges += 1;
+                    }
+                    break;
+                }
+                case GrowthEventType.LISTING_MAP_SELECT:
+                    discoveryMetrics.mapSelections += 1;
+                    break;
+                case GrowthEventType.PREMODERATION_FLAGGED: {
+                    moderationMetrics.premoderationFlagged += 1;
+                    if (row.businessId) {
+                        flaggedBusinessIds.add(row.businessId);
+                    }
+                    this.readMetadataStringArray(row.metadata, 'reasons').forEach((reason) => {
+                        moderationReasonCounts.set(reason, (moderationReasonCounts.get(reason) ?? 0) + 1);
+                    });
+                    break;
+                }
+                case GrowthEventType.PREMODERATION_RELEASED:
+                    moderationMetrics.premoderationReleased += 1;
+                    break;
+                case GrowthEventType.PREMODERATION_CONFIRMED:
+                    moderationMetrics.premoderationConfirmed += 1;
+                    break;
+                case GrowthEventType.BUSINESS_ONBOARDING_STEP: {
+                    const step = this.readMetadataNumber(row.metadata, 'step');
+                    if (!row.sessionId || !step || !(step in onboardingStepSessions)) {
+                        break;
+                    }
+                    onboardingStepSessions[step as 1 | 2 | 3 | 4].add(row.sessionId);
+                    break;
+                }
+                case GrowthEventType.BUSINESS_ONBOARDING_COMPLETE:
+                    if (row.sessionId) {
+                        onboardingCompletionSessions.add(row.sessionId);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        moderationMetrics.uniqueFlaggedBusinesses = flaggedBusinessIds.size;
+        const reviewedPremoderationCount =
+            moderationMetrics.premoderationReleased + moderationMetrics.premoderationConfirmed;
+        moderationMetrics.releaseRatePct = reviewedPremoderationCount > 0
+            ? Number(((moderationMetrics.premoderationReleased / reviewedPremoderationCount) * 100).toFixed(2))
+            : 0;
+        moderationMetrics.topReasons = [...moderationReasonCounts.entries()]
+            .map(([reason, count]) => ({ reason, count }))
+            .sort((left, right) => right.count - left.count)
+            .slice(0, limit);
+        onboardingMetrics.step1Sessions = onboardingStepSessions[1].size;
+        onboardingMetrics.step2Sessions = onboardingStepSessions[2].size;
+        onboardingMetrics.step3Sessions = onboardingStepSessions[3].size;
+        onboardingMetrics.step4Sessions = onboardingStepSessions[4].size;
+        onboardingMetrics.completedSessions = onboardingCompletionSessions.size;
+        onboardingMetrics.completionRatePct = onboardingMetrics.step1Sessions > 0
+            ? Number(((onboardingMetrics.completedSessions / onboardingMetrics.step1Sessions) * 100).toFixed(2))
+            : 0;
+
+        return {
+            activationMetrics,
+            discoveryMetrics,
+            moderationMetrics,
+            onboardingMetrics,
+            derivedMetrics: {
+                recoveryCompletionRatePct: activationMetrics.passwordResetRequests > 0
+                    ? Number(((activationMetrics.passwordResetCompletions / activationMetrics.passwordResetRequests) * 100).toFixed(2))
+                    : 0,
+                mapSelectionRatePct: discoveryMetrics.mapViewChanges > 0
+                    ? Number(((discoveryMetrics.mapSelections / discoveryMetrics.mapViewChanges) * 100).toFixed(2))
+                    : 0,
+            },
+        };
+    }
+
+    private buildTrendMetric(
+        current: number,
+        previous: number,
+        precision = 2,
+    ): GrowthTrendMetric {
+        const normalize = (value: number) => (
+            precision === 0
+                ? Math.round(value)
+                : Number(value.toFixed(precision))
+        );
+        const normalizedCurrent = normalize(current);
+        const normalizedPrevious = normalize(previous);
+        const delta = normalize(normalizedCurrent - normalizedPrevious);
+
+        return {
+            current: normalizedCurrent,
+            previous: normalizedPrevious,
+            delta,
+            direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat',
+        };
+    }
+
+    private buildActionableAlert(alert: GrowthActionableAlert): GrowthActionableAlert {
+        return alert;
+    }
+
+    private normalizeDays(days: number | string | null | undefined): number {
+        const parsedDays = typeof days === 'string'
+            ? Number.parseInt(days, 10)
+            : days;
+
+        if (!Number.isFinite(parsedDays)) {
             return 30;
         }
-        return Math.min(Math.max(Math.floor(days), 1), 365);
+        const safeDays = parsedDays as number;
+        return Math.min(Math.max(Math.floor(safeDays), 1), 365);
     }
 
     private toDateOnly(date: Date): Date {

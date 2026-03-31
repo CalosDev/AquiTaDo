@@ -1,0 +1,27 @@
+DO $$
+BEGIN
+    ALTER TYPE "GrowthEventType" ADD VALUE 'SHARE_CLICK';
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER TYPE "GrowthEventType" ADD VALUE 'PASSWORD_RESET_REQUEST';
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER TYPE "GrowthEventType" ADD VALUE 'PASSWORD_RESET_COMPLETE';
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER TYPE "GrowthEventType" ADD VALUE 'GOOGLE_AUTH_SUCCESS';
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;

@@ -24,6 +24,7 @@ import { CurrentOrganization } from '../organizations/decorators/current-organiz
 import { OrgContextGuard } from '../organizations/guards/org-context.guard';
 import {
     ListVerificationDocumentsQueryDto,
+    ResolvePreventiveModerationDto,
     ReviewBusinessVerificationDto,
     ReviewVerificationDocumentDto,
     SubmitBusinessVerificationDto,
@@ -144,6 +145,21 @@ export class VerificationController {
         const parsedLimit = limitRaw ? Number(limitRaw) : 100;
         return this.verificationService.listModerationQueue(
             Number.isFinite(parsedLimit) ? parsedLimit : 100,
+        );
+    }
+
+    @Patch('admin/businesses/:businessId/pre-moderation')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async resolvePreventiveModeration(
+        @Param('businessId', new ParseUUIDPipe()) businessId: string,
+        @CurrentUser('id') reviewerUserId: string,
+        @Body() dto: ResolvePreventiveModerationDto,
+    ) {
+        return this.verificationService.resolvePreventiveModeration(
+            businessId,
+            reviewerUserId,
+            dto,
         );
     }
 

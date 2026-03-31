@@ -2,12 +2,14 @@ import { startTransition, useCallback, useEffect, useMemo, useState } from 'reac
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationApi } from '../api/endpoints';
+import { BusinessesMap } from '../components/BusinessesMap';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { businessPriceRangeLabel } from '../lib/businessProfile';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { calculateBusinessTrustScore } from '../lib/trust';
+import { trackGrowthEvent as trackGrowthSignal } from '../lib/growthTracking';
 import { preloadRouteChunk } from '../routes/preload';
 import { featureFlags } from '../config/features';
 
@@ -88,7 +90,7 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
     'con-delivery': {
         label: 'Negocios con delivery',
         feature: 'delivery',
-        description: 'Encuentra negocios que ofrecen delivery en República Dominicana.',
+        description: 'Encuentra negocios que ofrecen delivery en RepÃºblica Dominicana.',
     },
     'pet-friendly': {
         label: 'Negocios pet friendly',
@@ -103,7 +105,7 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
     'con-reservas': {
         label: 'Negocios con reservaciones',
         feature: 'reservaciones',
-        description: 'Compara negocios que aceptan reservaciones en línea o por WhatsApp.',
+        description: 'Compara negocios que aceptan reservaciones en lÃ­nea o por WhatsApp.',
     },
     accesibles: {
         label: 'Negocios accesibles',
@@ -113,6 +115,7 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
 };
 
 const PAGE_SIZE = 12;
+type ListingViewMode = 'list' | 'map';
 
 function buildPagination(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
     if (totalPages <= 7) {
@@ -173,9 +176,11 @@ export function BusinessesList() {
     const currentFeature = searchParams.get('feature') || '';
     const currentOpenNow = searchParams.get('openNow') === 'true';
     const currentVerified = searchParams.get('verified') === 'true';
+    const currentView: ListingViewMode = searchParams.get('view') === 'map' ? 'map' : 'list';
     const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
     const currentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
     const [searchInput, setSearchInput] = useState(currentSearch);
+    const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
     const paginationItems = useMemo(
         () => buildPagination(currentPage, totalPages),
         [currentPage, totalPages],
@@ -203,6 +208,16 @@ export function BusinessesList() {
         sorted.sort((left, right) => left.name.localeCompare(right.name, 'es'));
         return sorted;
     }, [businesses, sortKey]);
+    const mappableBusinesses = useMemo(
+        () => sortedBusinesses.filter(
+            (business) => typeof business.latitude === 'number' && typeof business.longitude === 'number',
+        ),
+        [sortedBusinesses],
+    );
+    const selectedBusiness = useMemo(
+        () => sortedBusinesses.find((business) => business.id === selectedBusinessId) ?? null,
+        [selectedBusinessId, sortedBusinesses],
+    );
     const resultsCountLabel = useMemo(() => {
         if (loading) {
             return 'Cargando resultados...';
@@ -314,6 +329,23 @@ export function BusinessesList() {
     useEffect(() => {
         setSearchInput(currentSearch);
     }, [currentSearch]);
+
+    useEffect(() => {
+        if (mappableBusinesses.length === 0) {
+            if (selectedBusinessId !== null) {
+                setSelectedBusinessId(null);
+            }
+            return;
+        }
+
+        const selectedStillVisible = selectedBusinessId
+            ? mappableBusinesses.some((business) => business.id === selectedBusinessId)
+            : false;
+
+        if (!selectedStillVisible) {
+            setSelectedBusinessId(mappableBusinesses[0].id);
+        }
+    }, [mappableBusinesses, selectedBusinessId]);
 
     const loadFilters = useCallback(async () => {
         try {
@@ -499,6 +531,50 @@ export function BusinessesList() {
         }).catch(() => undefined);
     }, [currentCategory, currentCity, currentFeature, currentOpenNow, currentPage, currentProvince, currentSearch, currentSector]);
 
+    const trackListingEvent = useCallback((
+        eventType: 'LISTING_FILTER_APPLY' | 'LISTING_VIEW_CHANGE' | 'LISTING_MAP_SELECT',
+        metadata: Record<string, unknown>,
+        overrides: { businessId?: string } = {},
+    ) => {
+        void trackGrowthSignal({
+            eventType,
+            businessId: overrides.businessId,
+            categoryId: currentCategory || undefined,
+            provinceId: currentProvince || undefined,
+            cityId: currentCity || undefined,
+            searchQuery: currentSearch || undefined,
+            metadata: {
+                page: currentPage,
+                currentView,
+                feature: currentFeature || undefined,
+                sectorId: currentSector || undefined,
+                openNow: currentOpenNow,
+                verified: currentVerified,
+                ...metadata,
+            },
+        });
+    }, [
+        currentCategory,
+        currentCity,
+        currentFeature,
+        currentOpenNow,
+        currentPage,
+        currentProvince,
+        currentSearch,
+        currentSector,
+        currentVerified,
+        currentView,
+    ]);
+
+    const handleMapSelectBusiness = useCallback((businessId: string) => {
+        setSelectedBusinessId(businessId);
+        trackListingEvent('LISTING_MAP_SELECT', {
+            selectedBusinessId: businessId,
+            resultsOnPage: sortedBusinesses.length,
+            mappableResults: mappableBusinesses.length,
+        }, { businessId });
+    }, [mappableBusinesses.length, sortedBusinesses.length, trackListingEvent]);
+
     const updateFilter = useCallback((
         key: string,
         value: string,
@@ -551,6 +627,44 @@ export function BusinessesList() {
             });
         });
     }, [setSearchParams, categorySlug, provinceSlug, intentSlug, searchParams, navigate]);
+
+    const handleTrackedFilterChange = useCallback((
+        key: string,
+        value: string,
+        metadata: Record<string, unknown>,
+    ) => {
+        trackListingEvent('LISTING_FILTER_APPLY', {
+            filterKey: key,
+            value: value || null,
+            ...metadata,
+        });
+        updateFilter(key, value);
+    }, [trackListingEvent, updateFilter]);
+
+    const handleViewModeChange = useCallback((nextView: ListingViewMode) => {
+        if (nextView === currentView) {
+            return;
+        }
+
+        trackListingEvent('LISTING_VIEW_CHANGE', {
+            nextView,
+            previousView: currentView,
+            resultsOnPage: sortedBusinesses.length,
+            mappableResults: mappableBusinesses.length,
+        });
+
+        startTransition(() => {
+            setSearchParams((previous) => {
+                const params = new URLSearchParams(previous);
+                if (nextView === 'map') {
+                    params.set('view', 'map');
+                } else {
+                    params.delete('view');
+                }
+                return params;
+            });
+        });
+    }, [currentView, mappableBusinesses.length, setSearchParams, sortedBusinesses.length, trackListingEvent]);
 
     useEffect(() => {
         if (!currentProvince) {
@@ -654,23 +768,33 @@ export function BusinessesList() {
     };
 
     const handleClearFilters = useCallback(() => {
+        trackListingEvent('LISTING_FILTER_APPLY', {
+            filterKey: 'clear_all',
+            value: null,
+            source: 'filters-panel',
+        });
         setSearchInput('');
         if (categorySlug || provinceSlug || intentSlug) {
             navigate('/businesses');
             return;
         }
         setSearchParams({});
-    }, [categorySlug, intentSlug, navigate, provinceSlug, setSearchParams]);
+    }, [categorySlug, intentSlug, navigate, provinceSlug, setSearchParams, trackListingEvent]);
 
     useEffect(() => {
         const debounceTimer = window.setTimeout(() => {
             if (searchInput !== currentSearch) {
+                trackListingEvent('LISTING_FILTER_APPLY', {
+                    filterKey: 'search',
+                    value: searchInput.trim() || null,
+                    source: 'topbar-search',
+                });
                 updateFilter('search', searchInput, { resetPage: true });
             }
         }, 350);
 
         return () => window.clearTimeout(debounceTimer);
-    }, [searchInput, currentSearch, updateFilter]);
+    }, [searchInput, currentSearch, trackListingEvent, updateFilter]);
 
     useEffect(() => {
         const headingBase = activeIntent
@@ -678,20 +802,20 @@ export function BusinessesList() {
             : activeCategory && activeProvince
             ? `${activeCategory.name} en ${activeProvince.name}`
             : activeCategory
-                ? `${activeCategory.name} en República Dominicana`
+                ? `${activeCategory.name} en RepÃºblica Dominicana`
                 : activeProvince
                     ? `Negocios en ${activeProvince.name}`
-                    : 'Directorio de negocios en República Dominicana';
+                    : 'Directorio de negocios en RepÃºblica Dominicana';
 
         const descriptionBase = activeIntent
-            ? `${activeIntent.description} Contacta por WhatsApp o teléfono desde AquiTa.do.`
+            ? `${activeIntent.description} Contacta por WhatsApp o telÃ©fono desde AquiTa.do.`
             : activeCategory && activeProvince
             ? `Descubre ${activeCategory.name.toLowerCase()} en ${activeProvince.name}. Compara opciones locales, contacta por WhatsApp y reserva en AquiTa.do.`
             : activeCategory
-                ? `Explora ${activeCategory.name.toLowerCase()} en República Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
+                ? `Explora ${activeCategory.name.toLowerCase()} en RepÃºblica Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
                 : activeProvince
-                    ? `Encuentra negocios locales en ${activeProvince.name}. Descubre perfiles verificados, reseñas y canales de contacto.`
-                    : 'Explora negocios locales en República Dominicana. Filtra por categoría y provincia para encontrar opciones verificadas.';
+                    ? `Encuentra negocios locales en ${activeProvince.name}. Descubre perfiles verificados, reseÃ±as y canales de contacto.`
+                    : 'Explora negocios locales en RepÃºblica Dominicana. Filtra por categorÃ­a y provincia para encontrar opciones verificadas.';
 
         applySeoMeta({
             title: `${headingBase} | AquiTa.do`,
@@ -801,7 +925,7 @@ export function BusinessesList() {
                             <select
                                 id="businesses-province-top"
                                 value={currentProvince}
-                                onChange={(e) => updateFilter('provinceId', e.target.value)}
+                                onChange={(e) => handleTrackedFilterChange('provinceId', e.target.value, { source: 'topbar-province' })}
                                 className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm text-slate-700 transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                             >
                                 <option value="">Toda Republica Dominicana</option>
@@ -814,6 +938,32 @@ export function BusinessesList() {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                            <button
+                                type="button"
+                                onClick={() => handleViewModeChange('list')}
+                                aria-pressed={currentView === 'list'}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    currentView === 'list'
+                                        ? 'bg-white text-primary-700 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                Lista
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleViewModeChange('map')}
+                                aria-pressed={currentView === 'map'}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    currentView === 'map'
+                                        ? 'bg-white text-primary-700 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                Mapa
+                            </button>
+                        </div>
                         <button
                             type="button"
                             onClick={() => setFiltersOpen((prev) => !prev)}
@@ -831,7 +981,15 @@ export function BusinessesList() {
                         <div className="relative">
                             <select
                                 value={sortKey}
-                                onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
+                                onChange={(e) => {
+                                    const nextSort = e.target.value as typeof sortKey;
+                                    setSortKey(nextSort);
+                                    trackListingEvent('LISTING_FILTER_APPLY', {
+                                        filterKey: 'sort',
+                                        value: nextSort,
+                                        source: 'topbar-sort',
+                                    });
+                                }}
                                 className="min-w-[170px] appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-8 text-sm text-slate-700 transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                             >
                                 <option value="relevance">Mas relevantes</option>
@@ -849,7 +1007,14 @@ export function BusinessesList() {
                 </div>
             </div>
 
-            <p className="mt-3 text-xs text-slate-500">{resultsCountLabel}</p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-slate-500">{resultsCountLabel}</p>
+                {currentView === 'map' ? (
+                    <p className="text-xs text-slate-500">
+                        {mappableBusinesses.length} de {sortedBusinesses.length} resultados visibles con punto en mapa
+                    </p>
+                ) : null}
+            </div>
 
             <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
                 <aside className={`${filtersOpen ? 'block' : 'hidden'} lg:block`}>
@@ -891,7 +1056,7 @@ export function BusinessesList() {
                                             <input
                                                 type="checkbox"
                                                 checked={currentCategory === cat.id}
-                                                onChange={(event) => updateFilter('categoryId', event.target.checked ? cat.id : '')}
+                                                onChange={(event) => handleTrackedFilterChange('categoryId', event.target.checked ? cat.id : '', { source: 'sidebar-category' })}
                                                 className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500/30"
                                             />
                                             <span>
@@ -909,7 +1074,7 @@ export function BusinessesList() {
                                     <select
                                         id="businesses-province"
                                         value={currentProvince}
-                                        onChange={(e) => updateFilter('provinceId', e.target.value)}
+                                        onChange={(e) => handleTrackedFilterChange('provinceId', e.target.value, { source: 'sidebar-province' })}
                                         className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                                     >
                                         <option value="">Todas las provincias</option>
@@ -923,7 +1088,7 @@ export function BusinessesList() {
                                     <select
                                         id="businesses-city"
                                         value={currentCity}
-                                        onChange={(e) => updateFilter('cityId', e.target.value)}
+                                        onChange={(e) => handleTrackedFilterChange('cityId', e.target.value, { source: 'sidebar-city' })}
                                         disabled={!currentProvince}
                                         className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none disabled:bg-slate-50 disabled:text-slate-400"
                                     >
@@ -938,7 +1103,7 @@ export function BusinessesList() {
                                     <select
                                         id="businesses-sector"
                                         value={currentSector}
-                                        onChange={(e) => updateFilter('sectorId', e.target.value)}
+                                        onChange={(e) => handleTrackedFilterChange('sectorId', e.target.value, { source: 'sidebar-sector' })}
                                         disabled={!currentCity || sectors.length === 0}
                                         className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none disabled:bg-slate-50 disabled:text-slate-400"
                                     >
@@ -973,7 +1138,7 @@ export function BusinessesList() {
                                         <input
                                             type="checkbox"
                                             checked={currentOpenNow}
-                                            onChange={(event) => updateFilter('openNow', event.target.checked ? 'true' : '')}
+                                            onChange={(event) => handleTrackedFilterChange('openNow', event.target.checked ? 'true' : '', { source: 'sidebar-open-now' })}
                                             className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500/30"
                                         />
                                         Abierto ahora
@@ -982,7 +1147,7 @@ export function BusinessesList() {
                                         <input
                                             type="checkbox"
                                             checked={currentVerified}
-                                            onChange={(event) => updateFilter('verified', event.target.checked ? 'true' : '')}
+                                            onChange={(event) => handleTrackedFilterChange('verified', event.target.checked ? 'true' : '', { source: 'sidebar-verified' })}
                                             className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500/30"
                                         />
                                         Verificados
@@ -1027,11 +1192,41 @@ export function BusinessesList() {
                                             <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">Patrocinado #{placement.placementRank}</p>
                                             <p className="mt-1 font-semibold text-slate-900">{placement.business.name}</p>
                                             <p className="mt-1 text-xs text-slate-600">Campana: {placement.campaign.name}</p>
-                                            <p className="mt-1 text-xs text-slate-600">CPC {placement.campaign.bidAmount} · CTR {placement.campaign.ctr}%</p>
+                                            <p className="mt-1 text-xs text-slate-600">CPC {placement.campaign.bidAmount} Â· CTR {placement.campaign.ctr}%</p>
                                         </Link>
                                     ))}
                                 </div>
                             )}
+
+                            {currentView === 'map' ? (
+                                <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                                    <div className="mb-3 flex flex-col gap-3 border-b border-slate-100 pb-3 md:flex-row md:items-center md:justify-between">
+                                        <div>
+                                            <h2 className="text-sm font-semibold text-slate-900">Mapa sincronizado con el listado</h2>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Los filtros activos y la paginacion de esta vista se reflejan en el mapa.
+                                                {` ${mappableBusinesses.length} de ${sortedBusinesses.length} resultados visibles tienen coordenadas.`}
+                                            </p>
+                                        </div>
+                                        {selectedBusiness ? (
+                                            <Link
+                                                to={`/businesses/${selectedBusiness.slug || selectedBusiness.id}`}
+                                                onClick={() => trackBusinessClick(selectedBusiness.id, 'listing-map-selected')}
+                                                className="text-xs font-semibold text-primary-700 transition hover:text-primary-800"
+                                            >
+                                                Ver {selectedBusiness.name}
+                                            </Link>
+                                        ) : null}
+                                    </div>
+                                    <BusinessesMap
+                                        businesses={sortedBusinesses}
+                                        selectedBusinessId={selectedBusinessId}
+                                        onSelectBusiness={handleMapSelectBusiness}
+                                        onOpenBusiness={(businessId) => trackBusinessClick(businessId, 'listing-map-selected')}
+                                        emptyLabel="No hay coordenadas suficientes en esta pagina para dibujar el mapa todavia."
+                                    />
+                                </div>
+                            ) : null}
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 {sortedBusinesses.map((biz) => {
@@ -1040,11 +1235,13 @@ export function BusinessesList() {
                                     const primaryCategory = biz.categories?.[0]?.category ?? null;
                                     const secondaryCategory = biz.categories?.[1]?.category ?? null;
                                     const reviewCount = biz._count?.reviews ?? 0;
-                                    const locationLabel = [biz.sector?.name, biz.city?.name || biz.province?.name].filter(Boolean).join(' • ');
+                                    const locationLabel = [biz.sector?.name, biz.city?.name || biz.province?.name].filter(Boolean).join(' â€¢ ');
                                     const priceLabel = businessPriceRangeLabel(biz.priceRange);
                                     const priceChip = priceLabel ? priceLabel.split(' ')[0] : null;
                                     const ratingValue = Number(biz.reputationScore ?? 0);
                                     const ratingDisplay = Number.isFinite(ratingValue) && ratingValue > 0 ? (ratingValue / 20).toFixed(1) : null;
+                                    const isMappable = typeof biz.latitude === 'number' && typeof biz.longitude === 'number';
+                                    const isSelectedOnMap = currentView === 'map' && isMappable && selectedBusinessId === biz.id;
 
                                     return (
                                         <Link
@@ -1053,9 +1250,23 @@ export function BusinessesList() {
                                             onClick={() => {
                                                 trackBusinessClick(biz.id, 'businesses-list');
                                             }}
-                                            onMouseEnter={() => preloadRouteChunk(businessPath)}
-                                            onFocus={() => preloadRouteChunk(businessPath)}
-                                            className="group rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md"
+                                            onMouseEnter={() => {
+                                                preloadRouteChunk(businessPath);
+                                                if (currentView === 'map' && isMappable) {
+                                                    setSelectedBusinessId(biz.id);
+                                                }
+                                            }}
+                                            onFocus={() => {
+                                                preloadRouteChunk(businessPath);
+                                                if (currentView === 'map' && isMappable) {
+                                                    setSelectedBusinessId(biz.id);
+                                                }
+                                            }}
+                                            className={`group rounded-2xl border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                                                isSelectedOnMap
+                                                    ? 'border-primary-300 ring-2 ring-primary-100'
+                                                    : 'border-slate-200 hover:border-primary-200'
+                                            }`}
                                         >
                                             <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-100">
                                                 {biz.images?.[0] ? (
@@ -1146,7 +1357,7 @@ export function BusinessesList() {
                                                     <span>{locationLabel || biz.province?.name || biz.address}</span>
                                                     {biz.distanceKm ? (
                                                         <>
-                                                            <span className="text-slate-400">•</span>
+                                                            <span className="text-slate-400">â€¢</span>
                                                             <span>{biz.distanceKm.toFixed(1)} km</span>
                                                         </>
                                                     ) : null}
@@ -1171,6 +1382,11 @@ export function BusinessesList() {
                                                                     : 'bg-red-50 text-red-700'
                                                         }`}>
                                                             Confianza {trust.score}
+                                                        </span>
+                                                    ) : null}
+                                                    {currentView === 'map' && !isMappable ? (
+                                                        <span className="rounded-full border border-dashed border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                                                            Sin punto en mapa
                                                         </span>
                                                     ) : null}
                                                 </div>

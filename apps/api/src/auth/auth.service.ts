@@ -4,17 +4,19 @@ import {
     ConflictException,
     Inject,
     Injectable,
+    Logger,
     UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { CookieOptions, Request, Response } from 'express';
 import { Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
+import { ChangePasswordDto, GoogleAuthDto, LoginDto, RegisterDto } from './dto/auth.dto';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { ObservabilityService } from '../observability/observability.service';
 import {
     buildTotpOtpauthUrl,
     generateTotpSecret,
@@ -31,14 +33,36 @@ type AuthSessionUser = {
     name: string;
     email: string;
     phone: string | null;
+    avatarUrl: string | null;
     role: Role;
     createdAt: Date;
     updatedAt: Date;
     twoFactorEnabled: boolean;
 };
 
+type GoogleIdentityPayload = {
+    subject: string;
+    email: string;
+    name: string;
+    avatarUrl: string | null;
+};
+
+type GoogleTokenInfoResponse = {
+    aud?: string;
+    azp?: string;
+    email?: string;
+    email_verified?: boolean | string;
+    exp?: string;
+    iss?: string;
+    name?: string;
+    picture?: string;
+    sub?: string;
+};
+
 @Injectable()
 export class AuthService {
+    private readonly logger = new Logger(AuthService.name);
+
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
@@ -48,6 +72,8 @@ export class AuthService {
         private readonly configService: ConfigService,
         @Inject(IntegrationsService)
         private readonly integrationsService: IntegrationsService,
+        @Inject(ObservabilityService)
+        private readonly observabilityService: ObservabilityService,
     ) { }
 
     async register(dto: RegisterDto, request: Request, response: Response) {
@@ -56,25 +82,16 @@ export class AuthService {
         });
 
         if (existingUser) {
-            throw new ConflictException('El correo electrónico ya está registrado');
+            throw new ConflictException('El correo electronico ya esta registrado');
         }
 
-        const rawRequestedRole = (dto as { role?: unknown }).role;
-        if (
-            rawRequestedRole !== undefined
-            && rawRequestedRole !== 'USER'
-            && rawRequestedRole !== 'BUSINESS_OWNER'
-        ) {
-            throw new BadRequestException('Rol no permitido para registro público');
-        }
-
-        const requestedRole: Role = rawRequestedRole === 'BUSINESS_OWNER' ? 'BUSINESS_OWNER' : 'USER';
+        const requestedRole = this.resolveRequestedRole(dto.role);
         const requestedPhone = dto.phone?.trim();
         let normalizedPhone: string | null = null;
         if (requestedPhone && requestedPhone.length > 0) {
             const phoneValidation = await this.integrationsService.validateDominicanPhone(requestedPhone);
             if (!phoneValidation.isValid || !phoneValidation.normalizedPhone) {
-                throw new BadRequestException('El teléfono debe ser un número dominicano válido');
+                throw new BadRequestException('El telefono debe ser un numero dominicano valido');
             }
             normalizedPhone = phoneValidation.normalizedPhone;
         }
@@ -91,20 +108,7 @@ export class AuthService {
             },
         });
 
-        return this.issueAuthSession(
-            {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                phone: user.phone,
-                role: user.role,
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt,
-                twoFactorEnabled: user.twoFactorEnabled,
-            },
-            request,
-            response,
-        );
+        return this.issueAuthSession(this.toAuthSessionUser(user), request, response);
     }
 
     async login(dto: LoginDto, request: Request, response: Response) {
@@ -113,30 +117,41 @@ export class AuthService {
         });
 
         if (!user) {
-            throw new UnauthorizedException('Credenciales inválidas');
+            throw new UnauthorizedException('Credenciales invalidas');
         }
 
         const isPasswordValid = await bcrypt.compare(dto.password, user.password);
         if (!isPasswordValid) {
-            throw new UnauthorizedException('Credenciales inválidas');
+            throw new UnauthorizedException('Credenciales invalidas');
         }
 
         this.assertAdminSecondFactor(user.role, user.twoFactorEnabled, user.twoFactorSecret, dto.twoFactorCode);
 
-        const session = await this.issueAuthSession(
-            {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                phone: user.phone,
-                role: user.role,
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt,
-                twoFactorEnabled: user.twoFactorEnabled,
-            },
-            request,
-            response,
+        const session = await this.issueAuthSession(this.toAuthSessionUser(user), request, response);
+
+        if (user.role === 'ADMIN' && !user.twoFactorEnabled) {
+            return {
+                ...session,
+                securityWarnings: ['ADMIN_2FA_NOT_ENABLED'],
+            };
+        }
+
+        return session;
+    }
+
+    async authenticateWithGoogle(dto: GoogleAuthDto, request: Request, response: Response) {
+        const googleIdentity = await this.verifyGoogleIdToken(dto.idToken);
+        const requestedRole = this.resolveRequestedRole(dto.role);
+        const user = await this.findOrCreateUserFromGoogleIdentity(googleIdentity, requestedRole);
+
+        this.assertAdminSecondFactor(
+            user.role,
+            user.twoFactorEnabled,
+            user.twoFactorSecret,
+            dto.twoFactorCode,
         );
+
+        const session = await this.issueAuthSession(this.toAuthSessionUser(user), request, response);
 
         if (user.role === 'ADMIN' && !user.twoFactorEnabled) {
             return {
@@ -159,7 +174,7 @@ export class AuthService {
             true,
         );
         if (!normalizedToken) {
-            throw new UnauthorizedException('Refresh token inválido');
+            throw new UnauthorizedException('Refresh token invalido');
         }
 
         const payload = this.verifyRefreshToken(normalizedToken);
@@ -173,6 +188,7 @@ export class AuthService {
                         id: true,
                         name: true,
                         email: true,
+                        avatarUrl: true,
                         phone: true,
                         role: true,
                         createdAt: true,
@@ -184,11 +200,11 @@ export class AuthService {
         });
 
         if (!storedRefreshToken || storedRefreshToken.revokedAt || storedRefreshToken.expiresAt <= new Date()) {
-            throw new UnauthorizedException('Refresh token inválido o expirado');
+            throw new UnauthorizedException('Refresh token invalido o expirado');
         }
 
         if (payload.sub !== storedRefreshToken.userId) {
-            throw new UnauthorizedException('Refresh token inválido');
+            throw new UnauthorizedException('Refresh token invalido');
         }
 
         return this.issueAuthSession(
@@ -220,7 +236,7 @@ export class AuthService {
         }
 
         this.clearRefreshCookie(response);
-        return { message: 'Sesión cerrada' };
+        return { message: 'Sesion cerrada' };
     }
 
     async changePassword(userId: string, dto: ChangePasswordDto, response: Response) {
@@ -238,11 +254,11 @@ export class AuthService {
 
         const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, user.password);
         if (!isCurrentPasswordValid) {
-            throw new UnauthorizedException('La contraseña actual no es correcta');
+            throw new UnauthorizedException('La contrasena actual no es correcta');
         }
 
         if (dto.currentPassword === dto.newPassword) {
-            throw new BadRequestException('La nueva contraseña debe ser diferente a la actual');
+            throw new BadRequestException('La nueva contrasena debe ser diferente a la actual');
         }
 
         const hashedPassword = await bcrypt.hash(dto.newPassword, 12);
@@ -267,7 +283,132 @@ export class AuthService {
         });
 
         this.clearRefreshCookie(response);
-        return { message: 'Contraseña actualizada. Inicia sesión nuevamente.' };
+        return { message: 'Contrasena actualizada. Inicia sesion nuevamente.' };
+    }
+
+    async requestPasswordReset(email: string) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const genericResponse = {
+            message: 'Si el correo existe, enviaremos un enlace para restablecer la contrasena.',
+        };
+
+        const user = await this.prisma.user.findUnique({
+            where: { email: normalizedEmail },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+            },
+        });
+
+        if (!user) {
+            return genericResponse;
+        }
+
+        const rawToken = randomBytes(32).toString('hex');
+        const tokenHash = this.hashToken(rawToken);
+        const expiresAt = new Date(Date.now() + this.resolvePasswordResetTtlMinutes() * 60 * 1000);
+        const resetUrl = this.buildPasswordResetUrl(rawToken);
+
+        await this.prisma.$transaction(async (tx) => {
+            await tx.passwordResetToken.deleteMany({
+                where: {
+                    userId: user.id,
+                },
+            });
+
+            await tx.passwordResetToken.create({
+                data: {
+                    userId: user.id,
+                    tokenHash,
+                    expiresAt,
+                },
+            });
+        });
+
+        await this.sendPasswordResetLink({
+            name: user.name,
+            email: user.email,
+            resetUrl,
+            expiresAt,
+        });
+
+        if (this.isPasswordResetDebugEnabled()) {
+            return {
+                ...genericResponse,
+                debugResetToken: rawToken,
+                debugResetUrl: resetUrl,
+            };
+        }
+
+        return genericResponse;
+    }
+
+    async resetPassword(token: string, newPassword: string) {
+        const normalizedToken = token.trim();
+        const tokenHash = this.hashToken(normalizedToken);
+
+        const resetToken = await this.prisma.passwordResetToken.findUnique({
+            where: { tokenHash },
+            select: {
+                id: true,
+                userId: true,
+                expiresAt: true,
+                usedAt: true,
+                user: {
+                    select: {
+                        id: true,
+                        password: true,
+                    },
+                },
+            },
+        });
+
+        if (!resetToken || resetToken.usedAt || resetToken.expiresAt <= new Date()) {
+            throw new BadRequestException('El enlace de recuperacion no es valido o ya expiro');
+        }
+
+        const isSamePassword = await bcrypt.compare(newPassword, resetToken.user.password);
+        if (isSamePassword) {
+            throw new BadRequestException('La nueva contrasena debe ser diferente a la actual');
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+        await this.prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: resetToken.userId },
+                data: {
+                    password: hashedPassword,
+                },
+            });
+
+            await tx.passwordResetToken.update({
+                where: { id: resetToken.id },
+                data: {
+                    usedAt: new Date(),
+                },
+            });
+
+            await tx.passwordResetToken.deleteMany({
+                where: {
+                    userId: resetToken.userId,
+                    id: { not: resetToken.id },
+                },
+            });
+
+            await tx.refreshToken.updateMany({
+                where: {
+                    userId: resetToken.userId,
+                    revokedAt: null,
+                },
+                data: {
+                    revokedAt: new Date(),
+                },
+            });
+        });
+
+        return { message: 'Contrasena restablecida. Inicia sesion con la nueva clave.' };
     }
 
     async getTwoFactorStatus(userId: string) {
@@ -357,11 +498,11 @@ export class AuthService {
         }
 
         if (!user.twoFactorPendingSecret) {
-            throw new BadRequestException('No hay configuración 2FA pendiente');
+            throw new BadRequestException('No hay configuracion 2FA pendiente');
         }
 
         if (!verifyTotpCode(user.twoFactorPendingSecret, code)) {
-            throw new UnauthorizedException('Código 2FA inválido');
+            throw new UnauthorizedException('Codigo 2FA invalido');
         }
 
         await this.prisma.$transaction(async (tx) => {
@@ -388,7 +529,7 @@ export class AuthService {
 
         return {
             enabled: true,
-            message: '2FA habilitado correctamente. Inicia sesión nuevamente.',
+            message: '2FA habilitado correctamente. Inicia sesion nuevamente.',
         };
     }
 
@@ -412,11 +553,11 @@ export class AuthService {
         }
 
         if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-            throw new BadRequestException('2FA no está habilitado');
+            throw new BadRequestException('2FA no esta habilitado');
         }
 
         if (!verifyTotpCode(user.twoFactorSecret, code)) {
-            throw new UnauthorizedException('Código 2FA inválido');
+            throw new UnauthorizedException('Codigo 2FA invalido');
         }
 
         await this.prisma.$transaction(async (tx) => {
@@ -443,8 +584,198 @@ export class AuthService {
 
         return {
             enabled: false,
-            message: '2FA deshabilitado. Inicia sesión nuevamente.',
+            message: '2FA deshabilitado. Inicia sesion nuevamente.',
         };
+    }
+
+    private resolveRequestedRole(role?: unknown): Role {
+        if (role !== undefined && role !== 'USER' && role !== 'BUSINESS_OWNER') {
+            throw new BadRequestException('Rol no permitido para registro publico');
+        }
+
+        return role === 'BUSINESS_OWNER' ? 'BUSINESS_OWNER' : 'USER';
+    }
+
+    private toAuthSessionUser(user: {
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        avatarUrl?: string | null;
+        role: Role;
+        createdAt: Date;
+        updatedAt: Date;
+        twoFactorEnabled: boolean;
+    }): AuthSessionUser {
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            avatarUrl: user.avatarUrl ?? null,
+            role: user.role,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            twoFactorEnabled: user.twoFactorEnabled,
+        };
+    }
+
+    private async verifyGoogleIdToken(idToken: string): Promise<GoogleIdentityPayload> {
+        const googleClientId = this.resolveGoogleClientId();
+        const requestUrl = new URL('https://oauth2.googleapis.com/tokeninfo');
+        requestUrl.searchParams.set('id_token', idToken.trim());
+
+        let googleResponse: globalThis.Response;
+        try {
+            googleResponse = await fetch(requestUrl, {
+                method: 'GET',
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Google identity verification failed (${error instanceof Error ? error.message : String(error)})`,
+            );
+            throw new UnauthorizedException('No se pudo validar la identidad de Google');
+        }
+
+        if (!googleResponse.ok) {
+            throw new UnauthorizedException('Token de Google invalido');
+        }
+
+        const payload = await googleResponse.json() as GoogleTokenInfoResponse;
+        const audience = String(payload.aud ?? '').trim();
+        const issuer = String(payload.iss ?? '').trim();
+        const subject = String(payload.sub ?? '').trim();
+        const email = String(payload.email ?? '').trim().toLowerCase();
+        const emailVerified = payload.email_verified === true
+            || String(payload.email_verified ?? '').trim().toLowerCase() === 'true';
+
+        if (audience !== googleClientId) {
+            throw new UnauthorizedException('Token de Google invalido');
+        }
+
+        if (
+            issuer.length > 0
+            && issuer !== 'accounts.google.com'
+            && issuer !== 'https://accounts.google.com'
+        ) {
+            throw new UnauthorizedException('Token de Google invalido');
+        }
+
+        if (!subject || !email || !emailVerified) {
+            throw new UnauthorizedException('La cuenta de Google no pudo ser verificada');
+        }
+
+        const candidateAvatarUrl = String(payload.picture ?? '').trim();
+        const avatarUrl = /^https?:\/\//i.test(candidateAvatarUrl)
+            ? candidateAvatarUrl
+            : null;
+
+        return {
+            subject,
+            email,
+            name: String(payload.name ?? '').trim() || email.split('@')[0] || 'Usuario Google',
+            avatarUrl,
+        };
+    }
+
+    private resolveGoogleClientId(): string {
+        const clientId = this.configService.get<string>('GOOGLE_OAUTH_CLIENT_ID')?.trim();
+        if (!clientId) {
+            throw new BadRequestException('Google sign-in no esta configurado');
+        }
+
+        return clientId;
+    }
+
+    private async findOrCreateUserFromGoogleIdentity(
+        identity: GoogleIdentityPayload,
+        requestedRole: Role,
+    ) {
+        const authSelect = {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            avatarUrl: true,
+            role: true,
+            createdAt: true,
+            updatedAt: true,
+            twoFactorEnabled: true,
+            twoFactorSecret: true,
+            googleSubject: true,
+        } as const;
+
+        const existingByGoogleSubject = await this.prisma.user.findUnique({
+            where: { googleSubject: identity.subject },
+            select: authSelect,
+        });
+
+        if (existingByGoogleSubject) {
+            const emailChanged = existingByGoogleSubject.email !== identity.email;
+            let nextEmail = existingByGoogleSubject.email;
+
+            if (emailChanged) {
+                const emailOwner = await this.prisma.user.findUnique({
+                    where: { email: identity.email },
+                    select: { id: true },
+                });
+
+                if (!emailOwner || emailOwner.id === existingByGoogleSubject.id) {
+                    nextEmail = identity.email;
+                }
+            }
+
+            const shouldFillAvatar = !existingByGoogleSubject.avatarUrl && Boolean(identity.avatarUrl);
+            if (nextEmail !== existingByGoogleSubject.email || shouldFillAvatar) {
+                return this.prisma.user.update({
+                    where: { id: existingByGoogleSubject.id },
+                    data: {
+                        ...(nextEmail !== existingByGoogleSubject.email ? { email: nextEmail } : {}),
+                        ...(shouldFillAvatar ? { avatarUrl: identity.avatarUrl } : {}),
+                    },
+                    select: authSelect,
+                });
+            }
+
+            return existingByGoogleSubject;
+        }
+
+        const existingByEmail = await this.prisma.user.findUnique({
+            where: { email: identity.email },
+            select: authSelect,
+        });
+
+        if (existingByEmail) {
+            if (
+                existingByEmail.googleSubject
+                && existingByEmail.googleSubject !== identity.subject
+            ) {
+                throw new ConflictException('Este correo ya esta vinculado a otra cuenta de Google');
+            }
+
+            return this.prisma.user.update({
+                where: { id: existingByEmail.id },
+                data: {
+                    googleSubject: identity.subject,
+                    ...(!existingByEmail.avatarUrl && identity.avatarUrl ? { avatarUrl: identity.avatarUrl } : {}),
+                },
+                select: authSelect,
+            });
+        }
+
+        const generatedPassword = await bcrypt.hash(randomBytes(24).toString('hex'), 12);
+
+        return this.prisma.user.create({
+            data: {
+                name: identity.name,
+                email: identity.email,
+                googleSubject: identity.subject,
+                password: generatedPassword,
+                avatarUrl: identity.avatarUrl,
+                role: requestedRole,
+            },
+            select: authSelect,
+        });
     }
 
     private async issueAuthSession(
@@ -510,6 +841,7 @@ export class AuthService {
                 name: user.name,
                 email: user.email,
                 phone: user.phone,
+                avatarUrl: user.avatarUrl,
                 role: user.role,
                 twoFactorEnabled: user.twoFactorEnabled,
                 createdAt: user.createdAt.toISOString(),
@@ -546,7 +878,7 @@ export class AuthService {
         try {
             return this.jwtService.verify<AuthTokenPayload>(token, { secret: refreshSecret });
         } catch {
-            throw new UnauthorizedException('Refresh token inválido');
+            throw new UnauthorizedException('Refresh token invalido');
         }
     }
 
@@ -571,6 +903,93 @@ export class AuthService {
         }
 
         return Math.floor(configuredDays);
+    }
+
+    private resolvePasswordResetTtlMinutes(): number {
+        const configuredMinutes = Number(this.configService.get<string>('AUTH_PASSWORD_RESET_TTL_MINUTES') ?? 60);
+        if (!Number.isFinite(configuredMinutes) || configuredMinutes <= 0) {
+            return 60;
+        }
+
+        return Math.floor(configuredMinutes);
+    }
+
+    private buildPasswordResetUrl(rawToken: string): string {
+        const baseUrl = this.configService.get<string>('APP_PUBLIC_WEB_URL')?.trim() || 'http://localhost:5173';
+        const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+        return `${normalizedBaseUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
+    }
+
+    private isPasswordResetDebugEnabled(): boolean {
+        const value = this.configService.get<string>('AUTH_DEBUG_RESET_TOKENS')?.trim().toLowerCase();
+        return value === '1' || value === 'true';
+    }
+
+    private async sendPasswordResetLink(input: {
+        name: string;
+        email: string;
+        resetUrl: string;
+        expiresAt: Date;
+    }): Promise<void> {
+        const startedAt = Date.now();
+        const resendApiKey = this.configService.get<string>('RESEND_API_KEY')?.trim();
+        const resendFromEmail = this.configService.get<string>('RESEND_FROM_EMAIL')?.trim();
+        const resendReplyToEmail = this.configService.get<string>('RESEND_REPLY_TO_EMAIL')?.trim();
+        const expiresAtLabel = input.expiresAt.toLocaleString('es-DO', { hour12: false });
+
+        if (!resendApiKey || !resendFromEmail) {
+            this.logger.warn(
+                `Password reset requested for ${input.email} but email provider is not configured. Reset URL: ${input.resetUrl}`,
+            );
+            return;
+        }
+
+        let success = false;
+        try {
+            const response = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${resendApiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    from: resendFromEmail,
+                    to: [input.email],
+                    ...(resendReplyToEmail ? { reply_to: resendReplyToEmail } : {}),
+                    subject: 'Restablece tu contrasena de AquiTa.do',
+                    html: [
+                        `<p>Hola ${this.escapeHtml(input.name || 'usuario')},</p>`,
+                        '<p>Recibimos una solicitud para restablecer tu contrasena en AquiTa.do.</p>',
+                        `<p><a href="${this.escapeHtml(input.resetUrl)}">Restablecer contrasena</a></p>`,
+                        `<p>Este enlace vence el ${this.escapeHtml(expiresAtLabel)}.</p>`,
+                        '<p>Si no solicitaste este cambio, puedes ignorar este mensaje.</p>',
+                    ].join(''),
+                    text: [
+                        `Hola ${input.name || 'usuario'},`,
+                        '',
+                        'Recibimos una solicitud para restablecer tu contrasena en AquiTa.do.',
+                        `Abre este enlace: ${input.resetUrl}`,
+                        `Este enlace vence el ${expiresAtLabel}.`,
+                        '',
+                        'Si no solicitaste este cambio, puedes ignorar este mensaje.',
+                    ].join('\n'),
+                }),
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text().catch(() => '');
+                this.logger.warn(`Failed to send password reset email: HTTP ${response.status} ${errorBody}`);
+            } else {
+                success = true;
+            }
+        } finally {
+            this.observabilityService.trackExternalDependencyCall(
+                'email',
+                'password_reset_link',
+                Date.now() - startedAt,
+                success,
+            );
+        }
     }
 
     private resolveRefreshCookieName(): string {
@@ -641,7 +1060,7 @@ export class AuthService {
         }
 
         if (required) {
-            throw new UnauthorizedException('Refresh token inválido');
+            throw new UnauthorizedException('Refresh token invalido');
         }
 
         return null;
@@ -674,6 +1093,15 @@ export class AuthService {
         return createHash('sha256').update(token).digest('hex');
     }
 
+    private escapeHtml(value: string): string {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     private resolveTotpIssuer(): string {
         const configuredIssuer = this.configService.get<string>('TOTP_ISSUER')?.trim();
         return configuredIssuer && configuredIssuer.length > 0
@@ -697,11 +1125,11 @@ export class AuthService {
 
         const normalizedCode = twoFactorCode?.trim();
         if (!normalizedCode) {
-            throw new UnauthorizedException('Se requiere código 2FA para cuentas admin');
+            throw new UnauthorizedException('Se requiere codigo 2FA para cuentas admin');
         }
 
         if (!verifyTotpCode(twoFactorSecret, normalizedCode)) {
-            throw new UnauthorizedException('Código 2FA inválido');
+            throw new UnauthorizedException('Codigo 2FA invalido');
         }
     }
 

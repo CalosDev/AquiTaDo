@@ -51,6 +51,31 @@ export class UploadsController {
         );
     }
 
+    @Post('avatar')
+    @UseGuards(JwtAuthGuard)
+    @UseInterceptors(FileInterceptor('file'))
+    async uploadAvatar(
+        @UploadedFile(
+            new ParseFilePipe({
+                validators: [
+                    new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+                ],
+            }),
+        )
+        file: Express.Multer.File,
+        @CurrentUser('id') userId: string,
+    ) {
+        return this.uploadsService.uploadUserAvatar(file, userId);
+    }
+
+    @Delete('avatar')
+    @UseGuards(JwtAuthGuard)
+    async deleteAvatar(
+        @CurrentUser('id') userId: string,
+    ) {
+        return this.uploadsService.deleteUserAvatar(userId);
+    }
+
     @Delete('business-image/:imageId')
     @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
     @OrgRoles('OWNER', 'MANAGER')

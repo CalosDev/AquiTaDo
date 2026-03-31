@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Inject, Patch, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Patch, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UsersService } from './users.service';
@@ -22,7 +23,14 @@ export class UsersController {
     async updateMyProfile(
         @CurrentUser('id') userId: string,
         @Body() dto: UpdateMyProfileDto,
+        @Req() request: Request,
     ) {
+        if (Object.prototype.hasOwnProperty.call(request.body ?? {}, 'avatarUrl')) {
+            throw new BadRequestException(
+                'La foto de perfil se actualiza mediante el flujo de carga gestionada',
+            );
+        }
+
         return this.usersService.updateMyProfile(userId, dto);
     }
 

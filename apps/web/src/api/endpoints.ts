@@ -40,6 +40,12 @@ export const authApi = {
         api.post('/auth/register', data),
     login: (data: { email: string; password: string; twoFactorCode?: string }) =>
         api.post('/auth/login', data),
+    loginWithGoogle: (data: { idToken: string; role?: 'USER' | 'BUSINESS_OWNER'; twoFactorCode?: string }) =>
+        api.post('/auth/google', data),
+    requestPasswordReset: (data: { email: string }) =>
+        api.post('/auth/forgot-password', data),
+    resetPassword: (data: { token: string; newPassword: string }) =>
+        api.post('/auth/reset-password', data),
     refresh: () => api.post('/auth/refresh', {}),
     logout: () => api.post('/auth/logout', {}),
     changePassword: (data: { currentPassword: string; newPassword: string }) =>
@@ -54,7 +60,7 @@ export const authApi = {
 // ---- Users ----
 export const usersApi = {
     getMyProfileDetails: () => api.get('/users/me/profile'),
-    updateMyProfile: (data: { name?: string; phone?: string; avatarUrl?: string }) =>
+    updateMyProfile: (data: { name?: string; phone?: string }) =>
         api.patch('/users/me', data),
 };
 
@@ -166,6 +172,15 @@ export const reviewApi = {
 
 // ---- Uploads ----
 export const uploadApi = {
+    uploadAvatar: (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/upload/avatar', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
+    deleteAvatar: () =>
+        api.delete('/upload/avatar'),
     uploadBusinessImage: (businessId: string, file: File) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -337,7 +352,24 @@ export const analyticsApi = {
     }) => api.get('/analytics/market-reports', { params }),
     getMarketReportById: (reportId: string) => api.get(`/analytics/market-reports/${reportId}`),
     trackGrowthEvent: (data: {
-        eventType: 'SEARCH_QUERY' | 'SEARCH_RESULT_CLICK' | 'CONTACT_CLICK' | 'WHATSAPP_CLICK' | 'BOOKING_INTENT';
+        eventType:
+            | 'SEARCH_QUERY'
+            | 'SEARCH_RESULT_CLICK'
+            | 'CONTACT_CLICK'
+            | 'WHATSAPP_CLICK'
+            | 'BOOKING_INTENT'
+            | 'SHARE_CLICK'
+            | 'PASSWORD_RESET_REQUEST'
+            | 'PASSWORD_RESET_COMPLETE'
+            | 'GOOGLE_AUTH_SUCCESS'
+            | 'LISTING_FILTER_APPLY'
+            | 'LISTING_VIEW_CHANGE'
+            | 'LISTING_MAP_SELECT'
+            | 'PREMODERATION_FLAGGED'
+            | 'PREMODERATION_RELEASED'
+            | 'PREMODERATION_CONFIRMED'
+            | 'BUSINESS_ONBOARDING_STEP'
+            | 'BUSINESS_ONBOARDING_COMPLETE';
         businessId?: string;
         categoryId?: string;
         provinceId?: string;
@@ -564,6 +596,10 @@ export const verificationApi = {
         api.get('/verification/admin/pending-businesses', { params }),
     getModerationQueueAdmin: (params?: { limit?: number }) =>
         api.get('/verification/admin/moderation-queue', { params }),
+    resolvePreventiveModerationAdmin: (
+        businessId: string,
+        data: { decision: 'APPROVE_FOR_KYC' | 'KEEP_BLOCKED'; notes?: string },
+    ) => api.patch(`/verification/admin/businesses/${businessId}/pre-moderation`, data),
     reviewBusinessAdmin: (
         businessId: string,
         data: { status: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED'; notes?: string },

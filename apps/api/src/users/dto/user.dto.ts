@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
+import { IsEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateMyProfileDto {
     @IsOptional()
@@ -13,11 +13,8 @@ export class UpdateMyProfileDto {
     phone?: string;
 
     @IsOptional()
-    @IsString()
-    @MaxLength(500)
-    @IsUrl({
-        require_protocol: true,
-        require_tld: false,
+    @IsEmpty({
+        message: 'La foto de perfil se actualiza mediante el flujo de carga gestionada',
     })
-    avatarUrl?: string;
+    avatarUrl?: never;
 }

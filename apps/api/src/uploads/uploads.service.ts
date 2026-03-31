@@ -117,6 +117,50 @@ export class UploadsService {
         }
     }
 
+    async uploadUserAvatar(file: Express.Multer.File, userId: string) {
+        const extension = this.allowedMimeTypes[file.mimetype];
+        if (!extension) {
+            throw new BadRequestException('Formato de imagen no permitido');
+        }
+
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                avatarUrl: true,
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('Usuario no encontrado');
+        }
+
+        const storedAsset = await this.storeUserAvatarAsset(
+            file.buffer,
+            file.mimetype,
+            userId,
+            extension,
+        );
+
+        try {
+            const updatedUser = await this.prisma.user.update({
+                where: { id: userId },
+                data: {
+                    avatarUrl: storedAsset.url,
+                },
+                select: {
+                    avatarUrl: true,
+                },
+            });
+
+            await this.deleteManagedAssetByUrl(user.avatarUrl);
+            return updatedUser;
+        } catch (error) {
+            await this.deleteStoredAsset(storedAsset).catch(() => undefined);
+            throw error;
+        }
+    }
+
     async uploadVerificationDocument(
         file: Express.Multer.File,
         businessId: string,
@@ -169,6 +213,40 @@ export class UploadsService {
         };
     }
 
+    async deleteUserAvatar(userId: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                avatarUrl: true,
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('Usuario no encontrado');
+        }
+
+        if (!user.avatarUrl) {
+            return {
+                avatarUrl: null,
+            };
+        }
+
+        const previousAvatarUrl = user.avatarUrl;
+        const updatedUser = await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                avatarUrl: null,
+            },
+            select: {
+                avatarUrl: true,
+            },
+        });
+
+        await this.deleteManagedAssetByUrl(previousAvatarUrl);
+        return updatedUser;
+    }
+
     async deleteBusinessImage(
         imageId: string,
         _userId: string,
@@ -203,15 +281,7 @@ export class UploadsService {
             where: { id: imageId },
         });
 
-        await this.deleteStoredAsset({
-            url: image.url,
-            localPath: this.resolveUploadPath(image.url) ?? undefined,
-            objectKey: this.resolveObjectKeyFromUrl(image.url) ?? undefined,
-        }).catch((error) => {
-            this.logger.warn(
-                `No se pudo eliminar el archivo de imagen (${error instanceof Error ? error.message : String(error)})`,
-            );
-        });
+        await this.deleteManagedAssetByUrl(image.url);
 
         return { message: 'Imagen eliminada exitosamente' };
     }
@@ -322,6 +392,26 @@ export class UploadsService {
         );
     }
 
+    private async storeUserAvatarAsset(
+        sourceBuffer: Buffer,
+        mimeType: string,
+        userId: string,
+        extension: string,
+    ): Promise<StoredAsset> {
+        const provider = this.resolveStorageProvider();
+        const objectKey = `avatars/${userId}/${randomUUID()}.${extension}`;
+
+        if (provider === 's3') {
+            return this.uploadToS3(sourceBuffer, mimeType, objectKey);
+        }
+
+        return this.storeLocalFile(
+            sourceBuffer,
+            `avatars/${userId}`,
+            `${randomUUID()}.${extension}`,
+        );
+    }
+
     private async storeLocalFile(
         sourceBuffer: Buffer,
         relativeDirectory: string,
@@ -332,7 +422,10 @@ export class UploadsService {
 
         const filePath = path.join(uploadsDir, fileName);
         await fs.writeFile(filePath, sourceBuffer);
-        if (relativeDirectory.startsWith('businesses')) {
+        if (
+            relativeDirectory.startsWith('businesses')
+            || relativeDirectory.startsWith('avatars')
+        ) {
             void this.generateOptimizedVariants(sourceBuffer, filePath);
         }
 
@@ -383,7 +476,7 @@ export class UploadsService {
             return;
         }
 
-        const objectKey = asset.objectKey || this.resolveObjectKeyFromUrl(asset.url);
+        const objectKey = asset.objectKey || this.resolveManagedObjectKeyFromUrl(asset.url);
         if (!objectKey) {
             return;
         }
@@ -411,6 +504,23 @@ export class UploadsService {
         }
 
         return absolutePath;
+    }
+
+    private async deleteManagedAssetByUrl(assetUrl: string | null | undefined): Promise<void> {
+        if (!assetUrl) {
+            return;
+        }
+
+        const managedAsset = this.resolveManagedStoredAsset(assetUrl);
+        if (!managedAsset) {
+            return;
+        }
+
+        await this.deleteStoredAsset(managedAsset).catch((error) => {
+            this.logger.warn(
+                `No se pudo eliminar el archivo gestionado (${error instanceof Error ? error.message : String(error)})`,
+            );
+        });
     }
 
     private resolveStorageProvider(): StorageProvider {
@@ -497,7 +607,27 @@ export class UploadsService {
         }
     }
 
-    private resolveObjectKeyFromUrl(assetUrl: string): string | null {
+    private resolveManagedStoredAsset(assetUrl: string): StoredAsset | null {
+        const localPath = this.resolveUploadPath(assetUrl);
+        if (localPath) {
+            return {
+                url: assetUrl,
+                localPath,
+            };
+        }
+
+        const objectKey = this.resolveManagedObjectKeyFromUrl(assetUrl);
+        if (objectKey) {
+            return {
+                url: assetUrl,
+                objectKey,
+            };
+        }
+
+        return null;
+    }
+
+    private resolveManagedObjectKeyFromUrl(assetUrl: string): string | null {
         const normalized = assetUrl.trim();
         const publicBase = this.configService.get<string>('STORAGE_PUBLIC_BASE_URL')?.trim().replace(/\/+$/, '');
 
@@ -505,13 +635,43 @@ export class UploadsService {
             return decodeURIComponent(normalized.slice(publicBase.length + 1));
         }
 
+        if (this.resolveStorageProvider() !== 's3') {
+            return null;
+        }
+
         try {
             const parsed = new URL(normalized);
             const bucket = this.resolveS3Bucket();
             const pathname = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
-            if (pathname.startsWith(`${bucket}/`)) {
-                return pathname.slice(bucket.length + 1);
+            const endpoint = this.configService.get<string>('STORAGE_S3_ENDPOINT')?.trim().replace(/\/+$/, '');
+
+            if (endpoint) {
+                const parsedEndpoint = new URL(endpoint);
+                if (parsed.origin !== parsedEndpoint.origin) {
+                    return null;
+                }
+
+                const forcePathStyle = ['1', 'true'].includes(
+                    (this.configService.get<string>('STORAGE_S3_FORCE_PATH_STYLE') || 'false').trim().toLowerCase(),
+                );
+
+                if (forcePathStyle) {
+                    if (!pathname.startsWith(`${bucket}/`)) {
+                        return null;
+                    }
+
+                    return pathname.slice(bucket.length + 1);
+                }
+
+                return pathname || null;
             }
+
+            const region = (this.configService.get<string>('STORAGE_S3_REGION') || 'us-east-1').trim();
+            const expectedHost = `${bucket}.s3.${region}.amazonaws.com`;
+            if (parsed.hostname !== expectedHost) {
+                return null;
+            }
+
             return pathname || null;
         } catch {
             return null;

@@ -183,7 +183,7 @@ export function DashboardBusiness() {
                 }),
             );
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificaciÃ³n documental'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificacion documental'));
         }
     }, []);
 
@@ -231,7 +231,7 @@ export function DashboardBusiness() {
             const uploadPayload = (uploadRes.data || {}) as { fileUrl?: string; url?: string };
             const fileUrl = uploadPayload.fileUrl || uploadPayload.url;
             if (!fileUrl) {
-                throw new Error('No se recibiÃ³ la URL del archivo');
+                throw new Error('No se recibio la URL del archivo');
             }
 
             await verificationApi.submitDocument({
@@ -242,7 +242,7 @@ export function DashboardBusiness() {
 
             setSelectedFile(null);
             await loadVerificationData(selectedBusinessId);
-            setSuccessMessage('Documento enviado para revisiÃ³n');
+            setSuccessMessage('Documento enviado para revision');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo subir el documento'));
         } finally {
@@ -264,9 +264,9 @@ export function DashboardBusiness() {
                 notes: verificationNotes.trim() || undefined,
             });
             await loadVerificationData(selectedBusinessId);
-            setSuccessMessage('Solicitud de verificaciÃ³n enviada');
+            setSuccessMessage('Solicitud de verificacion enviada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificaciÃ³n'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificacion'));
         } finally {
             setSaving(false);
         }
@@ -308,7 +308,7 @@ export function DashboardBusiness() {
                         <p className="role-kpi-value">{totals.views ?? 0}</p>
                     </article>
                     <article className="role-kpi-card">
-                        <p className="role-kpi-label">ConversiÃ³n</p>
+                        <p className="role-kpi-label">Conversion</p>
                         <p className="role-kpi-value">{totals.conversionRate ?? 0}%</p>
                     </article>
                     <article className="role-kpi-card">
@@ -351,14 +351,14 @@ export function DashboardBusiness() {
                     <p className="text-sm uppercase tracking-wide text-primary-700 font-semibold">Primer paso</p>
                     <h2 className="font-display text-2xl font-bold text-gray-900 mt-2">Registra tu primer negocio</h2>
                     <p className="text-gray-600 mt-2 max-w-2xl">
-                        Tu panel de negocio se activa despuÃ©s de crear el primer negocio. En ese proceso se prepara tu organizaciÃ³n interna y la verificaciÃ³n documental.
+                        Tu panel de negocio se activa despues de crear el primer negocio. En ese proceso se prepara tu organizacion interna y la verificacion documental.
                     </p>
                     <div className="mt-5 flex flex-wrap gap-3">
                         <Link className="btn-primary" to="/register-business">
                             Registrar negocio ahora
                         </Link>
                         <Link className="btn-secondary" to="/businesses">
-                            Ver directorio pÃºblico
+                            Ver directorio publico
                         </Link>
                     </div>
                 </section>
@@ -389,7 +389,7 @@ export function DashboardBusiness() {
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.clicks ?? 0}</p>
                 </article>
                 <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">ConversiÃ³n</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversion</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.conversionRate ?? 0}%</p>
                 </article>
                 <article className="panel-premium p-5">
@@ -414,7 +414,7 @@ export function DashboardBusiness() {
                         )}
                     </div>
                     {businesses.length === 0 ? (
-                        <p className="text-sm text-gray-500">AÃºn no tienes negocios creados.</p>
+                        <p className="text-sm text-gray-500">Aun no tienes negocios creados.</p>
                     ) : (
                         <div className="space-y-2">
                             {businesses.map((business) => (
@@ -430,7 +430,7 @@ export function DashboardBusiness() {
                                 >
                                     <p className="font-medium text-gray-900">{business.name}</p>
                                     <p className="text-xs text-gray-500 mt-1">
-                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificaciÃ³n'}
+                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificacion'}
                                     </p>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         <span className="text-[11px] rounded-full bg-primary-50 px-2 py-1 text-primary-700">
@@ -459,7 +459,7 @@ export function DashboardBusiness() {
 
                 <article className="card p-6 lg:col-span-2 space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="font-display text-xl font-bold text-gray-900">VerificaciÃ³n documental</h2>
+                        <h2 className="font-display text-xl font-bold text-gray-900">Verificacion documental</h2>
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getStatusClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
                             {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
                         </span>
@@ -470,7 +470,7 @@ export function DashboardBusiness() {
                             Negocio seleccionado: <strong>{selectedBusiness.name}</strong>
                         </p>
                     ) : (
-                        <p className="text-sm text-gray-500">Selecciona un negocio para gestionar su verificaciÃ³n.</p>
+                        <p className="text-sm text-gray-500">Selecciona un negocio para gestionar su verificacion.</p>
                     )}
 
                     {verificationStatus?.verificationSubmittedAt && (
@@ -498,10 +498,10 @@ export function DashboardBusiness() {
                                 onChange={(event) => setDocumentType(event.target.value as VerificationDocument['documentType'])}
                                 disabled={!selectedBusinessId || saving}
                             >
-                                <option value="ID_CARD">CÃ©dula</option>
+                                <option value="ID_CARD">Cedula</option>
                                 <option value="TAX_CERTIFICATE">RNC</option>
                                 <option value="BUSINESS_LICENSE">Licencia comercial</option>
-                                <option value="ADDRESS_PROOF">Comprobante de direcciÃ³n</option>
+                                <option value="ADDRESS_PROOF">Comprobante de direccion</option>
                                 <option value="SELFIE">Selfie</option>
                                 <option value="OTHER">Otro</option>
                             </select>
@@ -519,11 +519,11 @@ export function DashboardBusiness() {
                     </form>
 
                     <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-                        <h3 className="font-semibold text-gray-900">Enviar solicitud de revisiÃ³n</h3>
+                        <h3 className="font-semibold text-gray-900">Enviar solicitud de revision</h3>
                         <textarea
                             className="input-field text-sm"
                             rows={3}
-                            placeholder="Notas para el equipo de verificaciÃ³n (opcional)"
+                            placeholder="Notas para el equipo de verificacion (opcional)"
                             value={verificationNotes}
                             onChange={(event) => setVerificationNotes(event.target.value)}
                             disabled={!selectedBusinessId || saving}
@@ -534,14 +534,14 @@ export function DashboardBusiness() {
                             onClick={() => void handleSubmitBusinessVerification()}
                             disabled={!selectedBusinessId || saving}
                         >
-                            {saving ? 'Enviando...' : 'Solicitar verificaciÃ³n'}
+                            {saving ? 'Enviando...' : 'Solicitar verificacion'}
                         </button>
                     </div>
 
                     <div className="rounded-xl border border-gray-100 p-4">
                         <h3 className="font-semibold text-gray-900 mb-3">Historial de documentos</h3>
                         {documents.length === 0 ? (
-                            <p className="text-sm text-gray-500">TodavÃ­a no has subido documentos.</p>
+                            <p className="text-sm text-gray-500">Todavia no has subido documentos.</p>
                         ) : (
                             <div className="space-y-2">
                                 {documents.map((document) => (

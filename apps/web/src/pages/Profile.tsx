@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { usersApi } from '../api/endpoints';
+import { uploadApi, usersApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { ChangePasswordCard } from '../components/ChangePasswordCard';
 import { useAuth } from '../context/useAuth';
@@ -152,14 +152,17 @@ export function Profile() {
     const { refreshProfile } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [avatarUploading, setAvatarUploading] = useState(false);
+    const [avatarRemoving, setAvatarRemoving] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [payload, setPayload] = useState<ProfilePayload | null>(null);
     const [form, setForm] = useState({
         name: '',
         phone: '',
-        avatarUrl: '',
     });
+
+    const currentAvatarUrl = payload?.user.avatarUrl || null;
 
     const initials = useMemo(() => {
         const source = form.name || payload?.user.name || 'U';
@@ -181,7 +184,6 @@ export function Profile() {
             setForm({
                 name: loaded.user.name || '',
                 phone: loaded.user.phone || '',
-                avatarUrl: loaded.user.avatarUrl || '',
             });
         } catch (error) {
             setPayload(null);
@@ -191,11 +193,25 @@ export function Profile() {
         }
     }, []);
 
+    const syncAvatarUrl = useCallback((nextAvatarUrl: string | null) => {
+        setPayload((current) => (
+            current
+                ? {
+                    ...current,
+                    user: {
+                        ...current.user,
+                        avatarUrl: nextAvatarUrl,
+                    },
+                }
+                : current
+        ));
+    }, []);
+
     useEffect(() => {
         void loadProfile();
     }, [loadProfile]);
 
-    const handleSubmit = async (event: React.FormEvent) => {
+    const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
         setSaving(true);
         setErrorMessage('');
@@ -204,7 +220,6 @@ export function Profile() {
             await usersApi.updateMyProfile({
                 name: form.name.trim(),
                 phone: form.phone.trim() || undefined,
-                avatarUrl: form.avatarUrl.trim() || undefined,
             });
             await Promise.all([loadProfile(), refreshProfile()]);
             setSuccessMessage('Perfil actualizado');
@@ -215,12 +230,56 @@ export function Profile() {
         }
     };
 
+    const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+
+        if (!file) {
+            return;
+        }
+
+        setAvatarUploading(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            const response = await uploadApi.uploadAvatar(file);
+            const nextAvatarUrl = (response.data as { avatarUrl?: string | null }).avatarUrl ?? null;
+            syncAvatarUrl(nextAvatarUrl);
+            await refreshProfile();
+            setSuccessMessage('Foto de perfil actualizada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo subir tu foto de perfil'));
+        } finally {
+            setAvatarUploading(false);
+        }
+    };
+
+    const handleAvatarRemove = async () => {
+        if (!currentAvatarUrl) {
+            return;
+        }
+
+        setAvatarRemoving(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+        try {
+            await uploadApi.deleteAvatar();
+            syncAvatarUrl(null);
+            await refreshProfile();
+            setSuccessMessage('Foto de perfil eliminada');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo eliminar tu foto de perfil'));
+        } finally {
+            setAvatarRemoving(false);
+        }
+    };
+
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <div>
                     <h1 className="font-display text-3xl font-bold text-gray-900">Mi Perfil</h1>
-                    <p className="text-sm text-gray-500">Vista personalizada según tu rol en la plataforma.</p>
+                    <p className="text-sm text-gray-500">Vista personalizada segun tu rol en la plataforma.</p>
                 </div>
                 {payload?.profileType && (
                     <span className={`text-xs px-3 py-1 rounded-full font-semibold ${getRoleBadge(payload.profileType)}`}>
@@ -260,17 +319,45 @@ export function Profile() {
                                 <input
                                     className="input-field text-sm"
                                     type="tel"
-                                    placeholder="Teléfono"
+                                    placeholder="Telefono"
                                     value={form.phone}
                                     onChange={(event) => setForm((previous) => ({ ...previous, phone: event.target.value }))}
                                 />
-                                <input
-                                    className="input-field text-sm"
-                                    type="url"
-                                    placeholder="URL de foto de perfil"
-                                    value={form.avatarUrl}
-                                    onChange={(event) => setForm((previous) => ({ ...previous, avatarUrl: event.target.value }))}
-                                />
+                                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <label
+                                            className={`btn-secondary text-sm cursor-pointer ${
+                                                avatarUploading || avatarRemoving ? 'pointer-events-none opacity-60' : ''
+                                            }`}
+                                        >
+                                            <input
+                                                className="hidden"
+                                                type="file"
+                                                accept="image/png,image/jpeg,image/webp"
+                                                onChange={handleAvatarUpload}
+                                                disabled={avatarUploading || avatarRemoving}
+                                            />
+                                            {avatarUploading
+                                                ? 'Subiendo foto...'
+                                                : currentAvatarUrl
+                                                    ? 'Cambiar foto'
+                                                    : 'Subir foto'}
+                                        </label>
+                                        {currentAvatarUrl ? (
+                                            <button
+                                                type="button"
+                                                className="btn-secondary text-sm"
+                                                onClick={handleAvatarRemove}
+                                                disabled={avatarUploading || avatarRemoving}
+                                            >
+                                                {avatarRemoving ? 'Quitando...' : 'Quitar foto'}
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        JPG, PNG o WebP. Maximo 5 MB. La foto se guarda desde el sistema, ya no por URL manual.
+                                    </p>
+                                </div>
                                 <button type="submit" className="btn-primary text-sm" disabled={saving}>
                                     {saving ? 'Guardando...' : 'Guardar cambios'}
                                 </button>
@@ -280,9 +367,9 @@ export function Profile() {
                         <div className="card p-5">
                             <h2 className="font-display text-lg font-semibold text-gray-900 mb-4">Resumen</h2>
                             <div className="flex items-center gap-3 mb-4">
-                                {form.avatarUrl ? (
+                                {currentAvatarUrl ? (
                                     <img
-                                        src={form.avatarUrl}
+                                        src={currentAvatarUrl}
                                         alt={payload.user.name}
                                         className="w-14 h-14 rounded-full object-cover border border-gray-200"
                                     />
@@ -292,12 +379,12 @@ export function Profile() {
                                     </div>
                                 )}
                                 <div>
-                                    <p className="font-semibold text-gray-900">{payload.user.name}</p>
+                                    <p className="font-semibold text-gray-900">{form.name.trim() || payload.user.name}</p>
                                     <p className="text-xs text-gray-500">{payload.user.email}</p>
                                 </div>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
-                                <p>Reseñas publicadas: <strong className="text-gray-900">{payload.userProfile.reviewCount}</strong></p>
+                                <p>Resenas publicadas: <strong className="text-gray-900">{payload.userProfile.reviewCount}</strong></p>
                                 <p>Reservas creadas: <strong className="text-gray-900">{payload.userProfile.bookingCount}</strong></p>
                                 <p>Creado: <strong className="text-gray-900">{formatDateTime(payload.user.createdAt)}</strong></p>
                             </div>
@@ -305,13 +392,13 @@ export function Profile() {
                     </div>
 
                     <ChangePasswordCard
-                        title="Cambiar contraseña"
-                        description="Actualiza tu contraseña de acceso. Al guardar, cerraremos tu sesión para que entres nuevamente con la nueva clave."
+                        title="Cambiar contrasena"
+                        description="Actualiza tu contrasena de acceso. Al guardar, cerraremos tu sesion para que entres nuevamente con la nueva clave."
                     />
 
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         <div className="card p-5">
-                            <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis reseñas</h3>
+                            <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis resenas</h3>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                                 {payload.userProfile.recentReviews.length > 0 ? payload.userProfile.recentReviews.map((review) => (
                                     <div key={review.id} className="rounded-xl border border-gray-100 p-3">
@@ -319,11 +406,11 @@ export function Profile() {
                                             <p className="font-medium text-gray-900">{review.business.name}</p>
                                             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{review.rating}/5</span>
                                         </div>
-                                        <p className="text-xs text-gray-500">{formatDateTime(review.createdAt)} · {review.moderationStatus}</p>
+                                        <p className="text-xs text-gray-500">{formatDateTime(review.createdAt)} - {review.moderationStatus}</p>
                                         <p className="text-sm text-gray-700 mt-1">{review.comment?.trim() || '(Sin comentario)'}</p>
                                     </div>
                                 )) : (
-                                    <p className="text-sm text-gray-500">Aún no tienes reseñas publicadas.</p>
+                                    <p className="text-sm text-gray-500">Aun no tienes resenas publicadas.</p>
                                 )}
                             </div>
                         </div>
@@ -340,12 +427,12 @@ export function Profile() {
                                         <p className="text-xs text-gray-500">{formatDateTime(booking.scheduledFor)}</p>
                                         <p className="text-sm text-gray-700 mt-1">
                                             Cotizado: {formatMoney(booking.quotedAmount, booking.currency)}
-                                            {' · '}
-                                            Depósito: {formatMoney(booking.depositAmount, booking.currency)}
+                                            {' - '}
+                                            Deposito: {formatMoney(booking.depositAmount, booking.currency)}
                                         </p>
                                     </div>
                                 )) : (
-                                    <p className="text-sm text-gray-500">Aún no tienes reservas registradas.</p>
+                                    <p className="text-sm text-gray-500">Aun no tienes reservas registradas.</p>
                                 )}
                             </div>
                         </div>
@@ -360,10 +447,12 @@ export function Profile() {
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <div>
                                                 <p className="font-semibold text-gray-900">{organization.name}</p>
-                                                <p className="text-xs text-gray-500">{organization.plan} · {organization.subscriptionStatus} · Rol {organization.myRole}</p>
+                                                <p className="text-xs text-gray-500">
+                                                    {organization.plan} - {organization.subscriptionStatus} - Rol {organization.myRole}
+                                                </p>
                                             </div>
                                             <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
-                                                {organization._count.businesses} negocios · {organization._count.members} miembros
+                                                {organization._count.businesses} negocios - {organization._count.members} miembros
                                             </span>
                                         </div>
                                         <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -372,9 +461,9 @@ export function Profile() {
                                                     <p className="font-medium text-gray-900">{business.name}</p>
                                                     <p className="text-xs text-gray-500">
                                                         {business.verified ? 'Verificado' : business.verificationStatus}
-                                                        {' · '}
-                                                        {business._count.reviews} reseñas
-                                                        {' · '}
+                                                        {' - '}
+                                                        {business._count.reviews} resenas
+                                                        {' - '}
                                                         {business._count.bookings} reservas
                                                     </p>
                                                 </div>
@@ -393,7 +482,7 @@ export function Profile() {
                             <div className="card p-5">
                                 <h3 className="font-display text-lg font-semibold text-gray-900 mb-2">Seguridad de administrador</h3>
                                 <p className="text-sm text-gray-600 mb-4">
-                                    La configuración de 2FA y controles de sesión de admin se gestiona en una pantalla dedicada.
+                                    La configuracion de 2FA y controles de sesion de admin se gestiona en una pantalla dedicada.
                                 </p>
                                 <Link to="/security" className="btn-secondary text-sm">
                                     Ir a Seguridad
@@ -416,7 +505,7 @@ export function Profile() {
                                         <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalBusinesses}</p>
                                     </div>
                                     <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                                        <p className="text-xs text-gray-500">Reseñas</p>
+                                        <p className="text-xs text-gray-500">Resenas</p>
                                         <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalReviews}</p>
                                     </div>
                                     <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
@@ -432,34 +521,34 @@ export function Profile() {
 
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                                 <div className="card p-5">
-                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Reseñas en riesgo</h4>
+                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Resenas en riesgo</h4>
                                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                         {payload.adminProfile.flaggedReviews.length > 0 ? payload.adminProfile.flaggedReviews.map((review) => (
                                             <div key={review.id} className="rounded-xl border border-gray-100 p-3">
-                                                <p className="font-medium text-gray-900">{review.business.name} · {review.user.name}</p>
-                                                <p className="text-xs text-gray-500">{formatDateTime(review.createdAt)} · rating {review.rating}/5</p>
+                                                <p className="font-medium text-gray-900">{review.business.name} - {review.user.name}</p>
+                                                <p className="text-xs text-gray-500">{formatDateTime(review.createdAt)} - rating {review.rating}/5</p>
                                                 <p className="text-sm text-gray-700 mt-1">{review.comment?.trim() || '(Sin comentario)'}</p>
                                                 {review.moderationReason ? (
                                                     <p className="text-xs text-red-700 mt-1">{review.moderationReason}</p>
                                                 ) : null}
                                             </div>
                                         )) : (
-                                            <p className="text-sm text-gray-500">No hay reseñas en riesgo.</p>
+                                            <p className="text-sm text-gray-500">No hay resenas en riesgo.</p>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="card p-5">
-                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Últimas organizaciones</h4>
+                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Ultimas organizaciones</h4>
                                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                         {payload.adminProfile.latestOrganizations.length > 0 ? payload.adminProfile.latestOrganizations.map((organization) => (
                                             <div key={organization.id} className="rounded-xl border border-gray-100 p-3">
                                                 <p className="font-medium text-gray-900">{organization.name}</p>
                                                 <p className="text-xs text-gray-500">
-                                                    {organization.plan} · {organization.subscriptionStatus} · {formatDateTime(organization.createdAt)}
+                                                    {organization.plan} - {organization.subscriptionStatus} - {formatDateTime(organization.createdAt)}
                                                 </p>
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    {organization._count.businesses} negocios · {organization._count.members} miembros
+                                                    {organization._count.businesses} negocios - {organization._count.members} miembros
                                                 </p>
                                             </div>
                                         )) : (

@@ -30,7 +30,7 @@ export class RegisterDto {
     @MinLength(8)
     @MaxLength(128)
     @Matches(PASSWORD_COMPLEXITY_REGEX, {
-        message: 'La contraseña debe incluir letras y números',
+        message: 'La contrasena debe incluir letras y numeros',
     })
     password!: string;
 
@@ -38,7 +38,7 @@ export class RegisterDto {
     @IsOptional()
     @IsString()
     @Matches(/^[0-9+()\-\s]{7,20}$/, {
-        message: 'El teléfono no tiene un formato válido',
+        message: 'El telefono no tiene un formato valido',
     })
     phone?: string;
 
@@ -48,6 +48,7 @@ export class RegisterDto {
 }
 
 export class LoginDto {
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     @IsEmail()
     email!: string;
 
@@ -58,7 +59,26 @@ export class LoginDto {
     @IsOptional()
     @IsString()
     @Matches(/^\d{6}$/, {
-        message: 'El código 2FA debe tener 6 dígitos',
+        message: 'El codigo 2FA debe tener 6 digitos',
+    })
+    twoFactorCode?: string;
+}
+
+export class GoogleAuthDto {
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(20)
+    idToken!: string;
+
+    @IsOptional()
+    @IsIn(['USER', 'BUSINESS_OWNER'])
+    role?: 'USER' | 'BUSINESS_OWNER';
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{6}$/, {
+        message: 'El codigo 2FA debe tener 6 digitos',
     })
     twoFactorCode?: string;
 }
@@ -72,7 +92,32 @@ export class ChangePasswordDto {
     @MinLength(8)
     @MaxLength(128)
     @Matches(PASSWORD_COMPLEXITY_REGEX, {
-        message: 'La contraseña debe incluir letras y números',
+        message: 'La contrasena debe incluir letras y numeros',
+    })
+    newPassword!: string;
+}
+
+export class ForgotPasswordDto {
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    @IsEmail()
+    @MaxLength(120)
+    email!: string;
+}
+
+export class ResetPasswordDto {
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(20)
+    @MaxLength(255)
+    token!: string;
+
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+    @IsString()
+    @MinLength(8)
+    @MaxLength(128)
+    @Matches(PASSWORD_COMPLEXITY_REGEX, {
+        message: 'La contrasena debe incluir letras y numeros',
     })
     newPassword!: string;
 }
@@ -88,7 +133,7 @@ export class TwoFactorCodeDto {
     @IsString()
     @IsNotEmpty()
     @Matches(/^\d{6}$/, {
-        message: 'El código 2FA debe tener 6 dígitos',
+        message: 'El codigo 2FA debe tener 6 digitos',
     })
     code!: string;
 }

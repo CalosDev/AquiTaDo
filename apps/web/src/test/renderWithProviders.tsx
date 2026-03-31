@@ -46,6 +46,7 @@ export function renderWithProviders(
         refreshToken: null,
         loading: false,
         login: vi.fn(),
+        loginWithGoogle: vi.fn(),
         register: vi.fn(),
         refreshProfile: vi.fn(),
         logout: vi.fn(),

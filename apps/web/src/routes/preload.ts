@@ -7,6 +7,8 @@ export const pageLoaders = {
     businessesList: () => import('../pages/BusinessesList'),
     businessDetails: () => import('../pages/BusinessDetails'),
     login: () => import('../pages/Login'),
+    forgotPassword: () => import('../pages/ForgotPassword'),
+    resetPassword: () => import('../pages/ResetPassword'),
     register: () => import('../pages/Register'),
     registerBusiness: () => import('../pages/RegisterBusiness'),
     editBusiness: () => import('../pages/EditBusiness'),
@@ -69,12 +71,22 @@ export function preloadRouteChunk(pathname: string): void {
     }
 
     if (normalizedPath === '/login') {
-        preloadMany(['login', 'register']);
+        preloadMany(['login', 'register', 'forgotPassword']);
+        return;
+    }
+
+    if (normalizedPath === '/forgot-password') {
+        preloadMany(['forgotPassword', 'login', 'resetPassword']);
+        return;
+    }
+
+    if (normalizedPath === '/reset-password') {
+        preloadMany(['resetPassword', 'login', 'forgotPassword']);
         return;
     }
 
     if (normalizedPath === '/register') {
-        preloadMany(['register', 'login']);
+        preloadMany(['register', 'login', 'forgotPassword']);
         return;
     }
 
@@ -140,7 +152,7 @@ export function preloadLikelyRoutesForSession(options: {
     preloadMany(['home', 'businessesList', 'businessDetails']);
 
     if (!options.isAuthenticated) {
-        preloadMany(['login', 'register', 'about']);
+        preloadMany(['login', 'register', 'forgotPassword', 'resetPassword', 'about']);
         return;
     }
 

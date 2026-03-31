@@ -11,6 +11,7 @@ import {
     mergeBusinessHours,
     type BusinessHourEntry,
 } from '../lib/businessProfile';
+import { evaluateBusinessSubmissionGuidance } from '../lib/businessSubmissionGuidance';
 
 interface Category {
     id: string;
@@ -149,6 +150,24 @@ export function EditBusiness() {
     const selectedFeatureSet = useMemo(
         () => new Set(formData.featureIds),
         [formData.featureIds],
+    );
+    const submissionGuidance = useMemo(
+        () => evaluateBusinessSubmissionGuidance({
+            name: formData.name,
+            description: formData.description,
+            phone: formData.phone,
+            whatsapp: formData.whatsapp,
+            website: formData.website,
+            email: formData.email,
+            address: formData.address,
+            provinceId: formData.provinceId,
+            cityId: formData.cityId,
+            sectorId: formData.sectorId,
+            categoryIds: formData.categoryIds,
+            featureIds: formData.featureIds,
+            imageCount: (business?.images?.length ?? 0) + selectedImages.length,
+        }),
+        [business?.images?.length, formData, selectedImages.length],
     );
 
     const loadCities = useCallback(async (provinceId: string) => {
@@ -393,18 +412,6 @@ export function EditBusiness() {
         if (formData.cityId && sectors.length > 0 && !formData.sectorId) {
             return 'Selecciona un sector para mejorar la ubicacion del negocio';
         }
-        if (formData.latitude.trim()) {
-            const latitude = Number.parseFloat(formData.latitude);
-            if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
-                return 'La latitud no es valida';
-            }
-        }
-        if (formData.longitude.trim()) {
-            const longitude = Number.parseFloat(formData.longitude);
-            if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-                return 'La longitud no es valida';
-            }
-        }
         return null;
     };
 
@@ -471,13 +478,6 @@ export function EditBusiness() {
             if (formData.sectorId) {
                 payload.sectorId = formData.sectorId;
             }
-            if (formData.latitude.trim()) {
-                payload.latitude = Number.parseFloat(formData.latitude);
-            }
-            if (formData.longitude.trim()) {
-                payload.longitude = Number.parseFloat(formData.longitude);
-            }
-
             await businessApi.update(businessId, payload);
 
             if (selectedImages.length > 0) {
@@ -796,35 +796,19 @@ export function EditBusiness() {
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label htmlFor="edit-business-lat" className="text-sm font-medium text-gray-700 mb-1 block">
-                            Latitud
-                        </label>
-                        <input
-                            id="edit-business-lat"
-                            type="number"
-                            step="any"
-                            className="input-field"
-                            value={formData.latitude}
-                            onChange={(event) =>
-                                setFormData((previous) => ({ ...previous, latitude: event.target.value }))
-                            }
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="edit-business-lng" className="text-sm font-medium text-gray-700 mb-1 block">
-                            Longitud
-                        </label>
-                        <input
-                            id="edit-business-lng"
-                            type="number"
-                            step="any"
-                            className="input-field"
-                            value={formData.longitude}
-                            onChange={(event) =>
-                                setFormData((previous) => ({ ...previous, longitude: event.target.value }))
-                            }
-                        />
+                    <div className="md:col-span-2 rounded-xl border border-primary-100 bg-primary-50/50 p-4">
+                        <p className="text-sm font-medium text-gray-900">Ubicación del mapa</p>
+                        <p className="mt-1 text-xs text-gray-600">
+                            AquiTa recalcula las coordenadas automáticamente cuando cambias dirección, provincia, ciudad o sector.
+                        </p>
+                        {formData.latitude.trim() && formData.longitude.trim() && (
+                            <p className="mt-2 text-xs text-gray-700">
+                                Referencia actual: {formData.latitude}, {formData.longitude}
+                            </p>
+                        )}
+                        <p className="mt-2 text-xs text-gray-500">
+                            Ya no hace falta editar latitud y longitud manualmente en este formulario.
+                        </p>
                     </div>
                 </div>
 
@@ -873,12 +857,101 @@ export function EditBusiness() {
                     </p>
                 </div>
 
+                <div className={`rounded-xl border p-4 ${
+                    submissionGuidance.blockedByLocalHeuristics
+                        ? 'border-amber-200 bg-amber-50'
+                        : submissionGuidance.readinessLevel === 'ALTA'
+                            ? 'border-emerald-200 bg-emerald-50'
+                            : 'border-gray-200 bg-gray-50'
+                }`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 className="font-display text-lg font-semibold text-gray-900">Lectura preventiva y de visibilidad</h2>
+                            <p className="text-sm text-gray-600">
+                                Esta vista replica senales visibles que suelen empujar la ficha a revision preventiva o bajar su calidad de discovery.
+                            </p>
+                            {submissionGuidance.riskClusters.length > 0 ? (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    {submissionGuidance.riskClusters.map((cluster) => (
+                                        <span key={cluster} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 border border-gray-200">
+                                            {cluster}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Score de visibilidad</p>
+                            <p className="text-xl font-semibold text-gray-900">{submissionGuidance.readinessScore}</p>
+                            <p className="mt-1 text-xs text-gray-500">Riesgo {submissionGuidance.preventiveSeverity}</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                        <div>
+                            <p className="text-sm font-medium text-gray-900">Checklist</p>
+                            <div className="mt-2 space-y-2">
+                                {submissionGuidance.visibilityChecks.map((check) => (
+                                    <div key={check.label} className="rounded-lg bg-white/80 px-3 py-2">
+                                        <p className="text-sm font-medium text-gray-900">
+                                            {check.passed ? 'Listo' : 'Pendiente'} · {check.label}
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-600">{check.detail}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="text-sm font-medium text-gray-900">Riesgo preventivo {submissionGuidance.preventiveScore}/100</p>
+                            {submissionGuidance.preventiveSignals.length > 0 ? (
+                                <div className="mt-2 space-y-2">
+                                    {submissionGuidance.preventiveSignals.map((signal) => (
+                                        <div key={signal.reason} className="rounded-lg bg-white/80 px-3 py-2">
+                                            <p className="text-sm font-medium text-gray-900">{signal.reason}</p>
+                                            <p className="mt-1 text-xs text-gray-600">Peso estimado: {signal.points} puntos.</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="mt-2 text-sm text-gray-600">
+                                    No se detectan senales locales fuertes de premoderacion en esta ficha.
+                                </p>
+                            )}
+
+                            {submissionGuidance.recommendedActions.length > 0 ? (
+                                <div className="mt-3">
+                                    <p className="text-sm font-medium text-gray-900">Acciones sugeridas</p>
+                                    <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                                        {submissionGuidance.recommendedActions.slice(0, 4).map((action) => (
+                                            <li key={action}>{action}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    {submissionGuidance.missingCriticalFields.length > 0 ? (
+                        <div className="mt-4 rounded-lg bg-white/80 px-3 py-2">
+                            <p className="text-sm font-medium text-gray-900">Faltantes visibles</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {submissionGuidance.missingCriticalFields.map((item) => (
+                                    <span key={item} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700">
+                                        {item}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                         <div>
                             <h2 className="font-display text-lg font-semibold text-gray-900">Horarios del negocio</h2>
                             <p className="text-sm text-gray-600">
-                                La ficha pÃºblica y el filtro abierto ahora dependen de estos horarios.
+                                La ficha pública y el filtro abierto ahora dependen de estos horarios.
                             </p>
                         </div>
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200">

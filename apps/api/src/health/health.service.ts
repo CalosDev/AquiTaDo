@@ -109,24 +109,66 @@ export class HealthService {
     async getOperationalDashboard() {
         const startedAt = Date.now();
         const aiLatencyThresholdMs = this.resolveNumber('HEALTH_AI_P95_MAX_MS', 2_500);
+        const emailLatencyThresholdMs = this.resolveNumber('HEALTH_EMAIL_P95_MAX_MS', 4_000);
         const whatsappLatencyThresholdMs = this.resolveNumber('HEALTH_WHATSAPP_P95_MAX_MS', 3_000);
         const dbWarnThreshold = this.resolveNumber('HEALTH_DB_POOL_WARN_RATIO', 0.75);
         const dbCriticalThreshold = this.resolveNumber('HEALTH_DB_POOL_CRITICAL_RATIO', 0.9);
+        const emailProviderConfigured = this.isTransactionalEmailConfigured();
+        const now = new Date();
+        const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        const [dbState] = await this.prisma.$queryRaw<Array<{
-            ping: number;
-            businesses: string | null;
-            categories: string | null;
-            active_connections: number;
-            max_connections: number;
-        }>>`
-            SELECT
-                1 AS ping,
-                to_regclass('public.businesses')::text AS businesses,
-                to_regclass('public.categories')::text AS categories,
-                (SELECT COUNT(*)::int FROM pg_stat_activity WHERE datname = current_database()) AS active_connections,
-                (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') AS max_connections
-        `;
+        const [
+            dbState,
+            requestsLast24h,
+            completionsLast24h,
+            activeTokens,
+            expiredPendingTokens,
+        ] = await Promise.all([
+            this.prisma.$queryRaw<Array<{
+                ping: number;
+                businesses: string | null;
+                categories: string | null;
+                active_connections: number;
+                max_connections: number;
+            }>>`
+                SELECT
+                    1 AS ping,
+                    to_regclass('public.businesses')::text AS businesses,
+                    to_regclass('public.categories')::text AS categories,
+                    (SELECT COUNT(*)::int FROM pg_stat_activity WHERE datname = current_database()) AS active_connections,
+                    (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') AS max_connections
+            `.then((rows) => rows[0]),
+            this.prisma.passwordResetToken.count({
+                where: {
+                    createdAt: {
+                        gte: last24Hours,
+                    },
+                },
+            }),
+            this.prisma.passwordResetToken.count({
+                where: {
+                    usedAt: {
+                        gte: last24Hours,
+                    },
+                },
+            }),
+            this.prisma.passwordResetToken.count({
+                where: {
+                    usedAt: null,
+                    expiresAt: {
+                        gte: now,
+                    },
+                },
+            }),
+            this.prisma.passwordResetToken.count({
+                where: {
+                    usedAt: null,
+                    expiresAt: {
+                        lt: now,
+                    },
+                },
+            }),
+        ]);
 
         const schemaReady = Boolean(dbState?.businesses && dbState?.categories);
         const activeConnections = Number(dbState?.active_connections ?? 0);
@@ -140,18 +182,31 @@ export class HealthService {
 
         const dependencySnapshots = this.observabilityService.getDependencyHealthSnapshot({
             ai: aiLatencyThresholdMs,
+            email: emailLatencyThresholdMs,
             whatsapp: whatsappLatencyThresholdMs,
         });
 
         const aiDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'ai');
+        const emailDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'email');
         const whatsappDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'whatsapp');
 
         const aiHealth = this.summarizeDependencyGroup(aiDependencies, aiLatencyThresholdMs);
+        const emailHealth = emailProviderConfigured
+            ? this.summarizeDependencyGroup(emailDependencies, emailLatencyThresholdMs)
+            : {
+                status: 'down' as const,
+                reason: 'not_configured',
+                thresholdMs: emailLatencyThresholdMs,
+                operations: [],
+            };
         const whatsappHealth = this.summarizeDependencyGroup(whatsappDependencies, whatsappLatencyThresholdMs);
 
         const overallStatus = !schemaReady || dbPoolStatus === 'down' || aiHealth.status === 'down' || whatsappHealth.status === 'down'
             ? 'down'
-            : dbPoolStatus === 'degraded' || aiHealth.status === 'degraded' || whatsappHealth.status === 'degraded'
+            : dbPoolStatus === 'degraded'
+                || aiHealth.status === 'degraded'
+                || whatsappHealth.status === 'degraded'
+                || emailHealth.status !== 'up'
                 ? 'degraded'
                 : 'up';
 
@@ -173,7 +228,18 @@ export class HealthService {
                     },
                 },
                 ai: aiHealth,
+                email: emailHealth,
                 whatsapp: whatsappHealth,
+            },
+            passwordReset: {
+                providerConfigured: emailProviderConfigured,
+                requestsLast24h,
+                completionsLast24h,
+                completionRatePct: requestsLast24h > 0
+                    ? Number(((completionsLast24h / requestsLast24h) * 100).toFixed(2))
+                    : 0,
+                activeTokens,
+                expiredPendingTokens,
             },
         };
     }
@@ -225,5 +291,11 @@ export class HealthService {
 
         const parsed = Number(raw);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+    }
+
+    private isTransactionalEmailConfigured(): boolean {
+        const resendApiKey = this.configService.get<string>('RESEND_API_KEY')?.trim();
+        const resendFromEmail = this.configService.get<string>('RESEND_FROM_EMAIL')?.trim();
+        return Boolean(resendApiKey && resendFromEmail);
     }
 }

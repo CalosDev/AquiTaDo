@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
     IsEnum,
+    IsIn,
     IsInt,
     IsNotEmpty,
     IsOptional,
@@ -67,6 +68,16 @@ export class SubmitBusinessVerificationDto {
 export class ReviewBusinessVerificationDto {
     @IsEnum(BusinessVerificationStatus)
     status!: BusinessVerificationStatus;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    notes?: string;
+}
+
+export class ResolvePreventiveModerationDto {
+    @IsIn(['APPROVE_FOR_KYC', 'KEEP_BLOCKED'])
+    decision!: 'APPROVE_FOR_KYC' | 'KEEP_BLOCKED';
 
     @IsOptional()
     @IsString()

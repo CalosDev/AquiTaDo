@@ -236,6 +236,18 @@ enum GrowthEventType {
   CONTACT_CLICK
   WHATSAPP_CLICK
   BOOKING_INTENT
+  SHARE_CLICK
+  PASSWORD_RESET_REQUEST
+  PASSWORD_RESET_COMPLETE
+  GOOGLE_AUTH_SUCCESS
+  LISTING_FILTER_APPLY
+  LISTING_VIEW_CHANGE
+  LISTING_MAP_SELECT
+  PREMODERATION_FLAGGED
+  PREMODERATION_RELEASED
+  PREMODERATION_CONFIRMED
+  BUSINESS_ONBOARDING_STEP
+  BUSINESS_ONBOARDING_COMPLETE
 }
 
 enum SalesLeadStage {
@@ -250,6 +262,7 @@ model User {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)
   email     String   @unique @db.VarChar(255)
+  googleSubject String? @unique @db.VarChar(191)
   password  String
   phone     String?  @db.VarChar(20)
   avatarUrl String?  @db.VarChar(500)
@@ -272,6 +285,7 @@ model User {
   organizationInvitesSent  OrganizationInvite[]           @relation("OrganizationInvitedBy")
   auditLogs                AuditLog[]                     @relation("AuditActor")
   refreshTokens            RefreshToken[]
+  passwordResetTokens      PasswordResetToken[]
   bookings                 Booking[]
   promotionsCreated        Promotion[]                    @relation("PromotionCreator")
   transactionsAsBuyer      Transaction[]                  @relation("TransactionBuyer")
@@ -1039,6 +1053,20 @@ model RefreshToken {
   @@index([userId, expiresAt])
   @@index([revokedAt])
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique @db.VarChar(255)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([usedAt])
+  @@map("password_reset_tokens")
 }
 
 model Conversation {

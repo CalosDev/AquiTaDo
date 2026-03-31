@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { BusinessHoursEditor } from '../components/BusinessHoursEditor';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
+import { evaluateBusinessSubmissionGuidance } from '../lib/businessSubmissionGuidance';
+import { trackGrowthEvent as trackGrowthSignal } from '../lib/growthTracking';
 import {
     BUSINESS_PRICE_RANGE_OPTIONS,
     businessPriceRangeLabel,
@@ -45,11 +47,35 @@ type RegisterStep = 1 | 2 | 3 | 4;
 const BOOKING_FEATURE_CANONICAL = 'reservaciones';
 
 const STEP_TITLES: Array<{ step: RegisterStep; title: string; subtitle: string }> = [
-    { step: 1, title: 'Información', subtitle: 'Nombre y propuesta' },
-    { step: 2, title: 'Contacto', subtitle: 'Teléfono y WhatsApp' },
-    { step: 3, title: 'Ubicación', subtitle: 'Dirección y mapa' },
-    { step: 4, title: 'Categorías y servicios', subtitle: 'Dónde aparecerás y cómo operas' },
+    { step: 1, title: 'Informacion', subtitle: 'Nombre y propuesta' },
+    { step: 2, title: 'Contacto', subtitle: 'Telefono y WhatsApp' },
+    { step: 3, title: 'Ubicacion', subtitle: 'Direccion y mapa' },
+    { step: 4, title: 'Categorias y servicios', subtitle: 'Donde apareceras y como operas' },
 ];
+const STEP_PRIMARY_ACTION_LABEL: Record<RegisterStep, string> = {
+    1: 'Guardar informacion y seguir',
+    2: 'Guardar contacto y seguir',
+    3: 'Confirmar ubicacion y seguir',
+    4: 'Publicar negocio',
+};
+const STEP_UNLOCK_SUMMARY: Record<RegisterStep, { title: string; detail: string }> = {
+    1: {
+        title: 'Este paso define como se entiende tu negocio',
+        detail: 'Una propuesta clara mejora discovery y evita que la ficha parezca promocion vacia o spam.',
+    },
+    2: {
+        title: 'Aqui dejas el canal que convierte',
+        detail: 'WhatsApp, telefono o website bien puestos reducen rebote y mejoran la utilidad de la ficha desde el dia uno.',
+    },
+    3: {
+        title: 'La ubicacion decide donde apareces',
+        detail: 'Direccion, provincia y ciudad alimentan geocodificacion, resultados cercanos y la vista de mapa.',
+    },
+    4: {
+        title: 'Ahora cierras visibilidad y operacion',
+        detail: 'Categorias, horarios e imagenes empujan confianza y mejoran el filtro de discovery antes de publicar.',
+    },
+};
 
 const TOTAL_STEPS = STEP_TITLES.length;
 
@@ -69,6 +95,7 @@ export function RegisterBusiness() {
     const [locating, setLocating] = useState(false);
     const [error, setError] = useState('');
     const [currentStep, setCurrentStep] = useState<RegisterStep>(1);
+    const trackedOnboardingStepsRef = useRef<Set<RegisterStep>>(new Set());
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -99,10 +126,125 @@ export function RegisterBusiness() {
         () => categories.filter((category) => !category.children || category.children.length === 0),
         [categories],
     );
+    const submissionGuidance = useMemo(
+        () => evaluateBusinessSubmissionGuidance({
+            name: formData.name,
+            description: formData.description,
+            phone: formData.phone,
+            whatsapp: formData.whatsapp,
+            website: formData.website,
+            email: formData.email,
+            address: formData.address,
+            provinceId: formData.provinceId,
+            cityId: formData.cityId,
+            sectorId: formData.sectorId,
+            categoryIds: formData.categoryIds,
+            featureIds: formData.featureIds,
+            imageCount: selectedImages.length,
+        }),
+        [formData, selectedImages.length],
+    );
+    const currentStepMeta = useMemo(
+        () => STEP_TITLES.find((item) => item.step === currentStep) ?? STEP_TITLES[0],
+        [currentStep],
+    );
+    const currentStepUnlock = useMemo(
+        () => STEP_UNLOCK_SUMMARY[currentStep],
+        [currentStep],
+    );
+    const currentStepTips = useMemo(() => {
+        if (currentStep === 1) {
+            return [
+                'Explica que vendes, en que zona operas y por que alguien deberia elegirte.',
+                'No pongas telefonos, links ni WhatsApp dentro de la descripcion.',
+            ];
+        }
+        if (currentStep === 2) {
+            return [
+                'Completa al menos un canal de contacto util desde el dia uno.',
+                'Si usas WhatsApp como canal principal, dejalo en su campo estructurado.',
+            ];
+        }
+        if (currentStep === 3) {
+            return [
+                'Direccion, provincia y ciudad mejoran discovery local y geocodificacion.',
+                'Mientras mas precisa la ubicacion, mejor responde lista/mapa.',
+            ];
+        }
+        return [
+            'La categoria define donde apareces; los horarios alimentan filtros como "abierto ahora".',
+            'Antes de publicar, revisa el bloque de visibilidad y riesgo preventivo.',
+        ];
+    }, [currentStep]);
+    const currentStepActionLabel = useMemo(
+        () => STEP_PRIMARY_ACTION_LABEL[currentStep],
+        [currentStep],
+    );
+    const descriptionLength = formData.description.trim().length;
+    const completedVisibilityChecks = submissionGuidance.visibilityChecks.filter((check) => check.passed).length;
+    const remainingPublishNeeds = submissionGuidance.missingCriticalFields;
+
+    const trackOnboardingEvent = useCallback((
+        eventType: 'BUSINESS_ONBOARDING_STEP' | 'BUSINESS_ONBOARDING_COMPLETE',
+        metadata: Record<string, unknown>,
+        overrides: { businessId?: string } = {},
+    ) => {
+        void trackGrowthSignal({
+            eventType,
+            businessId: overrides.businessId,
+            categoryId: formData.categoryIds[0] || undefined,
+            provinceId: formData.provinceId || undefined,
+            cityId: formData.cityId || undefined,
+            metadata: {
+                step: currentStep,
+                stepTitle: currentStepMeta.title,
+                stepSubtitle: currentStepMeta.subtitle,
+                progressPercentage,
+                categoriesSelected: formData.categoryIds.length,
+                featuresSelected: formData.featureIds.length,
+                hasPhone: Boolean(formData.phone.trim()),
+                hasWhatsApp: Boolean(formData.whatsapp.trim()),
+                hasWebsite: Boolean(formData.website.trim()),
+                hasEmail: Boolean(formData.email.trim()),
+                hasAddress: Boolean(formData.address.trim()),
+                selectedImages: selectedImages.length,
+                ...metadata,
+            },
+        });
+    }, [
+        currentStep,
+        currentStepMeta.subtitle,
+        currentStepMeta.title,
+        formData.address,
+        formData.categoryIds,
+        formData.cityId,
+        formData.email,
+        formData.featureIds,
+        formData.phone,
+        formData.provinceId,
+        formData.website,
+        formData.whatsapp,
+        progressPercentage,
+        selectedImages.length,
+    ]);
 
     useEffect(() => {
         void loadFormData();
     }, []);
+
+    useEffect(() => {
+        if (trackedOnboardingStepsRef.current.has(currentStep)) {
+            return;
+        }
+
+        trackedOnboardingStepsRef.current.add(currentStep);
+        trackOnboardingEvent('BUSINESS_ONBOARDING_STEP', {
+            action: 'step_visible',
+            step: currentStep,
+            stepTitle: currentStepMeta.title,
+            stepSubtitle: currentStepMeta.subtitle,
+        });
+    }, [currentStep, currentStepMeta.subtitle, currentStepMeta.title, trackOnboardingEvent]);
 
     useEffect(() => {
         if (!formData.provinceId) {
@@ -136,7 +278,7 @@ export function RegisterBusiness() {
             setFeatures(featRes.data || []);
             setProvinces(provRes.data || []);
         } catch (err: unknown) {
-            setError(getApiErrorMessage(err, 'No se pudieron cargar categorías y provincias'));
+            setError(getApiErrorMessage(err, 'No se pudieron cargar categorias y provincias'));
         } finally {
             setLoadingData(false);
         }
@@ -190,7 +332,7 @@ export function RegisterBusiness() {
 
         if (step === 3) {
             if (!formData.address.trim()) {
-                return 'La dirección es obligatoria';
+                return 'La direccion es obligatoria';
             }
             if (!formData.provinceId) {
                 return 'Debes seleccionar una provincia';
@@ -201,7 +343,7 @@ export function RegisterBusiness() {
         }
 
         if (step === 4 && formData.categoryIds.length === 0) {
-            return 'Selecciona al menos una categoría para publicar el negocio';
+            return 'Selecciona al menos una categoria para publicar el negocio';
         }
 
         return null;
@@ -250,7 +392,7 @@ export function RegisterBusiness() {
                 setLocating(false);
             },
             () => {
-                setError('No se pudo obtener la ubicación actual');
+                setError('No se pudo obtener la ubicacion actual');
                 setLocating(false);
             },
             { enableHighAccuracy: true, timeout: 12000 },
@@ -340,6 +482,14 @@ export function RegisterBusiness() {
                 response.data.organizationId ||
                 null) as string | null;
 
+            trackOnboardingEvent('BUSINESS_ONBOARDING_COMPLETE', {
+                step: TOTAL_STEPS,
+                completed: true,
+                imagesUploaded: selectedImages.length,
+                categoriesSelected: formData.categoryIds.length,
+                featuresSelected: formData.featureIds.length,
+            }, { businessId: createdBusinessId });
+
             await refreshProfile();
             if (createdOrganizationId) {
                 setActiveOrganizationId(createdOrganizationId);
@@ -383,6 +533,13 @@ export function RegisterBusiness() {
             return;
         }
 
+        if (submissionGuidance.blockedByLocalHeuristics) {
+            setError(
+                `La ficha todavia muestra senales que probablemente activaran revision preventiva: ${submissionGuidance.preventiveSignals.map((signal) => signal.reason).join('; ')}. Corrigela antes de publicar.`,
+            );
+            return;
+        }
+
         await submitBusiness();
     };
 
@@ -422,6 +579,28 @@ export function RegisterBusiness() {
                         <p className="mt-1 text-xs text-gray-500">
                             Mientras mas clara sea la descripcion, mejor posicionara en resultados.
                         </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                            <span className={`rounded-full px-2 py-0.5 ${
+                                descriptionLength >= 60
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : 'bg-amber-50 text-amber-700'
+                            }`}>
+                                {descriptionLength} caracteres
+                            </span>
+                            <span>Objetivo recomendado: 60+ con propuesta, zona y diferenciador.</span>
+                        </div>
+                        {submissionGuidance.preventiveSignals.length > 0 ? (
+                            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                                <p className="font-semibold">Riesgo preventivo detectado en la descripcion</p>
+                                <ul className="mt-2 space-y-1">
+                                    {submissionGuidance.preventiveSignals.map((signal) => (
+                                        <li key={signal.reason}>
+                                            {signal.reason}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             );
@@ -558,6 +737,14 @@ export function RegisterBusiness() {
                     <p className="sm:col-span-2 text-xs text-gray-500">
                         Completa al menos WhatsApp, website o email para que la ficha sea util desde el primer dia.
                     </p>
+                    <div className="sm:col-span-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                        <p className="font-medium text-gray-900">Lectura rapida de contacto</p>
+                        <p className="mt-1">
+                            {formData.whatsapp.trim() || formData.phone.trim() || formData.website.trim() || formData.email.trim()
+                                ? 'Ya hay al menos un canal util para convertir desde discovery.'
+                                : 'Todavia no hay un canal estructurado visible; eso baja conversion y confianza inicial.'}
+                        </p>
+                    </div>
                 </div>
             );
         }
@@ -673,39 +860,18 @@ export function RegisterBusiness() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="register-business-latitude" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Latitud
-                            </label>
-                            <input
-                                id="register-business-latitude"
-                                type="number"
-                                step="any"
-                                value={formData.latitude}
-                                onChange={(event) =>
-                                    setFormData((previous) => ({ ...previous, latitude: event.target.value }))
-                                }
-                                className="input-field"
-                                placeholder="18.4861"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="register-business-longitude" className="text-sm font-medium text-gray-700 mb-1 block">
-                                Longitud
-                            </label>
-                            <input
-                                id="register-business-longitude"
-                                type="number"
-                                step="any"
-                                value={formData.longitude}
-                                onChange={(event) =>
-                                    setFormData((previous) => ({ ...previous, longitude: event.target.value }))
-                                }
-                                className="input-field"
-                                placeholder="-69.9312"
-                            />
-                        </div>
+                    <p className="text-xs text-gray-600">
+                        {formData.latitude.trim() && formData.longitude.trim()
+                            ? `Referencia capturada: ${formData.latitude}, ${formData.longitude}. Se enviará junto con la dirección para mejorar la precisión inicial.`
+                            : 'Si no compartes tu ubicación actual, el sistema intentará geocodificar la dirección automáticamente al publicar.'}
+                    </p>
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                        <p className="font-medium text-gray-900">Checklist de ubicacion</p>
+                        <p className="mt-1">
+                            {formData.address.trim() && formData.provinceId
+                                ? 'La base minima para discovery local ya esta lista.'
+                                : 'Todavia falta direccion o provincia para una geocodificacion confiable.'}
+                        </p>
                     </div>
                 </div>
             );
@@ -764,7 +930,7 @@ export function RegisterBusiness() {
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                     <h3 className="font-medium text-gray-900 mb-2">Horarios</h3>
                     <p className="mb-3 text-xs text-gray-500">
-                        Define horarios reales. Esta informaciÃ³n alimenta filtros como "abierto ahora".
+                        Define horarios reales. Esta información alimenta filtros como "abierto ahora".
                     </p>
                     <BusinessHoursEditor
                         hours={formData.hours}
@@ -868,7 +1034,88 @@ export function RegisterBusiness() {
                         </div>
 
                         <div className="rounded-2xl border border-gray-100 p-5">
+                            <div className="mb-4 rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Lo que desbloqueas en este paso</p>
+                                <h2 className="mt-1 text-lg font-semibold text-gray-900">{currentStepUnlock.title}</h2>
+                                <p className="mt-1 text-sm text-gray-600">{currentStepUnlock.detail}</p>
+                            </div>
                             {renderStepBody()}
+                        </div>
+
+                        <div className={`rounded-2xl border p-5 ${
+                            submissionGuidance.blockedByLocalHeuristics
+                                ? 'border-red-200 bg-red-50'
+                                : submissionGuidance.readinessLevel === 'ALTA'
+                                    ? 'border-emerald-200 bg-emerald-50'
+                                    : 'border-amber-200 bg-amber-50'
+                        }`}>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Guia de publicacion</p>
+                                    <h2 className="mt-1 text-lg font-semibold text-gray-900">
+                                        Visibilidad {submissionGuidance.readinessLevel} · Score {submissionGuidance.readinessScore}
+                                    </h2>
+                                    <p className="mt-1 text-sm text-gray-600">
+                                        {completedVisibilityChecks} de {submissionGuidance.visibilityChecks.length} checks listos
+                                        {submissionGuidance.riskClusters.length > 0 ? ` - Riesgos: ${submissionGuidance.riskClusters.join(', ')}` : ''}
+                                    </p>
+                                </div>
+                                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                    submissionGuidance.blockedByLocalHeuristics
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-white text-gray-700'
+                                }`}>
+                                    Riesgo preventivo {submissionGuidance.preventiveScore}/100 - {submissionGuidance.preventiveSeverity}
+                                </span>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-900">En este paso conviene cuidar</p>
+                                    <ul className="mt-2 space-y-2 text-sm text-gray-700">
+                                        {currentStepTips.map((tip) => (
+                                            <li key={tip}>{tip}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-900">Checklist de visibilidad</p>
+                                    <div className="mt-2 space-y-2">
+                                        {submissionGuidance.visibilityChecks.map((check) => (
+                                            <div key={check.label} className="rounded-xl bg-white/80 px-3 py-2">
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    {check.passed ? 'Listo' : 'Pendiente'} · {check.label}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-600">{check.detail}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {remainingPublishNeeds.length > 0 ? (
+                                <div className="mt-4 rounded-xl bg-white/80 px-4 py-3">
+                                    <p className="text-sm font-medium text-gray-900">Aun falta para publicar con buena calidad</p>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {remainingPublishNeeds.map((item) => (
+                                            <span key={item} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700">
+                                                {item}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {submissionGuidance.recommendedActions.length > 0 ? (
+                                <div className="mt-4">
+                                    <p className="text-sm font-medium text-gray-900">Acciones sugeridas</p>
+                                    <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                                        {submissionGuidance.recommendedActions.slice(0, 4).map((action) => (
+                                            <li key={action}>{action}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -888,13 +1135,9 @@ export function RegisterBusiness() {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="btn-primary min-w-[180px]"
+                                    className="btn-primary min-w-[220px]"
                                 >
-                                    {loading
-                                        ? 'Registrando...'
-                                        : currentStep < TOTAL_STEPS
-                                            ? 'Continuar'
-                                            : 'Publicar negocio'}
+                                    {loading ? 'Registrando...' : currentStepActionLabel}
                                 </button>
                             </div>
                         </div>

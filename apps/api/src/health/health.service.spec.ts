@@ -10,14 +10,20 @@ import { HealthService } from './health.service';
 describe('HealthService', () => {
     function createService(
         prisma: PrismaService,
+        options?: {
+            observability?: Partial<ObservabilityService>;
+            config?: Partial<ConfigService>;
+        },
         redisOverrides?: Partial<RedisService>,
         searchOverrides?: Partial<SearchService>,
     ): HealthService {
         const observability = {
             getDependencyHealthSnapshot: vi.fn().mockReturnValue([]),
+            ...options?.observability,
         } as unknown as ObservabilityService;
         const configService = {
             get: vi.fn(),
+            ...options?.config,
         } as unknown as ConfigService;
         const redisService = {
             ping: vi.fn().mockResolvedValue(null),
@@ -112,6 +118,7 @@ describe('HealthService', () => {
         } as unknown as PrismaService;
         const service = createService(
             prisma,
+            undefined,
             { ping: vi.fn().mockResolvedValue(false) },
             { ping: vi.fn().mockResolvedValue(null) },
         );
@@ -123,6 +130,81 @@ describe('HealthService', () => {
             schema: 'up',
             redis: 'down',
             search: 'disabled',
+        });
+    });
+
+    it('includes email health and password reset stats in operational dashboard', async () => {
+        const queryRaw = vi.fn().mockResolvedValue([
+            {
+                ping: 1,
+                businesses: 'businesses',
+                categories: 'categories',
+                active_connections: 8,
+                max_connections: 100,
+            },
+        ]);
+        const passwordResetToken = {
+            count: vi.fn()
+                .mockResolvedValueOnce(12)
+                .mockResolvedValueOnce(7)
+                .mockResolvedValueOnce(3)
+                .mockResolvedValueOnce(2),
+        };
+        const prisma = {
+            $queryRaw: queryRaw,
+            passwordResetToken,
+        } as unknown as PrismaService;
+        const getDependencyHealthSnapshot = vi.fn().mockReturnValue([
+            {
+                dependency: 'email',
+                operation: 'password_reset_link',
+                samples: 6,
+                p50Ms: 240,
+                p95Ms: 480,
+                errorRatePct: 0,
+                lastSeenAt: new Date().toISOString(),
+                latencyThresholdMs: 4000,
+                healthy: true,
+            },
+        ]);
+        const configGet = vi.fn((key: string) => {
+            if (key === 'RESEND_API_KEY') {
+                return 'resend-key';
+            }
+            if (key === 'RESEND_FROM_EMAIL') {
+                return 'noreply@aquita.do';
+            }
+            return undefined;
+        });
+
+        const service = createService(
+            prisma,
+            {
+                observability: {
+                    getDependencyHealthSnapshot,
+                },
+                config: {
+                    get: configGet,
+                },
+            },
+        );
+
+        const result = await service.getOperationalDashboard();
+
+        expect(result.status).toBe('degraded');
+        expect(result.checks?.email?.status).toBe('up');
+        expect(result.passwordReset).toMatchObject({
+            providerConfigured: true,
+            requestsLast24h: 12,
+            completionsLast24h: 7,
+            completionRatePct: 58.33,
+            activeTokens: 3,
+            expiredPendingTokens: 2,
+        });
+        expect(getDependencyHealthSnapshot).toHaveBeenCalledWith({
+            ai: 2500,
+            email: 4000,
+            whatsapp: 3000,
         });
     });
 });

@@ -42,6 +42,27 @@ describe('BusinessesController (e2e)', () => {
     });
 
     async function cleanBusinessFixtures() {
+        await prisma.growthEvent.deleteMany({
+            where: {
+                OR: [
+                    {
+                        business: {
+                            slug: {
+                                startsWith: BUSINESS_SLUG_PREFIX,
+                            },
+                        },
+                    },
+                    {
+                        user: {
+                            email: {
+                                endsWith: BUSINESSES_EMAIL_DOMAIN,
+                            },
+                        },
+                    },
+                ],
+            },
+        });
+
         await prisma.review.deleteMany({
             where: {
                 business: {
@@ -426,6 +447,252 @@ describe('BusinessesController (e2e)', () => {
             id: businessId,
             slug: created.body.slug,
             verified: true,
+        });
+    });
+
+    it('lets a clean business enter verification review after documents are uploaded', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
+        const ownerToken = signToken(owner.id, owner.role);
+        const province = await createProvince();
+        const seed = makeSeed();
+
+        const created = await request(app.getHttpServer())
+            .post('/api/businesses')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .send(makeCreateBusinessPayload(seed, province.id))
+            .expect(201);
+
+        const businessId = String(created.body.id);
+        const organizationId = String(created.body.organization.id);
+
+        await request(app.getHttpServer())
+            .post('/api/verification/documents')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .send({
+                businessId,
+                documentType: 'OTHER',
+                fileUrl: '/uploads/verification/e2e-clean.pdf',
+            })
+            .expect(201);
+
+        const submitted = await request(app.getHttpServer())
+            .post(`/api/verification/businesses/${businessId}/submit`)
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .send({
+                notes: 'Documentacion inicial lista para revision.',
+            })
+            .expect(201);
+
+        expect(submitted.body).toMatchObject({
+            id: businessId,
+            verificationStatus: 'PENDING',
+            verificationNotes: 'Documentacion inicial lista para revision.',
+        });
+    });
+
+    it('blocks suspicious businesses behind preventive moderation and exposes them in the admin queue', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
+        const admin = await createUser('ADMIN');
+        const ownerToken = signToken(owner.id, owner.role);
+        const adminToken = signToken(admin.id, admin.role);
+        const province = await createProvince();
+        const seed = makeSeed();
+
+        const created = await request(app.getHttpServer())
+            .post('/api/businesses')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .send({
+                ...makeCreateBusinessPayload(seed, province.id),
+                description: 'GANA DINERO RAPIDO CLICK AQUI ONLYFANS TELEGRAM WHATSAPP +1 809 555 1122 WWW.OFERTAS-RARAS.TEST',
+            })
+            .expect(201);
+
+        const businessId = String(created.body.id);
+        const organizationId = String(created.body.organization.id);
+
+        await request(app.getHttpServer())
+            .post('/api/verification/documents')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .send({
+                businessId,
+                documentType: 'OTHER',
+                fileUrl: '/uploads/verification/e2e-suspicious.pdf',
+            })
+            .expect(201);
+
+        const blocked = await request(app.getHttpServer())
+            .post(`/api/verification/businesses/${businessId}/submit`)
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .send({
+                notes: 'Intento de envio inicial.',
+            })
+            .expect(400);
+
+        expect(String(blocked.body.message).toLowerCase()).toContain('revision preventiva');
+
+        const status = await request(app.getHttpServer())
+            .get(`/api/verification/businesses/${businessId}/status`)
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .expect(200);
+
+        expect(status.body).toMatchObject({
+            id: businessId,
+            verificationStatus: 'UNVERIFIED',
+        });
+        expect(String(status.body.verificationNotes)).toContain('Revision preventiva requerida');
+
+        const moderationQueue = await request(app.getHttpServer())
+            .get('/api/verification/admin/moderation-queue')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .expect(200);
+
+        const preModerationItem = (moderationQueue.body.items as Array<any>).find((item) => (
+            item.queueType === 'BUSINESS_PREMODERATION'
+            && item.entityId === businessId
+        ));
+
+        expect(preModerationItem).toBeDefined();
+        expect(preModerationItem?.status).toBe('FLAGGED');
+        expect(Array.isArray(preModerationItem?.payload?.preventiveReasons)).toBe(true);
+        expect(preModerationItem?.payload?.preventiveReasons?.length ?? 0).toBeGreaterThan(0);
+        expect(preModerationItem?.payload?.preventiveSeverity).toBe('HIGH');
+        expect(preModerationItem?.payload?.preventiveRiskClusters).toEqual(
+            expect.arrayContaining(['Contenido', 'Contacto']),
+        );
+        expect(Array.isArray(preModerationItem?.payload?.preventiveSuggestedActions)).toBe(true);
+        expect(preModerationItem?.payload?.preventiveSuggestedActions?.length ?? 0).toBeGreaterThan(0);
+
+        const moderationEvents = await prisma.growthEvent.findMany({
+            where: {
+                businessId,
+                eventType: 'PREMODERATION_FLAGGED',
+            },
+            orderBy: {
+                createdAt: 'asc',
+            },
+            select: {
+                eventType: true,
+                metadata: true,
+            },
+        });
+
+        expect(moderationEvents.length).toBeGreaterThan(0);
+        expect(moderationEvents.some((event) => (
+            typeof event.metadata === 'object'
+            && event.metadata !== null
+            && !Array.isArray(event.metadata)
+            && (event.metadata as Record<string, unknown>).trigger === 'business_submit'
+        ))).toBe(true);
+        expect(moderationEvents[0]?.metadata).toMatchObject({
+            trigger: 'document_submit',
+        });
+        expect(moderationEvents[1]?.metadata).toMatchObject({
+            trigger: 'business_submit',
+        });
+    });
+
+    it('allows admins to clear preventive moderation and move a business into the KYC queue', async () => {
+        const owner = await createUser('BUSINESS_OWNER');
+        const admin = await createUser('ADMIN');
+        const ownerToken = signToken(owner.id, owner.role);
+        const adminToken = signToken(admin.id, admin.role);
+        const province = await createProvince();
+        const seed = makeSeed();
+
+        const created = await request(app.getHttpServer())
+            .post('/api/businesses')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .send({
+                ...makeCreateBusinessPayload(seed, province.id),
+                description: 'GANA DINERO RAPIDO CLICK AQUI ONLYFANS TELEGRAM WHATSAPP +1 809 555 3344 WWW.ATAJO-RARO.TEST',
+            })
+            .expect(201);
+
+        const businessId = String(created.body.id);
+        const organizationId = String(created.body.organization.id);
+
+        await request(app.getHttpServer())
+            .post('/api/verification/documents')
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .send({
+                businessId,
+                documentType: 'OTHER',
+                fileUrl: '/uploads/verification/e2e-premoderation-release.pdf',
+            })
+            .expect(201);
+
+        await request(app.getHttpServer())
+            .post(`/api/verification/businesses/${businessId}/submit`)
+            .set('Authorization', `Bearer ${ownerToken}`)
+            .set('x-organization-id', organizationId)
+            .send({
+                notes: 'Intento inicial para entrar a KYC.',
+            })
+            .expect(400);
+
+        const released = await request(app.getHttpServer())
+            .patch(`/api/verification/admin/businesses/${businessId}/pre-moderation`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                decision: 'APPROVE_FOR_KYC',
+                notes: 'Liberado para revision KYC manual',
+            })
+            .expect(200);
+
+        expect(released.body).toMatchObject({
+            id: businessId,
+            verificationStatus: 'PENDING',
+            verificationNotes: 'Liberado para revision KYC manual',
+        });
+
+        const moderationQueue = await request(app.getHttpServer())
+            .get('/api/verification/admin/moderation-queue')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .expect(200);
+
+        const preModerationItem = (moderationQueue.body.items as Array<any>).find((item) => (
+            item.queueType === 'BUSINESS_PREMODERATION'
+            && item.entityId === businessId
+        ));
+        const businessVerificationItem = (moderationQueue.body.items as Array<any>).find((item) => (
+            item.queueType === 'BUSINESS_VERIFICATION'
+            && item.entityId === businessId
+        ));
+
+        expect(preModerationItem).toBeUndefined();
+        expect(businessVerificationItem).toBeDefined();
+
+        const moderationEvents = await prisma.growthEvent.findMany({
+            where: {
+                businessId,
+                eventType: {
+                    in: ['PREMODERATION_FLAGGED', 'PREMODERATION_RELEASED'],
+                },
+            },
+            orderBy: {
+                createdAt: 'asc',
+            },
+            select: {
+                eventType: true,
+                userId: true,
+                metadata: true,
+            },
+        });
+
+        expect(moderationEvents.map((event) => event.eventType)).toEqual([
+            'PREMODERATION_FLAGGED',
+            'PREMODERATION_FLAGGED',
+            'PREMODERATION_RELEASED',
+        ]);
+        expect(moderationEvents[2]?.userId).toBe(admin.id);
+        expect(moderationEvents[2]?.metadata).toMatchObject({
+            decision: 'APPROVE_FOR_KYC',
         });
     });
 

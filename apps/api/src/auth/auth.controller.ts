@@ -1,8 +1,28 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Inject, Req, Res, UseGuards, Get } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Inject,
+    Post,
+    Req,
+    Res,
+    UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, RegisterDto, LoginDto, RefreshTokenDto, TwoFactorCodeDto } from './dto/auth.dto';
-import { Request, Response } from 'express';
+import {
+    ChangePasswordDto,
+    ForgotPasswordDto,
+    GoogleAuthDto,
+    LoginDto,
+    RefreshTokenDto,
+    RegisterDto,
+    ResetPasswordDto,
+    TwoFactorCodeDto,
+} from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
@@ -11,7 +31,7 @@ export class AuthController {
     constructor(
         @Inject(AuthService)
         private readonly authService: AuthService,
-    ) { }
+    ) {}
 
     @Post('register')
     @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -34,6 +54,17 @@ export class AuthController {
         return this.authService.login(dto, request, response);
     }
 
+    @Post('google')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 8, ttl: 60_000 } })
+    async loginWithGoogle(
+        @Body() dto: GoogleAuthDto,
+        @Req() request: Request,
+        @Res({ passthrough: true }) response: Response,
+    ) {
+        return this.authService.authenticateWithGoogle(dto, request, response);
+    }
+
     @Post('refresh')
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -54,6 +85,20 @@ export class AuthController {
         @Res({ passthrough: true }) response: Response,
     ) {
         return this.authService.logout(dto.refreshToken, request, response);
+    }
+
+    @Post('forgot-password')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    async forgotPassword(@Body() dto: ForgotPasswordDto) {
+        return this.authService.requestPasswordReset(dto.email);
+    }
+
+    @Post('reset-password')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    async resetPassword(@Body() dto: ResetPasswordDto) {
+        return this.authService.resetPassword(dto.token, dto.newPassword);
     }
 
     @Post('change-password')
