@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { PlansModule } from '../plans/plans.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { PaymentsController } from './payments.controller';
+import { PaymentsReportingService } from './payments-reporting.service';
 import { PaymentsService } from './payments.service';
+import { PaymentsWebhookService } from './payments-webhook.service';
 
 @Module({
     imports: [PlansModule, SubscriptionsModule],
     controllers: [PaymentsController],
-    providers: [PaymentsService],
+    providers: [PaymentsService, PaymentsReportingService, PaymentsWebhookService],
     exports: [PaymentsService],
 })
 export class PaymentsModule { }

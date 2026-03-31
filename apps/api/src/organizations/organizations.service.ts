@@ -10,9 +10,7 @@ import {
 import { createHash, randomBytes } from 'crypto';
 import slugify from 'slugify';
 import {
-    OrganizationPlan,
     OrganizationRole,
-    OrganizationSubscriptionStatus,
     Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,7 +21,7 @@ import {
     UpdateOrganizationMemberRoleDto,
     UpdateOrganizationSubscriptionDto,
 } from './dto/organization.dto';
-import { getOrganizationPlanLimits } from './organization-plan-limits';
+import { OrganizationsUsageService } from './organizations-usage.service';
 
 type ActorOrgRole = OrganizationRole;
 type PrismaClientLike = PrismaService | Prisma.TransactionClient;
@@ -44,13 +42,16 @@ export class OrganizationsService {
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
+        @Inject(OrganizationsUsageService)
+        private readonly organizationsUsageService: OrganizationsUsageService,
     ) { }
+
     private readonly logger = new Logger(OrganizationsService.name);
 
     async create(dto: CreateOrganizationDto, userId: string) {
         const baseSlug = slugify(dto.name, { lower: true, strict: true });
         if (!baseSlug) {
-            throw new BadRequestException('El nombre de la organización no es válido para generar un slug');
+            throw new BadRequestException('El nombre de la organizacion no es valido para generar un slug');
         }
 
         const slug = await this.generateUniqueSlug(baseSlug);
@@ -155,7 +156,7 @@ export class OrganizationsService {
         });
 
         if (!organization) {
-            throw new NotFoundException('Organización no encontrada');
+            throw new NotFoundException('Organizacion no encontrada');
         }
 
         return {
@@ -174,7 +175,7 @@ export class OrganizationsService {
         });
 
         if (!existing) {
-            throw new NotFoundException('Organización no encontrada');
+            throw new NotFoundException('Organizacion no encontrada');
         }
 
         const normalizedName = dto.name?.trim();
@@ -187,7 +188,7 @@ export class OrganizationsService {
 
         const slugBase = slugify(normalizedName, { lower: true, strict: true });
         if (!slugBase) {
-            throw new BadRequestException('El nombre de la organización no es válido para generar un slug');
+            throw new BadRequestException('El nombre de la organizacion no es valido para generar un slug');
         }
 
         const slug =
@@ -278,10 +279,14 @@ export class OrganizationsService {
         });
 
         if (!organization) {
-            throw new NotFoundException('Organización no encontrada');
+            throw new NotFoundException('Organizacion no encontrada');
         }
 
-        const usageSnapshot = await this.getUsageSnapshot(this.prisma, organizationId, organization.plan);
+        const usageSnapshot = await this.organizationsUsageService.getUsageSnapshot(
+            this.prisma,
+            organizationId,
+            organization.plan,
+        );
 
         return {
             ...organization,
@@ -300,7 +305,7 @@ export class OrganizationsService {
     ) {
         const actorRole = await this.resolveActorRole(organizationId, userId, userRole);
         if (actorRole !== 'OWNER') {
-            throw new ForbiddenException('Solo el owner puede actualizar la suscripción de la organización');
+            throw new ForbiddenException('Solo el owner puede actualizar la suscripcion de la organizacion');
         }
 
         const updated = await this.prisma.$transaction(async (tx) => {
@@ -315,11 +320,19 @@ export class OrganizationsService {
             });
 
             if (!currentOrganization) {
-                throw new NotFoundException('Organización no encontrada');
+                throw new NotFoundException('Organizacion no encontrada');
             }
 
-            const usageSnapshot = await this.getUsageSnapshot(tx, organizationId, dto.plan);
-            this.assertPlanSupportsCurrentUsage(dto.plan, usageSnapshot.usage.businesses, usageSnapshot.usage.allocatedSeats);
+            const usageSnapshot = await this.organizationsUsageService.getUsageSnapshot(
+                tx,
+                organizationId,
+                dto.plan,
+            );
+            this.organizationsUsageService.assertPlanSupportsCurrentUsage(
+                dto.plan,
+                usageSnapshot.usage.businesses,
+                usageSnapshot.usage.allocatedSeats,
+            );
 
             const updateData: Prisma.OrganizationUpdateInput = {
                 plan: dto.plan,
@@ -397,7 +410,11 @@ export class OrganizationsService {
             `organization.subscription.updated org=${organizationId} actor=${userId} plan=${updated.plan}`,
         );
 
-        const usageSnapshot = await this.getUsageSnapshot(this.prisma, organizationId, updated.plan);
+        const usageSnapshot = await this.organizationsUsageService.getUsageSnapshot(
+            this.prisma,
+            organizationId,
+            updated.plan,
+        );
 
         return {
             ...updated,
@@ -420,10 +437,14 @@ export class OrganizationsService {
         });
 
         if (!organization) {
-            throw new NotFoundException('Organización no encontrada');
+            throw new NotFoundException('Organizacion no encontrada');
         }
 
-        const usageSnapshot = await this.getUsageSnapshot(this.prisma, organizationId, organization.plan);
+        const usageSnapshot = await this.organizationsUsageService.getUsageSnapshot(
+            this.prisma,
+            organizationId,
+            organization.plan,
+        );
 
         return {
             organizationId: organization.id,
@@ -483,7 +504,7 @@ export class OrganizationsService {
         });
 
         if (existingMember) {
-            throw new ConflictException('Ese correo ya pertenece a la organización');
+            throw new ConflictException('Ese correo ya pertenece a la organizacion');
         }
 
         const plainToken = randomBytes(32).toString('hex');
@@ -499,7 +520,7 @@ export class OrganizationsService {
                 },
             });
 
-            await this.assertCanAllocateSeat(tx, organizationId, true);
+            await this.organizationsUsageService.assertCanAllocateSeat(tx, organizationId, true);
 
             const createdInvite = await tx.organizationInvite.create({
                 data: {
@@ -548,7 +569,7 @@ export class OrganizationsService {
     async acceptInvite(token: string, userId: string) {
         const normalizedToken = token.trim();
         if (!normalizedToken) {
-            throw new BadRequestException('Token de invitación inválido');
+            throw new BadRequestException('Token de invitacion invalido');
         }
 
         const tokenHash = this.hashInviteToken(normalizedToken);
@@ -567,19 +588,19 @@ export class OrganizationsService {
         });
 
         if (!invite) {
-            throw new NotFoundException('Invitación no encontrada');
+            throw new NotFoundException('Invitacion no encontrada');
         }
 
         if (invite.acceptedAt) {
-            throw new BadRequestException('La invitación ya fue aceptada');
+            throw new BadRequestException('La invitacion ya fue aceptada');
         }
 
         if (invite.expiresAt.getTime() <= Date.now()) {
-            throw new BadRequestException('La invitación ha expirado');
+            throw new BadRequestException('La invitacion ha expirado');
         }
 
         if (invite.organization.subscriptionStatus === 'CANCELED') {
-            throw new ForbiddenException('La suscripción de esta organización está cancelada');
+            throw new ForbiddenException('La suscripcion de esta organizacion esta cancelada');
         }
 
         const user = await this.prisma.user.findUnique({
@@ -592,7 +613,7 @@ export class OrganizationsService {
         }
 
         if (user.email.trim().toLowerCase() !== invite.email.trim().toLowerCase()) {
-            throw new ForbiddenException('Esta invitación no pertenece a tu cuenta');
+            throw new ForbiddenException('Esta invitacion no pertenece a tu cuenta');
         }
 
         const membership = await this.prisma.$transaction(async (tx) => {
@@ -662,7 +683,7 @@ export class OrganizationsService {
         return {
             organization: invite.organization,
             membership,
-            message: 'Invitación aceptada exitosamente',
+            message: 'Invitacion aceptada exitosamente',
         };
     }
 
@@ -699,7 +720,7 @@ export class OrganizationsService {
         }
 
         if (targetMembership.role === 'OWNER') {
-            throw new ForbiddenException('No puedes modificar el rol del owner de la organización');
+            throw new ForbiddenException('No puedes modificar el rol del owner de la organizacion');
         }
 
         if (actorRole === 'MANAGER') {
@@ -776,7 +797,7 @@ export class OrganizationsService {
         }
 
         if (targetMembership.role === 'OWNER') {
-            throw new ForbiddenException('No puedes eliminar al owner de la organización');
+            throw new ForbiddenException('No puedes eliminar al owner de la organizacion');
         }
 
         if (actorRole === 'MANAGER' && targetMembership.role !== 'STAFF') {
@@ -810,127 +831,6 @@ export class OrganizationsService {
         return { message: 'Miembro removido exitosamente' };
     }
 
-    private async getUsageSnapshot(
-        client: PrismaClientLike,
-        organizationId: string,
-        planOverride?: OrganizationPlan,
-    ): Promise<{
-        plan: OrganizationPlan;
-        subscriptionStatus: OrganizationSubscriptionStatus;
-        limits: ReturnType<typeof getOrganizationPlanLimits>;
-        usage: {
-            businesses: number;
-            members: number;
-            pendingInvites: number;
-            allocatedSeats: number;
-        };
-        remaining: {
-            businesses: number | null;
-            seats: number | null;
-        };
-    }> {
-        const organization = await client.organization.findUnique({
-            where: { id: organizationId },
-            select: {
-                id: true,
-                plan: true,
-                subscriptionStatus: true,
-            },
-        });
-
-        if (!organization) {
-            throw new NotFoundException('Organización no encontrada');
-        }
-
-        const effectivePlan = planOverride ?? organization.plan;
-        const limits = getOrganizationPlanLimits(effectivePlan);
-
-        const [businesses, members, pendingInvites] = await Promise.all([
-            client.business.count({
-                where: { organizationId },
-            }),
-            client.organizationMember.count({
-                where: { organizationId },
-            }),
-            client.organizationInvite.count({
-                where: {
-                    organizationId,
-                    acceptedAt: null,
-                    expiresAt: {
-                        gt: new Date(),
-                    },
-                },
-            }),
-        ]);
-
-        const allocatedSeats = members + pendingInvites;
-
-        return {
-            plan: effectivePlan,
-            subscriptionStatus: organization.subscriptionStatus,
-            limits,
-            usage: {
-                businesses,
-                members,
-                pendingInvites,
-                allocatedSeats,
-            },
-            remaining: {
-                businesses:
-                    limits.maxBusinesses === null
-                        ? null
-                        : Math.max(limits.maxBusinesses - businesses, 0),
-                seats:
-                    limits.maxMembers === null
-                        ? null
-                        : Math.max(limits.maxMembers - allocatedSeats, 0),
-            },
-        };
-    }
-
-    private assertPlanSupportsCurrentUsage(
-        targetPlan: OrganizationPlan,
-        currentBusinesses: number,
-        currentAllocatedSeats: number,
-    ): void {
-        const limits = getOrganizationPlanLimits(targetPlan);
-
-        if (limits.maxBusinesses !== null && currentBusinesses > limits.maxBusinesses) {
-            throw new BadRequestException(
-                `No puedes cambiar al plan ${targetPlan} porque excede el limite de negocios`,
-            );
-        }
-
-        if (limits.maxMembers !== null && currentAllocatedSeats > limits.maxMembers) {
-            throw new BadRequestException(
-                `No puedes cambiar al plan ${targetPlan} porque excede el limite de miembros`,
-            );
-        }
-    }
-
-    private async assertCanAllocateSeat(
-        client: PrismaClientLike,
-        organizationId: string,
-        allocatingNewSeat: boolean,
-    ): Promise<void> {
-        const usageSnapshot = await this.getUsageSnapshot(client, organizationId);
-
-        if (usageSnapshot.subscriptionStatus === 'CANCELED') {
-            throw new ForbiddenException('La suscripción de la organización está cancelada');
-        }
-
-        if (!allocatingNewSeat) {
-            return;
-        }
-
-        if (
-            usageSnapshot.limits.maxMembers !== null &&
-            usageSnapshot.usage.allocatedSeats >= usageSnapshot.limits.maxMembers
-        ) {
-            throw new BadRequestException('La organización alcanzó el límite de miembros de su plan');
-        }
-    }
-
     private readonly organizationInclude = {
         ownerUser: {
             select: {
@@ -959,7 +859,7 @@ export class OrganizationsService {
         });
 
         if (!organization) {
-            throw new NotFoundException('Organización no encontrada');
+            throw new NotFoundException('Organizacion no encontrada');
         }
 
         const membership = await this.prisma.organizationMember.findUnique({
@@ -973,7 +873,7 @@ export class OrganizationsService {
         });
 
         if (!membership) {
-            throw new ForbiddenException('No tienes acceso a esta organización');
+            throw new ForbiddenException('No tienes acceso a esta organizacion');
         }
 
         return membership.role;
@@ -981,7 +881,7 @@ export class OrganizationsService {
 
     private assertCanManageOrganization(actorRole: ActorOrgRole): void {
         if (actorRole !== 'OWNER' && actorRole !== 'MANAGER') {
-            throw new ForbiddenException('No tienes permisos para gestionar esta organización');
+            throw new ForbiddenException('No tienes permisos para gestionar esta organizacion');
         }
     }
 
