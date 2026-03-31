@@ -17,23 +17,34 @@ import {
     BusinessQueryDto,
     NearbyQueryDto,
     CreatePublicLeadDto,
-    BusinessHourInputDto,
 } from './dto/business.dto';
 import slugify from 'slugify';
 import { getOrganizationPlanLimits } from '../organizations/organization-plan-limits';
 import { ReputationService } from '../reputation/reputation.service';
 import { RedisService } from '../cache/redis.service';
-import { hashedCacheKey } from '../cache/cache-key';
 import { DomainEventsService } from '../core/events/domain-events.service';
 import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { SearchService } from '../search/search.service';
 import {
-    buildTodayBusinessHoursLabel,
-    calculateBusinessProfileCompletenessScore,
-    isBusinessOpenNow,
-    listMissingBusinessProfileFields,
-} from './business-profile';
+    assertCoordinatePair,
+    canAccessUnverified,
+    decorateBusinessProfile,
+    decorateBusinessProfiles,
+    findDuplicateCandidates,
+    normalizeBusinessHours,
+    normalizeOptionalEmail,
+    normalizeOptionalText,
+    normalizePublicListQuery,
+    resolvePagination,
+} from './businesses.helpers';
+import {
+    adminListBusinessSelect,
+    catalogQualityBusinessSelect,
+    fullBusinessDetailInclude,
+    fullBusinessInclude,
+    mineListBusinessSelect,
+} from './businesses.selects';
 
 @Injectable()
 export class BusinessesService {
@@ -58,102 +69,6 @@ export class BusinessesService {
         private readonly searchService: SearchService,
     ) { }
     private readonly uploadsRoot = path.resolve(process.cwd(), 'uploads');
-
-    private readonly fullInclude = {
-        owner: {
-            select: { id: true, name: true },
-        },
-        organization: {
-            select: { id: true, name: true, slug: true },
-        },
-        province: {
-            select: { id: true, name: true, slug: true },
-        },
-        city: {
-            select: { id: true, name: true, slug: true },
-        },
-        sector: {
-            select: { id: true, name: true, slug: true },
-        },
-        categories: {
-            include: {
-                category: {
-                    select: { id: true, name: true, slug: true, icon: true, parentId: true },
-                },
-            },
-        },
-        images: {
-            orderBy: [
-                { isCover: Prisma.SortOrder.desc },
-                { sortOrder: Prisma.SortOrder.asc },
-                { id: Prisma.SortOrder.asc },
-            ],
-        },
-        hours: {
-            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
-        },
-        features: {
-            include: {
-                feature: {
-                    select: { id: true, name: true },
-                },
-            },
-        },
-        _count: {
-            select: { reviews: true },
-        },
-    };
-
-    private readonly publicListSelect = {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        address: true,
-        priceRange: true,
-        latitude: true,
-        longitude: true,
-        verified: true,
-        reputationScore: true,
-        verificationStatus: true,
-        province: {
-            select: { id: true, name: true, slug: true },
-        },
-        city: {
-            select: { id: true, name: true, slug: true },
-        },
-        sector: {
-            select: { id: true, name: true, slug: true },
-        },
-        categories: {
-            select: {
-                category: {
-                    select: { id: true, name: true, slug: true, icon: true, parentId: true },
-                },
-            },
-        },
-        images: {
-            select: { id: true, url: true, isCover: true, caption: true, type: true },
-            orderBy: [
-                { isCover: Prisma.SortOrder.desc },
-                { sortOrder: Prisma.SortOrder.asc },
-                { id: Prisma.SortOrder.asc },
-            ],
-            take: 1,
-        },
-        hours: {
-            select: {
-                dayOfWeek: true,
-                opensAt: true,
-                closesAt: true,
-                closed: true,
-            },
-            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
-        },
-        _count: {
-            select: { reviews: true },
-        },
-    };
 
     async createPublicLead(
         businessId: string,
@@ -299,302 +214,6 @@ export class BusinessesService {
         };
     }
 
-    private readonly adminListSelect = {
-        id: true,
-        name: true,
-        slug: true,
-        verified: true,
-        verificationStatus: true,
-        createdAt: true,
-        phone: true,
-        website: true,
-        email: true,
-        owner: {
-            select: { id: true, name: true },
-        },
-        organization: {
-            select: { id: true, name: true, slug: true },
-        },
-        province: {
-            select: { id: true, name: true, slug: true },
-        },
-        city: {
-            select: { id: true, name: true, slug: true },
-        },
-        sector: {
-            select: { id: true, name: true, slug: true },
-        },
-        categories: {
-            select: {
-                category: {
-                    select: { id: true, name: true, slug: true, icon: true, parentId: true },
-                },
-            },
-        },
-        images: {
-            select: { id: true, url: true, isCover: true },
-            orderBy: [
-                { isCover: Prisma.SortOrder.desc },
-                { sortOrder: Prisma.SortOrder.asc },
-                { id: Prisma.SortOrder.asc },
-            ],
-            take: 1,
-        },
-        hours: {
-            select: {
-                dayOfWeek: true,
-                opensAt: true,
-                closesAt: true,
-                closed: true,
-            },
-            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
-        },
-        _count: {
-            select: { reviews: true },
-        },
-    };
-
-    private readonly mineListSelect = {
-        id: true,
-        name: true,
-        slug: true,
-        verified: true,
-        verificationStatus: true,
-        city: {
-            select: { id: true, name: true, slug: true },
-        },
-        sector: {
-            select: { id: true, name: true, slug: true },
-        },
-        categories: {
-            select: {
-                category: {
-                    select: { id: true, name: true, slug: true, parentId: true },
-                },
-            },
-        },
-        images: {
-            select: { id: true, url: true, isCover: true },
-            orderBy: [
-                { isCover: Prisma.SortOrder.desc },
-                { sortOrder: Prisma.SortOrder.asc },
-                { id: Prisma.SortOrder.asc },
-            ],
-            take: 1,
-        },
-        hours: {
-            select: {
-                dayOfWeek: true,
-                opensAt: true,
-                closesAt: true,
-                closed: true,
-            },
-            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
-        },
-        phone: true,
-        website: true,
-        email: true,
-        latitude: true,
-        longitude: true,
-        _count: {
-            select: { reviews: true },
-        },
-    };
-
-    private readonly catalogQualitySelect = {
-        id: true,
-        name: true,
-        slug: true,
-        verified: true,
-        createdAt: true,
-        phone: true,
-        website: true,
-        email: true,
-        address: true,
-        latitude: true,
-        longitude: true,
-        province: {
-            select: { id: true, name: true, slug: true },
-        },
-        city: {
-            select: { id: true, name: true, slug: true },
-        },
-        sector: {
-            select: { id: true, name: true, slug: true },
-        },
-        categories: {
-            select: {
-                category: {
-                    select: { id: true, name: true, slug: true, parentId: true },
-                },
-            },
-        },
-        images: {
-            select: { id: true, url: true, isCover: true },
-            orderBy: [
-                { isCover: Prisma.SortOrder.desc },
-                { sortOrder: Prisma.SortOrder.asc },
-                { id: Prisma.SortOrder.asc },
-            ],
-        },
-        hours: {
-            select: {
-                dayOfWeek: true,
-                opensAt: true,
-                closesAt: true,
-                closed: true,
-            },
-            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
-        },
-    };
-
-    private decorateBusinessProfile<T extends Record<string, any>>(business: T): T & {
-        profileCompletenessScore: number;
-        missingCoreFields: string[];
-        openNow: boolean | null;
-        todayHoursLabel: string | null;
-    } {
-        const profileCompletenessScore = calculateBusinessProfileCompletenessScore(business);
-        return {
-            ...business,
-            profileCompletenessScore,
-            missingCoreFields: listMissingBusinessProfileFields(business),
-            openNow: isBusinessOpenNow(business.hours),
-            todayHoursLabel: buildTodayBusinessHoursLabel(business.hours),
-        };
-    }
-
-    private decorateBusinessProfiles<T extends Record<string, any>>(businesses: T[]) {
-        return businesses.map((business) => this.decorateBusinessProfile(business));
-    }
-
-    private normalizeOptionalText(value?: string | null): string | null | undefined {
-        if (value === undefined) {
-            return undefined;
-        }
-
-        if (value === null) {
-            return null;
-        }
-
-        const normalized = value.trim();
-        return normalized.length > 0 ? normalized : null;
-    }
-
-    private normalizeOptionalEmail(value?: string | null): string | null | undefined {
-        if (value === undefined) {
-            return undefined;
-        }
-
-        if (value === null) {
-            return null;
-        }
-
-        const normalized = value.trim().toLowerCase();
-        return normalized.length > 0 ? normalized : null;
-    }
-
-    private normalizeBusinessHours(hours?: BusinessHourInputDto[]) {
-        if (!hours) {
-            return undefined;
-        }
-
-        const normalized = hours
-            .map((entry) => ({
-                dayOfWeek: entry.dayOfWeek,
-                opensAt: this.normalizeOptionalText(entry.opensAt) ?? null,
-                closesAt: this.normalizeOptionalText(entry.closesAt) ?? null,
-                closed: Boolean(entry.closed),
-            }))
-            .sort((left, right) => left.dayOfWeek - right.dayOfWeek);
-
-        const uniqueDays = new Set<number>();
-        for (const entry of normalized) {
-            if (uniqueDays.has(entry.dayOfWeek)) {
-                throw new BadRequestException('No puedes enviar horarios duplicados para el mismo dia');
-            }
-            uniqueDays.add(entry.dayOfWeek);
-
-            if (entry.closed) {
-                entry.opensAt = null;
-                entry.closesAt = null;
-                continue;
-            }
-
-            if (!entry.opensAt || !entry.closesAt) {
-                throw new BadRequestException('Cada horario abierto debe incluir apertura y cierre');
-            }
-        }
-
-        return normalized;
-    }
-
-    private findDuplicateCandidates(
-        businesses: Array<Record<string, any> & { profileCompletenessScore: number; missingCoreFields: string[] }>,
-    ) {
-        const candidates = new Map<string, {
-            key: string;
-            reasons: Set<string>;
-            businesses: Array<Record<string, any>>;
-        }>();
-        const phoneGroups = new Map<string, Array<Record<string, any>>>();
-        const nameLocationGroups = new Map<string, Array<Record<string, any>>>();
-
-        for (const business of businesses) {
-            const normalizedPhone = String(business.phone ?? '').replace(/\D/g, '');
-            if (normalizedPhone.length >= 7) {
-                const group = phoneGroups.get(normalizedPhone) ?? [];
-                group.push(business);
-                phoneGroups.set(normalizedPhone, group);
-            }
-
-            const normalizedName = String(business.name ?? '')
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')
-                .trim()
-                .toLowerCase();
-            const cityKey = String(business.city?.id ?? business.province?.id ?? '');
-            if (normalizedName && cityKey) {
-                const compositeKey = `${normalizedName}::${cityKey}`;
-                const group = nameLocationGroups.get(compositeKey) ?? [];
-                group.push(business);
-                nameLocationGroups.set(compositeKey, group);
-            }
-        }
-
-        const registerGroups = (groups: Iterable<Array<Record<string, any>>>, reason: string) => {
-            for (const group of groups) {
-                if (group.length < 2) {
-                    continue;
-                }
-
-                const key = group
-                    .map((entry) => String(entry.id))
-                    .sort()
-                    .join(':');
-
-                const existing = candidates.get(key) ?? {
-                    key,
-                    reasons: new Set<string>(),
-                    businesses: group,
-                };
-                existing.reasons.add(reason);
-                candidates.set(key, existing);
-            }
-        };
-
-        registerGroups(phoneGroups.values(), 'telefono_compartido');
-        registerGroups(nameLocationGroups.values(), 'nombre_y_ciudad_similares');
-
-        return [...candidates.values()]
-            .map((entry) => ({
-                key: entry.key,
-                reasons: [...entry.reasons],
-                businesses: entry.businesses,
-            }))
-            .sort((left, right) => right.businesses.length - left.businesses.length);
-    }
-
     async findAll(
         query: BusinessQueryDto,
         trackingContext?: { visitorId?: string; sessionId?: string; source?: string | null },
@@ -603,14 +222,14 @@ export class BusinessesService {
     }
 
     async findAllAdmin(query: BusinessQueryDto) {
-        const normalizedQuery = this.normalizePublicListQuery(query);
-        const { page, limit, skip } = this.resolvePagination(normalizedQuery.page, normalizedQuery.limit, 12, 100);
+        const normalizedQuery = normalizePublicListQuery(query);
+        const { page, limit, skip } = resolvePagination(normalizedQuery.page, normalizedQuery.limit, 12, 100);
         const where = await this.buildWhere(normalizedQuery, true);
 
         const [data, total] = await Promise.all([
             this.prisma.business.findMany({
                 where,
-                select: this.adminListSelect,
+                select: adminListBusinessSelect,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
@@ -618,7 +237,7 @@ export class BusinessesService {
             this.prisma.business.count({ where }),
         ]);
 
-        const decoratedData = this.decorateBusinessProfiles(data as Record<string, any>[]);
+        const decoratedData = decorateBusinessProfiles(data as Record<string, any>[]);
 
         return {
             data: decoratedData,
@@ -635,10 +254,10 @@ export class BusinessesService {
                 organizationId,
                 deletedAt: null,
             },
-            select: this.mineListSelect,
+            select: mineListBusinessSelect,
             orderBy: { createdAt: 'desc' },
         });
-        return this.decorateBusinessProfiles(businesses as Record<string, any>[]);
+        return decorateBusinessProfiles(businesses as Record<string, any>[]);
     }
 
     async findById(
@@ -654,7 +273,7 @@ export class BusinessesService {
                 if (!publicBusiness) {
                     throw new NotFoundException('Negocio no encontrado');
                 }
-                return this.decorateBusinessProfile(publicBusiness as Record<string, any>);
+                return decorateBusinessProfile(publicBusiness as Record<string, any>);
             });
         }
 
@@ -664,20 +283,17 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        if (
-            !business.verified &&
-            !this.canAccessUnverified(
-                business.ownerId,
-                business.organizationId,
-                userId,
-                userRole,
-                currentOrganizationId,
-            )
-        ) {
+        if (!business.verified && !canAccessUnverified(
+            business.ownerId,
+            business.organizationId,
+            userId,
+            userRole,
+            currentOrganizationId,
+        )) {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        return this.decorateBusinessProfile(business as Record<string, any>);
+        return decorateBusinessProfile(business as Record<string, any>);
     }
 
     async findBySlug(
@@ -693,7 +309,7 @@ export class BusinessesService {
                 if (!publicBusiness) {
                     throw new NotFoundException('Negocio no encontrado');
                 }
-                return this.decorateBusinessProfile(publicBusiness as Record<string, any>);
+                return decorateBusinessProfile(publicBusiness as Record<string, any>);
             });
         }
 
@@ -703,20 +319,17 @@ export class BusinessesService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        if (
-            !business.verified &&
-            !this.canAccessUnverified(
-                business.ownerId,
-                business.organizationId,
-                userId,
-                userRole,
-                currentOrganizationId,
-            )
-        ) {
+        if (!business.verified && !canAccessUnverified(
+            business.ownerId,
+            business.organizationId,
+            userId,
+            userRole,
+            currentOrganizationId,
+        )) {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        return this.decorateBusinessProfile(business as Record<string, any>);
+        return decorateBusinessProfile(business as Record<string, any>);
     }
     async create(
         dto: CreateBusinessDto,
@@ -725,7 +338,7 @@ export class BusinessesService {
         organizationId?: string,
         organizationRole?: OrganizationRole,
     ) {
-        this.assertCoordinatePair(dto.latitude, dto.longitude);
+        assertCoordinatePair(dto.latitude, dto.longitude);
         const baseSlug = slugify(dto.name, { lower: true, strict: true });
         if (!baseSlug) {
             throw new BadRequestException('El nombre del negocio no es valido para generar un slug');
@@ -734,13 +347,13 @@ export class BusinessesService {
         const slug = await this.generateUniqueSlug(baseSlug);
         const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
-        const hours = this.normalizeBusinessHours(dto.hours);
+        const hours = normalizeBusinessHours(dto.hours, normalizeOptionalText);
         const contactChannels = await this.normalizeBusinessContactChannels(dto.phone, dto.whatsapp);
-        const website = this.normalizeOptionalText(dto.website) ?? null;
-        const email = this.normalizeOptionalEmail(dto.email) ?? null;
-        const instagramUrl = this.normalizeOptionalText(dto.instagramUrl) ?? null;
-        const facebookUrl = this.normalizeOptionalText(dto.facebookUrl) ?? null;
-        const tiktokUrl = this.normalizeOptionalText(dto.tiktokUrl) ?? null;
+        const website = normalizeOptionalText(dto.website) ?? null;
+        const email = normalizeOptionalEmail(dto.email) ?? null;
+        const instagramUrl = normalizeOptionalText(dto.instagramUrl) ?? null;
+        const facebookUrl = normalizeOptionalText(dto.facebookUrl) ?? null;
+        const tiktokUrl = normalizeOptionalText(dto.tiktokUrl) ?? null;
         const coordinates = await this.resolveCoordinatesForBusiness({
             address: dto.address,
             provinceId: dto.provinceId,
@@ -813,7 +426,7 @@ export class BusinessesService {
                             }
                             : undefined,
                     },
-                    include: this.fullInclude,
+                    include: fullBusinessInclude,
                 });
                 await this.syncBusinessLocation(tx, business.id, coordinates.latitude, coordinates.longitude);
 
@@ -828,7 +441,7 @@ export class BusinessesService {
 
             this.publishBusinessChangedEvent(createdBusiness.id, createdBusiness.slug, 'created');
 
-            return this.decorateBusinessProfile(createdBusiness as Record<string, any>);
+            return decorateBusinessProfile(createdBusiness as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -843,16 +456,16 @@ export class BusinessesService {
         organizationId: string,
         organizationRole: OrganizationRole,
     ) {
-        this.assertCoordinatePair(dto.latitude, dto.longitude);
+        assertCoordinatePair(dto.latitude, dto.longitude);
         const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
         const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
-        const hours = this.normalizeBusinessHours(dto.hours);
+        const hours = normalizeBusinessHours(dto.hours, normalizeOptionalText);
         const contactChannels = await this.normalizeBusinessContactChannels(dto.phone, dto.whatsapp);
-        const normalizedWebsite = this.normalizeOptionalText(dto.website);
-        const normalizedEmail = this.normalizeOptionalEmail(dto.email);
-        const normalizedInstagramUrl = this.normalizeOptionalText(dto.instagramUrl);
-        const normalizedFacebookUrl = this.normalizeOptionalText(dto.facebookUrl);
-        const normalizedTiktokUrl = this.normalizeOptionalText(dto.tiktokUrl);
+        const normalizedWebsite = normalizeOptionalText(dto.website);
+        const normalizedEmail = normalizeOptionalEmail(dto.email);
+        const normalizedInstagramUrl = normalizeOptionalText(dto.instagramUrl);
+        const normalizedFacebookUrl = normalizeOptionalText(dto.facebookUrl);
+        const normalizedTiktokUrl = normalizeOptionalText(dto.tiktokUrl);
         const nextSectorIdForUpdate = dto.sectorId !== undefined
             ? dto.sectorId
             : dto.cityId !== undefined
@@ -989,7 +602,7 @@ export class BusinessesService {
                             }
                             : undefined,
                     },
-                    include: this.fullInclude,
+                    include: fullBusinessInclude,
                 });
 
                 const nextLatitude = updatedBusiness.latitude ?? business.latitude ?? undefined;
@@ -1001,7 +614,7 @@ export class BusinessesService {
 
             this.publishBusinessChangedEvent(updatedBusiness.id, updatedBusiness.slug, 'updated');
 
-            return this.decorateBusinessProfile(updatedBusiness as Record<string, any>);
+            return decorateBusinessProfile(updatedBusiness as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -1155,24 +768,16 @@ export class BusinessesService {
                     verificationStatus: 'VERIFIED',
                     verificationReviewedAt: new Date(),
                 },
-                include: this.fullInclude,
+                include: fullBusinessInclude,
             });
 
             await this.reputationService.recalculateBusinessReputation(id);
             this.publishBusinessChangedEvent(id, business.slug, 'verified');
 
-            return this.decorateBusinessProfile(business as Record<string, any>);
+            return decorateBusinessProfile(business as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
-        }
-    }
-
-    private assertCoordinatePair(latitude?: number, longitude?: number): void {
-        const hasLatitude = latitude !== undefined && latitude !== null;
-        const hasLongitude = longitude !== undefined && longitude !== null;
-        if (hasLatitude !== hasLongitude) {
-            throw new BadRequestException('Debes enviar latitud y longitud juntas');
         }
     }
 
@@ -1218,7 +823,7 @@ export class BusinessesService {
         latitude?: number;
         longitude?: number;
     }): Promise<{ latitude?: number; longitude?: number }> {
-        this.assertCoordinatePair(input.latitude, input.longitude);
+        assertCoordinatePair(input.latitude, input.longitude);
 
         if (input.latitude !== undefined && input.longitude !== undefined) {
             return {
@@ -1259,17 +864,17 @@ export class BusinessesService {
             where: {
                 deletedAt: null,
             },
-            select: this.catalogQualitySelect,
+            select: catalogQualityBusinessSelect,
             orderBy: { createdAt: 'desc' },
             take: 500,
         });
 
-        const decoratedBusinesses = this.decorateBusinessProfiles(businesses as Record<string, any>[]);
+        const decoratedBusinesses = decorateBusinessProfiles(businesses as Record<string, any>[]);
         const incompleteBusinesses = decoratedBusinesses
             .filter((business) => business.profileCompletenessScore < 80)
             .sort((left, right) => left.profileCompletenessScore - right.profileCompletenessScore)
             .slice(0, safeLimit);
-        const duplicateCandidates = this.findDuplicateCandidates(decoratedBusinesses).slice(0, safeLimit);
+        const duplicateCandidates = findDuplicateCandidates(decoratedBusinesses).slice(0, safeLimit);
 
         return {
             summary: {
@@ -1369,20 +974,7 @@ export class BusinessesService {
                 id,
                 deletedAt: null,
             },
-            include: {
-                ...this.fullInclude,
-                reviews: {
-                    where: {
-                        moderationStatus: 'APPROVED',
-                        isSpam: false,
-                    },
-                    include: {
-                        user: { select: { id: true, name: true } },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 20,
-                },
-            },
+            include: fullBusinessDetailInclude,
         });
     }
 
@@ -1392,20 +984,7 @@ export class BusinessesService {
                 slug,
                 deletedAt: null,
             },
-            include: {
-                ...this.fullInclude,
-                reviews: {
-                    where: {
-                        moderationStatus: 'APPROVED',
-                        isSpam: false,
-                    },
-                    include: {
-                        user: { select: { id: true, name: true } },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 20,
-                },
-            },
+            include: fullBusinessDetailInclude,
         });
     }
 
@@ -1416,20 +995,7 @@ export class BusinessesService {
                 verified: true,
                 deletedAt: null,
             },
-            include: {
-                ...this.fullInclude,
-                reviews: {
-                    where: {
-                        moderationStatus: 'APPROVED',
-                        isSpam: false,
-                    },
-                    include: {
-                        user: { select: { id: true, name: true } },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 20,
-                },
-            },
+            include: fullBusinessDetailInclude,
         });
     }
 
@@ -1440,20 +1006,7 @@ export class BusinessesService {
                 verified: true,
                 deletedAt: null,
             },
-            include: {
-                ...this.fullInclude,
-                reviews: {
-                    where: {
-                        moderationStatus: 'APPROVED',
-                        isSpam: false,
-                    },
-                    include: {
-                        user: { select: { id: true, name: true } },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 20,
-                },
-            },
+            include: fullBusinessDetailInclude,
         });
     }
 
@@ -1708,16 +1261,6 @@ export class BusinessesService {
         return where;
     }
 
-    private normalizePublicListQuery(query: BusinessQueryDto): BusinessQueryDto {
-        return {
-            ...query,
-            search: query.search?.trim() || undefined,
-            categorySlug: query.categorySlug?.trim() || undefined,
-            provinceSlug: query.provinceSlug?.trim() || undefined,
-            feature: query.feature?.trim() || undefined,
-        };
-    }
-
     private async resolveFeatureIds(featureQuery: string): Promise<string[]> {
         const rows = await this.prisma.feature.findMany({
             where: {
@@ -1752,24 +1295,6 @@ export class BusinessesService {
         });
 
         return [category.id, ...children.map((entry) => entry.id)];
-    }
-
-    private resolvePagination(
-        rawPage: number | undefined,
-        rawLimit: number | undefined,
-        defaultLimit: number,
-        maxLimit: number,
-    ): { page: number; limit: number; skip: number } {
-        const page = rawPage && Number.isFinite(rawPage) && rawPage > 0
-            ? Math.floor(rawPage)
-            : 1;
-        const requestedLimit = rawLimit && Number.isFinite(rawLimit) && rawLimit > 0
-            ? Math.floor(rawLimit)
-            : defaultLimit;
-        const limit = Math.min(requestedLimit, maxLimit);
-        const skip = (page - 1) * limit;
-
-        return { page, limit, skip };
     }
 
     private async assertCityBelongsToProvince(
@@ -1885,21 +1410,4 @@ export class BusinessesService {
         }
     }
 
-    private canAccessUnverified(
-        ownerId: string,
-        businessOrganizationId: string,
-        userId?: string,
-        userRole?: string,
-        currentOrganizationId?: string,
-    ): boolean {
-        if (!userId) {
-            return false;
-        }
-
-        if (ownerId === userId || userRole === 'ADMIN') {
-            return true;
-        }
-
-        return currentOrganizationId === businessOrganizationId;
-    }
 }
