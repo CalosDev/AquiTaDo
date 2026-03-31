@@ -13,6 +13,15 @@ import {
     createDefaultBusinessHours,
     type BusinessHourEntry,
 } from '../lib/businessProfile';
+import { PublicationGuidancePanel } from './register-business/PublicationGuidancePanel';
+import {
+    getRegisterStepActionLabel,
+    getRegisterStepTips,
+    getRegisterStepUnlock,
+    REGISTER_STEP_TITLES,
+    TOTAL_REGISTER_STEPS,
+    type RegisterStep,
+} from './register-business/flow';
 
 interface Category {
     id: string;
@@ -43,41 +52,7 @@ interface Sector {
     name: string;
 }
 
-type RegisterStep = 1 | 2 | 3 | 4;
 const BOOKING_FEATURE_CANONICAL = 'reservaciones';
-
-const STEP_TITLES: Array<{ step: RegisterStep; title: string; subtitle: string }> = [
-    { step: 1, title: 'Informacion', subtitle: 'Nombre y propuesta' },
-    { step: 2, title: 'Contacto', subtitle: 'Telefono y WhatsApp' },
-    { step: 3, title: 'Ubicacion', subtitle: 'Direccion y mapa' },
-    { step: 4, title: 'Categorias y servicios', subtitle: 'Donde apareceras y como operas' },
-];
-const STEP_PRIMARY_ACTION_LABEL: Record<RegisterStep, string> = {
-    1: 'Guardar informacion y seguir',
-    2: 'Guardar contacto y seguir',
-    3: 'Confirmar ubicacion y seguir',
-    4: 'Publicar negocio',
-};
-const STEP_UNLOCK_SUMMARY: Record<RegisterStep, { title: string; detail: string }> = {
-    1: {
-        title: 'Este paso define como se entiende tu negocio',
-        detail: 'Una propuesta clara mejora discovery y evita que la ficha parezca promocion vacia o spam.',
-    },
-    2: {
-        title: 'Aqui dejas el canal que convierte',
-        detail: 'WhatsApp, telefono o website bien puestos reducen rebote y mejoran la utilidad de la ficha desde el dia uno.',
-    },
-    3: {
-        title: 'La ubicacion decide donde apareces',
-        detail: 'Direccion, provincia y ciudad alimentan geocodificacion, resultados cercanos y la vista de mapa.',
-    },
-    4: {
-        title: 'Ahora cierras visibilidad y operacion',
-        detail: 'Categorias, horarios e imagenes empujan confianza y mejoran el filtro de discovery antes de publicar.',
-    },
-};
-
-const TOTAL_STEPS = STEP_TITLES.length;
 
 export function RegisterBusiness() {
     const navigate = useNavigate();
@@ -119,7 +94,7 @@ export function RegisterBusiness() {
     });
 
     const progressPercentage = useMemo(
-        () => Math.round((currentStep / TOTAL_STEPS) * 100),
+        () => Math.round((currentStep / TOTAL_REGISTER_STEPS) * 100),
         [currentStep],
     );
     const categoryOptions = useMemo(
@@ -145,39 +120,16 @@ export function RegisterBusiness() {
         [formData, selectedImages.length],
     );
     const currentStepMeta = useMemo(
-        () => STEP_TITLES.find((item) => item.step === currentStep) ?? STEP_TITLES[0],
+        () => REGISTER_STEP_TITLES.find((item) => item.step === currentStep) ?? REGISTER_STEP_TITLES[0],
         [currentStep],
     );
     const currentStepUnlock = useMemo(
-        () => STEP_UNLOCK_SUMMARY[currentStep],
+        () => getRegisterStepUnlock(currentStep),
         [currentStep],
     );
-    const currentStepTips = useMemo(() => {
-        if (currentStep === 1) {
-            return [
-                'Explica que vendes, en que zona operas y por que alguien deberia elegirte.',
-                'No pongas telefonos, links ni WhatsApp dentro de la descripcion.',
-            ];
-        }
-        if (currentStep === 2) {
-            return [
-                'Completa al menos un canal de contacto util desde el dia uno.',
-                'Si usas WhatsApp como canal principal, dejalo en su campo estructurado.',
-            ];
-        }
-        if (currentStep === 3) {
-            return [
-                'Direccion, provincia y ciudad mejoran discovery local y geocodificacion.',
-                'Mientras mas precisa la ubicacion, mejor responde lista/mapa.',
-            ];
-        }
-        return [
-            'La categoria define donde apareces; los horarios alimentan filtros como "abierto ahora".',
-            'Antes de publicar, revisa el bloque de visibilidad y riesgo preventivo.',
-        ];
-    }, [currentStep]);
+    const currentStepTips = useMemo(() => getRegisterStepTips(currentStep), [currentStep]);
     const currentStepActionLabel = useMemo(
-        () => STEP_PRIMARY_ACTION_LABEL[currentStep],
+        () => getRegisterStepActionLabel(currentStep),
         [currentStep],
     );
     const descriptionLength = formData.description.trim().length;
@@ -370,7 +322,7 @@ export function RegisterBusiness() {
 
         setError('');
         setCurrentStep((previous) =>
-            previous < TOTAL_STEPS ? ((previous + 1) as RegisterStep) : previous,
+            previous < TOTAL_REGISTER_STEPS ? ((previous + 1) as RegisterStep) : previous,
         );
     };
 
@@ -483,7 +435,7 @@ export function RegisterBusiness() {
                 null) as string | null;
 
             trackOnboardingEvent('BUSINESS_ONBOARDING_COMPLETE', {
-                step: TOTAL_STEPS,
+                step: TOTAL_REGISTER_STEPS,
                 completed: true,
                 imagesUploaded: selectedImages.length,
                 categoriesSelected: formData.categoryIds.length,
@@ -522,7 +474,7 @@ export function RegisterBusiness() {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-        if (currentStep < TOTAL_STEPS) {
+        if (currentStep < TOTAL_REGISTER_STEPS) {
             handleNextStep();
             return;
         }
@@ -1012,7 +964,7 @@ export function RegisterBusiness() {
                                 />
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {STEP_TITLES.map((item) => (
+                                {REGISTER_STEP_TITLES.map((item) => (
                                     <button
                                         key={item.step}
                                         type="button"
@@ -1042,81 +994,12 @@ export function RegisterBusiness() {
                             {renderStepBody()}
                         </div>
 
-                        <div className={`rounded-2xl border p-5 ${
-                            submissionGuidance.blockedByLocalHeuristics
-                                ? 'border-red-200 bg-red-50'
-                                : submissionGuidance.readinessLevel === 'ALTA'
-                                    ? 'border-emerald-200 bg-emerald-50'
-                                    : 'border-amber-200 bg-amber-50'
-                        }`}>
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Guia de publicacion</p>
-                                    <h2 className="mt-1 text-lg font-semibold text-gray-900">
-                                        Visibilidad {submissionGuidance.readinessLevel} · Score {submissionGuidance.readinessScore}
-                                    </h2>
-                                    <p className="mt-1 text-sm text-gray-600">
-                                        {completedVisibilityChecks} de {submissionGuidance.visibilityChecks.length} checks listos
-                                        {submissionGuidance.riskClusters.length > 0 ? ` - Riesgos: ${submissionGuidance.riskClusters.join(', ')}` : ''}
-                                    </p>
-                                </div>
-                                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                    submissionGuidance.blockedByLocalHeuristics
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-white text-gray-700'
-                                }`}>
-                                    Riesgo preventivo {submissionGuidance.preventiveScore}/100 - {submissionGuidance.preventiveSeverity}
-                                </span>
-                            </div>
-
-                            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-900">En este paso conviene cuidar</p>
-                                    <ul className="mt-2 space-y-2 text-sm text-gray-700">
-                                        {currentStepTips.map((tip) => (
-                                            <li key={tip}>{tip}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-gray-900">Checklist de visibilidad</p>
-                                    <div className="mt-2 space-y-2">
-                                        {submissionGuidance.visibilityChecks.map((check) => (
-                                            <div key={check.label} className="rounded-xl bg-white/80 px-3 py-2">
-                                                <p className="text-sm font-medium text-gray-900">
-                                                    {check.passed ? 'Listo' : 'Pendiente'} · {check.label}
-                                                </p>
-                                                <p className="mt-1 text-xs text-gray-600">{check.detail}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {remainingPublishNeeds.length > 0 ? (
-                                <div className="mt-4 rounded-xl bg-white/80 px-4 py-3">
-                                    <p className="text-sm font-medium text-gray-900">Aun falta para publicar con buena calidad</p>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {remainingPublishNeeds.map((item) => (
-                                            <span key={item} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700">
-                                                {item}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            {submissionGuidance.recommendedActions.length > 0 ? (
-                                <div className="mt-4">
-                                    <p className="text-sm font-medium text-gray-900">Acciones sugeridas</p>
-                                    <ul className="mt-2 space-y-1 text-sm text-gray-700">
-                                        {submissionGuidance.recommendedActions.slice(0, 4).map((action) => (
-                                            <li key={action}>{action}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            ) : null}
-                        </div>
+                        <PublicationGuidancePanel
+                            submissionGuidance={submissionGuidance}
+                            currentStepTips={currentStepTips}
+                            completedVisibilityChecks={completedVisibilityChecks}
+                            remainingPublishNeeds={remainingPublishNeeds}
+                        />
 
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                             <button
@@ -1130,7 +1013,7 @@ export function RegisterBusiness() {
 
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-gray-500">
-                                    Paso {currentStep} de {TOTAL_STEPS}
+                                    Paso {currentStep} de {TOTAL_REGISTER_STEPS}
                                 </span>
                                 <button
                                     type="submit"

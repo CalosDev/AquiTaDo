@@ -10,6 +10,7 @@ import {
     reviewApi,
     verificationApi,
 } from '../api/endpoints';
+import type { GrowthInsightsSnapshot, ModerationQueueItem, TrendDirection, TrendMetricSnapshot } from './admin-dashboard/types';
 
 type BusinessVerificationState = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED' | 'UNVERIFIED';
 
@@ -112,36 +113,6 @@ interface FlaggedReview {
     business: {
         id: string;
         name: string;
-    };
-}
-
-interface ModerationQueueItem {
-    id: string;
-    queueType: 'BUSINESS_VERIFICATION' | 'BUSINESS_PREMODERATION' | 'DOCUMENT_REVIEW' | 'REVIEW_MODERATION';
-    entityId: string;
-    status: string;
-    priority: 'HIGH' | 'MEDIUM' | 'LOW';
-    createdAt: string;
-    organization: {
-        id: string;
-        name: string;
-        slug: string;
-    };
-    business: {
-        id: string;
-        name: string;
-        slug: string;
-        riskScore: number;
-    };
-    payload?: {
-        verificationNotes?: string | null;
-        preventiveScore?: number;
-        preventiveSeverity?: 'LOW' | 'MEDIUM' | 'HIGH';
-        preventiveRiskClusters?: string[];
-        preventiveReasons?: string[];
-        preventiveSuggestedActions?: string[];
-        documentType?: string;
-        moderationReason?: string | null;
     };
 }
 
@@ -265,163 +236,6 @@ interface MarketInsightsSnapshot {
     }>;
 }
 
-interface GrowthInsightsSnapshot {
-    range: {
-        days: number;
-        from: string;
-        to: string;
-    };
-    topSearchedCategories: Array<{
-        categoryId: string | null;
-        categoryName: string;
-        searches: number;
-        supplyBusinesses: number;
-        demandSupplyRatio: number;
-    }>;
-    demandSupplyGaps: Array<{
-        provinceId: string | null;
-        provinceName: string;
-        categoryId: string | null;
-        categoryName: string;
-        demandSearches: number;
-        supplyBusinesses: number;
-        demandSupplyRatio: number;
-    }>;
-    conversionFunnels: {
-        searchToWhatsApp: {
-            uniqueSearchVisitors: number;
-            uniqueWhatsAppVisitors: number;
-            conversionRate: number;
-        };
-    };
-    activationMetrics: {
-        shareClicks: number;
-        passwordResetRequests: number;
-        passwordResetCompletions: number;
-        googleAuthSuccesses: number;
-        googleAuthLoginSuccesses: number;
-        googleAuthRegistrationSuccesses: number;
-        stickyPhoneClicks: number;
-        stickyWhatsAppClicks: number;
-        totalWhatsAppClicks: number;
-    };
-    discoveryMetrics: {
-        listingFilterApplies: number;
-        listingSortChanges: number;
-        mapViewChanges: number;
-        listViewChanges: number;
-        mapSelections: number;
-        listingResultClicks: number;
-        sponsoredResultClicks: number;
-    };
-    moderationMetrics: {
-        premoderationFlagged: number;
-        uniqueFlaggedBusinesses: number;
-        premoderationReleased: number;
-        premoderationConfirmed: number;
-        releaseRatePct: number;
-        topReasons: Array<{
-            reason: string;
-            count: number;
-        }>;
-    };
-    onboardingMetrics: {
-        step1Sessions: number;
-        step2Sessions: number;
-        step3Sessions: number;
-        step4Sessions: number;
-        completedSessions: number;
-        completionRatePct: number;
-    };
-    actionableAlerts: Array<{
-        level: 'HIGH' | 'MEDIUM';
-        title: string;
-        description: string;
-        metricKey: string;
-        owner: string;
-        cadence: 'Diario' | 'Semanal';
-        slaHours: number;
-        playbookSection: string;
-        recommendedAction: string;
-    }>;
-    trendComparisons: {
-        comparisonLabel: string;
-        activation: {
-            recoveryCompletionRatePct: TrendMetricSnapshot;
-            passwordResetRequests: TrendMetricSnapshot;
-            googleAuthSuccesses: TrendMetricSnapshot;
-            shareClicks: TrendMetricSnapshot;
-        };
-        discovery: {
-            mapSelectionRatePct: TrendMetricSnapshot;
-            listingResultClicks: TrendMetricSnapshot;
-            mapViewChanges: TrendMetricSnapshot;
-            listingFilterApplies: TrendMetricSnapshot;
-        };
-        moderation: {
-            releaseRatePct: TrendMetricSnapshot;
-            premoderationFlagged: TrendMetricSnapshot;
-            uniqueFlaggedBusinesses: TrendMetricSnapshot;
-        };
-        onboarding: {
-            completionRatePct: TrendMetricSnapshot;
-            step1Sessions: TrendMetricSnapshot;
-            completedSessions: TrendMetricSnapshot;
-        };
-    };
-    abTesting: {
-        experiment: string;
-        winner?: {
-            variantKey: string;
-            contactClicks: number;
-            whatsappClicks: number;
-            conversionRate: number;
-        } | null;
-        variants: Array<{
-            variantKey: string;
-            contactClicks: number;
-            whatsappClicks: number;
-            conversionRate: number;
-        }>;
-    };
-}
-
-type TrendDirection = 'up' | 'down' | 'flat';
-
-type TrendMetricSnapshot = {
-    current: number;
-    previous: number;
-    delta: number;
-    direction: TrendDirection;
-};
-
-const OPERATIONS_RHYTHMS = [
-    {
-        cadence: 'Diario',
-        owner: 'Soporte',
-        title: 'Recovery y email',
-        detail: 'Revisar badge Email, Recovery 24h, expirados y alertas con SLA de 24h.',
-    },
-    {
-        cadence: 'Diario',
-        owner: 'Trust & Safety',
-        title: 'Premoderacion',
-        detail: 'Mirar release rate, top razones y casos HIGH antes de abrir mas volumen a KYC.',
-    },
-    {
-        cadence: 'Semanal',
-        owner: 'Growth',
-        title: 'Discovery lista/mapa',
-        detail: 'Comparar seleccion en mapa, CTR a fichas y cambios de filtros contra la ventana previa.',
-    },
-    {
-        cadence: 'Semanal',
-        owner: 'Producto',
-        title: 'Onboarding de negocios',
-        detail: 'Revisar caidas por paso, alertas de friccion y microcopy del paso con mayor abandono.',
-    },
-] as const;
-
 interface MarketReportDetail extends MarketReport {
     summary?: Record<string, unknown> | null;
     filters?: Record<string, unknown> | null;
@@ -450,6 +264,33 @@ const EMPTY_OBSERVABILITY_SUMMARY: ObservabilitySummary = {
     rateLimitHits: 0,
     externalFailures: 0,
 };
+
+const OPERATIONS_RHYTHMS = [
+    {
+        cadence: 'Diario',
+        owner: 'Soporte',
+        title: 'Recovery y email',
+        detail: 'Revisar badge Email, Recovery 24h, expirados y alertas con SLA de 24h.',
+    },
+    {
+        cadence: 'Diario',
+        owner: 'Trust & Safety',
+        title: 'Premoderacion',
+        detail: 'Mirar release rate, top razones y casos HIGH antes de abrir mas volumen a KYC.',
+    },
+    {
+        cadence: 'Semanal',
+        owner: 'Growth',
+        title: 'Discovery lista/mapa',
+        detail: 'Comparar seleccion en mapa, CTR a fichas y cambios de filtros contra la ventana previa.',
+    },
+    {
+        cadence: 'Semanal',
+        owner: 'Producto',
+        title: 'Onboarding de negocios',
+        detail: 'Revisar caidas por paso, alertas de friccion y microcopy del paso con mayor abandono.',
+    },
+] as const;
 
 function normalizeBusinessVerificationStatus(business: Business): BusinessVerificationState {
     if (business.verificationStatus) {

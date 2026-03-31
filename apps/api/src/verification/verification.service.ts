@@ -19,6 +19,15 @@ import { ReputationService } from '../reputation/reputation.service';
 import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 import { UploadsService } from '../uploads/uploads.service';
 import {
+    buildPreventiveModerationErrorMessage,
+    buildPreventiveModerationNote,
+    buildPreventiveSuggestedActions,
+    evaluatePreventiveModerationSnapshot,
+    isPreventiveModerationNote,
+    type PreventiveModerationResult,
+    resolvePreventiveBlockedStatus,
+} from './preventive-moderation';
+import {
     ListVerificationDocumentsQueryDto,
     ResolvePreventiveModerationDto,
     ReviewBusinessVerificationDto,
@@ -29,37 +38,6 @@ import {
 } from './dto/verification.dto';
 
 type PrismaClientLike = PrismaService | Prisma.TransactionClient;
-
-type PreventiveModerationResult = {
-    blocked: boolean;
-    score: number;
-    severity: 'LOW' | 'MEDIUM' | 'HIGH';
-    riskClusters: string[];
-    reasons: string[];
-    currentStatus: BusinessVerificationStatus;
-    currentNotes: string | null;
-};
-
-const PREVENTIVE_MODERATION_THRESHOLD = 40;
-const PREVENTIVE_MODERATION_NOTE_PREFIX = 'Revision preventiva requerida antes del KYC';
-const PREVENTIVE_SPAM_KEYWORDS = [
-    'gana dinero',
-    'click aqui',
-    'haz clic aqui',
-    'prestamo rapido',
-    'viagra',
-    'crypto',
-    'bitcoin',
-    'onlyfans',
-    'telegram',
-    'casino',
-    'apuesta',
-    'contenido xxx',
-    'dm',
-    'inbox',
-];
-const EXTERNAL_LINK_REGEX = /(https?:\/\/|www\.|wa\.me|bit\.ly|instagram\.com|facebook\.com|tiktok\.com)/i;
-const EXTERNAL_CONTACT_REGEX = /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(\+?\d[\d\s().-]{7,}\d))/i;
 
 @Injectable()
 export class VerificationService {
@@ -136,9 +114,9 @@ export class VerificationService {
                     await tx.business.update({
                         where: { id: business.id },
                         data: {
-                            verificationStatus: this.resolvePreventiveBlockedStatus(moderation.currentStatus),
+                            verificationStatus: resolvePreventiveBlockedStatus(moderation.currentStatus),
                             verificationSubmittedAt: null,
-                            verificationNotes: this.buildPreventiveModerationNote(
+                            verificationNotes: buildPreventiveModerationNote(
                                 moderation.reasons,
                                 moderation.currentNotes,
                             ),
@@ -255,9 +233,9 @@ export class VerificationService {
                 await tx.business.update({
                     where: { id: businessId },
                     data: {
-                        verificationStatus: this.resolvePreventiveBlockedStatus(moderation.currentStatus),
+                        verificationStatus: resolvePreventiveBlockedStatus(moderation.currentStatus),
                         verificationSubmittedAt: null,
-                        verificationNotes: this.buildPreventiveModerationNote(
+                        verificationNotes: buildPreventiveModerationNote(
                             moderation.reasons,
                             moderation.currentNotes,
                         ),
@@ -280,7 +258,7 @@ export class VerificationService {
 
                 return {
                     blocked: true as const,
-                    message: this.buildPreventiveModerationErrorMessage(moderation.reasons),
+                    message: buildPreventiveModerationErrorMessage(moderation.reasons),
                 };
             }
 
@@ -582,7 +560,7 @@ export class VerificationService {
             }
 
             const moderation = await this.evaluatePreventiveModeration(tx, businessId);
-            const hasPreventiveBlock = moderation.blocked || this.isPreventiveModerationNote(business.verificationNotes);
+            const hasPreventiveBlock = moderation.blocked || isPreventiveModerationNote(business.verificationNotes);
 
             if (!hasPreventiveBlock) {
                 throw new BadRequestException('El negocio no tiene una revision preventiva activa');
@@ -653,12 +631,12 @@ export class VerificationService {
             const updatedBusiness = await tx.business.update({
                 where: { id: businessId },
                 data: {
-                    verificationStatus: this.resolvePreventiveBlockedStatus(business.verificationStatus),
+                    verificationStatus: resolvePreventiveBlockedStatus(business.verificationStatus),
                     verificationSubmittedAt: null,
                     verificationReviewedAt: null,
                     verified: false,
                     verifiedAt: null,
-                    verificationNotes: this.buildPreventiveModerationNote(
+                    verificationNotes: buildPreventiveModerationNote(
                         blockedReasons,
                         business.verificationNotes,
                         dto.notes,
@@ -955,7 +933,7 @@ export class VerificationService {
 
         const relevantCandidates = candidates.filter((business) => (
             business._count.verificationDocuments > 0
-            || this.isPreventiveModerationNote(business.verificationNotes)
+            || isPreventiveModerationNote(business.verificationNotes)
         ));
 
         const evaluated = await Promise.all(relevantCandidates.map(async (business) => {
@@ -986,7 +964,7 @@ export class VerificationService {
                     preventiveSeverity: moderation.severity,
                     preventiveRiskClusters: moderation.riskClusters,
                     preventiveReasons: moderation.reasons,
-                    preventiveSuggestedActions: this.buildPreventiveSuggestedActions(moderation.reasons),
+                    preventiveSuggestedActions: buildPreventiveSuggestedActions(moderation.reasons),
                     verificationNotes: business.verificationNotes,
                     documents: {
                         total: business._count.verificationDocuments,
@@ -1030,81 +1008,6 @@ export class VerificationService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        const reasons: Array<{ reason: string; points: number }> = [];
-        const normalizedName = this.normalizeModerationText(business.name);
-        const normalizedDescription = this.normalizeModerationText(business.description);
-        const normalizedText = `${normalizedName} ${normalizedDescription}`.trim();
-
-        if (PREVENTIVE_SPAM_KEYWORDS.some((keyword) => normalizedText.includes(keyword))) {
-            reasons.push({
-                reason: 'Palabras clave de spam o captacion externa en la ficha',
-                points: 45,
-            });
-        }
-
-        if (EXTERNAL_CONTACT_REGEX.test(business.description)) {
-            reasons.push({
-                reason: 'La descripcion incluye datos de contacto fuera de los campos estructurados',
-                points: 20,
-            });
-        }
-
-        if (EXTERNAL_LINK_REGEX.test(business.description)) {
-            reasons.push({
-                reason: 'La descripcion deriva trafico a canales externos antes de la verificacion',
-                points: 15,
-            });
-        }
-
-        if (business.description.length > 0 && business.description.length < 40 && (EXTERNAL_CONTACT_REGEX.test(business.description) || EXTERNAL_LINK_REGEX.test(business.description))) {
-            reasons.push({
-                reason: 'Descripcion demasiado corta para sustentar una oferta legitima',
-                points: 10,
-            });
-        }
-
-        if (!business.phone?.trim() && !business.whatsapp?.trim() && !business.website?.trim() && !business.email?.trim() && EXTERNAL_CONTACT_REGEX.test(business.description)) {
-            reasons.push({
-                reason: 'Intenta derivar el contacto sin dejar un canal estructurado verificable',
-                points: 15,
-            });
-        }
-
-        const uppercaseRatio = business.description.replace(/[^A-Z]/g, '').length
-            / Math.max(1, business.description.replace(/\s/g, '').length);
-        if (Number.isFinite(uppercaseRatio) && uppercaseRatio > 0.65 && business.description.length > 30) {
-            reasons.push({
-                reason: 'Uso excesivo de mayusculas promocionales',
-                points: 15,
-            });
-        }
-
-        if (/(.)\1{5,}/.test(business.description)) {
-            reasons.push({
-                reason: 'Patron repetitivo poco natural en la descripcion',
-                points: 10,
-            });
-        }
-
-        const descriptionWords = normalizedDescription.split(' ').filter(Boolean);
-        if (descriptionWords.length >= 10) {
-            const uniqueWords = new Set(descriptionWords);
-            const diversityRatio = uniqueWords.size / descriptionWords.length;
-            if (diversityRatio < 0.45) {
-                reasons.push({
-                    reason: 'Baja diversidad de contenido en la descripcion comercial',
-                    points: 10,
-                });
-            }
-        }
-
-        if (normalizedDescription.length > 0 && normalizedDescription === normalizedName) {
-            reasons.push({
-                reason: 'Nombre y descripcion repiten casi el mismo texto',
-                points: 10,
-            });
-        }
-
         const [
             ownerBusinessBurst,
             duplicateListingCount,
@@ -1144,53 +1047,22 @@ export class VerificationService {
             this.countDuplicateBusinessField(prismaClient, business.id, business.organizationId, 'website', business.website),
         ]);
 
-        if (ownerBusinessBurst >= 3) {
-            reasons.push({
-                reason: 'Creacion acelerada de multiples negocios por la misma cuenta',
-                points: ownerBusinessBurst >= 5 ? 35 : 20,
-            });
-        }
-
-        if (duplicateListingCount > 0) {
-            reasons.push({
-                reason: 'Existe otra ficha casi identica en una organizacion distinta',
-                points: 35,
-            });
-        }
-
-        const duplicateContactFields = [
-            duplicatePhoneCount > 0 ? 'telefono' : null,
-            duplicateWhatsappCount > 0 ? 'whatsapp' : null,
-            duplicateEmailCount > 0 ? 'email' : null,
-            duplicateWebsiteCount > 0 ? 'sitio web' : null,
-        ].filter(Boolean);
-
-        if (duplicateContactFields.length > 0) {
-            reasons.push({
-                reason: `Comparte ${duplicateContactFields.join(', ')} con otro negocio fuera de su organizacion`,
-                points: 25,
-            });
-        }
-
-        const score = Math.min(
-            100,
-            reasons.reduce((total, current) => total + current.points, 0),
-        );
-        const severity: 'LOW' | 'MEDIUM' | 'HIGH' = score >= 70
-            ? 'HIGH'
-            : score >= PREVENTIVE_MODERATION_THRESHOLD
-                ? 'MEDIUM'
-                : 'LOW';
-
-        return {
-            blocked: score >= PREVENTIVE_MODERATION_THRESHOLD,
-            score,
-            severity,
-            riskClusters: this.buildPreventiveRiskClusters(reasons.map((item) => item.reason)),
-            reasons: reasons.map((item) => item.reason),
-            currentStatus: business.verificationStatus,
-            currentNotes: business.verificationNotes,
-        };
+        return evaluatePreventiveModerationSnapshot({
+            name: business.name,
+            description: business.description,
+            phone: business.phone,
+            whatsapp: business.whatsapp,
+            website: business.website,
+            email: business.email,
+            verificationStatus: business.verificationStatus,
+            verificationNotes: business.verificationNotes,
+            ownerBusinessBurst,
+            duplicateListingCount,
+            duplicatePhoneCount,
+            duplicateWhatsappCount,
+            duplicateEmailCount,
+            duplicateWebsiteCount,
+        });
     }
 
     private async recalculateRiskScore(
@@ -1261,123 +1133,6 @@ export class VerificationService {
                 },
             },
         });
-    }
-
-    private normalizeModerationText(value?: string | null): string {
-        return (value ?? '')
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9\s]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-    private resolvePreventiveBlockedStatus(
-        currentStatus: BusinessVerificationStatus,
-    ): BusinessVerificationStatus {
-        if (currentStatus === 'REJECTED' || currentStatus === 'SUSPENDED') {
-            return currentStatus;
-        }
-
-        return 'UNVERIFIED';
-    }
-
-    private buildPreventiveModerationNote(
-        reasons: string[],
-        currentNotes?: string | null,
-        adminNotes?: string | null,
-    ): string {
-        const baseMessage = `${PREVENTIVE_MODERATION_NOTE_PREFIX}: ${reasons.join('; ')}. Ajusta la ficha y vuelve a intentarlo.`;
-        const extraNotes = [
-            currentNotes?.trim() && !this.isPreventiveModerationNote(currentNotes)
-                ? `Observacion previa: ${currentNotes.trim()}`
-                : null,
-            adminNotes?.trim()
-                ? `Decision admin: ${adminNotes.trim()}`
-                : null,
-        ].filter((note): note is string => Boolean(note));
-
-        return [baseMessage, ...extraNotes].join(' ').slice(0, 500);
-    }
-
-    private buildPreventiveModerationErrorMessage(reasons: string[]): string {
-        return `Tu negocio requiere revision preventiva antes del KYC: ${reasons.join('; ')}. Corrige la ficha y vuelve a intentarlo.`;
-    }
-
-    private buildPreventiveRiskClusters(reasons: string[]): string[] {
-        const clusters = new Set<string>();
-
-        for (const reason of reasons) {
-            if (
-                reason.includes('spam')
-                || reason.includes('mayusculas')
-                || reason.includes('repetitivo')
-                || reason.includes('diversidad')
-                || reason.includes('Descripcion demasiado corta')
-                || reason.includes('Nombre y descripcion')
-            ) {
-                clusters.add('Contenido');
-            }
-            if (
-                reason.includes('contacto')
-                || reason.includes('canales externos')
-                || reason.includes('canal estructurado')
-            ) {
-                clusters.add('Contacto');
-            }
-            if (reason.includes('Creacion acelerada')) {
-                clusters.add('Velocidad');
-            }
-            if (reason.includes('ficha casi identica') || reason.includes('Comparte')) {
-                clusters.add('Identidad');
-            }
-        }
-
-        return [...clusters];
-    }
-
-    private buildPreventiveSuggestedActions(reasons: string[]): string[] {
-        const suggestions = new Set<string>();
-
-        for (const reason of reasons) {
-            if (reason.includes('contacto fuera de los campos estructurados')) {
-                suggestions.add('Mueve telefonos, WhatsApp y emails a sus campos dedicados.');
-            }
-            if (reason.includes('canales externos')) {
-                suggestions.add('Quita links y derivaciones externas de la descripcion antes de reenviar a KYC.');
-            }
-            if (reason.includes('Descripcion demasiado corta')) {
-                suggestions.add('Amplia la descripcion con propuesta, zona y servicios reales antes de reenviar.');
-            }
-            if (reason.includes('spam')) {
-                suggestions.add('Reescribe la descripcion con enfoque informativo, sin frases de captacion o spam.');
-            }
-            if (reason.includes('canal estructurado')) {
-                suggestions.add('Agrega al menos un canal estructurado verificable antes de volver a enviar la ficha.');
-            }
-            if (reason.includes('mayusculas')) {
-                suggestions.add('Normaliza el texto y evita bloques promocionales en mayusculas.');
-            }
-            if (reason.includes('diversidad') || reason.includes('repetitivo')) {
-                suggestions.add('Haz la descripcion mas especifica y menos repetitiva.');
-            }
-            if (reason.includes('Nombre y descripcion')) {
-                suggestions.add('Evita repetir el nombre del negocio en la descripcion y agrega contexto comercial real.');
-            }
-            if (reason.includes('Creacion acelerada')) {
-                suggestions.add('Agrupa altas legitimas y evita bursts de negocios casi simultaneos desde la misma cuenta.');
-            }
-            if (reason.includes('ficha casi identica') || reason.includes('Comparte')) {
-                suggestions.add('Revisa duplicados, contactos compartidos y diferencias reales entre fichas antes de reenviar.');
-            }
-        }
-
-        return [...suggestions].slice(0, 4);
-    }
-
-    private isPreventiveModerationNote(note?: string | null): boolean {
-        return note?.startsWith(PREVENTIVE_MODERATION_NOTE_PREFIX) ?? false;
     }
 
     private async recordPreventiveModerationEvent(
