@@ -26,15 +26,15 @@ const AdminSecurity = lazy(async () => ({ default: (await pageLoaders.adminSecur
 
 function RouteFallback() {
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-            <div className="h-10 w-64 rounded-xl bg-gray-100 animate-pulse mb-4"></div>
-            <div className="h-5 w-96 max-w-full rounded-lg bg-gray-100 animate-pulse mb-8"></div>
+        <div className="page-shell py-20">
+            <div className="mb-4 h-10 w-64 animate-pulse rounded-xl bg-primary-100"></div>
+            <div className="mb-8 h-5 w-96 max-w-full animate-pulse rounded-lg bg-slate-100"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="rounded-2xl border border-gray-100 bg-white p-4">
-                        <div className="h-40 rounded-xl bg-gray-100 animate-pulse mb-4"></div>
-                        <div className="h-4 w-2/3 rounded bg-gray-100 animate-pulse mb-2"></div>
-                        <div className="h-3 w-full rounded bg-gray-100 animate-pulse"></div>
+                    <div key={index} className="section-shell p-4">
+                        <div className="mb-4 h-40 animate-pulse rounded-xl bg-slate-100"></div>
+                        <div className="mb-2 h-4 w-2/3 animate-pulse rounded bg-primary-100"></div>
+                        <div className="h-3 w-full animate-pulse rounded bg-slate-100"></div>
                     </div>
                 ))}
             </div>

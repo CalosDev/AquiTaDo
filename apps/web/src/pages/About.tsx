@@ -18,8 +18,8 @@ export function About() {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
-            <section className="card p-7 md:p-10">
+        <div className="page-shell space-y-10">
+            <section className="section-shell p-7 md:p-10">
                 <span className="chip mb-4">Conoce AquiTa.do</span>
                 <h1 className="font-display text-3xl md:text-4xl font-bold text-slate-900">
                     Una plataforma de discovery local para Republica Dominicana
@@ -32,7 +32,7 @@ export function About() {
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <article className="card p-7">
+                <article className="section-shell p-7">
                     <h2 className="font-display text-2xl font-semibold text-slate-900 mb-3">
                         El proyecto
                     </h2>
@@ -49,7 +49,7 @@ export function About() {
                     </div>
                 </article>
 
-                <article id="equipo" className="card p-7">
+                <article id="equipo" className="section-shell p-7">
                     <h2 className="font-display text-2xl font-semibold text-slate-900 mb-3">
                         El equipo
                     </h2>

@@ -113,19 +113,18 @@ export function Register() {
     };
 
     return (
-        <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 animate-fade-in">
-            <div className="w-full max-w-md">
-                <div className="card p-8">
+        <div className="auth-stage">
+            <div className="auth-card">
                     <div className="text-center mb-8">
                         <div className="w-14 h-14 rounded-2xl gradient-hero flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 shadow-lg shadow-primary-500/30">
                             A
                         </div>
-                        <h1 className="font-display text-2xl font-bold text-gray-900">Crea tu cuenta</h1>
-                        <p className="text-gray-500 text-sm mt-1">Unete a la comunidad AquiTa.do</p>
+                        <h1 className="font-display text-2xl font-bold text-slate-900">Crea tu cuenta</h1>
+                        <p className="mt-1 text-sm text-slate-500">Unete a la comunidad AquiTa.do</p>
                     </div>
 
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-3 mb-6">
+                        <div className="alert-danger mb-6">
                             {error}
                         </div>
                     )}
@@ -138,20 +137,20 @@ export function Register() {
                                 disabled={loading}
                                 onCredential={handleGoogleCredential}
                             />
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-slate-500">
                                 Selecciona primero el tipo de cuenta y acepta los terminos para registrarte con Google.
                             </p>
-                            <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-gray-400">
-                                <div className="h-px flex-1 bg-gray-200"></div>
+                            <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+                                <div className="h-px flex-1 bg-slate-200"></div>
                                 <span>o</span>
-                                <div className="h-px flex-1 bg-gray-200"></div>
+                                <div className="h-px flex-1 bg-slate-200"></div>
                             </div>
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label htmlFor="register-name" className="text-sm font-medium text-gray-700 mb-1 block">
+                            <label htmlFor="register-name" className="mb-1 block text-sm font-medium text-slate-700">
                                 Nombre completo *
                             </label>
                             <input
@@ -165,7 +164,7 @@ export function Register() {
                             />
                         </div>
                         <div>
-                            <label htmlFor="register-email" className="text-sm font-medium text-gray-700 mb-1 block">
+                            <label htmlFor="register-email" className="mb-1 block text-sm font-medium text-slate-700">
                                 Correo electronico *
                             </label>
                             <input
@@ -179,7 +178,7 @@ export function Register() {
                             />
                         </div>
                         <div>
-                            <label htmlFor="register-account-type" className="text-sm font-medium text-gray-700 mb-1 block">
+                            <label htmlFor="register-account-type" className="mb-1 block text-sm font-medium text-slate-700">
                                 Tipo de cuenta *
                             </label>
                             <select
@@ -199,7 +198,7 @@ export function Register() {
                             </select>
                         </div>
                         <div>
-                            <label htmlFor="register-phone" className="text-sm font-medium text-gray-700 mb-1 block">
+                            <label htmlFor="register-phone" className="mb-1 block text-sm font-medium text-slate-700">
                                 Telefono (opcional)
                             </label>
                             <input
@@ -212,7 +211,7 @@ export function Register() {
                             />
                         </div>
                         <div>
-                            <label htmlFor="register-password" className="text-sm font-medium text-gray-700 mb-1 block">
+                            <label htmlFor="register-password" className="mb-1 block text-sm font-medium text-slate-700">
                                 Contrasena *
                             </label>
                             <input
@@ -227,7 +226,7 @@ export function Register() {
                             />
                         </div>
                         <div>
-                            <label htmlFor="register-confirm-password" className="text-sm font-medium text-gray-700 mb-1 block">
+                            <label htmlFor="register-confirm-password" className="mb-1 block text-sm font-medium text-slate-700">
                                 Confirmar contrasena *
                             </label>
                             <input
@@ -241,7 +240,7 @@ export function Register() {
                                 placeholder="Repite tu contrasena"
                             />
                         </div>
-                        <label className="flex items-start gap-2 text-sm text-gray-600">
+                        <label className="flex items-start gap-2 text-sm text-slate-600">
                             <input
                                 type="checkbox"
                                 checked={formData.acceptTerms}
@@ -258,13 +257,12 @@ export function Register() {
                         </button>
                     </form>
 
-                    <p className="text-center text-sm text-gray-500 mt-6">
+                    <p className="mt-6 text-center text-sm text-slate-500">
                         Ya tienes cuenta?{' '}
                         <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
                             Inicia sesion
                         </Link>
                     </p>
-                </div>
             </div>
         </div>
     );

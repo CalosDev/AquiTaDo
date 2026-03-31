@@ -2,8 +2,16 @@ import { useEffect, useMemo } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { useAuth } from '../context/useAuth';
 import { applySeoMeta } from '../seo/meta';
+
+const FOOTER_HIDDEN_PREFIXES = [
+    '/app',
+    '/profile',
+    '/register-business',
+    '/dashboard',
+    '/admin',
+    '/security',
+];
 
 function resolveRouteSeo(pathname: string): { title: string; description: string; noindex?: boolean } {
     if (pathname === '/') {
@@ -104,8 +112,12 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
 
 export function MainLayout() {
     const location = useLocation();
-    const { isAuthenticated } = useAuth();
-    const showFooter = !isAuthenticated && location.pathname === '/';
+    const showFooter = useMemo(
+        () => !FOOTER_HIDDEN_PREFIXES.some(
+            (prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`),
+        ),
+        [location.pathname],
+    );
     const routeSeo = useMemo(
         () => resolveRouteSeo(location.pathname),
         [location.pathname],

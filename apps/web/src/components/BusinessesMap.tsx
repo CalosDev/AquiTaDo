@@ -4,6 +4,15 @@ import { Link } from 'react-router-dom';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
+const MAP_MARKER_COLORS = {
+    selectedStroke: '#002d62',
+    selectedFill: '#5f95f2',
+    verifiedStroke: '#0f4fa8',
+    defaultStroke: '#64748b',
+    openFill: '#16a34a',
+    defaultFill: '#2c6fd6',
+} as const;
+
 type MapBusiness = {
     id: string;
     name: string;
@@ -65,14 +74,14 @@ export function BusinessesMap({
 
     if (mappableBusinesses.length === 0) {
         return (
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
                 {emptyLabel || 'No hay coordenadas suficientes para mostrar este resultado en mapa.'}
             </div>
         );
     }
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+        <div className="overflow-hidden rounded-2xl border border-primary-100/80 bg-white shadow-sm">
             <MapContainer
                 center={[center.lat, center.lng]}
                 zoom={12}
@@ -94,15 +103,15 @@ export function BusinessesMap({
                         radius={business.id === selectedBusiness?.id ? 12 : 9}
                         pathOptions={{
                             color: business.id === selectedBusiness?.id
-                                ? '#1d4ed8'
+                                ? MAP_MARKER_COLORS.selectedStroke
                                 : business.verified
-                                    ? '#0f766e'
-                                    : '#475569',
+                                    ? MAP_MARKER_COLORS.verifiedStroke
+                                    : MAP_MARKER_COLORS.defaultStroke,
                             fillColor: business.id === selectedBusiness?.id
-                                ? '#60a5fa'
+                                ? MAP_MARKER_COLORS.selectedFill
                                 : business.openNow
-                                    ? '#16a34a'
-                                    : '#0284c7',
+                                    ? MAP_MARKER_COLORS.openFill
+                                    : MAP_MARKER_COLORS.defaultFill,
                             fillOpacity: business.id === selectedBusiness?.id ? 0.95 : 0.8,
                             weight: business.id === selectedBusiness?.id ? 3 : 2,
                         }}
@@ -112,16 +121,16 @@ export function BusinessesMap({
                     >
                         <Popup>
                             <div className="space-y-1">
-                                <p className="text-sm font-semibold text-gray-900">{business.name}</p>
-                                <p className="text-xs text-gray-600">{business.address}</p>
+                                <p className="text-sm font-semibold text-slate-900">{business.name}</p>
+                                <p className="text-xs text-slate-600">{business.address}</p>
                                 {business.distanceKm ? (
                                     <p className="text-xs text-primary-700">{business.distanceKm.toFixed(1)} km</p>
                                 ) : null}
                                 {business.priceRange ? (
-                                    <p className="text-xs text-gray-500">{business.priceRange}</p>
+                                    <p className="text-xs text-slate-500">{business.priceRange}</p>
                                 ) : null}
                                 {business.openNow !== null && business.openNow !== undefined ? (
-                                    <p className={`text-xs font-medium ${business.openNow ? 'text-green-700' : 'text-gray-500'}`}>
+                                    <p className={`text-xs font-medium ${business.openNow ? 'text-emerald-700' : 'text-slate-500'}`}>
                                         {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
                                     </p>
                                 ) : null}

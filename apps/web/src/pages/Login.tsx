@@ -88,25 +88,24 @@ export function Login() {
     };
 
     return (
-        <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 animate-fade-in">
-            <div className="w-full max-w-md">
-                <div className="card p-8">
+        <div className="auth-stage">
+            <div className="auth-card">
                     <div className="text-center mb-8">
                         <div className="w-14 h-14 rounded-2xl gradient-hero flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 shadow-lg shadow-primary-500/30">
                             A
                         </div>
-                        <h1 className="font-display text-2xl font-bold text-gray-900">Bienvenido de vuelta</h1>
-                        <p className="text-gray-500 text-sm mt-1">Inicia sesion en tu cuenta</p>
+                        <h1 className="font-display text-2xl font-bold text-slate-900">Bienvenido de vuelta</h1>
+                        <p className="mt-1 text-sm text-slate-500">Inicia sesion en tu cuenta</p>
                     </div>
 
                     {notice && (
-                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl p-3 mb-6">
+                        <div className="alert-success mb-6">
                             {notice}
                         </div>
                     )}
 
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-3 mb-6">
+                        <div className="alert-danger mb-6">
                             {error}
                         </div>
                     )}
@@ -119,10 +118,10 @@ export function Login() {
                                 disabled={loading || Boolean(pendingGoogleIdToken)}
                                 onCredential={handleGoogleCredential}
                             />
-                            <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-gray-400">
-                                <div className="h-px flex-1 bg-gray-200"></div>
+                            <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+                                <div className="h-px flex-1 bg-slate-200"></div>
                                 <span>o</span>
-                                <div className="h-px flex-1 bg-gray-200"></div>
+                                <div className="h-px flex-1 bg-slate-200"></div>
                             </div>
                         </div>
                     )}
@@ -131,7 +130,7 @@ export function Login() {
                         {!pendingGoogleIdToken && (
                             <>
                                 <div>
-                                    <label htmlFor="login-email" className="text-sm font-medium text-gray-700 mb-1 block">
+                                    <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-slate-700">
                                         Correo electronico
                                     </label>
                                     <input
@@ -148,7 +147,7 @@ export function Login() {
                                 </div>
                                 <div>
                                     <div className="flex items-center justify-between gap-3 mb-1">
-                                        <label htmlFor="login-password" className="text-sm font-medium text-gray-700 block">
+                                        <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">
                                             Contrasena
                                         </label>
                                         <Link to="/forgot-password" className="text-xs font-medium text-primary-600 hover:text-primary-700">
@@ -170,7 +169,7 @@ export function Login() {
                             </>
                         )}
                         {pendingGoogleIdToken && (
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 space-y-3">
+                            <div className="alert-warning space-y-3">
                                 <p>Tu cuenta requiere un segundo factor. Introduce el codigo 2FA para completar el acceso con Google.</p>
                                 <button
                                     type="button"
@@ -188,7 +187,7 @@ export function Login() {
                         )}
                         {requiresTwoFactor && (
                             <div>
-                                <label htmlFor="login-2fa" className="text-sm font-medium text-gray-700 mb-1 block">
+                                <label htmlFor="login-2fa" className="mb-1 block text-sm font-medium text-slate-700">
                                     Codigo 2FA (6 digitos)
                                 </label>
                                 <input
@@ -216,13 +215,12 @@ export function Login() {
                         </button>
                     </form>
 
-                    <p className="text-center text-sm text-gray-500 mt-6">
+                    <p className="mt-6 text-center text-sm text-slate-500">
                         No tienes cuenta?{' '}
                         <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
                             Registrate
                         </Link>
                     </p>
-                </div>
             </div>
         </div>
     );
