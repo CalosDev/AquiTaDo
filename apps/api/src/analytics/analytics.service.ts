@@ -8,6 +8,13 @@ import { createHash } from 'crypto';
 import { GrowthEventType, MarketReportType, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+    buildDailySeries,
+    MS_PER_DAY,
+    normalizeAnalyticsDays,
+    roundMoney,
+    toDateOnly,
+} from './analytics.helpers';
+import {
     buildGrowthActionableAlerts,
     buildGrowthSignalSummary,
     buildTrendMetric,
@@ -33,7 +40,7 @@ export class AnalyticsService {
 
     async trackBusinessEvent(dto: TrackBusinessEventDto) {
         const eventTime = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
-        const analyticsDate = this.toDateOnly(eventTime);
+        const analyticsDate = toDateOnly(eventTime);
         const trackedAt = eventTime.toISOString();
 
         try {
@@ -185,11 +192,11 @@ export class AnalyticsService {
     }
 
     async getGrowthInsights(query: GrowthInsightsQueryDto) {
-        const normalizedDays = this.normalizeDays(query.days ?? 30);
+        const normalizedDays = normalizeAnalyticsDays(query.days ?? 30);
         const limit = Math.min(Math.max(query.limit ?? 15, 1), 50);
         const now = new Date();
-        const rangeStart = this.toDateOnly(new Date(now.getTime() - (normalizedDays - 1) * 86_400_000));
-        const comparisonRangeStart = this.toDateOnly(new Date(rangeStart.getTime() - normalizedDays * 86_400_000));
+        const rangeStart = toDateOnly(new Date(now.getTime() - (normalizedDays - 1) * MS_PER_DAY));
+        const comparisonRangeStart = toDateOnly(new Date(rangeStart.getTime() - normalizedDays * MS_PER_DAY));
 
         const sharedWhere: Prisma.GrowthEventWhereInput = {};
         if (query.provinceId) {
@@ -557,7 +564,7 @@ export class AnalyticsService {
             range: {
                 days: normalizedDays,
                 from: rangeStart.toISOString(),
-                to: this.toDateOnly(now).toISOString(),
+                to: toDateOnly(now).toISOString(),
             },
             filters: {
                 provinceId: query.provinceId ?? null,
@@ -1619,23 +1626,11 @@ export class AnalyticsService {
     }
 
     private normalizeDays(days: number | string | null | undefined): number {
-        const parsedDays = typeof days === 'string'
-            ? Number.parseInt(days, 10)
-            : days;
-
-        if (!Number.isFinite(parsedDays)) {
-            return 30;
-        }
-        const safeDays = parsedDays as number;
-        return Math.min(Math.max(Math.floor(safeDays), 1), 365);
+        return normalizeAnalyticsDays(days);
     }
 
     private toDateOnly(date: Date): Date {
-        return new Date(Date.UTC(
-            date.getUTCFullYear(),
-            date.getUTCMonth(),
-            date.getUTCDate(),
-        ));
+        return toDateOnly(date);
     }
 
     private dateKey(date: Date): string {
@@ -1657,43 +1652,10 @@ export class AnalyticsService {
         }
         >,
     ) {
-        const series: Array<{
-            date: string;
-            views: number;
-            uniqueVisitors: number;
-            clicks: number;
-            conversions: number;
-            reservationRequests: number;
-            grossRevenue: number;
-        }> = [];
-
-        for (let index = 0; index < days; index += 1) {
-            const currentDate = new Date(rangeStart.getTime() + index * 86_400_000);
-            const key = this.dateKey(currentDate);
-            const item = dailyMap.get(key) ?? {
-                views: 0,
-                uniqueVisitors: 0,
-                clicks: 0,
-                conversions: 0,
-                reservationRequests: 0,
-                grossRevenue: 0,
-            };
-
-            series.push({
-                date: key,
-                views: item.views,
-                uniqueVisitors: item.uniqueVisitors,
-                clicks: item.clicks,
-                conversions: item.conversions,
-                reservationRequests: item.reservationRequests,
-                grossRevenue: this.roundMoney(item.grossRevenue),
-            });
-        }
-
-        return series;
+        return buildDailySeries(rangeStart, days, dailyMap);
     }
 
     private roundMoney(value: number): number {
-        return Math.round(value * 100) / 100;
+        return roundMoney(value);
     }
 }

@@ -11,10 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import {
     OrganizationRole,
-    OrganizationPlan,
-    OrganizationSubscriptionStatus,
     Prisma,
-    SubscriptionStatus,
 } from '../generated/prisma/client';
 import { PlansService } from '../plans/plans.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,6 +21,20 @@ import {
     CreateAdsWalletCheckoutSessionDto,
     CreateBookingCheckoutSessionDto,
 } from './dto/payment.dto';
+import {
+    asJson,
+    mapStripeStatus,
+    mapSubscriptionToOrganizationStatus,
+    mergeJsonObject,
+    normalizeRawBody,
+    resolveBookingChargeAmount,
+    resolveDateRange,
+    resolveFiscalPeriod,
+    resolvePlanCode,
+    resolveStringId,
+    roundMoney,
+    toCsv,
+} from './payments.helpers';
 
 @Injectable()
 export class PaymentsService {
@@ -281,7 +292,7 @@ export class PaymentsService {
             throw new BadRequestException('La reserva no permite cobro');
         }
 
-        const chargeAmount = this.resolveBookingChargeAmount(
+        const chargeAmount = resolveBookingChargeAmount(
             booking.quotedAmount,
             booking.depositAmount,
         );
@@ -321,8 +332,8 @@ export class PaymentsService {
             }
 
             const feeBps = await this.resolveTransactionFeeBps(tx, booking.organizationId);
-            const platformFeeAmount = this.roundMoney((chargeAmount * feeBps) / 10_000);
-            const netAmount = this.roundMoney(chargeAmount - platformFeeAmount);
+            const platformFeeAmount = roundMoney((chargeAmount * feeBps) / 10_000);
+            const netAmount = roundMoney(chargeAmount - platformFeeAmount);
 
             const payment = await tx.payment.create({
                 data: {
@@ -331,7 +342,7 @@ export class PaymentsService {
                     amount: String(chargeAmount),
                     currency,
                     status: 'PENDING',
-                    metadata: this.asJson({
+                    metadata: asJson({
                         paymentType: 'BOOKING_PAYMENT',
                         bookingId: booking.id,
                     }),
@@ -420,7 +431,7 @@ export class PaymentsService {
                 }),
             );
 
-            const paymentIntentId = this.resolveStringId(checkoutSession.payment_intent);
+            const paymentIntentId = resolveStringId(checkoutSession.payment_intent);
 
             await this.prisma.$transaction(async (tx) => {
                 const payment = await tx.payment.findUnique({
@@ -434,7 +445,7 @@ export class PaymentsService {
                     where: { id: paymentContext.paymentId },
                     data: {
                         providerPaymentIntentId: paymentIntentId ?? undefined,
-                        metadata: this.mergeJsonObject(payment?.metadata, {
+                        metadata: mergeJsonObject(payment?.metadata, {
                             ...metadata,
                             checkoutSessionId: checkoutSession.id,
                         }),
@@ -493,8 +504,8 @@ export class PaymentsService {
         from?: string,
         to?: string,
     ) {
-        const issuedAtRange = this.resolveDateRange(from, to);
-        const createdAtRange = this.resolveDateRange(from, to);
+        const issuedAtRange = resolveDateRange(from, to);
+        const createdAtRange = resolveDateRange(from, to);
 
         const invoiceWhere: Prisma.InvoiceWhereInput = {
             organizationId,
@@ -592,7 +603,7 @@ export class PaymentsService {
         from?: string,
         to?: string,
     ) {
-        const issuedAtRange = this.resolveDateRange(from, to);
+        const issuedAtRange = resolveDateRange(from, to);
         const invoices = await this.prisma.invoice.findMany({
             where: {
                 organizationId,
@@ -629,7 +640,7 @@ export class PaymentsService {
             invoice.pdfUrl ?? '',
         ]);
 
-        const csv = this.toCsv(headers, rows);
+        const csv = toCsv(headers, rows);
         const fileName = `invoices_${organizationId}_${new Date().toISOString().slice(0, 10)}.csv`;
 
         return { fileName, csv };
@@ -640,7 +651,7 @@ export class PaymentsService {
         from?: string,
         to?: string,
     ) {
-        const createdAtRange = this.resolveDateRange(from, to);
+        const createdAtRange = resolveDateRange(from, to);
         const payments = await this.prisma.payment.findMany({
             where: {
                 organizationId,
@@ -673,7 +684,7 @@ export class PaymentsService {
             payment.failureReason ?? '',
         ]);
 
-        const csv = this.toCsv(headers, rows);
+        const csv = toCsv(headers, rows);
         const fileName = `payments_${organizationId}_${new Date().toISOString().slice(0, 10)}.csv`;
 
         return { fileName, csv };
@@ -684,7 +695,7 @@ export class PaymentsService {
         from?: string,
         to?: string,
     ) {
-        const issuedAtRange = this.resolveDateRange(from, to);
+        const issuedAtRange = resolveDateRange(from, to);
         const invoices = await this.prisma.invoice.findMany({
             where: {
                 organizationId,
@@ -724,7 +735,7 @@ export class PaymentsService {
             const rowTax = Number(invoice.amountTax.toString());
             const rowTotal = Number(invoice.amountTotal.toString());
             const isPaid = invoice.status === 'PAID';
-            const period = this.resolveFiscalPeriod(invoice.issuedAt);
+            const period = resolveFiscalPeriod(invoice.issuedAt);
 
             invoicesIssued += 1;
             subtotal += rowSubtotal;
@@ -787,7 +798,7 @@ export class PaymentsService {
         from?: string,
         to?: string,
     ) {
-        const issuedAtRange = this.resolveDateRange(from, to);
+        const issuedAtRange = resolveDateRange(from, to);
         const invoices = await this.prisma.invoice.findMany({
             where: {
                 organizationId,
@@ -819,7 +830,7 @@ export class PaymentsService {
         ];
 
         const rows = invoices.map((invoice) => [
-            this.resolveFiscalPeriod(invoice.issuedAt),
+            resolveFiscalPeriod(invoice.issuedAt),
             invoice.id,
             invoice.status,
             invoice.issuedAt.toISOString(),
@@ -830,7 +841,7 @@ export class PaymentsService {
             invoice.amountTotal.toString(),
         ]);
 
-        const csv = this.toCsv(headers, rows);
+        const csv = toCsv(headers, rows);
         const fileName = `fiscal_${organizationId}_${new Date().toISOString().slice(0, 10)}.csv`;
 
         return { fileName, csv };
@@ -859,7 +870,7 @@ export class PaymentsService {
                 externalEventId: event.id,
                 eventType: event.type,
                 signature: signature ?? null,
-                payload: this.asJson(event),
+                payload: asJson(event),
                 processingStatus: 'RECEIVED',
             },
         });
@@ -949,7 +960,7 @@ export class PaymentsService {
         }
 
         await this.plansService.syncDefaultPlans();
-        const selectedPlanCode = this.resolvePlanCode(session.metadata?.planCode);
+        const selectedPlanCode = resolvePlanCode(session.metadata?.planCode);
         const selectedPlan = selectedPlanCode
             ? await this.prisma.plan.findUnique({ where: { code: selectedPlanCode } })
             : null;
@@ -1004,7 +1015,7 @@ export class PaymentsService {
             data: {
                 status: 'CANCELED',
                 failureReason: 'Sesión de pago expirada',
-                metadata: this.asJson(session),
+                metadata: asJson(session),
             },
         });
     }
@@ -1034,7 +1045,7 @@ export class PaymentsService {
             return;
         }
 
-        const paymentIntentId = this.resolveStringId(session.payment_intent);
+        const paymentIntentId = resolveStringId(session.payment_intent);
         const paidAmount = Number.isFinite(session.amount_total ?? NaN)
             ? (session.amount_total ?? 0) / 100
             : Number(topup.amount.toString());
@@ -1051,7 +1062,7 @@ export class PaymentsService {
                     status: 'SUCCEEDED',
                     providerPaymentIntentId: paymentIntentId,
                     paidAt,
-                    metadata: this.asJson(session),
+                    metadata: asJson(session),
                 },
             });
 
@@ -1096,7 +1107,7 @@ export class PaymentsService {
             return;
         }
 
-        const paymentIntentId = this.resolveStringId(session.payment_intent);
+        const paymentIntentId = resolveStringId(session.payment_intent);
         const amountFromStripe = Number.isFinite(session.amount_total ?? NaN)
             ? Math.max((session.amount_total ?? 0) / 100, 0)
             : null;
@@ -1141,15 +1152,15 @@ export class PaymentsService {
                 return;
             }
 
-            const grossAmount = this.roundMoney(
+            const grossAmount = roundMoney(
                 amountFromStripe !== null && amountFromStripe > 0
                     ? amountFromStripe
                     : Number(payment.amount.toString()),
             );
 
             const feeBps = await this.resolveTransactionFeeBps(tx, organizationId);
-            const platformFeeAmount = this.roundMoney((grossAmount * feeBps) / 10_000);
-            const netAmount = this.roundMoney(grossAmount - platformFeeAmount);
+            const platformFeeAmount = roundMoney((grossAmount * feeBps) / 10_000);
+            const netAmount = roundMoney(grossAmount - platformFeeAmount);
 
             await tx.payment.update({
                 where: { id: payment.id },
@@ -1160,7 +1171,7 @@ export class PaymentsService {
                     status: 'SUCCEEDED',
                     paidAt,
                     failureReason: null,
-                    metadata: this.mergeJsonObject(payment.metadata, {
+                    metadata: mergeJsonObject(payment.metadata, {
                         paymentType: 'BOOKING_PAYMENT',
                         bookingId,
                         transactionId,
@@ -1252,7 +1263,7 @@ export class PaymentsService {
                 data: {
                     status: 'CANCELED',
                     failureReason: 'Sesión de pago expirada',
-                    metadata: this.mergeJsonObject(payment?.metadata, {
+                    metadata: mergeJsonObject(payment?.metadata, {
                         paymentType: 'BOOKING_PAYMENT',
                         checkoutSessionId: session.id,
                     }),
@@ -1320,7 +1331,7 @@ export class PaymentsService {
                     providerPaymentIntentId: paymentIntent.id,
                     status: 'FAILED',
                     failureReason,
-                    metadata: this.mergeJsonObject(payment.metadata, {
+                    metadata: mergeJsonObject(payment.metadata, {
                         paymentType: 'BOOKING_PAYMENT',
                         paymentIntentId: paymentIntent.id,
                     }),
@@ -1347,7 +1358,7 @@ export class PaymentsService {
 
         let organizationId: string | null = stripeSubscription.metadata?.organizationId ?? null;
         const providerSubscriptionId = stripeSubscription.id;
-        const planCode = this.resolvePlanCode(stripeSubscription.metadata?.planCode);
+        const planCode = resolvePlanCode(stripeSubscription.metadata?.planCode);
 
         if (!organizationId) {
             const existing = await this.prisma.subscription.findUnique({
@@ -1370,14 +1381,14 @@ export class PaymentsService {
             return;
         }
 
-        const mappedStatus = this.mapStripeStatus(stripeSubscription.status);
+        const mappedStatus = mapStripeStatus(stripeSubscription.status);
         await this.prisma.subscription.upsert({
             where: { organizationId },
             update: {
                 planId: selectedPlan.id,
                 status: mappedStatus,
                 providerSubscriptionId,
-                providerCustomerId: this.resolveStringId(stripeSubscription.customer),
+                providerCustomerId: resolveStringId(stripeSubscription.customer),
                 cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
                 canceledAt: stripeSubscription.canceled_at
                     ? new Date(stripeSubscription.canceled_at * 1000)
@@ -1388,7 +1399,7 @@ export class PaymentsService {
                 planId: selectedPlan.id,
                 status: mappedStatus,
                 providerSubscriptionId,
-                providerCustomerId: this.resolveStringId(stripeSubscription.customer),
+                providerCustomerId: resolveStringId(stripeSubscription.customer),
                 cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
                 canceledAt: stripeSubscription.canceled_at
                     ? new Date(stripeSubscription.canceled_at * 1000)
@@ -1401,7 +1412,7 @@ export class PaymentsService {
             where: { id: organizationId },
             data: {
                 plan: selectedPlan.code,
-                subscriptionStatus: this.mapSubscriptionToOrganizationStatus(mappedStatus),
+                subscriptionStatus: mapSubscriptionToOrganizationStatus(mappedStatus),
             },
         });
     }
@@ -1434,7 +1445,7 @@ export class PaymentsService {
             paidAt: new Date(),
             organizationId: subscription.organizationId,
             subscriptionId: subscription.id,
-            metadata: this.asJson(invoice),
+            metadata: asJson(invoice),
             providerPaymentIntentId: paymentIntentId,
         };
 
@@ -1485,7 +1496,7 @@ export class PaymentsService {
                 failureReason: invoice.last_finalization_error?.message ?? 'Pago fallido',
                 organizationId: subscription.organizationId,
                 subscriptionId: subscription.id,
-                metadata: this.asJson(invoice),
+                metadata: asJson(invoice),
                 providerPaymentIntentId: paymentIntentId,
             },
         });
@@ -1525,7 +1536,7 @@ export class PaymentsService {
                 paidAt: status === 'PAID' ? new Date() : null,
                 dueAt: invoice.due_date ? new Date(invoice.due_date * 1000) : null,
                 pdfUrl: invoicePdf,
-                metadata: this.asJson(invoice),
+                metadata: asJson(invoice),
             },
             create: {
                 organizationId,
@@ -1541,7 +1552,7 @@ export class PaymentsService {
                 dueAt: invoice.due_date ? new Date(invoice.due_date * 1000) : null,
                 paidAt: status === 'PAID' ? new Date() : null,
                 pdfUrl: invoicePdf,
-                metadata: this.asJson(invoice),
+                metadata: asJson(invoice),
             },
         });
     }
@@ -1553,57 +1564,12 @@ export class PaymentsService {
         }
 
         const subscription = parent.subscription_details?.subscription;
-        return this.resolveStringId(subscription);
+        return resolveStringId(subscription);
     }
 
     private extractInvoicePaymentIntentId(invoice: Stripe.Invoice): string | null {
         const candidate = (invoice as unknown as { payment_intent?: string | { id: string } }).payment_intent;
-        return this.resolveStringId(candidate);
-    }
-
-    private resolveStringId(value: unknown): string | null {
-        if (typeof value === 'string') {
-            return value;
-        }
-
-        if (value && typeof value === 'object' && 'id' in value) {
-            const id = (value as { id?: unknown }).id;
-            return typeof id === 'string' ? id : null;
-        }
-
-        return null;
-    }
-
-    private mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
-        switch (status) {
-            case 'active':
-            case 'trialing':
-                return 'ACTIVE';
-            case 'past_due':
-                return 'PAST_DUE';
-            case 'canceled':
-                return 'CANCELED';
-            case 'incomplete':
-            case 'incomplete_expired':
-                return 'INCOMPLETE';
-            case 'unpaid':
-                return 'UNPAID';
-            default:
-                return 'ACTIVE';
-        }
-    }
-
-    private mapSubscriptionToOrganizationStatus(
-        status: SubscriptionStatus,
-    ): OrganizationSubscriptionStatus {
-        switch (status) {
-            case 'PAST_DUE':
-                return 'PAST_DUE';
-            case 'CANCELED':
-                return 'CANCELED';
-            default:
-                return 'ACTIVE';
-        }
+        return resolveStringId(candidate);
     }
 
     private async assertCanManageBilling(
@@ -1680,16 +1646,6 @@ export class PaymentsService {
         }
     }
 
-    private resolveBookingChargeAmount(
-        quotedAmount: Prisma.Decimal | null,
-        depositAmount: Prisma.Decimal | null,
-    ): number {
-        const deposit = depositAmount ? Number(depositAmount.toString()) : 0;
-        const quoted = quotedAmount ? Number(quotedAmount.toString()) : 0;
-        const amount = deposit > 0 ? deposit : quoted;
-        return this.roundMoney(Math.max(amount, 0));
-    }
-
     private async resolveTransactionFeeBps(
         tx: Prisma.TransactionClient,
         organizationId: string,
@@ -1736,7 +1692,7 @@ export class PaymentsService {
         const normalizedSignature = signature?.trim();
         const isProduction =
             (this.configService.get<string>('NODE_ENV') ?? '').trim().toLowerCase() === 'production';
-        const rawBody = this.normalizeRawBody(body);
+        const rawBody = normalizeRawBody(body);
 
         if (isProduction && (!webhookSecret || !normalizedSignature)) {
             throw new BadRequestException('Webhook signature is required in production');
@@ -1769,38 +1725,6 @@ export class PaymentsService {
         }
     }
 
-    private normalizeRawBody(body: unknown): Buffer | null {
-        if (Buffer.isBuffer(body)) {
-            return body;
-        }
-
-        if (typeof body === 'string') {
-            return Buffer.from(body);
-        }
-
-        if (body && typeof body === 'object') {
-            try {
-                return Buffer.from(JSON.stringify(body));
-            } catch {
-                return null;
-            }
-        }
-
-        return null;
-    }
-
-    private resolvePlanCode(value: string | undefined): OrganizationPlan | null {
-        if (!value) {
-            return null;
-        }
-
-        if (value === 'FREE' || value === 'GROWTH' || value === 'SCALE') {
-            return value;
-        }
-
-        return null;
-    }
-
     private resolveStripeClient(): Stripe {
         const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY')?.trim();
         if (!stripeSecretKey) {
@@ -1808,28 +1732,6 @@ export class PaymentsService {
         }
 
         return new Stripe(stripeSecretKey);
-    }
-
-    private roundMoney(value: number): number {
-        return Math.round(value * 100) / 100;
-    }
-
-    private mergeJsonObject(
-        base: Prisma.JsonValue | null | undefined,
-        extra: Record<string, unknown>,
-    ): Prisma.InputJsonValue {
-        const normalizedBase =
-            base && typeof base === 'object' && !Array.isArray(base)
-                ? (base as Record<string, unknown>)
-                : {};
-        return {
-            ...normalizedBase,
-            ...extra,
-        } as Prisma.InputJsonValue;
-    }
-
-    private asJson(payload: unknown): Prisma.InputJsonValue {
-        return payload as Prisma.InputJsonValue;
     }
 
     private resolveDateRange(

@@ -7,119 +7,19 @@ import { OptimizedImage } from '../components/OptimizedImage';
 import {
     BUSINESS_PRICE_RANGE_OPTIONS,
     businessPriceRangeLabel,
-    createDefaultBusinessHours,
     mergeBusinessHours,
-    type BusinessHourEntry,
 } from '../lib/businessProfile';
 import { evaluateBusinessSubmissionGuidance } from '../lib/businessSubmissionGuidance';
-
-interface Category {
-    id: string;
-    name: string;
-    icon?: string;
-    parentId?: string | null;
-    parent?: { id: string; name: string } | null;
-    children?: Array<{ id: string }>;
-}
-
-interface Feature {
-    id: string;
-    name: string;
-}
-
-interface Province {
-    id: string;
-    name: string;
-}
-
-interface City {
-    id: string;
-    name: string;
-}
-
-interface Sector {
-    id: string;
-    name: string;
-}
-
-interface BusinessImage {
-    id: string;
-    url: string;
-    caption?: string | null;
-    sortOrder?: number;
-    isCover?: boolean;
-    type?: 'COVER' | 'GALLERY' | 'MENU' | 'INTERIOR' | 'EXTERIOR';
-}
-
-interface BusinessDetail {
-    id: string;
-    slug: string;
-    name: string;
-    description: string;
-    phone?: string | null;
-    whatsapp?: string | null;
-    website?: string | null;
-    email?: string | null;
-    instagramUrl?: string | null;
-    facebookUrl?: string | null;
-    tiktokUrl?: string | null;
-    priceRange?: string | null;
-    address: string;
-    latitude?: number | null;
-    longitude?: number | null;
-    province?: { id: string; name: string } | null;
-    city?: { id: string; name: string } | null;
-    sector?: { id: string; name: string } | null;
-    categories?: Array<{ category: { id: string; name: string; icon?: string; parent?: { name: string } | null } }>;
-    features?: Array<{ feature: { id: string; name: string } }>;
-    images?: BusinessImage[];
-    hours?: BusinessHourEntry[];
-    profileCompletenessScore?: number;
-}
-
-interface EditFormData {
-    name: string;
-    description: string;
-    phone: string;
-    whatsapp: string;
-    website: string;
-    email: string;
-    instagramUrl: string;
-    facebookUrl: string;
-    tiktokUrl: string;
-    priceRange: string;
-    address: string;
-    provinceId: string;
-    cityId: string;
-    sectorId: string;
-    latitude: string;
-    longitude: string;
-    categoryIds: string[];
-    featureIds: string[];
-    hours: BusinessHourEntry[];
-}
-
-const EMPTY_FORM: EditFormData = {
-    name: '',
-    description: '',
-    phone: '',
-    whatsapp: '',
-    website: '',
-    email: '',
-    instagramUrl: '',
-    facebookUrl: '',
-    tiktokUrl: '',
-    priceRange: '',
-    address: '',
-    provinceId: '',
-    cityId: '',
-    sectorId: '',
-    latitude: '',
-    longitude: '',
-    categoryIds: [],
-    featureIds: [],
-    hours: createDefaultBusinessHours(),
-};
+import {
+    EMPTY_FORM,
+    type BusinessDetail,
+    type Category,
+    type City,
+    type EditFormData,
+    type Feature,
+    type Province,
+    type Sector,
+} from './edit-business/types';
 
 export function EditBusiness() {
     const { businessId } = useParams<{ businessId: string }>();
