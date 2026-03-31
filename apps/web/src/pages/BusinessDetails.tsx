@@ -7,204 +7,26 @@ import { OptimizedImage } from '../components/OptimizedImage';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { trackGrowthEvent as trackGrowthSignal } from '../lib/growthTracking';
-import { BUSINESS_DAY_OPTIONS, businessPriceRangeLabel, formatHoursRange, type BusinessHourEntry } from '../lib/businessProfile';
+import { BUSINESS_DAY_OPTIONS, businessPriceRangeLabel } from '../lib/businessProfile';
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { featureFlags } from '../config/features';
-
-interface Business {
-    id: string;
-    name: string;
-    slug: string;
-    createdAt?: string;
-    updatedAt?: string;
-    description: string;
-    phone?: string;
-    whatsapp?: string;
-    website?: string | null;
-    email?: string | null;
-    instagramUrl?: string | null;
-    facebookUrl?: string | null;
-    tiktokUrl?: string | null;
-    priceRange?: string | null;
-    address: string;
-    latitude?: number;
-    longitude?: number;
-    verified: boolean;
-    openNow?: boolean | null;
-    todayHoursLabel?: string | null;
-    profileCompletenessScore?: number;
-    reputationScore?: number | string | null;
-    province?: { name: string };
-    city?: { name: string };
-    sector?: { name: string } | null;
-    images: Array<{ id: string; url: string; caption?: string | null; isCover?: boolean; type?: string }>;
-    categories?: { category: { name: string; icon?: string; parent?: { name: string } | null } }[];
-    features?: { feature: { name: string } }[];
-    hours?: BusinessHourEntry[];
-    reviews?: { id: string; rating: number; comment?: string; user: { name: string }; createdAt: string }[];
-    _count?: { reviews: number };
-    owner?: { name: string };
-}
-
-interface ReviewEntry {
-    id: string;
-    rating: number;
-    comment?: string | null;
-    createdAt: string;
-    user: {
-        id: string;
-        name: string;
-    };
-}
-
-interface PublicPromotion {
-    id: string;
-    title: string;
-    description?: string | null;
-    discountType: 'PERCENTAGE' | 'FIXED';
-    discountValue: string | number;
-    couponCode?: string | null;
-    endsAt: string;
-    isFlashOffer?: boolean;
-}
-
-interface NearbyBusiness {
-    id: string;
-    name: string;
-    slug: string;
-    address?: string;
-    distance?: number | string | null;
-}
-
-interface CheckInStats {
-    businessId: string;
-    totalCheckIns: number;
-    last24HoursCheckIns: number;
-    verifiedCheckIns: number;
-    uniqueUsers: number;
-}
-
-interface ReputationProfile {
-    business: {
-        id: string;
-        reputationScore: number;
-        reputationTier: 'BRONZE' | 'SILVER' | 'GOLD';
-        verified: boolean;
-        verifiedAt?: string | null;
-    };
-    metrics: {
-        averageRating: number;
-        reviewCount: number;
-        bookings: {
-            completed: number;
-            confirmed: number;
-            pending: number;
-            canceled: number;
-            noShow: number;
-        };
-        successfulTransactions: number;
-        grossRevenue: number;
-    };
-}
-
-async function getCurrentLocation() {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        return null;
-    }
-
-    return new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-            (position) =>
-                resolve({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                }),
-            () => resolve(null),
-            {
-                enableHighAccuracy: false,
-                timeout: 5000,
-                maximumAge: 60_000,
-            },
-        );
-    });
-}
-
-function formatDaysAgo(value?: string): string | null {
-    if (!value) {
-        return null;
-    }
-
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-        return null;
-    }
-
-    const days = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24)));
-    if (days === 0) {
-        return 'Actualizado hoy';
-    }
-    if (days === 1) {
-        return 'Actualizado hace 1 dia';
-    }
-    return `Actualizado hace ${days} dias`;
-}
-
-function tierLabel(tier: 'BRONZE' | 'SILVER' | 'GOLD'): string {
-    if (tier === 'GOLD') {
-        return 'Oro';
-    }
-    if (tier === 'SILVER') {
-        return 'Plata';
-    }
-    return 'Bronce';
-}
-
-function formatCurrencyDop(value: number): string {
-    return new Intl.NumberFormat('es-DO', {
-        style: 'currency',
-        currency: 'DOP',
-        maximumFractionDigits: 0,
-    }).format(value);
-}
-
-function normalizeText(value: string): string {
-    return value
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .trim();
-}
-
-function getDisplayInitial(value: string | undefined): string {
-    const normalized = value?.trim() ?? '';
-    if (!normalized) {
-        return '?';
-    }
-
-    return normalized.charAt(0).toUpperCase();
-}
-
-function renderStars(rating: number): string {
-    const normalized = Math.max(0, Math.min(5, Math.round(rating)));
-    return `${'★'.repeat(normalized)}${'☆'.repeat(5 - normalized)}`;
-}
-
-const BOOKING_FEATURE_CANONICAL = 'reservaciones';
-
-function businessSupportsBooking(features?: { feature: { name: string } }[]): boolean {
-    if (!features || features.length === 0) {
-        return false;
-    }
-
-    return features.some((entry) => {
-        const normalized = normalizeText(entry.feature.name);
-        return normalized === BOOKING_FEATURE_CANONICAL;
-    });
-}
-
-type ContactPlacement = 'sidebar_card' | 'sidebar_primary' | 'sticky_mobile' | 'public_lead_form';
-
+import { MobileContactBar } from './business-details/MobileContactBar';
+import { NearbyBusinessesSection } from './business-details/NearbyBusinessesSection';
+import { PromotionsSection } from './business-details/PromotionsSection';
+import { ReviewsSection } from './business-details/ReviewsSection';
+import { SidebarPanel } from './business-details/SidebarPanel';
+import { businessSupportsBooking, formatDaysAgo, getCurrentLocation, getDisplayInitial, renderStars } from './business-details/helpers';
+import type {
+    Business,
+    CheckInStats,
+    ContactPlacement,
+    FavoriteList,
+    NearbyBusiness,
+    PublicPromotion,
+    ReputationProfile,
+    ReviewEntry,
+} from './business-details/types';
 export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
     const { isAuthenticated, user } = useAuth();
@@ -249,7 +71,7 @@ export function BusinessDetails() {
     const [isFavorite, setIsFavorite] = useState(false);
     const [favoriteLoading, setFavoriteLoading] = useState(false);
     const [favoriteProcessing, setFavoriteProcessing] = useState(false);
-    const [favoriteLists, setFavoriteLists] = useState<Array<{ id: string; name: string }>>([]);
+    const [favoriteLists, setFavoriteLists] = useState<FavoriteList[]>([]);
     const [selectedListId, setSelectedListId] = useState('');
     const [newListName, setNewListName] = useState('');
     const [listProcessing, setListProcessing] = useState(false);
@@ -343,7 +165,7 @@ export function BusinessDetails() {
                 }
 
                 const hasFavorite = ((favoritesResponse.data?.data ?? []) as Array<unknown>).length > 0;
-                const loadedLists = ((listsResponse.data?.data ?? []) as Array<{ id: string; name: string }>);
+                const loadedLists = ((listsResponse.data?.data ?? []) as FavoriteList[]);
 
                 setIsFavorite(hasFavorite);
                 setFavoriteLists(loadedLists);
@@ -1500,761 +1322,83 @@ export function BusinessDetails() {
                         </div>
                     )}
 
-                    <div className="panel-premium p-6">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Promociones</p>
-                                <h2 className="mt-2 font-display text-2xl font-semibold text-slate-900">Ofertas activas</h2>
-                            </div>
-                            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                                {publicPromotions.length} activa{publicPromotions.length === 1 ? '' : 's'}
-                            </span>
-                        </div>
-                        <div className="mt-5">
-                            {promotionsLoading ? (
-                                <p className="text-sm text-slate-500">Cargando promociones...</p>
-                            ) : publicPromotions.length > 0 ? (
-                                <div className="space-y-3">
-                                    {publicPromotions.map((promotion) => (
-                                        <div key={promotion.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <p className="font-semibold text-slate-900">{promotion.title}</p>
-                                                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                                    {promotion.discountType === 'PERCENTAGE'
-                                                        ? `${Number(promotion.discountValue)}% OFF`
-                                                        : `${formatCurrencyDop(Number(promotion.discountValue))} OFF`}
-                                                </span>
-                                            </div>
-                                            {promotion.description ? (
-                                                <p className="mt-2 text-sm leading-6 text-slate-600">{promotion.description}</p>
-                                            ) : null}
-                                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                                {promotion.couponCode ? (
-                                                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700">
-                                                        Cupon: {promotion.couponCode}
-                                                    </span>
-                                                ) : null}
-                                                {promotion.isFlashOffer ? (
-                                                    <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-red-700">
-                                                        Flash
-                                                    </span>
-                                                ) : null}
-                                                <span>Vence: {new Date(promotion.endsAt).toLocaleDateString('es-DO')}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70 px-6 py-10 text-center">
-                                    <div className="text-3xl">🏷️</div>
-                                    <p className="mt-3 text-sm font-medium text-slate-700">
-                                        Este negocio no tiene promociones activas ahora mismo.
-                                    </p>
-                                    <p className="mt-1 text-sm text-slate-500">
-                                        Cuando haya nuevas ofertas, apareceran aqui.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                        </div>
-                    </div>
+                    <PromotionsSection loading={promotionsLoading} promotions={publicPromotions} />
 
-                    <div className="panel-premium p-6">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Exploracion cercana</p>
-                                <h2 className="mt-2 font-display text-2xl font-semibold text-slate-900">Negocios cerca de aqui</h2>
-                            </div>
-                            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                                {nearbyBusinesses.length} resultado{nearbyBusinesses.length === 1 ? '' : 's'}
-                            </span>
-                        </div>
-                        <div className="mt-5">
-                            {nearbyLoading ? (
-                                <p className="text-sm text-slate-500">Cargando negocios cercanos...</p>
-                            ) : nearbyBusinesses.length > 0 ? (
-                                <div className="space-y-3">
-                                    {nearbyBusinesses.map((nearbyBusiness) => {
-                                        const parsedDistance = Number(nearbyBusiness.distance);
-                                        const distanceLabel = Number.isFinite(parsedDistance)
-                                            ? `${parsedDistance.toFixed(1)} km`
-                                            : null;
-                                        return (
-                                            <Link
-                                                key={nearbyBusiness.id}
-                                                to={`/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`}
-                                                className="group flex items-center gap-4 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-4 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40"
-                                            >
-                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-sm font-semibold text-emerald-700">
-                                                    {getDisplayInitial(nearbyBusiness.name)}
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="truncate font-semibold text-slate-900 transition-colors group-hover:text-emerald-700">
-                                                        {nearbyBusiness.name}
-                                                    </p>
-                                                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                                                        {nearbyBusiness.address || 'Direccion no disponible'}
-                                                    </p>
-                                                </div>
-                                                {distanceLabel ? (
-                                                    <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                                        {distanceLabel}
-                                                    </span>
-                                                ) : null}
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-slate-500">No hay resultados cercanos para mostrar.</p>
-                            )}
-                        </div>
-                    </div>
+                    <NearbyBusinessesSection businesses={nearbyBusinesses} loading={nearbyLoading} />
 
-                    {/* Reviews */}
-                    <div className="panel-premium p-6">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Resenas</p>
-                                <h2 className="mt-2 font-display text-2xl font-semibold text-slate-900">
-                                    Opiniones ({reviewCount})
-                                </h2>
-                            </div>
-                            {averageRatingNumber ? (
-                                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-amber-900">
-                                    <div className="font-display text-2xl font-semibold leading-none">{averageRating}</div>
-                                    {reviewStarsLabel ? (
-                                        <div className="mt-1 text-[11px] tracking-[0.18em] text-amber-500">{reviewStarsLabel}</div>
-                                    ) : null}
-                                    <div className="mt-1 text-[11px] font-medium text-amber-700">
-                                        {reviewCount} reseña{reviewCount === 1 ? '' : 's'}
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
+                    <ReviewsSection
+                        averageRating={averageRating}
+                        averageRatingNumber={averageRatingNumber}
+                        isAuthenticated={isAuthenticated}
+                        isCustomerRole={isCustomerRole}
+                        onReviewFormChange={setReviewForm}
+                        onSubmit={handleReviewSubmit}
+                        reviewCount={reviewCount}
+                        reviewErrorMessage={reviewErrorMessage}
+                        reviewForm={reviewForm}
+                        reviews={visibleReviews}
+                        reviewsLoading={reviewsLoading}
+                        reviewStarsLabel={reviewStarsLabel}
+                        reviewSuccessMessage={reviewSuccessMessage}
+                        submittingReview={submittingReview}
+                    />
 
-                        <div className="mt-5">
-                        {/* Review Form */}
-                        {!isAuthenticated && (
-                            <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
-                                Inicia sesión para dejar tu reseña. <Link to="/login" className="underline font-medium">Ir a login</Link>
-                            </div>
-                        )}
-
-                        {isAuthenticated && !isCustomerRole && (
-                            <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                                Las reseñas están habilitadas para cuentas tipo cliente.
-                            </div>
-                        )}
-
-                        {isAuthenticated && isCustomerRole && (
-                            <form onSubmit={handleReviewSubmit} className="mb-6 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <span className="text-sm font-medium text-slate-600">Tu calificacion:</span>
-                                    <div className="flex gap-1.5">
-                                        {[1, 2, 3, 4, 5].map((star) => (
-                                            <button
-                                                key={star}
-                                                type="button"
-                                                onClick={() => setReviewForm({ ...reviewForm, rating: star })}
-                                                aria-label={`Seleccionar ${star} estrellas`}
-                                                className={`text-[1.75rem] leading-none transition-transform hover:scale-110 ${star <= reviewForm.rating ? 'text-amber-400' : 'text-slate-300'
-                                                    }`}
-                                            >
-                                                ★
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <textarea
-                                    value={reviewForm.comment}
-                                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-                                    placeholder="Escribe tu experiencia..."
-                                    className="input-field mt-1 text-sm"
-                                    rows={4}
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={submittingReview}
-                                    className="btn-primary mt-4 text-sm"
-                                >
-                                    {submittingReview ? 'Enviando...' : 'Enviar reseña'}
-                                </button>
-                            </form>
-                        )}
-
-                        {reviewErrorMessage && (
-                            <div className="mb-4 rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                                {reviewErrorMessage}
-                            </div>
-                        )}
-
-                        {reviewSuccessMessage && (
-                            <div className="mb-4 rounded-[1.25rem] border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                                {reviewSuccessMessage}
-                            </div>
-                        )}
-
-                        {/* Reviews List */}
-                        <div className="space-y-4">
-                            {reviewsLoading ? (
-                                <p className="py-4 text-center text-sm text-slate-500">
-                                    Cargando reseñas...
-                                </p>
-                            ) : visibleReviews.map((review) => (
-                                <article key={review.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-5">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex min-w-0 items-center gap-3">
-                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-semibold text-white">
-                                                {getDisplayInitial(review.user.name)}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="truncate font-semibold text-slate-900">{review.user.name}</p>
-                                                <div className="mt-1 text-xs tracking-[0.18em] text-amber-500">
-                                                    {renderStars(review.rating)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <span className="shrink-0 text-xs text-slate-500">
-                                            {new Date(review.createdAt).toLocaleDateString('es-DO')}
-                                        </span>
-                                    </div>
-                                    {review.comment ? (
-                                        <p className="mt-4 text-sm leading-6 text-slate-700">{review.comment}</p>
-                                    ) : (
-                                        <p className="mt-4 text-sm leading-6 text-slate-500">Sin comentario adicional.</p>
-                                    )}
-                                </article>
-                            ))}
-                            {!reviewsLoading && visibleReviews.length === 0 && (
-                                <p className="py-4 text-center text-sm text-slate-500">
-                                    Aún no hay reseñas. Sé el primero en opinar.
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    </div>
                 </div>
 
                 {/* Sidebar - Contact */}
-                <div className="space-y-6">
-                    <div className="panel-premium overflow-hidden lg:sticky lg:top-24">
-                        <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700 px-6 py-6 text-white">
-                        <div className="flex flex-col gap-4">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">Contacto</p>
-                                <h2 className="mt-2 font-display text-3xl font-semibold text-white">Confianza y contacto</h2>
-                            </div>
-                            {priceRangeLabel && (
-                                <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
-                                    {priceRangeLabel}
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {business.verified && (
-                                <span className="rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-medium text-white">
-                                    Verificado
-                                </span>
-                            )}
-                            {updatedLabel && (
-                                <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-medium text-white/85">
-                                    {updatedLabel}
-                                </span>
-                            )}
-                            {memberSinceYear && Number.isFinite(memberSinceYear) && (
-                                <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-medium text-white/85">
-                                    En AquiTa.do desde {memberSinceYear}
-                                </span>
-                            )}
-                        </div>
-                        <div className="rounded-[1.25rem] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm">
-                            <div className="mb-2 flex items-center justify-between text-xs text-white/75">
-                                <span className="font-semibold text-white/85">Indice de confianza</span>
-                                <span className={`font-semibold ${
-                                    trust.level === 'ALTA'
-                                        ? 'text-emerald-100'
-                                        : trust.level === 'MEDIA'
-                                            ? 'text-amber-200'
-                                            : 'text-rose-200'
-                                }`}>
-                                    {trust.score}/100
-                                </span>
-                            </div>
-                            <div className="h-2 rounded-full bg-white/15 overflow-hidden">
-                                <div
-                                    className={`h-full ${
-                                        trust.level === 'ALTA'
-                                            ? 'bg-emerald-300'
-                                            : trust.level === 'MEDIA'
-                                                ? 'bg-amber-300'
-                                                : 'bg-rose-300'
-                                    }`}
-                                    style={{ width: `${trust.score}%` }}
-                                />
-                            </div>
-                        </div>
-                        </div>
-                        </div>
-                        <div className="px-6 pb-6 pt-5">
-                        <div className="mb-4 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
-                            <div className="mb-3 flex items-center justify-between gap-3">
-                                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Reputacion oficial</span>
-                                {reputationLoading ? (
-                                    <span className="text-[11px] text-slate-500">Cargando...</span>
-                                ) : reputationProfile ? (
-                                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                                        Tier {tierLabel(reputationProfile.business.reputationTier)}
-                                    </span>
-                                ) : null}
-                            </div>
-                            {reputationProfile ? (
-                                <div className="grid grid-cols-2 gap-3 text-xs text-slate-600">
-                                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Score</p>
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            {reputationProfile.business.reputationScore.toFixed(1)}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Rating</p>
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            {reputationProfile.metrics.averageRating > 0
-                                                ? reputationProfile.metrics.averageRating.toFixed(1)
-                                                : '0.0'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Resenas</p>
-                                        <p className="text-sm font-semibold text-slate-900">
-                                            {reputationProfile.metrics.reviewCount}
-                                        </p>
-                                    </div>
-                                    {showBookings && (
-                                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                                            <p className="text-[10px] uppercase tracking-wide text-slate-500">Reservas completadas</p>
-                                            <p className="text-sm font-semibold text-slate-900">
-                                                {reputationProfile.metrics.bookings.completed}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <p className="text-xs text-slate-500">
-                                    Perfil de reputacion aun no disponible para este negocio.
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-3">
-                            {business.phone && (
-                                canUseCustomerContactFlows ? (
-                                    <a
-                                        href={`tel:${business.phone}`}
-                                        onClick={() => handlePhoneClick('sidebar_card')}
-                                        className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/50 border border-primary-100 hover:bg-primary-100 transition-colors hover-lift group"
-                                    >
-                                        <span className="text-lg">Tel</span>
-                                        <div>
-                                            <div className="text-xs text-gray-600">Teléfono</div>
-                                            <div className="text-sm font-medium text-gray-700 group-hover:text-primary-700">{business.phone}</div>
-                                        </div>
-                                    </a>
-                                ) : (
-                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
-                                        <span className="text-lg">Tel</span>
-                                        <div>
-                                            <div className="text-xs text-gray-600">Teléfono</div>
-                                            <div className="text-sm text-gray-700">{business.phone}</div>
-                                        </div>
-                                    </div>
-                                )
-                            )}
-                            {business.whatsapp && (
-                                canUseCustomerContactFlows ? (
-                                    <a
-                                        href={whatsappDirectUrl ?? '#'}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(event) => handleWhatsAppClick(event, 'sidebar_card')}
-                                        className={`flex items-center gap-3 p-3 rounded-xl transition-colors hover-lift group ${contactVariant === 'emphasis'
-                                            ? 'bg-green-100 hover:bg-green-200 border border-green-300 shadow-sm'
-                                            : 'bg-green-50 hover:bg-green-100 border border-green-100'
-                                            }`}
-                                    >
-                                        <span className="text-lg">WA</span>
-                                        <div>
-                                            <div className="text-xs text-gray-600">WhatsApp</div>
-                                            <div className="text-sm font-medium text-green-700">
-                                                {contactVariant === 'emphasis' ? 'Chatea ahora' : business.whatsapp}
-                                            </div>
-                                        </div>
-                                    </a>
-                                ) : (
-                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-green-50/50 border border-green-100">
-                                        <span className="text-lg">WA</span>
-                                        <div>
-                                            <div className="text-xs text-gray-600">WhatsApp</div>
-                                            <div className="text-sm text-green-700">{business.whatsapp}</div>
-                                        </div>
-                                    </div>
-                                )
-                            )}
-                            <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50/40 border border-primary-100">
-                                <span className="text-lg">Dir</span>
-                                <div>
-                                    <div className="text-xs text-gray-600">Dirección</div>
-                                    <div className="text-sm text-gray-700">{business.address}</div>
-                                </div>
-                            </div>
-                            {business.website && (
-                                <a
-                                    href={business.website}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-200 hover:border-primary-200 transition-colors"
-                                >
-                                    <span className="text-lg">Web</span>
-                                    <div>
-                                        <div className="text-xs text-gray-600">Website</div>
-                                        <div className="text-sm text-primary-700 break-all">{business.website}</div>
-                                    </div>
-                                </a>
-                            )}
-                            {business.email && (
-                                <a
-                                    href={`mailto:${business.email}`}
-                                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-200 hover:border-primary-200 transition-colors"
-                                >
-                                    <span className="text-lg">Mail</span>
-                                    <div>
-                                        <div className="text-xs text-gray-600">Email</div>
-                                        <div className="text-sm text-primary-700 break-all">{business.email}</div>
-                                    </div>
-                                </a>
-                            )}
-                            {(business.instagramUrl || business.facebookUrl || business.tiktokUrl) && (
-                                <div className="rounded-xl border border-gray-200 bg-white p-3">
-                                    <div className="text-xs text-gray-600 mb-2">Redes sociales</div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {business.instagramUrl && (
-                                            <a href={business.instagramUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs">
-                                                Instagram
-                                            </a>
-                                        )}
-                                        {business.facebookUrl && (
-                                            <a href={business.facebookUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs">
-                                                Facebook
-                                            </a>
-                                        )}
-                                        {business.tiktokUrl && (
-                                            <a href={business.tiktokUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs">
-                                                TikTok
-                                            </a>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            {business.whatsapp && canUseCustomerContactFlows && (
-                                <button
-                                    type="button"
-                                    onClick={() => void openWhatsApp('sidebar_primary')}
-                                    className="w-full rounded-[1.25rem] bg-green-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-600"
-                                >
-                                    Chatear ahora por WhatsApp
-                                </button>
-                            )}
-                            {hasBusinessHours && (
-                                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
-                                    <div className="mb-3 flex items-center justify-between gap-2">
-                                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Horario</div>
-                                        {business.openNow !== null && business.openNow !== undefined ? (
-                                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                                business.openNow
-                                                    ? 'bg-emerald-50 text-emerald-700'
-                                                    : 'bg-slate-100 text-slate-500'
-                                            }`}>
-                                                {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                    <div className="space-y-2">
-                                        {hoursByDay.map((day) => (
-                                            <div key={day.dayOfWeek} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 text-sm last:border-b-0 last:pb-0">
-                                                <span className={`${day.dayOfWeek === todayDayOfWeek ? 'font-semibold text-emerald-700' : 'text-slate-600'}`}>{day.label}</span>
-                                                <span className={`${day.dayOfWeek === todayDayOfWeek ? 'font-semibold text-emerald-700' : 'text-slate-900'}`}>
-                                                    {day.schedule?.closed
-                                                        ? 'Cerrado'
-                                                        : formatHoursRange(day.schedule?.opensAt, day.schedule?.closesAt) || 'Sin horario'}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {business.profileCompletenessScore !== undefined && (
-                                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
-                                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Calidad de ficha</div>
-                                    <div className="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
-                                        <div
-                                            className="h-full bg-gradient-to-r from-emerald-600 to-amber-400"
-                                            style={{ width: `${profileCompleteness}%` }}
-                                        />
-                                    </div>
-                                    <div className="mt-2 text-sm text-slate-700">
-                                        {profileCompleteness}% completado
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mt-6 border-t border-gray-100 pt-6">
-                            {hasOperatorRole && (
-                                <div className="mb-6 space-y-3">
-                                    <h3 className="font-display font-semibold text-gray-900">
-                                        {isAdminRole ? 'Herramientas de moderación' : 'Herramientas de gestión'}
-                                    </h3>
-                                    <p className="text-sm text-slate-700">
-                                        {isAdminRole
-                                            ? 'Gestiona verificaciones, calidad de datos y cumplimiento desde el panel administrativo.'
-                                            : 'Gestiona tu operación comercial desde tu panel de negocio.'}
-                                    </p>
-                                    <Link
-                                        to={isAdminRole ? '/admin' : '/dashboard'}
-                                        className="btn-secondary text-sm inline-flex"
-                                    >
-                                        {isAdminRole ? 'Ir a Panel Admin' : 'Ir a Panel Negocio'}
-                                    </Link>
-                                </div>
-                            )}
-                            {!hasOperatorRole && (
-                                <>
-                            {showBookings && isAuthenticated && isCustomerRole && canBookThisBusiness && (
-                                <div className="mb-6">
-                                    <h3 className="font-display font-semibold text-gray-900 mb-3">
-                                        Reservar ahora
-                                    </h3>
-                                    <form onSubmit={handleBookingSubmit} className="space-y-3">
-                                        <input
-                                            type="datetime-local"
-                                            className="input-field text-sm"
-                                            value={bookingForm.scheduledFor}
-                                            onChange={(event) =>
-                                                setBookingForm((previous) => ({
-                                                    ...previous,
-                                                    scheduledFor: event.target.value,
-                                                }))
-                                            }
-                                        />
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            className="input-field text-sm"
-                                            placeholder="Cantidad de personas"
-                                            value={bookingForm.partySize}
-                                            onChange={(event) =>
-                                                setBookingForm((previous) => ({
-                                                    ...previous,
-                                                    partySize: event.target.value,
-                                                }))
-                                            }
-                                        />
-                                        <textarea
-                                            className="input-field text-sm"
-                                            rows={2}
-                                            placeholder="Notas de la reserva (opcional)"
-                                            value={bookingForm.notes}
-                                            onChange={(event) =>
-                                                setBookingForm((previous) => ({
-                                                    ...previous,
-                                                    notes: event.target.value,
-                                                }))
-                                            }
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="btn-primary text-sm w-full"
-                                            disabled={submittingBooking}
-                                        >
-                                            {submittingBooking ? 'Enviando reserva...' : 'Enviar reserva'}
-                                        </button>
-                                    </form>
-
-                                    {bookingErrorMessage && (
-                                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                                            {bookingErrorMessage}
-                                        </div>
-                                    )}
-
-                                    {bookingSuccessMessage && (
-                                        <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                                            {bookingSuccessMessage}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            {showBookings && isAuthenticated && isCustomerRole && !canBookThisBusiness && (
-                                <div className="mb-6 rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm text-slate-700">
-                                    Este negocio no gestiona reservas en línea. Usa los canales de contacto disponibles para coordinar.
-                                </div>
-                            )}
-                            {showMessaging && (
-                                <>
-                                    <h3 className="font-display font-semibold text-gray-900 mb-3">
-                                        Mensaje directo
-                                    </h3>
-
-                                    {!isAuthenticated && (
-                                        <form onSubmit={handlePublicLeadSubmit} className="space-y-3">
-                                            <input
-                                                className="input-field text-sm"
-                                                placeholder="Tu nombre"
-                                                value={publicLeadForm.contactName}
-                                                onChange={(event) =>
-                                                    setPublicLeadForm((previous) => ({
-                                                        ...previous,
-                                                        contactName: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                            <input
-                                                className="input-field text-sm"
-                                                placeholder="Tu teléfono"
-                                                value={publicLeadForm.contactPhone}
-                                                onChange={(event) =>
-                                                    setPublicLeadForm((previous) => ({
-                                                        ...previous,
-                                                        contactPhone: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                            <input
-                                                className="input-field text-sm"
-                                                placeholder="Tu email (opcional)"
-                                                value={publicLeadForm.contactEmail}
-                                                onChange={(event) =>
-                                                    setPublicLeadForm((previous) => ({
-                                                        ...previous,
-                                                        contactEmail: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                            <textarea
-                                                className="input-field text-sm"
-                                                rows={3}
-                                                placeholder="Que necesitas?"
-                                                value={publicLeadForm.message}
-                                                onChange={(event) =>
-                                                    setPublicLeadForm((previous) => ({
-                                                        ...previous,
-                                                        message: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                            <button
-                                                type="submit"
-                                                className="btn-primary text-sm w-full"
-                                                disabled={submittingPublicLead}
-                                            >
-                                                {submittingPublicLead ? 'Enviando...' : 'Solicitar cotización sin cuenta'}
-                                            </button>
-                                            <p className="text-xs text-gray-500">
-                                                ¿Ya tienes cuenta? <Link to="/login" className="underline font-medium">Inicia sesión</Link>
-                                            </p>
-                                        </form>
-                                    )}
-
-                                    {isAuthenticated && isCustomerRole && (
-                                        <form onSubmit={handleMessageSubmit} className="space-y-3">
-                                            <input
-                                                className="input-field text-sm"
-                                                placeholder="Asunto (opcional)"
-                                                value={messageForm.subject}
-                                                onChange={(event) =>
-                                                    setMessageForm((previous) => ({
-                                                        ...previous,
-                                                        subject: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                            <textarea
-                                                className="input-field text-sm"
-                                                rows={3}
-                                                placeholder="Escribe tu consulta..."
-                                                value={messageForm.content}
-                                                onChange={(event) =>
-                                                    setMessageForm((previous) => ({
-                                                        ...previous,
-                                                        content: event.target.value,
-                                                    }))
-                                                }
-                                            />
-                                            <button
-                                                type="submit"
-                                                className="btn-primary text-sm w-full sm:w-auto"
-                                                disabled={sendingMessage}
-                                            >
-                                                {sendingMessage ? 'Enviando...' : 'Enviar mensaje'}
-                                            </button>
-                                        </form>
-                                    )}
-
-                                    {publicLeadErrorMessage && (
-                                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                                            {publicLeadErrorMessage}
-                                        </div>
-                                    )}
-
-                                    {publicLeadSuccessMessage && (
-                                        <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                                            {publicLeadSuccessMessage}
-                                        </div>
-                                    )}
-
-                                    {messageErrorMessage && (
-                                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                                            {messageErrorMessage}
-                                        </div>
-                                    )}
-
-                                    {messageSuccessMessage && (
-                                        <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                                            {messageSuccessMessage}
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <SidebarPanel
+                    bookingErrorMessage={bookingErrorMessage}
+                    bookingForm={bookingForm}
+                    bookingSuccessMessage={bookingSuccessMessage}
+                    business={business}
+                    canBookThisBusiness={canBookThisBusiness}
+                    canUseCustomerContactFlows={canUseCustomerContactFlows}
+                    contactVariant={contactVariant}
+                    hasBusinessHours={hasBusinessHours}
+                    hasOperatorRole={hasOperatorRole}
+                    hoursByDay={hoursByDay}
+                    isAdminRole={isAdminRole}
+                    isAuthenticated={isAuthenticated}
+                    isCustomerRole={isCustomerRole}
+                    memberSinceYear={memberSinceYear}
+                    messageErrorMessage={messageErrorMessage}
+                    messageForm={messageForm}
+                    messageSuccessMessage={messageSuccessMessage}
+                    onBookingFormChange={setBookingForm}
+                    onBookingSubmit={handleBookingSubmit}
+                    onMessageFormChange={setMessageForm}
+                    onMessageSubmit={handleMessageSubmit}
+                    onOpenWhatsApp={openWhatsApp}
+                    onPhoneClick={handlePhoneClick}
+                    onPublicLeadFormChange={setPublicLeadForm}
+                    onPublicLeadSubmit={handlePublicLeadSubmit}
+                    onWhatsAppClick={handleWhatsAppClick}
+                    priceRangeLabel={priceRangeLabel}
+                    profileCompleteness={profileCompleteness}
+                    publicLeadErrorMessage={publicLeadErrorMessage}
+                    publicLeadForm={publicLeadForm}
+                    publicLeadSuccessMessage={publicLeadSuccessMessage}
+                    reputationLoading={reputationLoading}
+                    reputationProfile={reputationProfile}
+                    showBookings={showBookings}
+                    showMessaging={showMessaging}
+                    submittingBooking={submittingBooking}
+                    submittingPublicLead={submittingPublicLead}
+                    sendingMessage={sendingMessage}
+                    todayDayOfWeek={todayDayOfWeek}
+                    trust={trust}
+                    updatedLabel={updatedLabel}
+                    whatsappDirectUrl={whatsappDirectUrl}
+                />
             </div>
 
-            {canUseCustomerContactFlows && (business.phone || business.whatsapp) && (
-                <div className="fixed inset-x-4 bottom-4 z-40 lg:hidden">
-                    <div className="rounded-2xl border border-primary-100 bg-white/95 backdrop-blur shadow-xl p-2 flex gap-2">
-                        {business.phone && (
-                            <a
-                                href={`tel:${business.phone}`}
-                                onClick={() => handlePhoneClick('sticky_mobile')}
-                                className="flex-1 touch-target rounded-xl bg-primary-600 text-white text-sm font-semibold flex items-center justify-center"
-                            >
-                                Llamar
-                            </a>
-                        )}
-                        {business.whatsapp && (
-                            <button
-                                type="button"
-                                onClick={() => void openWhatsApp('sticky_mobile')}
-                                className="flex-1 touch-target rounded-xl bg-green-600 text-white text-sm font-semibold"
-                            >
-                                WhatsApp
-                            </button>
-                        )}
-                    </div>
-                </div>
-            )}
+            <MobileContactBar
+                phone={business.phone}
+                show={canUseCustomerContactFlows}
+                whatsapp={business.whatsapp}
+                onOpenWhatsApp={openWhatsApp}
+                onPhoneClick={handlePhoneClick}
+            />
         </div>
     );
 }
