@@ -59,6 +59,28 @@ type GoogleTokenInfoResponse = {
     sub?: string;
 };
 
+const authSessionBaseSelect = {
+    id: true,
+    name: true,
+    email: true,
+    phone: true,
+    avatarUrl: true,
+    role: true,
+    createdAt: true,
+    updatedAt: true,
+} as const;
+
+const authLoginSelect = {
+    ...authSessionBaseSelect,
+    password: true,
+} as const;
+
+const authAdminSecondFactorSelect = {
+    id: true,
+    twoFactorEnabled: true,
+    twoFactorSecret: true,
+} as const;
+
 @Injectable()
 export class AuthService {
     private readonly logger = new Logger(AuthService.name);
@@ -79,6 +101,7 @@ export class AuthService {
     async register(dto: RegisterDto, request: Request, response: Response) {
         const existingUser = await this.prisma.user.findUnique({
             where: { email: dto.email.trim().toLowerCase() },
+            select: { id: true },
         });
 
         if (existingUser) {
@@ -106,17 +129,30 @@ export class AuthService {
                 phone: normalizedPhone,
                 role: requestedRole,
             },
+            select: authSessionBaseSelect,
         });
 
-        return this.issueAuthSession(this.toAuthSessionUser(user), request, response);
+        return this.issueAuthSession(
+            this.toAuthSessionUser({
+                ...user,
+                twoFactorEnabled: false,
+            }),
+            request,
+            response,
+        );
     }
 
     async login(dto: LoginDto, request: Request, response: Response) {
         const user = await this.prisma.user.findUnique({
             where: { email: dto.email.trim().toLowerCase() },
+            select: authLoginSelect,
         });
 
         if (!user) {
+            throw new UnauthorizedException('Credenciales invalidas');
+        }
+
+        if (!user.password || typeof user.password !== 'string') {
             throw new UnauthorizedException('Credenciales invalidas');
         }
 
@@ -125,11 +161,36 @@ export class AuthService {
             throw new UnauthorizedException('Credenciales invalidas');
         }
 
-        this.assertAdminSecondFactor(user.role, user.twoFactorEnabled, user.twoFactorSecret, dto.twoFactorCode);
+        let twoFactorEnabled = false;
+        if (user.role === 'ADMIN') {
+            const adminSecurity = await this.prisma.user.findUnique({
+                where: { id: user.id },
+                select: authAdminSecondFactorSelect,
+            });
 
-        const session = await this.issueAuthSession(this.toAuthSessionUser(user), request, response);
+            if (!adminSecurity) {
+                throw new UnauthorizedException('Credenciales invalidas');
+            }
 
-        if (user.role === 'ADMIN' && !user.twoFactorEnabled) {
+            twoFactorEnabled = adminSecurity.twoFactorEnabled;
+            this.assertAdminSecondFactor(
+                user.role,
+                adminSecurity.twoFactorEnabled,
+                adminSecurity.twoFactorSecret,
+                dto.twoFactorCode,
+            );
+        }
+
+        const session = await this.issueAuthSession(
+            this.toAuthSessionUser({
+                ...user,
+                twoFactorEnabled,
+            }),
+            request,
+            response,
+        );
+
+        if (user.role === 'ADMIN' && !twoFactorEnabled) {
             return {
                 ...session,
                 securityWarnings: ['ADMIN_2FA_NOT_ENABLED'],
