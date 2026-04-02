@@ -75,12 +75,14 @@ Copy-Item apps/web/.env.example apps/web/.env
 docker compose up -d db
 ```
 
-4. Generar cliente Prisma y migrar:
+4. Generar cliente Prisma y preparar esquema local:
 
 ```bash
 pnpm db:generate
 pnpm db:migrate
 ```
+
+Para entornos ya provisionados o despliegues sin cambios interactivos de esquema, usa `pnpm db:migrate:deploy`.
 
 5. (Opcional) Seed de datos iniciales:
 
@@ -211,6 +213,7 @@ docker compose down
 - `pnpm test`: ejecuta pruebas unitarias/funcionales estables del monorepo (sin E2E que dependen de DB real).
 - `pnpm test:unit`: alias explicito de pruebas unitarias.
 - `pnpm test:e2e:api`: ejecuta E2E del backend (`apps/api`) y requiere PostgreSQL accesible + migraciones aplicadas.
+- `pnpm db:status`: valida si el esquema local ya esta alineado con todas las migraciones de Prisma.
 - `pnpm perf:prod`: benchmark de latencia (Web + API) con reporte en consola y JSON opcional.
 - `pnpm keepwarm:prod`: ejecuta pings livianos para evitar cold starts prolongados en produccion.
 
@@ -225,8 +228,14 @@ Para E2E de API:
 1. Asegura `DATABASE_URL` valido en `apps/api/.env`.
 2. Opcional recomendado: define `DATABASE_URL_E2E` para apuntar a una base de datos separada de pruebas.
 3. Levanta PostgreSQL (por ejemplo `docker compose up -d db`).
-4. Aplica esquema: `pnpm db:migrate`.
-5. Ejecuta: `pnpm test:e2e:api`.
+4. Aplica esquema: `pnpm db:migrate:deploy`.
+5. Ejecuta: `pnpm test:e2e:api` (el runner vuelve a validar conectividad y ejecuta `prisma migrate deploy` antes de correr Vitest).
+
+Arranque de produccion del API:
+
+- `pnpm --filter @aquita/api start:prod` ahora intenta `prisma migrate deploy` automaticamente cuando el runtime tiene `DATABASE_URL`, `prisma/schema.prisma` y Prisma CLI disponibles.
+- Si el runtime no trae Prisma CLI o el schema de Prisma (por ejemplo, una imagen ya separada con job `migrate` dedicado), el bootstrap lo detecta y continua sin romper el proceso.
+- Puedes desactivar ese intento con `PRISMA_MIGRATE_ON_START=false`.
 
 ## Endpoints API
 
@@ -334,8 +343,9 @@ Separacion aplicada:
 - `pnpm smoke:prod`: Smoke de produccion (health + catalogo + IA concierge + check-ins + rutas web)
 - `pnpm ai:reindex:embeddings`: Reindex masivo de embeddings IA para negocios verificados
 - `pnpm db:generate`: Prisma generate
-- `pnpm db:migrate`: Prisma migrate dev
+- `pnpm db:migrate`: Prisma migrate dev (flujo local interactivo)
 - `pnpm db:migrate:deploy`: Prisma migrate deploy
+- `pnpm db:status`: Estado actual de migraciones aplicadas
 - `pnpm db:seed`: Seed inicial
 
 Reindex IA (Gemini) con filtros opcionales:

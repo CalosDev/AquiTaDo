@@ -27,6 +27,7 @@
     "ai:reindex:embeddings": "pnpm --filter @aquita/api ai:reindex:embeddings",
     "db:migrate": "pnpm --filter @aquita/api prisma:migrate",
     "db:migrate:deploy": "pnpm --filter @aquita/api prisma:migrate:deploy",
+    "db:status": "pnpm --filter @aquita/api prisma:migrate:status",
     "db:generate": "pnpm --filter @aquita/api prisma:generate",
     "db:backfill:organizations": "pnpm --filter @aquita/api prisma:backfill:organizations",
     "db:seed": "pnpm --filter @aquita/api prisma:seed"

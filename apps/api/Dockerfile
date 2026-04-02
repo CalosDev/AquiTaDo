@@ -49,4 +49,4 @@ USER nodejs
 
 EXPOSE 3000
 
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["node", "apps/api/dist/start-prod.js"]

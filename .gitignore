@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+output/
 .env
 .env.local
 *.log
@@ -8,6 +9,7 @@ build/
 coverage/
 .turbo/
 *.tsbuildinfo
+.vercel/
 /uploads/
 apps/api/uploads/
 apps/api/src/generated/prisma/
