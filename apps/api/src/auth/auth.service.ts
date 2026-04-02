@@ -12,7 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { CookieOptions, Request, Response } from 'express';
-import { Role } from '../generated/prisma/client';
+import { Prisma, Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChangePasswordDto, GoogleAuthDto, LoginDto, RegisterDto } from './dto/auth.dto';
 import { IntegrationsService } from '../integrations/integrations.service';
@@ -79,6 +79,19 @@ const authAdminSecondFactorSelect = {
     id: true,
     twoFactorEnabled: true,
     twoFactorSecret: true,
+} as const;
+
+const authTwoFactorStatusSelect = {
+    id: true,
+    role: true,
+    twoFactorEnabled: true,
+    twoFactorEnabledAt: true,
+    twoFactorPendingSecret: true,
+} as const;
+
+const authTwoFactorStatusFallbackSelect = {
+    id: true,
+    role: true,
 } as const;
 
 @Injectable()
@@ -245,17 +258,7 @@ export class AuthService {
             where: { tokenHash: refreshTokenHash },
             include: {
                 user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        avatarUrl: true,
-                        phone: true,
-                        role: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        twoFactorEnabled: true,
-                    },
+                    select: authSessionBaseSelect,
                 },
             },
         });
@@ -269,7 +272,7 @@ export class AuthService {
         }
 
         return this.issueAuthSession(
-            storedRefreshToken.user,
+            this.toAuthSessionUser(storedRefreshToken.user),
             request,
             response,
             refreshTokenHash,
@@ -473,16 +476,7 @@ export class AuthService {
     }
 
     async getTwoFactorStatus(userId: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                id: true,
-                role: true,
-                twoFactorEnabled: true,
-                twoFactorEnabledAt: true,
-                twoFactorPendingSecret: true,
-            },
-        });
+        const user = await this.findTwoFactorStatusUser(userId);
 
         if (!user) {
             throw new UnauthorizedException('Usuario no autenticado');
@@ -498,155 +492,167 @@ export class AuthService {
     }
 
     async setupTwoFactor(userId: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                id: true,
-                email: true,
-                role: true,
-            },
-        });
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: {
+                    id: true,
+                    email: true,
+                    role: true,
+                },
+            });
 
-        if (!user) {
-            throw new UnauthorizedException('Usuario no autenticado');
+            if (!user) {
+                throw new UnauthorizedException('Usuario no autenticado');
+            }
+
+            if (user.role !== 'ADMIN') {
+                throw new ForbiddenException('Solo las cuentas ADMIN pueden configurar 2FA');
+            }
+
+            const secret = generateTotpSecret();
+            const issuer = this.resolveTotpIssuer();
+            const otpauthUrl = buildTotpOtpauthUrl({
+                secret,
+                issuer,
+                accountLabel: user.email,
+            });
+
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    twoFactorPendingSecret: secret,
+                },
+            });
+
+            return {
+                secret,
+                otpauthUrl,
+                issuer,
+                accountLabel: user.email,
+                digits: 6,
+                periodSeconds: 30,
+            };
+        } catch (error) {
+            this.rethrowTwoFactorSchemaError(error);
         }
-
-        if (user.role !== 'ADMIN') {
-            throw new ForbiddenException('Solo las cuentas ADMIN pueden configurar 2FA');
-        }
-
-        const secret = generateTotpSecret();
-        const issuer = this.resolveTotpIssuer();
-        const otpauthUrl = buildTotpOtpauthUrl({
-            secret,
-            issuer,
-            accountLabel: user.email,
-        });
-
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-                twoFactorPendingSecret: secret,
-            },
-        });
-
-        return {
-            secret,
-            otpauthUrl,
-            issuer,
-            accountLabel: user.email,
-            digits: 6,
-            periodSeconds: 30,
-        };
     }
 
     async enableTwoFactor(userId: string, code: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                id: true,
-                role: true,
-                twoFactorPendingSecret: true,
-            },
-        });
-
-        if (!user) {
-            throw new UnauthorizedException('Usuario no autenticado');
-        }
-
-        if (user.role !== 'ADMIN') {
-            throw new ForbiddenException('Solo las cuentas ADMIN pueden habilitar 2FA');
-        }
-
-        if (!user.twoFactorPendingSecret) {
-            throw new BadRequestException('No hay configuracion 2FA pendiente');
-        }
-
-        if (!verifyTotpCode(user.twoFactorPendingSecret, code)) {
-            throw new UnauthorizedException('Codigo 2FA invalido');
-        }
-
-        await this.prisma.$transaction(async (tx) => {
-            await tx.user.update({
-                where: { id: user.id },
-                data: {
-                    twoFactorEnabled: true,
-                    twoFactorSecret: user.twoFactorPendingSecret,
-                    twoFactorPendingSecret: null,
-                    twoFactorEnabledAt: new Date(),
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: {
+                    id: true,
+                    role: true,
+                    twoFactorPendingSecret: true,
                 },
             });
 
-            await tx.refreshToken.updateMany({
-                where: {
-                    userId: user.id,
-                    revokedAt: null,
-                },
-                data: {
-                    revokedAt: new Date(),
-                },
-            });
-        });
+            if (!user) {
+                throw new UnauthorizedException('Usuario no autenticado');
+            }
 
-        return {
-            enabled: true,
-            message: '2FA habilitado correctamente. Inicia sesion nuevamente.',
-        };
+            if (user.role !== 'ADMIN') {
+                throw new ForbiddenException('Solo las cuentas ADMIN pueden habilitar 2FA');
+            }
+
+            if (!user.twoFactorPendingSecret) {
+                throw new BadRequestException('No hay configuracion 2FA pendiente');
+            }
+
+            if (!verifyTotpCode(user.twoFactorPendingSecret, code)) {
+                throw new UnauthorizedException('Codigo 2FA invalido');
+            }
+
+            await this.prisma.$transaction(async (tx) => {
+                await tx.user.update({
+                    where: { id: user.id },
+                    data: {
+                        twoFactorEnabled: true,
+                        twoFactorSecret: user.twoFactorPendingSecret,
+                        twoFactorPendingSecret: null,
+                        twoFactorEnabledAt: new Date(),
+                    },
+                });
+
+                await tx.refreshToken.updateMany({
+                    where: {
+                        userId: user.id,
+                        revokedAt: null,
+                    },
+                    data: {
+                        revokedAt: new Date(),
+                    },
+                });
+            });
+
+            return {
+                enabled: true,
+                message: '2FA habilitado correctamente. Inicia sesion nuevamente.',
+            };
+        } catch (error) {
+            this.rethrowTwoFactorSchemaError(error);
+        }
     }
 
     async disableTwoFactor(userId: string, code: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                id: true,
-                role: true,
-                twoFactorEnabled: true,
-                twoFactorSecret: true,
-            },
-        });
-
-        if (!user) {
-            throw new UnauthorizedException('Usuario no autenticado');
-        }
-
-        if (user.role !== 'ADMIN') {
-            throw new ForbiddenException('Solo las cuentas ADMIN pueden deshabilitar 2FA');
-        }
-
-        if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-            throw new BadRequestException('2FA no esta habilitado');
-        }
-
-        if (!verifyTotpCode(user.twoFactorSecret, code)) {
-            throw new UnauthorizedException('Codigo 2FA invalido');
-        }
-
-        await this.prisma.$transaction(async (tx) => {
-            await tx.user.update({
-                where: { id: user.id },
-                data: {
-                    twoFactorEnabled: false,
-                    twoFactorSecret: null,
-                    twoFactorPendingSecret: null,
-                    twoFactorEnabledAt: null,
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: {
+                    id: true,
+                    role: true,
+                    twoFactorEnabled: true,
+                    twoFactorSecret: true,
                 },
             });
 
-            await tx.refreshToken.updateMany({
-                where: {
-                    userId: user.id,
-                    revokedAt: null,
-                },
-                data: {
-                    revokedAt: new Date(),
-                },
-            });
-        });
+            if (!user) {
+                throw new UnauthorizedException('Usuario no autenticado');
+            }
 
-        return {
-            enabled: false,
-            message: '2FA deshabilitado. Inicia sesion nuevamente.',
-        };
+            if (user.role !== 'ADMIN') {
+                throw new ForbiddenException('Solo las cuentas ADMIN pueden deshabilitar 2FA');
+            }
+
+            if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+                throw new BadRequestException('2FA no esta habilitado');
+            }
+
+            if (!verifyTotpCode(user.twoFactorSecret, code)) {
+                throw new UnauthorizedException('Codigo 2FA invalido');
+            }
+
+            await this.prisma.$transaction(async (tx) => {
+                await tx.user.update({
+                    where: { id: user.id },
+                    data: {
+                        twoFactorEnabled: false,
+                        twoFactorSecret: null,
+                        twoFactorPendingSecret: null,
+                        twoFactorEnabledAt: null,
+                    },
+                });
+
+                await tx.refreshToken.updateMany({
+                    where: {
+                        userId: user.id,
+                        revokedAt: null,
+                    },
+                    data: {
+                        revokedAt: new Date(),
+                    },
+                });
+            });
+
+            return {
+                enabled: false,
+                message: '2FA deshabilitado. Inicia sesion nuevamente.',
+            };
+        } catch (error) {
+            this.rethrowTwoFactorSchemaError(error);
+        }
     }
 
     private resolveRequestedRole(role?: unknown): Role {
@@ -666,7 +672,7 @@ export class AuthService {
         role: Role;
         createdAt: Date;
         updatedAt: Date;
-        twoFactorEnabled: boolean;
+        twoFactorEnabled?: boolean;
     }): AuthSessionUser {
         return {
             id: user.id,
@@ -677,8 +683,51 @@ export class AuthService {
             role: user.role,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
-            twoFactorEnabled: user.twoFactorEnabled,
+            twoFactorEnabled: user.twoFactorEnabled ?? false,
         };
+    }
+
+    private async findTwoFactorStatusUser(userId: string) {
+        try {
+            return await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: authTwoFactorStatusSelect,
+            });
+        } catch (error) {
+            if (!this.isMissingColumnError(error)) {
+                throw error;
+            }
+
+            const fallbackUser = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: authTwoFactorStatusFallbackSelect,
+            });
+
+            if (!fallbackUser) {
+                return null;
+            }
+
+            return {
+                ...fallbackUser,
+                twoFactorEnabled: false,
+                twoFactorEnabledAt: null,
+                twoFactorPendingSecret: null,
+            };
+        }
+    }
+
+    private isMissingColumnError(error: unknown): boolean {
+        return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022';
+    }
+
+    private rethrowTwoFactorSchemaError(error: unknown): never {
+        if (this.isMissingColumnError(error)) {
+            throw new BadRequestException(
+                'La configuracion 2FA no esta disponible hasta aplicar las migraciones pendientes',
+            );
+        }
+
+        throw error;
     }
 
     private async verifyGoogleIdToken(idToken: string): Promise<GoogleIdentityPayload> {

@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Role } from '../generated/prisma/client';
+import { Prisma, Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { UpdateMyProfileDto } from './dto/user.dto';
@@ -20,21 +20,22 @@ export class UsersService {
         phone: true,
         avatarUrl: true,
         role: true,
-        loyaltyPoints: true,
-        checkinCount: true,
-        checkinStreak: true,
-        lastCheckinAt: true,
-        twoFactorEnabled: true,
-        twoFactorEnabledAt: true,
+        createdAt: true,
+        updatedAt: true,
+    };
+
+    private readonly userSelectFallback = {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
         createdAt: true,
         updatedAt: true,
     };
 
     async findById(id: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { id },
-            select: this.userSelect,
-        });
+        const user = await this.findUserProfileById(id);
 
         if (!user) {
             throw new NotFoundException('Usuario no encontrado');
@@ -69,14 +70,18 @@ export class UsersService {
             }
         }
 
-        return this.prisma.user.update({
+        await this.prisma.user.update({
             where: { id: userId },
             data: {
                 ...(name !== undefined ? { name } : {}),
                 ...(normalizedPhone !== undefined ? { phone: normalizedPhone } : {}),
             },
-            select: this.userSelect,
+            select: {
+                id: true,
+            },
         });
+
+        return this.findById(userId);
     }
 
     async getMyProfileDetails(userId: string) {
@@ -308,5 +313,36 @@ export class UsersService {
             select: this.userSelect,
             orderBy: { createdAt: 'desc' },
         });
+    }
+
+    private async findUserProfileById(id: string) {
+        try {
+            return await this.prisma.user.findUnique({
+                where: { id },
+                select: this.userSelect,
+            });
+        } catch (error) {
+            if (!this.isMissingColumnError(error)) {
+                throw error;
+            }
+
+            const fallbackUser = await this.prisma.user.findUnique({
+                where: { id },
+                select: this.userSelectFallback,
+            });
+
+            if (!fallbackUser) {
+                return null;
+            }
+
+            return {
+                ...fallbackUser,
+                avatarUrl: null,
+            };
+        }
+    }
+
+    private isMissingColumnError(error: unknown): boolean {
+        return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022';
     }
 }

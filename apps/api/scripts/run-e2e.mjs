@@ -69,6 +69,31 @@ function runVitestE2E() {
     child.on('exit', (code) => process.exit(code ?? 1));
 }
 
+function runPrismaMigrateDeploy() {
+    return new Promise((resolve, reject) => {
+        const isWindows = process.platform === 'win32';
+        const command = isWindows
+            ? `${resolvePnpmExecutable()} exec prisma migrate deploy`
+            : resolvePnpmExecutable();
+        const args = isWindows ? [] : ['exec', 'prisma', 'migrate', 'deploy'];
+        const child = spawn(command, args, {
+            stdio: 'inherit',
+            env: process.env,
+            shell: isWindows,
+        });
+
+        child.on('exit', (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+
+            reject(new Error(`prisma migrate deploy failed with exit code ${code ?? 1}`));
+        });
+        child.on('error', reject);
+    });
+}
+
 const envPath = path.join(process.cwd(), '.env');
 if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
@@ -103,6 +128,20 @@ try {
             : String(error);
     // eslint-disable-next-line no-console
     console.error(`[test:e2e] Details: ${details || 'Unknown connection error'}`);
+    process.exit(1);
+}
+
+try {
+    await runPrismaMigrateDeploy();
+} catch (error) {
+    const details =
+        error && typeof error === 'object'
+            ? [error.code, error.message].filter(Boolean).join(' ')
+            : String(error);
+    // eslint-disable-next-line no-console
+    console.error('[test:e2e] Failed to apply prisma migrate deploy before running tests.');
+    // eslint-disable-next-line no-console
+    console.error(`[test:e2e] Details: ${details || 'Unknown migration error'}`);
     process.exit(1);
 }
 

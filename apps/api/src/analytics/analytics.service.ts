@@ -142,53 +142,68 @@ export class AnalyticsService {
             ? createHash('sha256').update(dto.visitorId.trim()).digest('hex').slice(0, 64)
             : null;
         const searchQuery = dto.searchQuery?.trim().slice(0, 255) || null;
+        const trackedAt = occurredAt.toISOString();
 
-        let organizationId: string | null = null;
-        if (dto.businessId) {
-            const business = await this.prisma.business.findUnique({
-                where: { id: dto.businessId },
+        try {
+            let organizationId: string | null = null;
+            if (dto.businessId) {
+                const business = await this.prisma.business.findUnique({
+                    where: { id: dto.businessId },
+                    select: {
+                        id: true,
+                        organizationId: true,
+                    },
+                });
+
+                if (!business) {
+                    throw new NotFoundException('Negocio no encontrado');
+                }
+
+                organizationId = business.organizationId;
+            }
+
+            const growthEvent = await this.prisma.growthEvent.create({
+                data: {
+                    eventType: dto.eventType,
+                    businessId: dto.businessId ?? null,
+                    organizationId,
+                    userId: dto.userId ?? null,
+                    categoryId: dto.categoryId ?? null,
+                    provinceId: dto.provinceId ?? null,
+                    cityId: dto.cityId ?? null,
+                    visitorIdHash,
+                    sessionId: dto.sessionId?.trim() || null,
+                    variantKey: dto.variantKey?.trim() || null,
+                    searchQuery,
+                    metadata: (dto.metadata ?? null) as Prisma.InputJsonValue,
+                    occurredAt,
+                },
                 select: {
                     id: true,
-                    organizationId: true,
+                    eventType: true,
+                    occurredAt: true,
                 },
             });
 
-            if (!business) {
-                throw new NotFoundException('Negocio no encontrado');
-            }
-
-            organizationId = business.organizationId;
-        }
-
-        const growthEvent = await this.prisma.growthEvent.create({
-            data: {
+            return {
+                received: true,
+                id: growthEvent.id,
+                eventType: growthEvent.eventType,
+                occurredAt: growthEvent.occurredAt.toISOString(),
+            };
+        } catch (error) {
+            this.logger.warn(
+                `Growth tracking skipped for event ${dto.eventType}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return {
+                received: false,
                 eventType: dto.eventType,
-                businessId: dto.businessId ?? null,
-                organizationId,
-                userId: dto.userId ?? null,
-                categoryId: dto.categoryId ?? null,
-                provinceId: dto.provinceId ?? null,
-                cityId: dto.cityId ?? null,
-                visitorIdHash,
-                sessionId: dto.sessionId?.trim() || null,
-                variantKey: dto.variantKey?.trim() || null,
-                searchQuery,
-                metadata: (dto.metadata ?? null) as Prisma.InputJsonValue,
-                occurredAt,
-            },
-            select: {
-                id: true,
-                eventType: true,
-                occurredAt: true,
-            },
-        });
-
-        return {
-            received: true,
-            id: growthEvent.id,
-            eventType: growthEvent.eventType,
-            occurredAt: growthEvent.occurredAt.toISOString(),
-        };
+                occurredAt: trackedAt,
+                reason: 'analytics_unavailable',
+            };
+        }
     }
 
     async getGrowthInsights(query: GrowthInsightsQueryDto) {
