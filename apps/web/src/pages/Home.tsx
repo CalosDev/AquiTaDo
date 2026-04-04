@@ -6,6 +6,7 @@ import { aiApi, analyticsApi, businessApi, categoryApi, locationApi, reputationA
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { formatNumberDo } from '../lib/market';
+import { formatPublicCategoryName } from '../lib/categoryLabel';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { featureFlags } from '../config/features';
 
@@ -227,7 +228,7 @@ export function Home() {
             const matchByName = matchBySlug
                 ? null
                 : categories.find((category) => {
-                    const normalizedName = normalizeText(category.name);
+                    const normalizedName = normalizeText(formatPublicCategoryName(category.name));
                     return preset.queries.some((query) => normalizedName.includes(normalizeText(query)));
                 });
 
@@ -258,7 +259,7 @@ export function Home() {
             .filter((category) => !usedCategoryIds.has(category.id))
             .map<HomeTopCategoryCard>((category) => ({
                 key: category.id,
-                label: category.name,
+                label: formatPublicCategoryName(category.name),
                 href: category.slug
                     ? `/negocios/categoria/${category.slug}`
                     : `/businesses?categoryId=${category.id}`,
@@ -491,7 +492,7 @@ export function Home() {
                                     <div className="hero-metric-card">
                                         <p className="hero-metric-label">Top categoría</p>
                                         <p className="hero-metric-value truncate">
-                                            {topRadarCategories[0]?.name || 'Cargando'}
+                                            {topRadarCategories[0] ? formatPublicCategoryName(topRadarCategories[0].name) : 'Cargando'}
                                         </p>
                                     </div>
                                     <div className="hero-metric-card">
@@ -520,7 +521,7 @@ export function Home() {
                                                 <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-bold text-white">
                                                     {index + 1}
                                                 </span>
-                                                <span className="truncate">{category.name}</span>
+                                                <span className="truncate">{formatPublicCategoryName(category.name)}</span>
                                             </div>
                                             <span className="text-blue-100">{formatNumberDo(category._count?.businesses ?? 0)}</span>
                                         </Link>
@@ -582,7 +583,7 @@ export function Home() {
                                 <option value="">Todas las categorías</option>
                                 {categories.map((category) => (
                                     <option key={category.id} value={category.id}>
-                                        {category.name}
+                                        {formatPublicCategoryName(category.name)}
                                     </option>
                                 ))}
                             </select>

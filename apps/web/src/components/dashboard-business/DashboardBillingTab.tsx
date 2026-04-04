@@ -137,11 +137,11 @@ export function DashboardBillingTab({
 
             <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
                 <div className="card p-4 text-center"><p className="text-xs text-gray-500">Total facturado</p><p className="text-xl font-bold text-primary-700">{formatCurrency(billingSummary?.invoices.total || 0)}</p></div>
-                <div className="card p-4 text-center"><p className="text-xs text-gray-500">Cobrado</p><p className="text-xl font-bold text-emerald-700">{formatCurrency(billingSummary?.payments.totalCollected || 0)}</p></div>
+                <div className="card p-4 text-center"><p className="text-xs text-gray-500">Cobrado</p><p className="text-xl font-bold text-primary-700">{formatCurrency(billingSummary?.payments.totalCollected || 0)}</p></div>
                 <div className="card p-4 text-center"><p className="text-xs text-gray-500">Fallido</p><p className="text-xl font-bold text-red-700">{formatCurrency(billingSummary?.payments.totalFailed || 0)}</p></div>
                 <div className="card p-4 text-center"><p className="text-xs text-gray-500">Comision plataforma</p><p className="text-xl font-bold text-amber-700">{formatCurrency(billingSummary?.marketplace.platformFeeAmount || 0)}</p></div>
-                <div className="card p-4 text-center"><p className="text-xs text-gray-500">ITBIS acumulado</p><p className="text-xl font-bold text-indigo-700">{formatCurrency(fiscalSummary?.totals.tax || 0)}</p></div>
-                <div className="card p-4 text-center"><p className="text-xs text-gray-500">Facturas pagadas</p><p className="text-xl font-bold text-teal-700">{fiscalSummary?.totals.invoicesPaid || 0}</p></div>
+                <div className="card p-4 text-center"><p className="text-xs text-gray-500">ITBIS acumulado</p><p className="text-xl font-bold text-accent-700">{formatCurrency(fiscalSummary?.totals.tax || 0)}</p></div>
+                <div className="card p-4 text-center"><p className="text-xs text-gray-500">Facturas pagadas</p><p className="text-xl font-bold text-primary-700">{fiscalSummary?.totals.invoicesPaid || 0}</p></div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

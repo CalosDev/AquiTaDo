@@ -27,7 +27,7 @@ export function PromotionsSection({ loading, promotions }: PromotionsSectionProp
                             <div key={promotion.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <p className="font-semibold text-slate-900">{promotion.title}</p>
-                                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                    <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
                                         {promotion.discountType === 'PERCENTAGE'
                                             ? `${Number(promotion.discountValue)}% OFF`
                                             : `${formatCurrencyDop(Number(promotion.discountValue))} OFF`}

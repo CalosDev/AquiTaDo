@@ -34,13 +34,13 @@ export function NearbyBusinessesSection({ businesses, loading }: NearbyBusinesse
                                 <Link
                                     key={nearbyBusiness.id}
                                     to={`/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`}
-                                    className="group flex items-center gap-4 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-4 transition-colors hover:border-emerald-200 hover:bg-emerald-50/40"
+                                    className="group flex items-center gap-4 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-4 transition-colors hover:border-primary-200 hover:bg-primary-50/40"
                                 >
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-sm font-semibold text-emerald-700">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-sm font-semibold text-primary-700">
                                         {getDisplayInitial(nearbyBusiness.name)}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate font-semibold text-slate-900 transition-colors group-hover:text-emerald-700">
+                                        <p className="truncate font-semibold text-slate-900 transition-colors group-hover:text-primary-700">
                                             {nearbyBusiness.name}
                                         </p>
                                         <p className="mt-1 line-clamp-2 text-xs text-slate-500">
@@ -48,7 +48,7 @@ export function NearbyBusinessesSection({ businesses, loading }: NearbyBusinesse
                                         </p>
                                     </div>
                                     {distanceLabel ? (
-                                        <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                        <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
                                             {distanceLabel}
                                         </span>
                                     ) : null}

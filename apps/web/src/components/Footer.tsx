@@ -26,7 +26,7 @@ export function Footer() {
                 : 'Explorar negocios';
 
     return (
-        <footer className="mt-16 border-t border-primary-100 bg-primary-900 text-slate-200">
+        <footer className="mt-8 border-t border-primary-100 bg-primary-900 text-slate-200 sm:mt-10">
             <div className="flag-ribbon" aria-hidden="true"></div>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
                 <h2 className="sr-only">Navegacion del pie de pagina</h2>

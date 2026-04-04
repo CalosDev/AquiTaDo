@@ -108,7 +108,7 @@ export function DashboardAdsTab({
                             Refrescar
                         </button>
                     </div>
-                    <p className={`text-2xl font-bold ${adsWalletBalance > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    <p className={`text-2xl font-bold ${adsWalletBalance > 0 ? 'text-primary-700' : 'text-red-700'}`}>
                         {formatCurrency(adsWalletBalance)}
                     </p>
                     <form onSubmit={(event) => void handleCreateAdsWalletTopup(event)} className="flex items-end gap-2">

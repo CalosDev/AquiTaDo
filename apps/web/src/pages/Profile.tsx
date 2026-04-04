@@ -143,9 +143,9 @@ function getRoleBadge(profileType: ProfileType) {
         return 'bg-red-100 text-red-700';
     }
     if (profileType === 'BUSINESS_OWNER') {
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-primary-100 text-primary-700';
     }
-    return 'bg-emerald-100 text-emerald-700';
+    return 'bg-primary-100 text-primary-700';
 }
 
 export function Profile() {
@@ -289,13 +289,13 @@ export function Profile() {
             </div>
 
             {errorMessage && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="alert-danger mb-4">
                     {errorMessage}
                 </div>
             )}
 
             {successMessage && (
-                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                <div className="alert-info mb-4">
                     {successMessage}
                 </div>
             )}
@@ -451,7 +451,7 @@ export function Profile() {
                                                     {organization.plan} - {organization.subscriptionStatus} - Rol {organization.myRole}
                                                 </p>
                                             </div>
-                                            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                                            <span className="text-xs px-2 py-1 rounded-full bg-primary-100 text-primary-700">
                                                 {organization._count.businesses} negocios - {organization._count.members} miembros
                                             </span>
                                         </div>

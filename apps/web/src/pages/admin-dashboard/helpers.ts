@@ -41,7 +41,7 @@ export function verificationStatusLabel(status: BusinessVerificationState): stri
 
 export function verificationStatusClass(status: BusinessVerificationState): string {
     if (status === 'VERIFIED') {
-        return 'bg-green-100 text-green-700';
+        return 'bg-primary-100 text-primary-700';
     }
     if (status === 'REJECTED') {
         return 'bg-red-100 text-red-700';
@@ -54,7 +54,7 @@ export function verificationStatusClass(status: BusinessVerificationState): stri
 
 export function healthStatusClass(status: 'up' | 'degraded' | 'down' | undefined): string {
     if (status === 'up') {
-        return 'bg-green-100 text-green-700';
+        return 'bg-primary-100 text-primary-700';
     }
     if (status === 'degraded') {
         return 'bg-amber-100 text-amber-700';

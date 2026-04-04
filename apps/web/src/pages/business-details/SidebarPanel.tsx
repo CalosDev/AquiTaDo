@@ -123,7 +123,7 @@ export function SidebarPanel({
     return (
         <div className="space-y-6">
             <div className="panel-premium overflow-hidden lg:sticky lg:top-24">
-                <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700 px-6 py-6 text-white">
+                <div className="bg-gradient-to-br from-primary-900 via-primary-800 to-accent-700 px-6 py-6 text-white">
                     <div className="flex flex-col gap-4">
                         <div className="flex items-start justify-between gap-3">
                             <div>
@@ -144,13 +144,13 @@ export function SidebarPanel({
                         <div className="rounded-[1.25rem] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm">
                             <div className="mb-2 flex items-center justify-between text-xs text-white/75">
                                 <span className="font-semibold text-white/85">Indice de confianza</span>
-                                <span className={`font-semibold ${trust.level === 'ALTA' ? 'text-emerald-100' : trust.level === 'MEDIA' ? 'text-amber-200' : 'text-rose-200'}`}>
+                                <span className={`font-semibold ${trust.level === 'ALTA' ? 'text-blue-100' : trust.level === 'MEDIA' ? 'text-amber-200' : 'text-rose-200'}`}>
                                     {trust.score}/100
                                 </span>
                             </div>
                             <div className="h-2 overflow-hidden rounded-full bg-white/15">
                                 <div
-                                    className={`h-full ${trust.level === 'ALTA' ? 'bg-emerald-300' : trust.level === 'MEDIA' ? 'bg-amber-300' : 'bg-rose-300'}`}
+                                    className={`h-full ${trust.level === 'ALTA' ? 'bg-primary-200' : trust.level === 'MEDIA' ? 'bg-amber-300' : 'bg-rose-300'}`}
                                     style={{ width: `${trust.score}%` }}
                                 />
                             </div>
@@ -223,7 +223,7 @@ export function SidebarPanel({
                             <button
                                 type="button"
                                 onClick={() => void onOpenWhatsApp('sidebar_primary')}
-                                className="w-full rounded-[1.25rem] bg-green-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-600"
+                                className="btn-primary w-full text-sm"
                             >
                                 Chatear ahora por WhatsApp
                             </button>
@@ -241,7 +241,7 @@ export function SidebarPanel({
                             <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
                                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Calidad de ficha</div>
                                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                                    <div className="h-full bg-gradient-to-r from-emerald-600 to-amber-400" style={{ width: `${profileCompleteness}%` }} />
+                                    <div className="h-full bg-gradient-to-r from-primary-600 to-accent-500" style={{ width: `${profileCompleteness}%` }} />
                                 </div>
                                 <div className="mt-2 text-sm text-slate-700">{profileCompleteness}% completado</div>
                             </div>
@@ -423,12 +423,12 @@ interface ContactRowProps {
 function ContactRow({ action, emphasized = false, icon, label, tone, value }: ContactRowProps) {
     const toneClasses = tone === 'success'
         ? emphasized
-            ? 'border border-green-300 bg-green-100 shadow-sm hover:bg-green-200'
-            : 'border border-green-100 bg-green-50 hover:bg-green-100'
+            ? 'border border-accent-200 bg-accent-50 shadow-sm hover:bg-accent-100'
+            : 'border border-primary-200 bg-primary-50 hover:bg-primary-100'
         : tone === 'primary'
             ? 'border border-primary-100 bg-primary-50/50 hover:bg-primary-100'
             : 'border border-gray-200 bg-white hover:border-primary-200';
-    const valueClasses = tone === 'success' ? 'text-green-700' : tone === 'neutral' ? 'text-primary-700 break-all' : 'text-gray-700';
+    const valueClasses = tone === 'success' ? 'text-primary-700' : tone === 'neutral' ? 'text-primary-700 break-all' : 'text-gray-700';
     const content = (
         <>
             <span className="text-lg">{icon}</span>
@@ -441,7 +441,7 @@ function ContactRow({ action, emphasized = false, icon, label, tone, value }: Co
 
     if (!action) {
         return (
-            <div className={`flex items-center gap-3 rounded-xl border p-3 ${tone === 'success' ? 'border-green-100 bg-green-50/50' : 'border-primary-100 bg-primary-50/40'}`}>
+            <div className={`flex items-center gap-3 rounded-xl border p-3 ${tone === 'success' ? 'border-primary-200 bg-primary-50/60' : 'border-primary-100 bg-primary-50/40'}`}>
                 {content}
             </div>
         );
@@ -472,7 +472,7 @@ function HoursCard({ businessOpenNow, hoursByDay, todayDayOfWeek }: HoursCardPro
             <div className="mb-3 flex items-center justify-between gap-2">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Horario</div>
                 {businessOpenNow !== null && businessOpenNow !== undefined ? (
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${businessOpenNow ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${businessOpenNow ? 'bg-primary-50 text-primary-700' : 'bg-slate-100 text-slate-500'}`}>
                         {businessOpenNow ? 'Abierto ahora' : 'Cerrado ahora'}
                     </span>
                 ) : null}
@@ -480,8 +480,8 @@ function HoursCard({ businessOpenNow, hoursByDay, todayDayOfWeek }: HoursCardPro
             <div className="space-y-2">
                 {hoursByDay.map((day) => (
                     <div key={day.dayOfWeek} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 text-sm last:border-b-0 last:pb-0">
-                        <span className={day.dayOfWeek === todayDayOfWeek ? 'font-semibold text-emerald-700' : 'text-slate-600'}>{day.label}</span>
-                        <span className={day.dayOfWeek === todayDayOfWeek ? 'font-semibold text-emerald-700' : 'text-slate-900'}>
+                        <span className={day.dayOfWeek === todayDayOfWeek ? 'font-semibold text-primary-700' : 'text-slate-600'}>{day.label}</span>
+                        <span className={day.dayOfWeek === todayDayOfWeek ? 'font-semibold text-primary-700' : 'text-slate-900'}>
                             {day.schedule?.closed ? 'Cerrado' : formatHoursRange(day.schedule?.opensAt, day.schedule?.closesAt) || 'Sin horario'}
                         </span>
                     </div>
@@ -498,7 +498,7 @@ interface InlineMessageProps {
 
 function InlineMessage({ children, tone }: InlineMessageProps) {
     return (
-        <div className={`mt-3 rounded-xl border px-4 py-3 text-sm ${tone === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+        <div className={`mt-3 rounded-xl border px-4 py-3 text-sm ${tone === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-primary-200 bg-primary-50 text-primary-700'}`}>
             {children}
         </div>
     );

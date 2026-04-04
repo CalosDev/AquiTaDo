@@ -80,7 +80,7 @@ function getStatusClass(status: VerificationStatus | 'APPROVED' | 'REJECTED' | '
     switch (status) {
         case 'VERIFIED':
         case 'APPROVED':
-            return 'bg-green-100 text-green-700';
+            return 'bg-primary-100 text-primary-700';
         case 'PENDING':
             return 'bg-amber-100 text-amber-700';
         case 'REJECTED':
@@ -323,7 +323,7 @@ export function DashboardBusiness() {
                     <span className="chip !border-white/30 !bg-white/10 !text-white">
                         Negocio seleccionado: {selectedBusiness?.name || 'Ninguno'}
                     </span>
-                    <span className={`chip !border-white/30 !bg-white/10 !text-white ${verificationStatus?.verified ? '!text-emerald-100' : ''}`}>
+                    <span className={`chip !border-white/30 !bg-white/10 !text-white ${verificationStatus?.verified ? '!text-blue-100' : ''}`}>
                         Estado KYC: {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
                     </span>
                 </div>
@@ -365,13 +365,13 @@ export function DashboardBusiness() {
             )}
 
             {errorMessage && (
-                <section role="alert" aria-live="assertive" className="card p-4 border border-red-100 bg-red-50">
-                    <p className="text-sm text-red-700">{errorMessage}</p>
+                <section role="alert" aria-live="assertive" className="alert-danger">
+                    <p>{errorMessage}</p>
                 </section>
             )}
             {successMessage && (
-                <section role="status" aria-live="polite" className="card p-4 border border-green-100 bg-green-50">
-                    <p className="text-sm text-green-700">{successMessage}</p>
+                <section role="status" aria-live="polite" className="alert-info">
+                    <p>{successMessage}</p>
                 </section>
             )}
 
@@ -439,7 +439,7 @@ export function DashboardBusiness() {
                                         {business.openNow !== null && business.openNow !== undefined ? (
                                             <span className={`text-[11px] rounded-full px-2 py-1 ${
                                                 business.openNow
-                                                    ? 'bg-green-100 text-green-700'
+                                                    ? 'bg-primary-100 text-primary-700'
                                                     : 'bg-gray-100 text-gray-600'
                                             }`}>
                                                 {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}

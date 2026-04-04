@@ -462,8 +462,8 @@ export function EditBusiness() {
                 </section>
             )}
             {successMessage && (
-                <section role="status" aria-live="polite" className="card p-4 border border-green-100 bg-green-50">
-                    <p className="text-sm text-green-700">{successMessage}</p>
+                <section role="status" aria-live="polite" className="card p-4 border border-primary-100 bg-primary-50">
+                    <p className="text-sm text-primary-700">{successMessage}</p>
                 </section>
             )}
 
@@ -761,7 +761,7 @@ export function EditBusiness() {
                     submissionGuidance.blockedByLocalHeuristics
                         ? 'border-amber-200 bg-amber-50'
                         : submissionGuidance.readinessLevel === 'ALTA'
-                            ? 'border-emerald-200 bg-emerald-50'
+                            ? 'border-primary-200 bg-primary-50'
                             : 'border-gray-200 bg-gray-50'
                 }`}>
                     <div className="flex flex-wrap items-center justify-between gap-3">

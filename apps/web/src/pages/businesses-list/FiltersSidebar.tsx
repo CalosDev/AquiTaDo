@@ -1,4 +1,5 @@
 import type { Category, City, Province, Sector } from './types';
+import { formatPublicCategoryName } from '../../lib/categoryLabel';
 
 interface FiltersSidebarProps {
     activeFilterChips: string[];
@@ -82,7 +83,7 @@ export function FiltersSidebar({
                                     />
                                     <span>
                                         {category.icon ? `${category.icon} ` : ''}
-                                        {category.name}
+                                        {formatPublicCategoryName(category.name)}
                                     </span>
                                 </label>
                             ))}

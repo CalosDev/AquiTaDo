@@ -18,7 +18,7 @@ export function PublicationGuidancePanel({
             submissionGuidance.blockedByLocalHeuristics
                 ? 'border-red-200 bg-red-50'
                 : submissionGuidance.readinessLevel === 'ALTA'
-                    ? 'border-emerald-200 bg-emerald-50'
+                    ? 'border-primary-200 bg-primary-50'
                     : 'border-amber-200 bg-amber-50'
         }`}>
             <div className="flex flex-wrap items-center justify-between gap-3">

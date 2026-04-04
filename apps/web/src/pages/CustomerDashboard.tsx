@@ -175,18 +175,18 @@ export function CustomerDashboard() {
             </section>
 
             {error && (
-                <section role="alert" aria-live="assertive" className="card p-4 border border-red-100 bg-red-50">
-                    <p className="text-sm text-red-700">{error}</p>
+                <section role="alert" aria-live="assertive" className="alert-danger">
+                    <p>{error}</p>
                 </section>
             )}
             {favoritesErrorMessage && (
-                <section role="alert" aria-live="assertive" className="card p-4 border border-red-100 bg-red-50">
-                    <p className="text-sm text-red-700">{favoritesErrorMessage}</p>
+                <section role="alert" aria-live="assertive" className="alert-danger">
+                    <p>{favoritesErrorMessage}</p>
                 </section>
             )}
             {favoritesInfoMessage && (
-                <section role="status" aria-live="polite" className="card p-4 border border-green-100 bg-green-50">
-                    <p className="text-sm text-green-700">{favoritesInfoMessage}</p>
+                <section role="status" aria-live="polite" className="alert-info">
+                    <p>{favoritesInfoMessage}</p>
                 </section>
             )}
 

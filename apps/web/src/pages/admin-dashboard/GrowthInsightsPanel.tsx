@@ -164,7 +164,7 @@ export function GrowthInsightsPanel({
                         <MetricSummaryCard
                             label="Search a WhatsApp"
                             value={`${growthInsights?.conversionFunnels.searchToWhatsApp.conversionRate ?? 0}%`}
-                            valueClassName="text-emerald-700"
+                            valueClassName="text-primary-700"
                         />
                     </div>
 

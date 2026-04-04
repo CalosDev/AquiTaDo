@@ -854,7 +854,7 @@ export function AdminDashboard() {
                 <div
                     role="status"
                     aria-live="polite"
-                    className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                    className="mb-4 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700"
                 >
                     {successMessage}
                 </div>
@@ -930,7 +930,7 @@ export function AdminDashboard() {
                                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                                         Total {businessStatusSummary.total}
                                     </span>
-                                    <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                                    <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700">
                                         Verificados {businessStatusSummary.verified}
                                     </span>
                                     <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">
@@ -1000,7 +1000,7 @@ export function AdminDashboard() {
                                                             <button
                                                                 onClick={() => void handleReviewVerification(business.id, 'VERIFIED')}
                                                                 disabled={processingId === business.id}
-                                                                className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-lg hover:bg-green-200 transition-colors font-medium disabled:opacity-50"
+                                                                className="text-xs bg-primary-100 text-primary-700 px-3 py-1 rounded-lg hover:bg-primary-200 transition-colors font-medium disabled:opacity-50"
                                                             >
                                                                 {processingId === business.id
                                                                     ? 'Procesando...'

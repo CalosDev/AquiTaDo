@@ -534,7 +534,7 @@ export function RegisterBusiness() {
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                             <span className={`rounded-full px-2 py-0.5 ${
                                 descriptionLength >= 60
-                                    ? 'bg-emerald-50 text-emerald-700'
+                                    ? 'bg-primary-50 text-primary-700'
                                     : 'bg-amber-50 text-amber-700'
                             }`}>
                                 {descriptionLength} caracteres

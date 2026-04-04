@@ -1,6 +1,6 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
-import { getDisplayInitial, renderStars } from './helpers';
+import { getDisplayInitial, renderStarsSafe } from './helpers';
 import type { ReviewEntry, ReviewFormState } from './types';
 
 interface ReviewsSectionProps {
@@ -105,13 +105,13 @@ export function ReviewsSection({
                 )}
 
                 {reviewErrorMessage && (
-                    <div className="mb-4 rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="alert-danger mb-4 rounded-[1.25rem]">
                         {reviewErrorMessage}
                     </div>
                 )}
 
                 {reviewSuccessMessage && (
-                    <div className="mb-4 rounded-[1.25rem] border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                    <div className="alert-info mb-4 rounded-[1.25rem]">
                         {reviewSuccessMessage}
                     </div>
                 )}
@@ -123,13 +123,13 @@ export function ReviewsSection({
                         <article key={review.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-5">
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex min-w-0 items-center gap-3">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-semibold text-white">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-700 text-sm font-semibold text-white">
                                         {getDisplayInitial(review.user.name)}
                                     </div>
                                     <div className="min-w-0">
                                         <p className="truncate font-semibold text-slate-900">{review.user.name}</p>
                                         <div className="mt-1 text-xs tracking-[0.18em] text-amber-500">
-                                            {renderStars(review.rating)}
+                                            {renderStarsSafe(review.rating)}
                                         </div>
                                     </div>
                                 </div>

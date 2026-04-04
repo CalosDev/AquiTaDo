@@ -139,7 +139,7 @@ export function AdminSecurity() {
             )}
 
             {successMessage && (
-                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                <div className="mb-4 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
                     {successMessage}
                 </div>
             )}
@@ -160,7 +160,7 @@ export function AdminSecurity() {
                         <div className="space-y-2 text-sm text-gray-700">
                             <p>
                                 Estado:{' '}
-                                <strong className={status?.enabled ? 'text-emerald-700' : 'text-red-700'}>
+                                <strong className={status?.enabled ? 'text-primary-700' : 'text-red-700'}>
                                     {status?.enabled ? '2FA activo' : '2FA inactivo'}
                                 </strong>
                             </p>
@@ -172,7 +172,7 @@ export function AdminSecurity() {
                             )}
                             <p>
                                 Política requerida para admins:{' '}
-                                <strong className={status?.required ? 'text-emerald-700' : 'text-amber-700'}>
+                                <strong className={status?.required ? 'text-primary-700' : 'text-amber-700'}>
                                     {status?.required ? 'Sí' : 'No'}
                                 </strong>
                             </p>

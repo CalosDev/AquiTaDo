@@ -12,6 +12,7 @@ import { calculateBusinessTrustScore } from '../lib/trust';
 import { trackGrowthEvent as trackGrowthSignal } from '../lib/growthTracking';
 import { preloadRouteChunk } from '../routes/preload';
 import { featureFlags } from '../config/features';
+import { formatPublicCategoryName, formatPublicCategoryPath } from '../lib/categoryLabel';
 import { FiltersSidebar } from './businesses-list/FiltersSidebar';
 import { ListingControlsBar } from './businesses-list/ListingControlsBar';
 import type { Business, Category, City, ListingViewMode, Province, Sector, SponsoredPlacement } from './businesses-list/types';
@@ -174,6 +175,10 @@ export function BusinessesList() {
         () => categories.find((category) => category.slug === categorySlug || category.id === currentCategory) || null,
         [categories, categorySlug, currentCategory],
     );
+    const activeCategoryDisplayName = useMemo(
+        () => (activeCategory ? formatPublicCategoryName(activeCategory.name) : ''),
+        [activeCategory],
+    );
     const activeProvince = useMemo(
         () => provinces.find((province) => province.slug === provinceSlug || province.id === currentProvince) || null,
         [provinces, provinceSlug, currentProvince],
@@ -199,16 +204,16 @@ export function BusinessesList() {
             return activeIntent.label;
         }
         if (activeCity && activeCategory) {
-            return `${activeCategory.name} en ${activeCity.name}`;
+            return `${formatPublicCategoryName(activeCategory.name)} en ${activeCity.name}`;
         }
         if (activeCity) {
             return `Negocios en ${activeCity.name}`;
         }
         if (activeCategory && activeProvince) {
-            return `${activeCategory.name} en ${activeProvince.name}`;
+            return `${formatPublicCategoryName(activeCategory.name)} en ${activeProvince.name}`;
         }
         if (activeCategory) {
-            return activeCategory.name;
+            return formatPublicCategoryName(activeCategory.name);
         }
         if (activeProvince) {
             return `Negocios en ${activeProvince.name}`;
@@ -218,7 +223,7 @@ export function BusinessesList() {
     const activeFilterChips = useMemo(() => {
         const chips: string[] = [];
         if (currentSearch) chips.push(`Busqueda: ${currentSearch}`);
-        if (activeCategory) chips.push(`Categoria: ${activeCategory.name}`);
+        if (activeCategory) chips.push(`Categoria: ${formatPublicCategoryName(activeCategory.name)}`);
         if (activeProvince) chips.push(`Provincia: ${activeProvince.name}`);
         if (activeCity) chips.push(`Ciudad: ${activeCity.name}`);
         if (activeSector) chips.push(`Sector: ${activeSector.name}`);
@@ -743,9 +748,9 @@ export function BusinessesList() {
         const headingBase = activeIntent
             ? activeIntent.label
             : activeCategory && activeProvince
-            ? `${activeCategory.name} en ${activeProvince.name}`
+            ? `${activeCategoryDisplayName} en ${activeProvince.name}`
             : activeCategory
-                ? `${activeCategory.name} en República Dominicana`
+                ? `${activeCategoryDisplayName} en República Dominicana`
                 : activeProvince
                     ? `Negocios en ${activeProvince.name}`
                     : 'Directorio de negocios en República Dominicana';
@@ -753,9 +758,9 @@ export function BusinessesList() {
         const descriptionBase = activeIntent
             ? `${activeIntent.description} Contacta por WhatsApp o teléfono desde AquiTa.do.`
             : activeCategory && activeProvince
-            ? `Descubre ${activeCategory.name.toLowerCase()} en ${activeProvince.name}. Compara opciones locales, contacta por WhatsApp y reserva en AquiTa.do.`
+            ? `Descubre ${activeCategoryDisplayName.toLowerCase()} en ${activeProvince.name}. Compara opciones locales, contacta por WhatsApp y reserva en AquiTa.do.`
             : activeCategory
-                ? `Explora ${activeCategory.name.toLowerCase()} en República Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
+                ? `Explora ${activeCategoryDisplayName.toLowerCase()} en República Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
                 : activeProvince
                     ? `Encuentra negocios locales en ${activeProvince.name}. Descubre perfiles verificados, reseñas y canales de contacto.`
                     : 'Explora negocios locales en República Dominicana. Filtra por categoría y provincia para encontrar opciones verificadas.';
@@ -786,7 +791,7 @@ export function BusinessesList() {
             });
         } else if (activeCategory) {
             breadcrumbItems.push({
-                name: activeCategory.name,
+                name: activeCategoryDisplayName,
                 url: activeProvince
                     ? `${origin}/negocios/${activeProvince.slug}/${activeCategory.slug}`
                     : `${origin}/negocios/categoria/${activeCategory.slug}`,
@@ -819,7 +824,7 @@ export function BusinessesList() {
         } else {
             removeJsonLd('businesses-list-itemlist');
         }
-    }, [activeCategory, activeIntent, activeProvince, businesses, intentSlug, seoCanonicalPath]);
+    }, [activeCategory, activeCategoryDisplayName, activeIntent, activeProvince, businesses, intentSlug, seoCanonicalPath]);
 
     useEffect(() => {
         return () => {
@@ -1008,7 +1013,7 @@ export function BusinessesList() {
                                                     ) : null}
                                                     {biz.openNow !== null && biz.openNow !== undefined ? (
                                                         <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                                                            biz.openNow ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                                                            biz.openNow ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-600'
                                                         }`}>
                                                             {biz.openNow ? 'Abierto' : 'Cerrado'}
                                                         </span>
@@ -1053,7 +1058,7 @@ export function BusinessesList() {
 
                                                 {primaryCategory ? (
                                                     <p className="text-xs text-slate-500">
-                                                        {primaryCategory.parent?.name ? `${primaryCategory.parent.name} / ` : ''}{primaryCategory.name}
+                                                        {formatPublicCategoryPath(primaryCategory.parent?.name, primaryCategory.name)}
                                                     </p>
                                                 ) : null}
 
@@ -1083,7 +1088,7 @@ export function BusinessesList() {
                                                 <div className="flex flex-wrap gap-2 pt-1">
                                                     {secondaryCategory ? (
                                                         <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                                                            {secondaryCategory.name}
+                                                            {formatPublicCategoryName(secondaryCategory.name)}
                                                         </span>
                                                     ) : null}
                                                     {biz.todayHoursLabel ? (
@@ -1094,7 +1099,7 @@ export function BusinessesList() {
                                                     {trust ? (
                                                         <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
                                                             trust.level === 'ALTA'
-                                                                ? 'bg-emerald-50 text-emerald-700'
+                                                                ? 'bg-primary-50 text-primary-700'
                                                                 : trust.level === 'MEDIA'
                                                                     ? 'bg-amber-50 text-amber-700'
                                                                     : 'bg-red-50 text-red-700'

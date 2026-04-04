@@ -8,6 +8,7 @@ import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { trackGrowthEvent as trackGrowthSignal } from '../lib/growthTracking';
 import { BUSINESS_DAY_OPTIONS, businessPriceRangeLabel } from '../lib/businessProfile';
+import { formatPublicCategoryPath } from '../lib/categoryLabel';
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { featureFlags } from '../config/features';
@@ -16,7 +17,7 @@ import { NearbyBusinessesSection } from './business-details/NearbyBusinessesSect
 import { PromotionsSection } from './business-details/PromotionsSection';
 import { ReviewsSection } from './business-details/ReviewsSection';
 import { SidebarPanel } from './business-details/SidebarPanel';
-import { businessSupportsBooking, formatDaysAgo, getCurrentLocation, getDisplayInitial, renderStars } from './business-details/helpers';
+import { businessSupportsBooking, formatDaysAgo, getCurrentLocation, getDisplayInitial, renderStarsSafe } from './business-details/helpers';
 import type {
     Business,
     CheckInStats,
@@ -519,7 +520,7 @@ export function BusinessDetails() {
         business?.city?.name,
         business?.province?.name,
     ].filter(Boolean).join(' · ');
-    const reviewStarsLabel = averageRatingNumber ? renderStars(averageRatingNumber) : null;
+    const reviewStarsLabel = averageRatingNumber ? renderStarsSafe(averageRatingNumber) : null;
     const todayDayOfWeek = new Date().getDay();
     const hoursByDay = BUSINESS_DAY_OPTIONS.map((day) => ({
         ...day,
@@ -954,14 +955,14 @@ export function BusinessDetails() {
                                     <div className="max-w-3xl">
                                         <div className="mb-3 flex flex-wrap gap-2">
                                             {business.verified && (
-                                                <span className="rounded-full bg-green-700 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+                                                <span className="rounded-full bg-primary-700 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
                                                     Verificado
                                                 </span>
                                             )}
                                             {business.openNow !== null && business.openNow !== undefined && (
                                                 <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
                                                     business.openNow
-                                                        ? 'bg-white text-green-700'
+                                                        ? 'bg-white text-primary-700'
                                                         : 'bg-white/15 text-white ring-1 ring-white/20'
                                                 }`}>
                                                     {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
@@ -973,8 +974,7 @@ export function BusinessDetails() {
                                                     className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm"
                                                 >
                                                     {entry.category.icon ? `${entry.category.icon} ` : ''}
-                                                    {entry.category.parent?.name ? `${entry.category.parent.name} / ` : ''}
-                                                    {entry.category.name}
+                                                    {formatPublicCategoryPath(entry.category.parent?.name, entry.category.name)}
                                                 </span>
                                             ))}
                                             {priceRangeLabel && (
@@ -1066,7 +1066,7 @@ export function BusinessDetails() {
                         {(favoriteInfoMessage || favoriteErrorMessage || shareFeedback) && (
                             <div className="mb-4 flex flex-wrap gap-2 text-xs">
                                 {favoriteInfoMessage ? (
-                                    <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 font-medium text-green-700">
+                                    <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 font-medium text-primary-700">
                                         {favoriteInfoMessage}
                                     </span>
                                 ) : null}
@@ -1094,7 +1094,7 @@ export function BusinessDetails() {
                                     {business.openNow !== null && business.openNow !== undefined && (
                                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
                                             business.openNow
-                                                ? 'bg-green-100 text-green-700 border-green-200'
+                                                ? 'bg-primary-100 text-primary-700 border-primary-200'
                                                 : 'bg-gray-100 text-gray-600 border-gray-200'
                                         }`}>
                                             {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
@@ -1108,7 +1108,7 @@ export function BusinessDetails() {
                                     <div className="flex flex-wrap gap-1">
                                         {business.categories?.map((bc, i) => (
                                             <span key={i} className="bg-primary-50 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                                                {bc.category.icon} {bc.category.parent?.name ? `${bc.category.parent.name} / ` : ''}{bc.category.name}
+                                                {bc.category.icon} {formatPublicCategoryPath(bc.category.parent?.name, bc.category.name)}
                                             </span>
                                         ))}
                                     </div>
@@ -1133,10 +1133,10 @@ export function BusinessDetails() {
                             )}
                         </div>
 
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-5 py-4">
-                            <p className="text-sm leading-7 text-emerald-950 whitespace-pre-line">{business.description}</p>
+                        <div className="rounded-2xl border border-primary-200 bg-primary-50/60 px-5 py-4">
+                            <p className="text-sm leading-7 text-slate-800 whitespace-pre-line">{business.description}</p>
                             {memberSinceYear && Number.isFinite(memberSinceYear) && (
-                                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700">
                                     En AquiTa.do desde {memberSinceYear}
                                 </p>
                             )}
@@ -1239,7 +1239,7 @@ export function BusinessDetails() {
                                         {checkInProcessing ? 'Registrando...' : 'Hacer check-in y ganar puntos'}
                                     </button>
                                     {checkInInfoMessage ? (
-                                        <p className="text-xs text-green-700">{checkInInfoMessage}</p>
+                                        <p className="text-xs text-primary-700">{checkInInfoMessage}</p>
                                     ) : null}
                                     {checkInErrorMessage ? (
                                         <p className="text-xs text-red-700">{checkInErrorMessage}</p>
@@ -1285,7 +1285,7 @@ export function BusinessDetails() {
                                         href={googleMapsDirectionsUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                        className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-100"
                                     >
                                         Ver en Google Maps
                                     </a>
@@ -1300,7 +1300,7 @@ export function BusinessDetails() {
                                             style={{ border: 0 }}
                                             loading="lazy"
                                             src={openStreetMapEmbedUrl}
-                                            title={`Mapa de ubicación de ${business.name}`}
+                                            title={`Mapa de ubicacion de ${business.name}`}
                                             allowFullScreen
                                         ></iframe>
                                     </div>
@@ -1311,7 +1311,7 @@ export function BusinessDetails() {
                                                 href={googleMapsDirectionsUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="font-medium text-emerald-700 transition-colors hover:text-emerald-800"
+                                                className="font-medium text-primary-700 transition-colors hover:text-primary-800"
                                             >
                                                 Abrir ruta
                                             </a>

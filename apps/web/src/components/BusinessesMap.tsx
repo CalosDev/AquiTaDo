@@ -6,11 +6,11 @@ import 'leaflet/dist/leaflet.css';
 
 const MAP_MARKER_COLORS = {
     selectedStroke: '#002d62',
-    selectedFill: '#5f95f2',
-    verifiedStroke: '#0f4fa8',
+    selectedFill: '#ce1126',
+    verifiedStroke: '#002d62',
     defaultStroke: '#64748b',
-    openFill: '#16a34a',
-    defaultFill: '#2c6fd6',
+    openFill: '#1d4ed8',
+    defaultFill: '#60a5fa',
 } as const;
 
 type MapBusiness = {
@@ -130,7 +130,7 @@ export function BusinessesMap({
                                     <p className="text-xs text-slate-500">{business.priceRange}</p>
                                 ) : null}
                                 {business.openNow !== null && business.openNow !== undefined ? (
-                                    <p className={`text-xs font-medium ${business.openNow ? 'text-emerald-700' : 'text-slate-500'}`}>
+                                    <p className={`text-xs font-medium ${business.openNow ? 'text-primary-700' : 'text-slate-500'}`}>
                                         {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
                                     </p>
                                 ) : null}

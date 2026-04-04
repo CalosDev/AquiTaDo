@@ -146,7 +146,7 @@
   }
 
   .auth-stage {
-    @apply flex min-h-[calc(100vh-7rem)] items-center justify-center px-4 py-12 animate-fade-in;
+    @apply flex justify-center px-4 py-12 sm:py-16 animate-fade-in;
   }
 
   .auth-card {
@@ -166,7 +166,7 @@
   }
 
   .alert-success {
-    @apply rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700;
+    @apply rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700;
   }
 
   .alert-warning {

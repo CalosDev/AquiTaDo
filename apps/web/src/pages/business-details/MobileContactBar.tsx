@@ -35,7 +35,7 @@ export function MobileContactBar({
                     <button
                         type="button"
                         onClick={() => void onOpenWhatsApp('sticky_mobile')}
-                        className="touch-target flex-1 rounded-xl bg-green-600 text-sm font-semibold text-white"
+                        className="touch-target flex-1 rounded-xl bg-accent-600 text-sm font-semibold text-white transition-colors hover:bg-accent-700"
                     >
                         WhatsApp
                     </button>

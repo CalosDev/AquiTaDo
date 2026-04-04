@@ -82,6 +82,14 @@ export function renderStars(rating: number): string {
     return `${'★'.repeat(normalized)}${'☆'.repeat(5 - normalized)}`;
 }
 
+const FILLED_STAR = '★';
+const EMPTY_STAR = '☆';
+
+export function renderStarsSafe(rating: number): string {
+    const normalized = Math.max(0, Math.min(5, Math.round(rating)));
+    return `${FILLED_STAR.repeat(normalized)}${EMPTY_STAR.repeat(5 - normalized)}`;
+}
+
 const BOOKING_FEATURE_CANONICAL = 'reservaciones';
 
 export function businessSupportsBooking(features?: BusinessFeatureEntry[]): boolean {
