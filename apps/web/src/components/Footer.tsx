@@ -26,12 +26,12 @@ export function Footer() {
                 : 'Explorar negocios';
 
     return (
-        <footer className="mt-8 border-t border-primary-100 bg-primary-900 text-slate-200 sm:mt-10">
+        <footer className="footer-shell mt-8 border-t border-primary-100/60 text-slate-200 sm:mt-10">
             <div className="flag-ribbon" aria-hidden="true"></div>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-                <h2 className="sr-only">Navegacion del pie de pagina</h2>
+            <div className="max-w-7xl mx-auto px-4 py-14 sm:px-6 lg:px-8">
+                <h2 className="sr-only">Navegación del pie de página</h2>
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-                    <div className="lg:col-span-5">
+                    <div className="footer-panel lg:col-span-5">
                         <Link to="/" className="inline-flex items-center gap-3">
                             <div className="relative h-11 w-11 overflow-hidden rounded-2xl border border-primary-300/60 bg-white">
                                 <div className="absolute inset-y-0 left-0 w-1/2 bg-primary-700"></div>
@@ -43,49 +43,49 @@ export function Footer() {
                                     Aqui<span className="text-accent-400">Ta</span>.do
                                 </p>
                                 <p className="text-xs uppercase tracking-wide text-primary-200">
-                                    Discovery local para Republica Dominicana
+                                    Discovery local para República Dominicana
                                 </p>
                             </div>
                         </Link>
                         <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">
                             Descubre negocios confiables con mejor contexto por zona,
-                            categoria y senales de confianza en una plataforma pensada para el mercado dominicano.
+                            categoría y señales de confianza en una plataforma pensada para el mercado dominicano.
                         </p>
                         <div className="mt-5 flex flex-wrap gap-2">
-                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Discovery</span>
-                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Geografia RD</span>
-                            <span className="chip !bg-white/10 !text-blue-100 !border-white/20">Confianza</span>
+                            <span className="chip !border-white/20 !bg-white/10 !text-blue-100">Discovery</span>
+                            <span className="chip !border-white/20 !bg-white/10 !text-blue-100">Geografía RD</span>
+                            <span className="chip !border-white/20 !bg-white/10 !text-blue-100">Confianza</span>
                         </div>
                     </div>
 
-                    <div className="lg:col-span-2">
+                    <div className="footer-panel lg:col-span-2">
                         <h3 className="font-display text-base font-semibold text-white">Explorar</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                            <li><Link to="/businesses" className="hover:text-white transition-colors">Negocios</Link></li>
-                            <li><Link to="/about" className="hover:text-white transition-colors">Sobre el proyecto</Link></li>
-                            <li><Link to="/negocios/intencion/con-delivery" className="hover:text-white transition-colors">Con delivery</Link></li>
-                            <li><Link to="/negocios/intencion/pet-friendly" className="hover:text-white transition-colors">Pet friendly</Link></li>
-                            <li><Link to="/negocios/intencion/con-reservas" className="hover:text-white transition-colors">Con reservas</Link></li>
+                            <li><Link to="/businesses" className="transition-colors hover:text-white">Negocios</Link></li>
+                            <li><Link to="/about" className="transition-colors hover:text-white">Sobre el proyecto</Link></li>
+                            <li><Link to="/negocios/intencion/con-delivery" className="transition-colors hover:text-white">Con delivery</Link></li>
+                            <li><Link to="/negocios/intencion/pet-friendly" className="transition-colors hover:text-white">Pet friendly</Link></li>
+                            <li><Link to="/negocios/intencion/con-reservas" className="transition-colors hover:text-white">Con reservas</Link></li>
                         </ul>
                     </div>
 
-                    <div className="lg:col-span-2">
+                    <div className="footer-panel lg:col-span-2">
                         <h3 className="font-display text-base font-semibold text-white">Negocios</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                            <li><Link to={registerBusinessPath} className="hover:text-white transition-colors">{registerBusinessLabel}</Link></li>
+                            <li><Link to={registerBusinessPath} className="transition-colors hover:text-white">{registerBusinessLabel}</Link></li>
                             {isAuthenticated && canAccessBusinessPanel && (
-                                <li><Link to="/dashboard" className="hover:text-white transition-colors">Panel negocio</Link></li>
+                                <li><Link to="/dashboard" className="transition-colors hover:text-white">Panel negocio</Link></li>
                             )}
                             {isAuthenticated && canAccessAdminPanel && (
                                 <>
-                                    <li><Link to="/admin" className="hover:text-white transition-colors">Panel admin</Link></li>
-                                    <li><Link to="/security" className="hover:text-white transition-colors">Seguridad</Link></li>
+                                    <li><Link to="/admin" className="transition-colors hover:text-white">Panel admin</Link></li>
+                                    <li><Link to="/security" className="transition-colors hover:text-white">Seguridad</Link></li>
                                 </>
                             )}
                         </ul>
                     </div>
 
-                    <div className="lg:col-span-3">
+                    <div className="footer-panel lg:col-span-3">
                         <h3 className="font-display text-base font-semibold text-white">Contacto</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
                             <li>info@aquita.do</li>
@@ -93,7 +93,7 @@ export function Footer() {
                             <li>Santo Domingo, RD</li>
                         </ul>
                         <p className="mt-4 text-xs leading-relaxed text-slate-400">
-                            Enfocado hoy en Republica Dominicana.
+                            Enfocado hoy en República Dominicana.
                         </p>
                     </div>
                 </div>
@@ -101,8 +101,8 @@ export function Footer() {
                 <div className="mt-10 flex flex-col gap-3 border-t border-primary-800/70 pt-6 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                     <p>(c) {new Date().getFullYear()} AquiTa.do. Todos los derechos reservados.</p>
                     <div className="flex items-center gap-4">
-                        <Link to="/terms" className="hover:text-white transition-colors">Terminos</Link>
-                        <Link to="/privacy" className="hover:text-white transition-colors">Privacidad</Link>
+                        <Link to="/terms" className="transition-colors hover:text-white">Términos</Link>
+                        <Link to="/privacy" className="transition-colors hover:text-white">Privacidad</Link>
                     </div>
                 </div>
             </div>

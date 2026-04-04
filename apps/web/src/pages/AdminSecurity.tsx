@@ -111,8 +111,8 @@ export function AdminSecurity() {
 
     if (user?.role !== 'ADMIN') {
         return (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                <div className="card p-6">
+            <div className="page-shell-narrow">
+                <div className="section-shell p-6">
                     <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">Acceso restringido</h1>
                     <p className="text-sm text-gray-600">
                         Esta sección solo está disponible para administradores de plataforma.
@@ -126,11 +126,14 @@ export function AdminSecurity() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <div className="mb-6">
-                <h1 className="font-display text-3xl font-bold text-gray-900">Seguridad de Administrador</h1>
-                <p className="text-sm text-gray-500 mt-1">Gestión de segundo factor (2FA) y acceso reforzado de cuenta admin.</p>
-            </div>
+        <div className="page-shell max-w-5xl space-y-6">
+            <section className="role-hero role-hero-admin">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-200 font-semibold">Seguridad admin</p>
+                <h1 className="mt-2 font-display text-3xl font-bold text-white">Seguridad de Administrador</h1>
+                <p className="mt-2 max-w-2xl text-slate-200">
+                    Gestiona segundo factor, endurecimiento de acceso y cambios sensibles de sesión para la cuenta administrativa.
+                </p>
+            </section>
 
             {errorMessage && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -155,7 +158,7 @@ export function AdminSecurity() {
                         description="Rota tu credencial principal antes de abrir la plataforma al público. Al guardar, cerraremos tu sesión para obligar un nuevo login."
                     />
 
-                    <div className="card p-5">
+                    <div className="section-shell p-5">
                         <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Estado actual</h2>
                         <div className="space-y-2 text-sm text-gray-700">
                             <p>
@@ -180,7 +183,7 @@ export function AdminSecurity() {
                     </div>
 
                     {!status?.enabled && (
-                        <div className="card p-5">
+                        <div className="section-shell p-5">
                             <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Configurar 2FA</h2>
                             {!setup ? (
                                 <button
@@ -242,7 +245,7 @@ export function AdminSecurity() {
                     )}
 
                     {status?.enabled && (
-                        <div className="card p-5">
+                        <div className="section-shell p-5">
                             <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Deshabilitar 2FA</h2>
                             <p className="text-sm text-gray-600 mb-3">
                                 Solo deshabilita 2FA en casos de recuperación. Esta acción reduce seguridad.
@@ -270,7 +273,7 @@ export function AdminSecurity() {
                         </div>
                     )}
 
-                    <div className="card p-5">
+                    <div className="section-shell p-5">
                         <h2 className="font-display text-lg font-semibold text-gray-900 mb-2">Aplicar cambios de sesión</h2>
                         <p className="text-sm text-gray-600 mb-3">
                             Para cerrar sesiones anteriores y aplicar políticas de admin, vuelve a iniciar sesión.

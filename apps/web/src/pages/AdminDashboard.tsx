@@ -807,7 +807,7 @@ export function AdminDashboard() {
     ] as const;
 
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
+        <div className="page-shell max-w-6xl animate-fade-in">
             
             <section className="role-hero role-hero-admin mb-8">
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-200 font-semibold">Panel Admin</p>

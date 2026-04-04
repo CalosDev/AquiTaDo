@@ -8,12 +8,12 @@ export function About() {
         {
             name: 'Equipo Backend',
             role: 'Platform Engineering',
-            focus: 'API NestJS, seguridad, discovery y calidad de catalogo',
+            focus: 'API NestJS, seguridad, discovery y calidad de catálogo',
         },
         {
             name: 'Equipo Frontend',
             role: 'UX & Web Experience',
-            focus: 'Experiencia de usuario, exploracion y rendimiento web',
+            focus: 'Experiencia de usuario, exploración y rendimiento web',
         },
     ];
 
@@ -22,12 +22,12 @@ export function About() {
             <section className="section-shell p-7 md:p-10">
                 <span className="chip mb-4">Conoce AquiTa.do</span>
                 <h1 className="font-display text-3xl md:text-4xl font-bold text-slate-900">
-                    Una plataforma de discovery local para Republica Dominicana
+                    Una plataforma de discovery local para República Dominicana
                 </h1>
                 <p className="mt-4 text-slate-600 max-w-4xl leading-relaxed">
-                    AquiTa.do conecta discovery, confianza y utilidad publica en una sola plataforma.
+                    AquiTa.do conecta discovery, confianza y utilidad pública en una sola plataforma.
                     Ayudamos a personas a encontrar negocios reales con mejor contexto por
-                    categoria, ubicacion y calidad de ficha.
+                    categoría, ubicación y calidad de ficha.
                 </p>
             </section>
 
@@ -37,15 +37,15 @@ export function About() {
                         El proyecto
                     </h2>
                     <p className="text-slate-600 leading-relaxed">
-                        Nacimos con una vision clara: construir una plataforma profesional para el
-                        mercado dominicano, enfocada en discovery util y catalogo confiable.
-                        Priorizamos fichas utiles, taxonomia local, geografia real de uso y
-                        senales de confianza para que descubrir negocios sea mas facil.
+                        Nacimos con una visión clara: construir una plataforma profesional para el
+                        mercado dominicano, enfocada en discovery útil y catálogo confiable.
+                        Priorizamos fichas útiles, taxonomía local, geografía real de uso y
+                        señales de confianza para que descubrir negocios sea más fácil.
                     </p>
                     <div className="mt-5 space-y-2 text-sm text-slate-700">
-                        <p><strong>Mision:</strong> hacer util el discovery local dominicano.</p>
+                        <p><strong>Misión:</strong> hacer útil el discovery local dominicano.</p>
                         <p><strong>Enfoque:</strong> confianza, calidad de catalogo y relevancia.</p>
-                        <p><strong>Mercado inicial:</strong> Republica Dominicana.</p>
+                        <p><strong>Mercado inicial:</strong> República Dominicana.</p>
                     </div>
                 </article>
 
@@ -54,9 +54,9 @@ export function About() {
                         El equipo
                     </h2>
                     <p className="text-slate-600 leading-relaxed">
-                        Somos un equipo orientado a producto y ejecucion. Priorizamos calidad,
-                        estabilidad y crecimiento sostenible, con un estandar tecnico orientado
-                        a discovery local y operacion de catalogo.
+                        Somos un equipo orientado a producto y ejecución. Priorizamos calidad,
+                        estabilidad y crecimiento sostenible, con un estándar técnico orientado
+                        a discovery local y operación de catálogo.
                     </p>
                     <div className="mt-5 space-y-3">
                         {team.map((member) => (

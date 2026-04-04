@@ -27,10 +27,10 @@ export function ForgotPassword() {
                 },
             });
             setSuccessMessage(
-                String(response.data?.message || 'Si el correo existe, enviaremos un enlace para restablecer la contrasena.'),
+                String(response.data?.message || 'Si el correo existe, enviaremos un enlace para restablecer la contraseña.'),
             );
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar la recuperacion de contrasena'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar la recuperación de contraseña'));
         } finally {
             setLoading(false);
         }
@@ -45,7 +45,7 @@ export function ForgotPassword() {
                         </div>
                         <h1 className="font-display text-2xl font-bold text-slate-900">Recuperar acceso</h1>
                         <p className="mt-1 text-sm text-slate-500">
-                            Te enviaremos un enlace para restablecer tu contrasena.
+                            Te enviaremos un enlace para restablecer tu contraseña.
                         </p>
                     </div>
 
@@ -64,7 +64,7 @@ export function ForgotPassword() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label htmlFor="forgot-password-email" className="mb-1 block text-sm font-medium text-slate-700">
-                                Correo electronico
+                                Correo electrónico
                             </label>
                             <input
                                 id="forgot-password-email"
@@ -79,13 +79,13 @@ export function ForgotPassword() {
                         </div>
 
                         <button type="submit" disabled={loading} className="btn-primary w-full">
-                            {loading ? 'Enviando...' : 'Enviar enlace de recuperacion'}
+                            {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
                         </button>
                     </form>
 
                     <p className="mt-6 text-center text-sm text-slate-500">
                         <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-                            Volver a iniciar sesion
+                            Volver a iniciar sesión
                         </Link>
                     </p>
             </div>

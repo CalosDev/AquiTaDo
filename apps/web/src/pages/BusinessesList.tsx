@@ -861,7 +861,7 @@ export function BusinessesList() {
                 totalVisibleResults={sortedBusinesses.length}
             />
 
-            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <FiltersSidebar
                     activeFilterChips={activeFilterChips}
                     categoryOptions={categoryOptions}
@@ -922,12 +922,12 @@ export function BusinessesList() {
                             )}
 
                             {currentView === 'map' ? (
-                                <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                                <div className="discovery-callout mb-4 p-3">
                                     <div className="mb-3 flex flex-col gap-3 border-b border-slate-100 pb-3 md:flex-row md:items-center md:justify-between">
                                         <div>
                                             <h2 className="text-sm font-semibold text-slate-900">Mapa sincronizado con el listado</h2>
                                             <p className="mt-1 text-xs text-slate-500">
-                                                Los filtros activos y la paginacion de esta vista se reflejan en el mapa.
+                                                Los filtros activos y la paginación de esta vista se reflejan en el mapa.
                                                 {` ${mappableBusinesses.length} de ${sortedBusinesses.length} resultados visibles tienen coordenadas.`}
                                             </p>
                                         </div>
@@ -946,7 +946,7 @@ export function BusinessesList() {
                                         selectedBusinessId={selectedBusinessId}
                                         onSelectBusiness={handleMapSelectBusiness}
                                         onOpenBusiness={(businessId) => trackBusinessClick(businessId, 'listing-map-selected')}
-                                        emptyLabel="No hay coordenadas suficientes en esta pagina para dibujar el mapa todavia."
+                                        emptyLabel="No hay coordenadas suficientes en esta página para dibujar el mapa todavía."
                                     />
                                 </div>
                             ) : null}
@@ -958,7 +958,7 @@ export function BusinessesList() {
                                     const primaryCategory = biz.categories?.[0]?.category ?? null;
                                     const secondaryCategory = biz.categories?.[1]?.category ?? null;
                                     const reviewCount = biz._count?.reviews ?? 0;
-                                    const locationLabel = [biz.sector?.name, biz.city?.name || biz.province?.name].filter(Boolean).join(' • ');
+                                    const locationLabel = [biz.sector?.name, biz.city?.name || biz.province?.name].filter(Boolean).join(' · ');
                                     const priceLabel = businessPriceRangeLabel(biz.priceRange);
                                     const priceChip = priceLabel ? priceLabel.split(' ')[0] : null;
                                     const ratingValue = Number(biz.reputationScore ?? 0);
@@ -985,13 +985,13 @@ export function BusinessesList() {
                                                     setSelectedBusinessId(biz.id);
                                                 }
                                             }}
-                                            className={`group rounded-2xl border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                                            className={`group listing-card ${
                                                 isSelectedOnMap
                                                     ? 'border-primary-300 ring-2 ring-primary-100'
-                                                    : 'border-slate-200 hover:border-primary-200'
+                                                    : ''
                                             }`}
                                         >
-                                            <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-100">
+                                            <div className="listing-card-media aspect-[4/3]">
                                                 {biz.images?.[0] ? (
                                                     <OptimizedImage
                                                         src={biz.images[0].url}
@@ -1080,7 +1080,7 @@ export function BusinessesList() {
                                                     <span>{locationLabel || biz.province?.name || biz.address}</span>
                                                     {biz.distanceKm ? (
                                                         <>
-                                                            <span className="text-slate-400">•</span>
+                                                            <span className="text-slate-400">|</span>
                                                             <span>{biz.distanceKm.toFixed(1)} km</span>
                                                         </>
                                                     ) : null}
@@ -1175,9 +1175,21 @@ export function BusinessesList() {
                             </div>
                         </>
                     ) : (
-                        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center text-slate-500">
+                        <div className="discovery-callout px-6 py-16 text-center text-slate-500">
                             <p className="text-sm font-semibold text-slate-700">No se encontraron negocios</p>
-                            <p className="mt-2 text-sm">Prueba otros filtros o intenta con otro termino.</p>
+                            <p className="mt-2 text-sm">Prueba otros filtros o intenta con otra busqueda.</p>
+                            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleClearFilters}
+                                    className="btn-primary text-sm"
+                                >
+                                    Limpiar filtros
+                                </button>
+                                <Link to="/" className="btn-secondary text-sm">
+                                    Volver al inicio
+                                </Link>
+                            </div>
                         </div>
                     )}
                 </div>

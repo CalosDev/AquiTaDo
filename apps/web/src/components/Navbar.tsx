@@ -84,8 +84,6 @@ export function Navbar() {
         }
 
         const handler = (event: Event) => {
-            // Keep browser default install behavior to avoid console warning
-            // when users do not manually open the custom prompt.
             setInstallPromptEvent(event as BeforeInstallPromptEvent);
         };
         const installedHandler = () => setInstallPromptEvent(null);
@@ -138,17 +136,17 @@ export function Navbar() {
 
     return (
         <header className="sticky top-0 z-50 overflow-x-clip">
-            <div className="hidden xl:block border-b border-primary-100/70 bg-white/85 backdrop-blur-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <div className="hidden xl:block border-b border-primary-100/70 bg-white/88 backdrop-blur-md">
+                <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:px-6 lg:px-8">
                     <div className="flex items-center gap-3">
-                        <span className="chip !px-2.5 !py-0.5 !text-[10px]">Hecho en RD</span>
+                        <span className="chip !px-2.5 !py-0.5 !text-[10px] !shadow-none">Hecho en RD</span>
                         <span>Discovery local de negocios en RD</span>
                     </div>
                     <span className="text-primary-700">Santo Domingo, República Dominicana</span>
                 </div>
             </div>
 
-            <nav className="glass border-b border-primary-100/80 shadow-sm">
+            <nav className="nav-shell">
                 <div className="flag-ribbon" aria-hidden="true"></div>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between gap-4">
@@ -168,67 +166,75 @@ export function Navbar() {
                             </div>
                         </Link>
 
-                        <div className="hidden xl:flex items-center gap-3 2xl:gap-4 min-w-0">
-                            <Link
-                                to="/businesses"
-                                className={desktopNavClass(businessesActive)}
-                                aria-current={businessesActive ? 'page' : undefined}
-                                onMouseEnter={() => preloadRouteChunk('/businesses')}
-                                onFocus={() => preloadRouteChunk('/businesses')}
-                            >
-                                Negocios
-                            </Link>
-                            {!isAuthenticated && (
+                        <div className="hidden min-w-0 items-center gap-3 xl:flex 2xl:gap-4">
+                            <div className="nav-cluster flex min-w-0 items-center gap-4">
                                 <Link
-                                    to="/about"
-                                    className={desktopNavClass(aboutActive)}
-                                    aria-current={aboutActive ? 'page' : undefined}
-                                    onMouseEnter={() => preloadRouteChunk('/about')}
-                                    onFocus={() => preloadRouteChunk('/about')}
+                                    to="/businesses"
+                                    className={desktopNavClass(businessesActive)}
+                                    aria-current={businessesActive ? 'page' : undefined}
+                                    onMouseEnter={() => preloadRouteChunk('/businesses')}
+                                    onFocus={() => preloadRouteChunk('/businesses')}
                                 >
-                                    Nosotros
+                                    Negocios
                                 </Link>
-                            )}
+                                {!isAuthenticated && (
+                                    <Link
+                                        to="/about"
+                                        className={desktopNavClass(aboutActive)}
+                                        aria-current={aboutActive ? 'page' : undefined}
+                                        onMouseEnter={() => preloadRouteChunk('/about')}
+                                        onFocus={() => preloadRouteChunk('/about')}
+                                    >
+                                        Nosotros
+                                    </Link>
+                                )}
+                                {isAuthenticated ? (
+                                    <>
+                                        <Link
+                                            to={roleHomePath}
+                                            className={desktopNavClass(roleHomeActive)}
+                                            aria-current={roleHomeActive ? 'page' : undefined}
+                                            onMouseEnter={() => preloadRouteChunk(roleHomePath)}
+                                            onFocus={() => preloadRouteChunk(roleHomePath)}
+                                        >
+                                            {roleHomeLabel}
+                                        </Link>
+                                        {user?.role === 'ADMIN' && (
+                                            <Link
+                                                to="/security"
+                                                className={desktopNavClass(securityActive)}
+                                                aria-current={securityActive ? 'page' : undefined}
+                                                onMouseEnter={() => preloadRouteChunk('/security')}
+                                                onFocus={() => preloadRouteChunk('/security')}
+                                            >
+                                                Seguridad
+                                            </Link>
+                                        )}
+                                        <Link
+                                            to="/profile"
+                                            className={desktopNavClass(profileActive)}
+                                            aria-current={profileActive ? 'page' : undefined}
+                                            onMouseEnter={() => preloadRouteChunk('/profile')}
+                                            onFocus={() => preloadRouteChunk('/profile')}
+                                        >
+                                            Perfil
+                                        </Link>
+                                    </>
+                                ) : null}
+                            </div>
+
                             {installPromptEvent && (
-                                <button type="button" className="btn-secondary text-sm" onClick={() => void handleInstallApp()}>
+                                <button type="button" className="btn-secondary text-sm !rounded-full" onClick={() => void handleInstallApp()}>
                                     Instalar app
                                 </button>
                             )}
+
                             {isAuthenticated ? (
                                 <>
-                                    <Link
-                                        to={roleHomePath}
-                                        className={desktopNavClass(roleHomeActive)}
-                                        aria-current={roleHomeActive ? 'page' : undefined}
-                                        onMouseEnter={() => preloadRouteChunk(roleHomePath)}
-                                        onFocus={() => preloadRouteChunk(roleHomePath)}
-                                    >
-                                        {roleHomeLabel}
-                                    </Link>
-                                    {user?.role === 'ADMIN' && (
-                                        <Link
-                                            to="/security"
-                                            className={desktopNavClass(securityActive)}
-                                            aria-current={securityActive ? 'page' : undefined}
-                                            onMouseEnter={() => preloadRouteChunk('/security')}
-                                            onFocus={() => preloadRouteChunk('/security')}
-                                        >
-                                            Seguridad
-                                        </Link>
-                                    )}
-                                    <Link
-                                        to="/profile"
-                                        className={desktopNavClass(profileActive)}
-                                        aria-current={profileActive ? 'page' : undefined}
-                                        onMouseEnter={() => preloadRouteChunk('/profile')}
-                                        onFocus={() => preloadRouteChunk('/profile')}
-                                    >
-                                        Perfil
-                                    </Link>
                                     {canRegisterBusiness && (
                                         <Link
                                             to="/register-business"
-                                            className="btn-accent text-sm whitespace-nowrap shrink-0 !px-5 !py-2.5"
+                                            className="btn-accent shrink-0 whitespace-nowrap !px-5 !py-2.5 text-sm"
                                             onMouseEnter={() => preloadRouteChunk('/register-business')}
                                             onFocus={() => preloadRouteChunk('/register-business')}
                                         >
@@ -237,14 +243,14 @@ export function Navbar() {
                                             <span className="hidden 2xl:inline">+ Registrar Negocio</span>
                                         </Link>
                                     )}
-                                    <div className="flex items-center gap-2 min-w-0 shrink-0 border-l border-primary-100 pl-2">
-                                        <span className="chip hidden 2xl:inline-flex !py-1 whitespace-nowrap shrink-0">
+                                    <div className="nav-cluster flex min-w-0 shrink-0 items-center gap-3">
+                                        <span className="chip hidden shrink-0 whitespace-nowrap !py-1 2xl:inline-flex">
                                             {roleBadgeLabel(user?.role)}
                                         </span>
                                         <div className="min-w-0">
                                             <Link
                                                 to="/profile"
-                                                className="text-sm font-semibold text-slate-600 transition-colors hover:text-primary-700 whitespace-nowrap"
+                                                className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary-700"
                                                 onMouseEnter={() => preloadRouteChunk('/profile')}
                                                 onFocus={() => preloadRouteChunk('/profile')}
                                             >
@@ -252,7 +258,7 @@ export function Navbar() {
                                             </Link>
                                             {organizationName && (
                                                 <p
-                                                    className="hidden 2xl:block text-[11px] text-slate-500 leading-tight max-w-[170px] truncate"
+                                                    className="hidden max-w-[170px] truncate text-[11px] leading-tight text-slate-500 2xl:block"
                                                     title={organizationName}
                                                 >
                                                     {organizationName}
@@ -262,17 +268,17 @@ export function Navbar() {
                                         <button
                                             type="button"
                                             onClick={handleLogout}
-                                            className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition-colors hover:border-accent-300 hover:text-accent-700 whitespace-nowrap"
+                                            className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition-colors hover:border-accent-300 hover:text-accent-700 whitespace-nowrap"
                                         >
                                             Salir
                                         </button>
                                     </div>
                                 </>
                             ) : (
-                                <div className="flex items-center gap-3">
+                                <div className="nav-cluster flex items-center gap-2">
                                     <Link
                                         to="/login"
-                                        className="btn-secondary text-sm"
+                                        className="btn-secondary text-sm !rounded-full"
                                         onMouseEnter={() => preloadRouteChunk('/login')}
                                         onFocus={() => preloadRouteChunk('/login')}
                                     >
@@ -280,7 +286,7 @@ export function Navbar() {
                                     </Link>
                                     <Link
                                         to="/register"
-                                        className="btn-primary text-sm"
+                                        className="btn-primary text-sm !rounded-full"
                                         onMouseEnter={() => preloadRouteChunk('/register')}
                                         onFocus={() => preloadRouteChunk('/register')}
                                     >
@@ -290,7 +296,7 @@ export function Navbar() {
                             )}
                         </div>
 
-                        <div className="hidden lg:flex xl:hidden items-center gap-2 min-w-0">
+                        <div className="hidden min-w-0 items-center gap-2 lg:flex xl:hidden">
                             <Link
                                 to="/businesses"
                                 className={desktopNavClass(businessesActive)}
@@ -325,9 +331,9 @@ export function Navbar() {
 
                         <button
                             type="button"
-                            className="xl:hidden inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-700"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-700 xl:hidden"
                             onClick={() => setMenuOpen((previous) => !previous)}
-                            aria-label={menuOpen ? 'Cerrar menu principal' : 'Abrir menu principal'}
+                            aria-label={menuOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
                             aria-expanded={menuOpen}
                             aria-controls="mobile-main-menu"
                         >
@@ -342,17 +348,17 @@ export function Navbar() {
                     </div>
 
                     {menuOpen && (
-                        <div id="mobile-main-menu" className="xl:hidden pb-4 pt-2 animate-slide-down">
-                            <div className="surface-panel p-2">
-                                    <Link
-                                        to="/businesses"
-                                        className={mobileNavClass(businessesActive)}
-                                        aria-current={businessesActive ? 'page' : undefined}
-                                        onMouseEnter={() => preloadRouteChunk('/businesses')}
-                                        onFocus={() => preloadRouteChunk('/businesses')}
-                                        onClick={() => setMenuOpen(false)}
-                                    >
-                                        Negocios
+                        <div id="mobile-main-menu" className="animate-slide-down pb-4 pt-2 xl:hidden">
+                            <div className="surface-panel p-2 shadow-xl shadow-primary-950/8">
+                                <Link
+                                    to="/businesses"
+                                    className={mobileNavClass(businessesActive)}
+                                    aria-current={businessesActive ? 'page' : undefined}
+                                    onMouseEnter={() => preloadRouteChunk('/businesses')}
+                                    onFocus={() => preloadRouteChunk('/businesses')}
+                                    onClick={() => setMenuOpen(false)}
+                                >
+                                    Negocios
                                 </Link>
                                 {!isAuthenticated && (
                                     <Link

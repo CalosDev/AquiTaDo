@@ -44,6 +44,24 @@ interface UserBusinessList {
 const EMPTY_FAVORITES: FavoriteBusinessItem[] = [];
 const EMPTY_LISTS: UserBusinessList[] = [];
 
+function EmptyPanel({
+    title,
+    description,
+    primaryAction,
+}: {
+    title: string;
+    description: string;
+    primaryAction?: React.ReactNode;
+}) {
+    return (
+        <div className="discovery-callout">
+            <p className="text-sm font-semibold text-slate-900">{title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">{description}</p>
+            {primaryAction ? <div className="mt-4">{primaryAction}</div> : null}
+        </div>
+    );
+}
+
 export function CustomerDashboard() {
     const { user } = useAuth();
     const [favoritesActionLoading, setFavoritesActionLoading] = useState<string | null>(null);
@@ -127,7 +145,7 @@ export function CustomerDashboard() {
 
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
+            <div className="page-shell py-10 animate-fade-in">
                 <div className="h-10 w-56 rounded-xl bg-gray-100 animate-pulse mb-4"></div>
                 <div className="h-5 w-80 rounded-lg bg-gray-100 animate-pulse mb-8"></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -143,14 +161,14 @@ export function CustomerDashboard() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-fade-in">
+        <div className="page-shell space-y-8 animate-fade-in">
             <section className="role-hero role-hero-user">
-                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Cliente</p>
-                <h1 className="font-display text-3xl font-bold text-white mt-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">Panel cliente</p>
+                <h1 className="mt-2 font-display text-3xl font-bold text-white">
                     Hola, {user?.name?.split(' ')[0] ?? 'Usuario'}
                 </h1>
-                <p className="text-blue-100 mt-2 max-w-2xl">
-                    Gestiona tus favoritos y listas guardadas.
+                <p className="mt-2 max-w-2xl text-blue-100">
+                    Organiza tus negocios favoritos, compara listas y vuelve rapido a los perfiles que te interesan.
                 </p>
 
                 <div className="mt-5 role-kpi-grid">
@@ -190,69 +208,98 @@ export function CustomerDashboard() {
                 </section>
             )}
 
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <article className="card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Mis favoritos</h2>
-                        <Link to="/businesses" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+            <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <article className="section-shell p-6">
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Guardados</p>
+                            <h2 className="font-display text-xl font-bold text-slate-900">Mis favoritos</h2>
+                        </div>
+                        <Link to="/businesses" className="text-sm font-medium text-primary-600 hover:text-primary-700">
                             Explorar
                         </Link>
                     </div>
+
                     {favorites.length === 0 ? (
-                        <p className="text-sm text-gray-500">Aún no has guardado negocios.</p>
+                        <EmptyPanel
+                            title="Aun no has guardado negocios"
+                            description="Explora el directorio, compara perfiles y guarda los lugares que quieras revisar despues."
+                            primaryAction={(
+                                <Link to="/businesses" className="btn-primary inline-flex text-sm">
+                                    Empezar a explorar
+                                </Link>
+                            )}
+                        />
                     ) : (
                         <div className="space-y-3">
                             {favorites.map((favorite) => (
-                                <div key={favorite.businessId} className="rounded-xl border border-gray-100 p-4">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="font-semibold text-gray-900">{favorite.business.name}</p>
+                                <div key={favorite.businessId} className="panel-premium p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-semibold text-slate-900">{favorite.business.name}</p>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {favorite.business.province?.name || favorite.business.address}
+                                            </p>
+                                        </div>
                                         <button
                                             type="button"
-                                            className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                                            className="rounded-lg bg-red-100 px-2 py-1 text-xs text-red-700 transition-colors hover:bg-red-200 disabled:opacity-50"
                                             onClick={() => void handleRemoveFavorite(favorite.businessId)}
                                             disabled={favoritesActionLoading === `favorite-${favorite.businessId}`}
                                         >
                                             {favoritesActionLoading === `favorite-${favorite.businessId}` ? 'Quitando...' : 'Quitar'}
                                         </button>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {favorite.business.province?.name || favorite.business.address}
-                                    </p>
-                                    <p className="text-xs text-gray-400 mt-2">
-                                        Guardado: {formatDateTimeDo(favorite.createdAt)}
-                                    </p>
-                                    <Link
-                                        to={`/businesses/${favorite.business.slug}`}
-                                        className="inline-flex mt-3 text-xs font-semibold text-primary-700 hover:text-primary-800"
-                                    >
-                                        Ver negocio
-                                    </Link>
+
+                                    <div className="mt-3 flex items-center justify-between gap-3">
+                                        <p className="text-xs text-slate-400">
+                                            Guardado: {formatDateTimeDo(favorite.createdAt)}
+                                        </p>
+                                        <Link
+                                            to={`/businesses/${favorite.business.slug}`}
+                                            className="text-xs font-semibold text-primary-700 hover:text-primary-800"
+                                        >
+                                            Ver negocio
+                                        </Link>
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     )}
                 </article>
 
-                <article className="card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Mis listas</h2>
-                        <span className="text-xs text-gray-500">{lists.length} listas</span>
+                <article className="section-shell p-6">
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Curacion</p>
+                            <h2 className="font-display text-xl font-bold text-slate-900">Mis listas</h2>
+                        </div>
+                        <span className="chip">{lists.length} listas</span>
                     </div>
+
                     {lists.length === 0 ? (
-                        <p className="text-sm text-gray-500">Crea listas guardando negocios desde su detalle.</p>
+                        <EmptyPanel
+                            title="Tus listas aun estan vacias"
+                            description="Crea listas desde el detalle de cada negocio para comparar opciones o guardar ideas por zona y categoria."
+                        />
                     ) : (
                         <div className="space-y-3">
                             {lists.map((list) => (
-                                <div key={list.id} className="rounded-xl border border-gray-100 p-4">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="font-semibold text-gray-900">{list.name}</p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs rounded-full bg-gray-100 text-gray-600 px-2 py-0.5">
+                                <div key={list.id} className="panel-premium p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-semibold text-slate-900">{list.name}</p>
+                                            {list.description ? (
+                                                <p className="mt-1 line-clamp-2 text-sm text-slate-600">{list.description}</p>
+                                            ) : null}
+                                        </div>
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                                                 {list._count?.items ?? list.items.length} items
                                             </span>
                                             <button
                                                 type="button"
-                                                className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                                                className="rounded-lg bg-red-100 px-2 py-1 text-xs text-red-700 transition-colors hover:bg-red-200 disabled:opacity-50"
                                                 onClick={() => void handleDeleteList(list.id)}
                                                 disabled={favoritesActionLoading === `delete-list-${list.id}`}
                                             >
@@ -260,16 +307,17 @@ export function CustomerDashboard() {
                                             </button>
                                         </div>
                                     </div>
-                                    {list.description ? (
-                                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{list.description}</p>
-                                    ) : null}
+
                                     {list.items.length > 0 ? (
-                                        <div className="mt-2 space-y-2">
+                                        <div className="mt-3 space-y-2">
                                             {list.items.slice(0, 3).map((item) => (
-                                                <div key={item.businessId} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-2 py-1.5">
+                                                <div
+                                                    key={item.businessId}
+                                                    className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white px-3 py-2"
+                                                >
                                                     <Link
                                                         to={`/businesses/${item.business.slug}`}
-                                                        className="text-xs font-medium text-gray-700 hover:text-primary-700"
+                                                        className="truncate text-xs font-medium text-slate-700 hover:text-primary-700"
                                                     >
                                                         {item.business.name}
                                                     </Link>
@@ -285,7 +333,7 @@ export function CustomerDashboard() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-xs text-gray-500 mt-2">Sin negocios aun.</p>
+                                        <p className="mt-3 text-xs text-slate-500">Sin negocios aun.</p>
                                     )}
                                 </div>
                             ))}

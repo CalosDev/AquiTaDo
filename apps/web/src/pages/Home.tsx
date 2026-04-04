@@ -63,12 +63,12 @@ interface ReputationRankingItem {
 }
 
 const INTENT_LINKS = [
-    { slug: 'con-delivery', label: 'Con delivery', subtitle: 'Entrega rapida', icon: 'MOTO' },
-    { slug: 'con-parqueo', label: 'Con parqueo', subtitle: 'Llega sin estres', icon: 'PARK' },
-    { slug: 'pet-friendly', label: 'Pet friendly', subtitle: 'Aceptan mascotas', icon: 'PET' },
-    { slug: 'con-reservas', label: 'Con reservas', subtitle: 'Agenda facil', icon: 'BOOK' },
-    { slug: 'accesibles', label: 'Accesibles', subtitle: 'Entrada inclusiva', icon: 'ACCESS' },
-];
+    { slug: 'con-delivery', label: 'Con delivery', subtitle: 'Entrega rápida', icon: 'delivery' },
+    { slug: 'con-parqueo', label: 'Con parqueo', subtitle: 'Llega sin estrés', icon: 'parking' },
+    { slug: 'pet-friendly', label: 'Pet friendly', subtitle: 'Aceptan mascotas', icon: 'pet' },
+    { slug: 'con-reservas', label: 'Con reservas', subtitle: 'Agenda fácil', icon: 'booking' },
+    { slug: 'accesibles', label: 'Accesibles', subtitle: 'Entrada inclusiva', icon: 'accessibility' },
+] as const;
 
 const OPERATING_POINTS = [
     {
@@ -112,6 +112,13 @@ const DOMINICAN_CATEGORY_PRESETS: DominicanCategoryPreset[] = [
     { key: 'auto', label: 'Automotriz y talleres', queries: ['taller', 'mecanica'], slugHints: ['automotriz'] },
 ];
 
+const FEATURED_PROVINCE_FALLBACKS = [
+    { key: 'santo-domingo', label: 'Santo Domingo', href: '/businesses?search=Santo%20Domingo' },
+    { key: 'santiago', label: 'Santiago', href: '/businesses?search=Santiago' },
+    { key: 'la-altagracia', label: 'La Altagracia', href: '/businesses?search=La%20Altagracia' },
+    { key: 'puerto-plata', label: 'Puerto Plata', href: '/businesses?search=Puerto%20Plata' },
+] as const;
+
 function normalizeText(value: string): string {
     return value
         .toLowerCase()
@@ -152,6 +159,46 @@ function trackGrowthEvent(payload: {
         visitorId: getOrCreateVisitorId(),
         sessionId: getOrCreateSessionId(),
     }).catch(() => undefined);
+}
+
+function IntentIcon({ icon }: { icon: (typeof INTENT_LINKS)[number]['icon'] }) {
+    return (
+        <span className="intent-glyph" aria-hidden="true">
+            {icon === 'delivery' && (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h11v8H3zM14 10h3l4 3v2h-7z" />
+                    <circle cx="7.5" cy="17.5" r="1.5" fill="currentColor" stroke="none" />
+                    <circle cx="17.5" cy="17.5" r="1.5" fill="currentColor" stroke="none" />
+                </svg>
+            )}
+            {icon === 'parking' && (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 19V5h5a4 4 0 1 1 0 8H7" />
+                </svg>
+            )}
+            {icon === 'pet' && (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.5 14.5c-1.7 0-3.5 1.2-3.5 3s1.4 2.5 3 2.5c1 0 1.7-.2 4-.2s3 .2 4 .2c1.6 0 3-1 3-2.5s-1.8-3-3.5-3c-.9 0-1.8.4-3.5.4s-2.6-.4-3.5-.4z" />
+                    <circle cx="7" cy="8" r="2" />
+                    <circle cx="12" cy="6.5" r="2" />
+                    <circle cx="17" cy="8" r="2" />
+                </svg>
+            )}
+            {icon === 'booking' && (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                    <rect x="4" y="5" width="16" height="15" rx="3" />
+                    <path strokeLinecap="round" d="M8 3v4M16 3v4M4 10h16" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m9 15 2 2 4-5" />
+                </svg>
+            )}
+            {icon === 'accessibility' && (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                    <circle cx="12" cy="5" r="2" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 9h10M12 7v5M9 20l3-6 3 6M8 13l4-1 4 1" />
+                </svg>
+            )}
+        </span>
+    );
 }
 
 function toAffinityPercent(score: number): number {
@@ -415,16 +462,16 @@ export function Home() {
                             </div>
                             <h1 className="mt-5 font-display text-4xl sm:text-5xl xl:text-6xl font-extrabold leading-tight text-white">
                                 Descubre negocios reales
-                                <span className="block text-accent-300">por zona, categoria y confianza en RD</span>
+                                <span className="block text-accent-300">por zona, categoría y confianza en RD</span>
                             </h1>
                             <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-blue-100">
-                                AquiTa.do te ayuda a encontrar negocios locales utiles, comparables y confiables en Republica Dominicana,
-                                con mejor contexto por categoria, ubicacion y calidad de ficha.
+                                AquiTa.do te ayuda a encontrar negocios locales útiles, comparables y confiables en República Dominicana,
+                                con mejor contexto por categoría, ubicación y calidad de ficha.
                             </p>
 
                             <div className="mt-5 flex flex-wrap gap-2.5">
                                 <span className="chip !border-white/30 !bg-white/10 !text-white">Enfocado 100% en RD</span>
-                                <span className="chip !border-white/30 !bg-white/10 !text-white">Discovery por ubicacion</span>
+                                <span className="chip !border-white/30 !bg-white/10 !text-white">Discovery por ubicación</span>
                                 <span className="chip !border-white/30 !bg-white/10 !text-white">Catalogo confiable</span>
                             </div>
 
@@ -646,7 +693,7 @@ export function Home() {
                     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>
                             <h2 className="section-title !text-2xl md:!text-3xl">Explora por intención</h2>
-                            <p className="section-subtitle">Rutas rapidas para encontrar justo lo que necesitas.</p>
+                            <p className="section-subtitle">Rutas rápidas para encontrar justo lo que necesitas.</p>
                         </div>
                     </div>
                     <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -662,9 +709,14 @@ export function Home() {
                                 }}
                                 className="panel-premium p-4"
                             >
-                                <p className="text-[11px] uppercase tracking-[0.16em] text-primary-600 font-bold">{intent.icon}</p>
-                                <p className="mt-2 font-display text-lg font-semibold text-slate-900">{intent.label}</p>
-                                <p className="mt-1 text-sm text-slate-600">{intent.subtitle}</p>
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-[11px] uppercase tracking-[0.16em] text-primary-600 font-bold">Intención</p>
+                                        <p className="mt-2 font-display text-lg font-semibold text-slate-900">{intent.label}</p>
+                                        <p className="mt-1 text-sm text-slate-600">{intent.subtitle}</p>
+                                    </div>
+                                    <IntentIcon icon={intent.icon} />
+                                </div>
                             </Link>
                         ))}
                     </div>
@@ -677,7 +729,7 @@ export function Home() {
                         <div className="flex items-end justify-between gap-4">
                             <div>
                                 <h3 className="font-display text-2xl font-bold text-slate-900">Categorías top en RD</h3>
-                                <p className="mt-1 text-sm text-slate-600">Taxonomia local para descubrir negocios dominicanos sin friccion.</p>
+                                <p className="mt-1 text-sm text-slate-600">Taxonomía local para descubrir negocios dominicanos sin fricción.</p>
                             </div>
                             <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
                                 Ver todo
@@ -715,24 +767,44 @@ export function Home() {
                                 <p className="mt-1 text-sm text-slate-600">Cobertura local con enfoque en demanda real.</p>
                             </div>
                         </div>
-                        <div className="mt-5 flex flex-wrap gap-2.5">
-                            {topProvinces.map((province) => (
-                                <Link
-                                    key={province.id}
-                                    to={province.slug ? `/negocios/provincia/${province.slug}` : `/businesses?provinceId=${province.id}`}
-                                    onClick={() => {
-                                        void trackGrowthEvent({
-                                            eventType: 'SEARCH_QUERY',
-                                            provinceId: province.id,
-                                            metadata: { source: 'home-province-chip' },
-                                        });
-                                    }}
-                                    className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100"
-                                >
-                                    {province.name}
-                                </Link>
-                            ))}
-                        </div>
+                        {topProvinces.length > 0 ? (
+                            <div className="mt-5 flex flex-wrap gap-2.5">
+                                {topProvinces.map((province) => (
+                                    <Link
+                                        key={province.id}
+                                        to={province.slug ? `/negocios/provincia/${province.slug}` : `/businesses?provinceId=${province.id}`}
+                                        onClick={() => {
+                                            void trackGrowthEvent({
+                                                eventType: 'SEARCH_QUERY',
+                                                provinceId: province.id,
+                                                metadata: { source: 'home-province-chip' },
+                                            });
+                                        }}
+                                        className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100"
+                                    >
+                                        {province.name}
+                                    </Link>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="discovery-callout mt-5">
+                                <p className="text-sm font-semibold text-slate-900">Cobertura lista para expandirse</p>
+                                <p className="mt-1 text-sm text-slate-600">
+                                    Mientras se consolidan mas datos, puedes empezar por provincias de alta demanda en RD.
+                                </p>
+                                <div className="mt-4 flex flex-wrap gap-2.5">
+                                    {FEATURED_PROVINCE_FALLBACKS.map((province) => (
+                                        <Link
+                                            key={province.key}
+                                            to={province.href}
+                                            className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100"
+                                        >
+                                            {province.label}
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </section>
@@ -743,7 +815,7 @@ export function Home() {
                         <div>
                             <h3 className="font-display text-2xl font-bold text-slate-900">Ranking de reputación</h3>
                             <p className="mt-1 text-sm text-slate-600">
-                                Negocios verificados con mejor desempeno por provincia.
+                                Negocios verificados con mejor desempeño por provincia.
                             </p>
                         </div>
                         <select
@@ -777,7 +849,12 @@ export function Home() {
                             ))}
                         </div>
                     ) : rankings.length === 0 ? (
-                        <p className="mt-5 text-sm text-slate-500">Aún no hay ranking disponible para ese filtro.</p>
+                        <div className="discovery-callout mt-5">
+                            <p className="text-sm font-semibold text-slate-900">Aun no hay ranking disponible para ese filtro.</p>
+                            <p className="mt-1 text-sm text-slate-600">
+                                Prueba otra provincia o vuelve cuando existan suficientes senales para comparar.
+                            </p>
+                        </div>
                     ) : (
                         <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
                             {rankings.map((item) => (
@@ -825,7 +902,7 @@ export function Home() {
                 {recentBusinesses.length === 0 ? (
                     <div className="section-shell mt-6 p-10 text-center">
                         <p className="font-display text-2xl font-semibold text-slate-800">Aún no hay negocios registrados.</p>
-                        <p className="mt-2 text-sm text-slate-600">Aporta la primera ficha util para esa zona o categoria.</p>
+                        <p className="mt-2 text-sm text-slate-600">Aporta la primera ficha útil para esa zona o categoría.</p>
                         <Link to={registerBusinessPath} className="btn-primary mt-5 inline-flex">{registerBusinessLabel}</Link>
                     </div>
                 ) : (
@@ -835,9 +912,9 @@ export function Home() {
                                 key={business.id}
                                 to={`/businesses/${business.slug || business.id}`}
                                 onClick={() => handleBusinessClick(business.id)}
-                                className="panel-premium group overflow-hidden"
+                                className="listing-card group overflow-hidden p-0"
                             >
-                                <div className="relative h-48 bg-gradient-to-br from-primary-50 to-accent-50">
+                                <div className="listing-card-media h-48 bg-gradient-to-br from-primary-50 to-accent-50">
                                     {business.images?.[0] ? (
                                         <OptimizedImage
                                             src={business.images[0].url}
@@ -876,7 +953,7 @@ export function Home() {
                 <div className="section-shell p-6 md:p-8">
                     <h2 className="section-title !text-3xl">Por que AquiTa.do es diferente</h2>
                     <p className="section-subtitle mt-2">
-                        No es solo un listado: prioriza contexto local, fichas utiles y senales de confianza.
+                        No es solo un listado: prioriza contexto local, fichas útiles y señales de confianza.
                     </p>
                     <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                         {OPERATING_POINTS.map((point) => (

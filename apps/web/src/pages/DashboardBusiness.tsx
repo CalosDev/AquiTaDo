@@ -274,7 +274,7 @@ export function DashboardBusiness() {
 
     if (loading || organizationLoading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
+            <div className="page-shell py-10 animate-fade-in">
                 <div className="h-10 w-64 rounded-xl bg-gray-100 animate-pulse mb-4"></div>
                 <div className="h-5 w-80 rounded-lg bg-gray-100 animate-pulse mb-8"></div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -290,7 +290,7 @@ export function DashboardBusiness() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6 animate-fade-in">
+        <div className="page-shell space-y-6 animate-fade-in">
             <section className="role-hero role-hero-owner">
                 <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Estado del catalogo y visibilidad</h1>
@@ -347,10 +347,10 @@ export function DashboardBusiness() {
             </section>
 
             {needsFirstBusinessSetup && (
-                <section className="card p-6 lg:p-8 border border-primary-100 bg-primary-50/50">
+                <section className="section-shell border border-primary-100 bg-primary-50/70 p-6 lg:p-8">
                     <p className="text-sm uppercase tracking-wide text-primary-700 font-semibold">Primer paso</p>
-                    <h2 className="font-display text-2xl font-bold text-gray-900 mt-2">Registra tu primer negocio</h2>
-                    <p className="text-gray-600 mt-2 max-w-2xl">
+                    <h2 className="font-display text-2xl font-bold text-slate-900 mt-2">Registra tu primer negocio</h2>
+                    <p className="text-slate-600 mt-2 max-w-2xl">
                         Tu panel de negocio se activa despues de crear el primer negocio. En ese proceso se prepara tu organizacion interna y la verificacion documental.
                     </p>
                     <div className="mt-5 flex flex-wrap gap-3">
@@ -401,9 +401,12 @@ export function DashboardBusiness() {
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <article className="card p-6">
+                <article className="section-shell p-6">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Mis negocios</h2>
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Portafolio</p>
+                            <h2 className="font-display text-xl font-bold text-slate-900">Mis negocios</h2>
+                        </div>
                         {selectedBusinessId && (
                             <Link
                                 to={`/dashboard/businesses/${selectedBusinessId}/edit`}
@@ -421,15 +424,15 @@ export function DashboardBusiness() {
                                 <button
                                     type="button"
                                     key={business.id}
-                                    className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
+                                    className={`w-full rounded-2xl border px-3 py-3 text-left transition-all ${
                                         selectedBusinessId === business.id
-                                            ? 'border-primary-300 bg-primary-50'
-                                            : 'border-gray-100 hover:border-primary-100'
+                                            ? 'border-primary-300 bg-primary-50 shadow-sm'
+                                            : 'border-slate-200/80 bg-white hover:border-primary-100 hover:shadow-sm'
                                     }`}
                                     onClick={() => setSelectedBusinessId(business.id)}
                                 >
-                                    <p className="font-medium text-gray-900">{business.name}</p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="font-medium text-slate-900">{business.name}</p>
+                                    <p className="text-xs text-slate-500 mt-1">
                                         {business.verified ? 'Publicado y verificado' : 'Pendiente de verificacion'}
                                     </p>
                                     <div className="mt-2 flex flex-wrap gap-2">
@@ -440,7 +443,7 @@ export function DashboardBusiness() {
                                             <span className={`text-[11px] rounded-full px-2 py-1 ${
                                                 business.openNow
                                                     ? 'bg-primary-100 text-primary-700'
-                                                    : 'bg-gray-100 text-gray-600'
+                                                    : 'bg-slate-100 text-slate-600'
                                             }`}>
                                                 {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
                                             </span>
@@ -457,29 +460,32 @@ export function DashboardBusiness() {
                     )}
                 </article>
 
-                <article className="card p-6 lg:col-span-2 space-y-5">
+                <article className="section-shell p-6 lg:col-span-2 space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="font-display text-xl font-bold text-gray-900">Verificacion documental</h2>
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Compliance</p>
+                            <h2 className="font-display text-xl font-bold text-slate-900">Verificacion documental</h2>
+                        </div>
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getStatusClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
                             {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
                         </span>
                     </div>
 
                     {selectedBusiness ? (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-slate-600">
                             Negocio seleccionado: <strong>{selectedBusiness.name}</strong>
                         </p>
                     ) : (
-                        <p className="text-sm text-gray-500">Selecciona un negocio para gestionar su verificacion.</p>
+                        <p className="text-sm text-slate-500">Selecciona un negocio para gestionar su verificacion.</p>
                     )}
 
                     {verificationStatus?.verificationSubmittedAt && (
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-500">
                             Enviado: {formatDateTimeDo(verificationStatus.verificationSubmittedAt)}.
                         </p>
                     )}
                     {verificationStatus?.verificationReviewedAt && (
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-500">
                             Revisado: {formatDateTimeDo(verificationStatus.verificationReviewedAt)}.
                         </p>
                     )}
@@ -489,8 +495,8 @@ export function DashboardBusiness() {
                         </p>
                     )}
 
-                    <form onSubmit={handleUploadDocument} className="space-y-3 rounded-xl border border-gray-100 p-4">
-                        <h3 className="font-semibold text-gray-900">Subir documento</h3>
+                    <form onSubmit={handleUploadDocument} className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
+                        <h3 className="font-semibold text-slate-900">Subir documento</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <select
                                 className="input-field"
@@ -518,8 +524,8 @@ export function DashboardBusiness() {
                         </button>
                     </form>
 
-                    <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-                        <h3 className="font-semibold text-gray-900">Enviar solicitud de revision</h3>
+                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-3">
+                        <h3 className="font-semibold text-slate-900">Enviar solicitud de revision</h3>
                         <textarea
                             className="input-field text-sm"
                             rows={3}

@@ -148,6 +148,16 @@ function getRoleBadge(profileType: ProfileType) {
     return 'bg-primary-100 text-primary-700';
 }
 
+function getProfileHeroClass(profileType: ProfileType) {
+    if (profileType === 'ADMIN') {
+        return 'role-hero role-hero-admin';
+    }
+    if (profileType === 'BUSINESS_OWNER') {
+        return 'role-hero role-hero-owner';
+    }
+    return 'role-hero role-hero-user';
+}
+
 export function Profile() {
     const { refreshProfile } = useAuth();
     const [loading, setLoading] = useState(true);
@@ -275,18 +285,39 @@ export function Profile() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                <div>
+        <div className="page-shell max-w-6xl py-10">
+            {payload?.profileType ? (
+                <section className={`${getProfileHeroClass(payload.profileType)} mb-6`}>
+                    <div className="relative z-[1] flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                        <div className="max-w-2xl">
+                            <div className="kpi-chip-soft w-fit">{payload.profileType}</div>
+                            <h1 className="mt-4 font-display text-3xl font-bold text-white md:text-4xl">Mi Perfil</h1>
+                            <p className="mt-2 text-sm text-blue-100 md:text-base">
+                                Vista personalizada según tu rol en la plataforma, con acceso rápido a tu actividad y configuraciones clave.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div className="role-kpi-card">
+                                <p className="role-kpi-label">Reseñas</p>
+                                <p className="role-kpi-value">{payload.userProfile.reviewCount}</p>
+                            </div>
+                            <div className="role-kpi-card">
+                                <p className="role-kpi-label">Reservas</p>
+                                <p className="role-kpi-value">{payload.userProfile.bookingCount}</p>
+                            </div>
+                            <div className="role-kpi-card">
+                                <p className="role-kpi-label">Miembro desde</p>
+                                <p className="mt-1 text-sm font-semibold text-white">{formatDateTime(payload.user.createdAt)}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            ) : (
+                <div className="mb-6">
                     <h1 className="font-display text-3xl font-bold text-gray-900">Mi Perfil</h1>
-                    <p className="text-sm text-gray-500">Vista personalizada segun tu rol en la plataforma.</p>
+                    <p className="text-sm text-gray-500">Vista personalizada según tu rol en la plataforma.</p>
                 </div>
-                {payload?.profileType && (
-                    <span className={`text-xs px-3 py-1 rounded-full font-semibold ${getRoleBadge(payload.profileType)}`}>
-                        {payload.profileType}
-                    </span>
-                )}
-            </div>
+            )}
 
             {errorMessage && (
                 <div className="alert-danger mb-4">
@@ -306,8 +337,8 @@ export function Profile() {
                 </div>
             ) : !payload ? null : (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                        <div className="card p-5 xl:col-span-2">
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                        <div className="section-shell p-5 xl:col-span-2">
                             <h2 className="font-display text-lg font-semibold text-gray-900 mb-4">Datos de cuenta</h2>
                             <form className="space-y-3" onSubmit={handleSubmit}>
                                 <input
@@ -364,7 +395,7 @@ export function Profile() {
                             </form>
                         </div>
 
-                        <div className="card p-5">
+                        <div className="section-shell p-5">
                             <h2 className="font-display text-lg font-semibold text-gray-900 mb-4">Resumen</h2>
                             <div className="flex items-center gap-3 mb-4">
                                 {currentAvatarUrl ? (
@@ -392,13 +423,13 @@ export function Profile() {
                     </div>
 
                     <ChangePasswordCard
-                        title="Cambiar contrasena"
-                        description="Actualiza tu contrasena de acceso. Al guardar, cerraremos tu sesion para que entres nuevamente con la nueva clave."
+                        title="Cambiar contraseña"
+                        description="Actualiza tu contraseña de acceso. Al guardar, cerraremos tu sesión para que entres nuevamente con la nueva clave."
                     />
 
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        <div className="card p-5">
-                            <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis resenas</h3>
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                        <div className="section-shell p-5">
+                            <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis reseñas</h3>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                                 {payload.userProfile.recentReviews.length > 0 ? payload.userProfile.recentReviews.map((review) => (
                                     <div key={review.id} className="rounded-xl border border-gray-100 p-3">
@@ -410,12 +441,12 @@ export function Profile() {
                                         <p className="text-sm text-gray-700 mt-1">{review.comment?.trim() || '(Sin comentario)'}</p>
                                     </div>
                                 )) : (
-                                    <p className="text-sm text-gray-500">Aun no tienes resenas publicadas.</p>
+                                    <p className="text-sm text-gray-500">Aún no tienes reseñas publicadas.</p>
                                 )}
                             </div>
                         </div>
 
-                        <div className="card p-5">
+                        <div className="section-shell p-5">
                             <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis reservas</h3>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                                 {payload.userProfile.recentBookings.length > 0 ? payload.userProfile.recentBookings.map((booking) => (
@@ -439,7 +470,7 @@ export function Profile() {
                     </div>
 
                     {payload.profileType === 'BUSINESS_OWNER' && payload.businessProfile && (
-                        <div className="card p-5">
+                        <div className="section-shell p-5">
                             <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Perfil de negocio</h3>
                             <div className="space-y-3">
                                 {payload.businessProfile.organizations.length > 0 ? payload.businessProfile.organizations.map((organization) => (
@@ -462,7 +493,7 @@ export function Profile() {
                                                     <p className="text-xs text-gray-500">
                                                         {business.verified ? 'Verificado' : business.verificationStatus}
                                                         {' - '}
-                                                        {business._count.reviews} resenas
+                                                        {business._count.reviews} reseñas
                                                         {' - '}
                                                         {business._count.bookings} reservas
                                                     </p>
@@ -479,17 +510,17 @@ export function Profile() {
 
                     {payload.profileType === 'ADMIN' && payload.adminProfile && (
                         <div className="space-y-6">
-                            <div className="card p-5">
+                            <div className="section-shell p-5">
                                 <h3 className="font-display text-lg font-semibold text-gray-900 mb-2">Seguridad de administrador</h3>
                                 <p className="text-sm text-gray-600 mb-4">
-                                    La configuracion de 2FA y controles de sesion de admin se gestiona en una pantalla dedicada.
+                                    La configuración de 2FA y controles de sesión de admin se gestiona en una pantalla dedicada.
                                 </p>
                                 <Link to="/security" className="btn-secondary text-sm">
                                     Ir a Seguridad
                                 </Link>
                             </div>
 
-                            <div className="card p-5">
+                            <div className="section-shell p-5">
                                 <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Perfil admin</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                                     <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
@@ -520,8 +551,8 @@ export function Profile() {
                             </div>
 
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                                <div className="card p-5">
-                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Resenas en riesgo</h4>
+                                <div className="section-shell p-5">
+                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Reseñas en riesgo</h4>
                                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                         {payload.adminProfile.flaggedReviews.length > 0 ? payload.adminProfile.flaggedReviews.map((review) => (
                                             <div key={review.id} className="rounded-xl border border-gray-100 p-3">
@@ -533,12 +564,12 @@ export function Profile() {
                                                 ) : null}
                                             </div>
                                         )) : (
-                                            <p className="text-sm text-gray-500">No hay resenas en riesgo.</p>
+                                            <p className="text-sm text-gray-500">No hay reseñas en riesgo.</p>
                                         )}
                                     </div>
                                 </div>
 
-                                <div className="card p-5">
+                                <div className="section-shell p-5">
                                     <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Ultimas organizaciones</h4>
                                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                         {payload.adminProfile.latestOrganizations.length > 0 ? payload.adminProfile.latestOrganizations.map((organization) => (

@@ -50,7 +50,7 @@ export function Login() {
             navigate('/app');
         } catch (err: unknown) {
             const requestError = err as { response?: { data?: { message?: string } } };
-            const message = requestError.response?.data?.message || 'Error al iniciar sesion';
+            const message = requestError.response?.data?.message || 'Error al iniciar sesión';
             if (String(message).toLowerCase().includes('2fa')) {
                 setRequiresTwoFactor(true);
             }
@@ -95,7 +95,7 @@ export function Login() {
                             A
                         </div>
                         <h1 className="font-display text-2xl font-bold text-slate-900">Bienvenido de vuelta</h1>
-                        <p className="mt-1 text-sm text-slate-500">Inicia sesion en tu cuenta</p>
+                        <p className="mt-1 text-sm text-slate-500">Inicia sesión en tu cuenta</p>
                     </div>
 
                     {notice && (
@@ -131,7 +131,7 @@ export function Login() {
                             <>
                                 <div>
                                     <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-slate-700">
-                                        Correo electronico
+                                        Correo electrónico
                                     </label>
                                     <input
                                         id="login-email"
@@ -148,10 +148,10 @@ export function Login() {
                                 <div>
                                     <div className="flex items-center justify-between gap-3 mb-1">
                                         <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">
-                                            Contrasena
+                                            Contraseña
                                         </label>
                                         <Link to="/forgot-password" className="text-xs font-medium text-primary-600 hover:text-primary-700">
-                                            Olvide mi contrasena
+                                            Olvidé mi contraseña
                                         </Link>
                                     </div>
                                     <input
@@ -170,7 +170,7 @@ export function Login() {
                         )}
                         {pendingGoogleIdToken && (
                             <div className="alert-warning space-y-3">
-                                <p>Tu cuenta requiere un segundo factor. Introduce el codigo 2FA para completar el acceso con Google.</p>
+                                <p>Tu cuenta requiere un segundo factor. Introduce el código 2FA para completar el acceso con Google.</p>
                                 <button
                                     type="button"
                                     className="text-xs font-semibold text-amber-900 hover:text-amber-950"
@@ -181,14 +181,14 @@ export function Login() {
                                         setError('');
                                     }}
                                 >
-                                    Volver al acceso con correo y contrasena
+                                    Volver al acceso con correo y contraseña
                                 </button>
                             </div>
                         )}
                         {requiresTwoFactor && (
                             <div>
                                 <label htmlFor="login-2fa" className="mb-1 block text-sm font-medium text-slate-700">
-                                    Codigo 2FA (6 digitos)
+                                    Código 2FA (6 dígitos)
                                 </label>
                                 <input
                                     id="login-2fa"
@@ -211,14 +211,14 @@ export function Login() {
                             </div>
                         )}
                         <button type="submit" disabled={loading} className="btn-primary w-full">
-                            {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesion'}
+                            {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
                         </button>
                     </form>
 
                     <p className="mt-6 text-center text-sm text-slate-500">
-                        No tienes cuenta?{' '}
+                        ¿No tienes cuenta?{' '}
                         <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                            Registrate
+                            Regístrate
                         </Link>
                     </p>
             </div>

@@ -441,7 +441,7 @@ export function EditBusiness() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6 animate-fade-in">
+        <div className="page-shell max-w-5xl space-y-6 animate-fade-in">
             <section className="role-hero role-hero-owner">
                 <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Editar negocio</h1>
@@ -458,17 +458,17 @@ export function EditBusiness() {
             </section>
 
             {errorMessage && (
-                <section role="alert" aria-live="assertive" className="card p-4 border border-red-100 bg-red-50">
+                <section role="alert" aria-live="assertive" className="section-shell border border-red-100 bg-red-50 p-4">
                     <p className="text-sm text-red-700">{errorMessage}</p>
                 </section>
             )}
             {successMessage && (
-                <section role="status" aria-live="polite" className="card p-4 border border-primary-100 bg-primary-50">
+                <section role="status" aria-live="polite" className="section-shell border border-primary-100 bg-primary-50 p-4">
                     <p className="text-sm text-primary-700">{successMessage}</p>
                 </section>
             )}
 
-            <form onSubmit={(event) => void handleSubmit(event)} className="card p-6 lg:p-8 space-y-6">
+            <form onSubmit={(event) => void handleSubmit(event)} className="section-shell p-6 lg:p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                         <label htmlFor="edit-business-name" className="text-sm font-medium text-gray-700 mb-1 block">
