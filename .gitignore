@@ -10,6 +10,7 @@ coverage/
 .turbo/
 *.tsbuildinfo
 .vercel/
+**/.vercel/
 /uploads/
 apps/api/uploads/
 apps/api/src/generated/prisma/

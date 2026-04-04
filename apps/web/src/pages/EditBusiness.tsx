@@ -20,6 +20,7 @@ import {
     type Province,
     type Sector,
 } from './edit-business/types';
+import { formatPublicCategoryIcon, formatPublicCategoryPath } from '../lib/categoryLabel';
 
 export function EditBusiness() {
     const { businessId } = useParams<{ businessId: string }>();
@@ -726,9 +727,8 @@ export function EditBusiness() {
                                         : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
                                 }`}
                             >
-                                {category.icon ? `${category.icon} ` : ''}
-                                {category.parent?.name ? `${category.parent.name} / ` : ''}
-                                {category.name}
+                                {formatPublicCategoryIcon(category.icon) ? `${formatPublicCategoryIcon(category.icon)} ` : ''}
+                                {formatPublicCategoryPath(category.parent?.name, category.name)}
                             </button>
                         ))}
                     </div>

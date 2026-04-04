@@ -135,7 +135,7 @@ export function MainLayout() {
     return (
         <div className="min-h-screen flex flex-col">
             <Navbar />
-            <main className="flex-1">
+            <main>
                 <Outlet />
             </main>
             {showFooter && <Footer />}

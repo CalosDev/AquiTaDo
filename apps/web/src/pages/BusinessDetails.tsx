@@ -8,7 +8,7 @@ import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { trackGrowthEvent as trackGrowthSignal } from '../lib/growthTracking';
 import { BUSINESS_DAY_OPTIONS, businessPriceRangeLabel } from '../lib/businessProfile';
-import { formatPublicCategoryPath } from '../lib/categoryLabel';
+import { formatPublicCategoryIcon, formatPublicCategoryPath } from '../lib/categoryLabel';
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { featureFlags } from '../config/features';
@@ -973,7 +973,7 @@ export function BusinessDetails() {
                                                     key={entry.category.name}
                                                     className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm"
                                                 >
-                                                    {entry.category.icon ? `${entry.category.icon} ` : ''}
+                                                    {formatPublicCategoryIcon(entry.category.icon) ? `${formatPublicCategoryIcon(entry.category.icon)} ` : ''}
                                                     {formatPublicCategoryPath(entry.category.parent?.name, entry.category.name)}
                                                 </span>
                                             ))}
@@ -1108,7 +1108,8 @@ export function BusinessDetails() {
                                     <div className="flex flex-wrap gap-1">
                                         {business.categories?.map((bc, i) => (
                                             <span key={i} className="bg-primary-50 text-primary-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                                                {bc.category.icon} {formatPublicCategoryPath(bc.category.parent?.name, bc.category.name)}
+                                                {formatPublicCategoryIcon(bc.category.icon) ? `${formatPublicCategoryIcon(bc.category.icon)} ` : ''}
+                                                {formatPublicCategoryPath(bc.category.parent?.name, bc.category.name)}
                                             </span>
                                         ))}
                                     </div>

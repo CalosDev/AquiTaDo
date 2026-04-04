@@ -14,6 +14,7 @@ import {
     type BusinessHourEntry,
 } from '../lib/businessProfile';
 import { PublicationGuidancePanel } from './register-business/PublicationGuidancePanel';
+import { formatPublicCategoryIcon, formatPublicCategoryPath } from '../lib/categoryLabel';
 import {
     getRegisterStepActionLabel,
     getRegisterStepTips,
@@ -845,9 +846,8 @@ export function RegisterBusiness() {
                                         : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
                                 }`}
                             >
-                                {category.icon ? `${category.icon} ` : ''}
-                                {category.parent?.name ? `${category.parent.name} / ` : ''}
-                                {category.name}
+                                {formatPublicCategoryIcon(category.icon) ? `${formatPublicCategoryIcon(category.icon)} ` : ''}
+                                {formatPublicCategoryPath(category.parent?.name, category.name)}
                             </button>
                         ))}
                     </div>
