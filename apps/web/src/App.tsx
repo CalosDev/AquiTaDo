@@ -1,5 +1,6 @@
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider } from './context/AuthContext';
 import { OrganizationProvider } from './context/OrganizationContext';
 import { AppRouter } from './routes/Router';
@@ -15,6 +16,7 @@ function App() {
                     </OrganizationProvider>
                 </AuthProvider>
             </BrowserRouter>
+            <SpeedInsights />
         </QueryClientProvider>
     );
 }
