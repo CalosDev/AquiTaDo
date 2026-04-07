@@ -132,6 +132,52 @@ async function loadProvincesFromAdministrativeDivisionsDb(): Promise<string[] | 
     }
 }
 
+async function deduplicateFeaturesByName() {
+    const duplicates = await prisma.feature.groupBy({
+        by: ['name'],
+        _count: { name: true },
+        having: {
+            name: {
+                _count: {
+                    gt: 1,
+                },
+            },
+        },
+    });
+
+    for (const duplicate of duplicates) {
+        const entries = await prisma.feature.findMany({
+            where: { name: duplicate.name },
+            select: { id: true },
+            orderBy: { id: 'asc' },
+        });
+
+        const keeperId = entries[0]?.id;
+        const duplicateIds = entries.slice(1).map((entry) => entry.id);
+        if (!keeperId || duplicateIds.length === 0) {
+            continue;
+        }
+
+        for (const duplicateId of duplicateIds) {
+            await prisma.$executeRaw`
+                INSERT INTO "business_features" ("businessId", "featureId")
+                SELECT "businessId", ${keeperId}
+                FROM "business_features"
+                WHERE "featureId" = ${duplicateId}
+                ON CONFLICT DO NOTHING
+            `;
+
+            await prisma.businessFeature.deleteMany({
+                where: { featureId: duplicateId },
+            });
+
+            await prisma.feature.delete({
+                where: { id: duplicateId },
+            });
+        }
+    }
+}
+
 async function main() {
     console.log('🌱 Seeding AquiTa.do database...');
 
@@ -447,6 +493,8 @@ async function main() {
         'Para Llevar', 'Reservaciones', 'Accesible', 'Acepta Tarjetas',
         'Terraza', 'Música en Vivo', 'Pet Friendly', 'Área Infantil',
     ];
+
+    await deduplicateFeaturesByName();
 
     for (const name of features) {
         await prisma.feature.upsert({

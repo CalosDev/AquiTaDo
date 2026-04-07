@@ -334,8 +334,8 @@ Separacion aplicada:
 - `pnpm lint`: Lint de todo el monorepo
 - `pnpm smoke:api`: Smoke de endpoints health
 - `pnpm smoke:full`: Smoke integral (API + datos base + marketplace publico + health web)
-- `pnpm smoke:saas`: Smoke end-to-end de flujos SaaS y marketplace
-- `pnpm smoke:prod`: Smoke de produccion (health + catalogo + IA concierge + check-ins + rutas web)
+- `pnpm smoke:saas`: Smoke end-to-end local con matriz real de roles (`USER`, `BUSINESS_OWNER`, `ADMIN`)
+- `pnpm smoke:prod`: Smoke de produccion (publico + roles opcionales por credenciales)
 - `pnpm ai:reindex:embeddings`: Reindex masivo de embeddings IA para negocios verificados
 - `pnpm db:generate`: Prisma generate
 - `pnpm db:migrate`: Prisma migrate dev (flujo local interactivo)
@@ -356,11 +356,44 @@ AI_REINDEX_ORGANIZATION_ID=org_uuid pnpm ai:reindex:embeddings
 AI_REINDEX_LIMIT=100 pnpm ai:reindex:embeddings
 ```
 
+Smoke SaaS local por roles:
+
+```powershell
+# Requiere API local activa en http://localhost:3000
+# Si usas el stack docker + seed local, el admin seeded se resuelve automaticamente
+$env:SAAS_SMOKE_API_BASE_URL="http://localhost:3000"
+pnpm smoke:saas
+```
+
+Variables opcionales para smoke SaaS:
+
+- `SAAS_SMOKE_API_BASE_URL`: base URL del API local o de staging.
+- `SAAS_SMOKE_ADMIN_EMAIL` / `SAAS_SMOKE_ADMIN_PASSWORD`: admin explicito para flujos de verificacion, moderacion y observabilidad. Si el API es `localhost`, el script usa por defecto `admin@aquita.do` / `admin12345` del seed local.
+- `SAAS_SMOKE_VERIFICATION_FILE_URL`: habilita la subida de documento KYC dentro del smoke.
+
 Ejemplo smoke en produccion (PowerShell):
 
 ```powershell
 $env:SMOKE_PROD_API_BASE_URL="https://aquitado.onrender.com"
 $env:SMOKE_PROD_WEB_BASE_URL="https://aquitado.vercel.app"
 $env:SMOKE_PROD_SKIP_CHECKINS="1"   # usar "0" cuando migracion check-ins este aplicada
+$env:SMOKE_PROD_USER_EMAIL="user@example.com"
+$env:SMOKE_PROD_USER_PASSWORD="..."
+$env:SMOKE_PROD_OWNER_EMAIL="owner@example.com"
+$env:SMOKE_PROD_OWNER_PASSWORD="..."
+$env:SMOKE_PROD_ADMIN_EMAIL="admin@example.com"
+$env:SMOKE_PROD_ADMIN_PASSWORD="..."
 pnpm smoke:prod
 ```
+
+Variables soportadas por `pnpm smoke:prod`:
+
+- `SMOKE_PROD_API_BASE_URL`: API productiva o de staging.
+- `SMOKE_PROD_WEB_BASE_URL`: frontend productivo o de staging.
+- `SMOKE_PROD_SKIP_CHECKINS=1`: omite la validacion publica de check-ins si el entorno aun no la tiene lista.
+- `SMOKE_PROD_SKIP_WEB=1`: omite las rutas web cuando solo quieres validar API.
+- `SMOKE_PROD_CHECKIN_CREATE=1`: habilita un `POST /api/checkins` real en el actor `USER`.
+- `SMOKE_PROD_USER_EMAIL` / `SMOKE_PROD_USER_PASSWORD`: smoke autenticado de cliente final.
+- `SMOKE_PROD_OWNER_EMAIL` / `SMOKE_PROD_OWNER_PASSWORD`: smoke autenticado de propietario de negocio.
+- `SMOKE_PROD_OWNER_ORGANIZATION_ID`: fuerza el tenant a usar para endpoints con `x-organization-id`.
+- `SMOKE_PROD_ADMIN_EMAIL` / `SMOKE_PROD_ADMIN_PASSWORD`: smoke autenticado del panel admin y observabilidad.

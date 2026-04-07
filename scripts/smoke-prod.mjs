@@ -59,6 +59,7 @@ async function request(baseUrl, path, options = {}) {
     const {
         method = 'GET',
         token,
+        organizationId,
         body,
         headers: customHeaders,
         accept = 'application/json',
@@ -71,6 +72,10 @@ async function request(baseUrl, path, options = {}) {
 
     if (token) {
         headers.authorization = `Bearer ${token}`;
+    }
+
+    if (organizationId) {
+        headers['x-organization-id'] = organizationId;
     }
 
     if (body !== undefined) {
@@ -223,59 +228,191 @@ async function runApiSmoke(apiBaseUrl, skipCheckIns) {
     return { firstBusinessId };
 }
 
-async function runOptionalAuthSmoke(apiBaseUrl, firstBusinessId) {
+async function loginRole(apiBaseUrl, label, email, password) {
+    const login = await request(apiBaseUrl, '/api/auth/login', {
+        method: 'POST',
+        body: {
+            email,
+            password,
+        },
+    });
+    expectStatus(login, [200], `POST /api/auth/login (${label})`);
+
+    const accessToken = login.json?.accessToken;
+    assert(typeof accessToken === 'string', `${label} login did not return accessToken`);
+
+    return {
+        label,
+        accessToken,
+        user: login.json?.user ?? null,
+    };
+}
+
+async function runUserRoleSmoke(apiBaseUrl, firstBusinessId) {
     const userEmail = process.env.SMOKE_PROD_USER_EMAIL?.trim();
     const userPassword = process.env.SMOKE_PROD_USER_PASSWORD?.trim();
 
     if (!userEmail || !userPassword) {
-        console.log('Skipping auth checks: set SMOKE_PROD_USER_EMAIL and SMOKE_PROD_USER_PASSWORD');
+        console.log('Skipping USER smoke: set SMOKE_PROD_USER_EMAIL and SMOKE_PROD_USER_PASSWORD');
         return;
     }
 
-    console.log('Running authenticated checks');
+    const user = await loginRole(apiBaseUrl, 'USER', userEmail, userPassword);
 
-    const login = await request(apiBaseUrl, '/api/auth/login', {
-        method: 'POST',
-        body: {
-            email: userEmail,
-            password: userPassword,
-        },
-    });
-    expectStatus(login, [200], 'POST /api/auth/login');
-    const accessToken = login.json?.accessToken;
-    assert(typeof accessToken === 'string', 'Login did not return accessToken');
+    const endpoints = [
+        '/api/users/me',
+        '/api/users/me/profile',
+        '/api/favorites/businesses/my?limit=8',
+        '/api/favorites/lists/my?limit=8',
+        '/api/auth/2fa/status',
+    ];
 
-    const me = await request(apiBaseUrl, '/api/users/me', {
-        token: accessToken,
-    });
-    expectStatus(me, [200], 'GET /api/users/me');
+    for (const endpoint of endpoints) {
+        const response = await request(apiBaseUrl, endpoint, {
+            token: user.accessToken,
+        });
+        expectStatus(response, [200], `GET ${endpoint} (USER)`);
+    }
 
     if (process.env.SMOKE_PROD_CHECKIN_CREATE !== '1') {
-        console.log('Skipping check-in create: set SMOKE_PROD_CHECKIN_CREATE=1 to enable');
+        console.log('Skipping USER check-in create: set SMOKE_PROD_CHECKIN_CREATE=1 to enable');
         return;
     }
 
     const createCheckIn = await request(apiBaseUrl, '/api/checkins', {
         method: 'POST',
-        token: accessToken,
+        token: user.accessToken,
         body: {
             businessId: firstBusinessId,
         },
     });
 
     if (createCheckIn.status === 201 || createCheckIn.status === 200) {
-        console.log('Check-in create passed');
+        console.log('USER check-in create passed');
         return;
     }
 
     if (isExpectedCheckInError(createCheckIn)) {
-        console.log('Check-in create returned expected cooldown/daily-limit validation');
+        console.log('USER check-in create returned expected cooldown/daily-limit validation');
         return;
     }
 
     throw new Error(
         `POST /api/checkins failed with HTTP ${createCheckIn.status}. Response: ${formatResponsePayload(createCheckIn)}`,
     );
+}
+
+async function runOwnerRoleSmoke(apiBaseUrl) {
+    const ownerEmail =
+        process.env.SMOKE_PROD_OWNER_EMAIL?.trim()
+        || process.env.SMOKE_PROD_BUSINESS_OWNER_EMAIL?.trim();
+    const ownerPassword =
+        process.env.SMOKE_PROD_OWNER_PASSWORD?.trim()
+        || process.env.SMOKE_PROD_BUSINESS_OWNER_PASSWORD?.trim();
+
+    if (!ownerEmail || !ownerPassword) {
+        console.log(
+            'Skipping BUSINESS_OWNER smoke: set SMOKE_PROD_OWNER_EMAIL/SMOKE_PROD_OWNER_PASSWORD',
+        );
+        return;
+    }
+
+    const owner = await loginRole(apiBaseUrl, 'BUSINESS_OWNER', ownerEmail, ownerPassword);
+
+    const meEndpoints = [
+        '/api/users/me',
+        '/api/users/me/profile',
+        '/api/auth/2fa/status',
+        '/api/organizations/mine',
+    ];
+
+    let organizationsResponse = null;
+    for (const endpoint of meEndpoints) {
+        const response = await request(apiBaseUrl, endpoint, {
+            token: owner.accessToken,
+        });
+        expectStatus(response, [200], `GET ${endpoint} (BUSINESS_OWNER)`);
+        if (endpoint === '/api/organizations/mine') {
+            organizationsResponse = response;
+        }
+    }
+
+    const explicitOrganizationId = process.env.SMOKE_PROD_OWNER_ORGANIZATION_ID?.trim();
+    const organizationId =
+        explicitOrganizationId
+        || organizationsResponse?.json?.[0]?.id
+        || organizationsResponse?.json?.data?.[0]?.id
+        || null;
+
+    if (!organizationId) {
+        console.log('Skipping organization-scoped BUSINESS_OWNER checks: no organization id available');
+        return;
+    }
+
+    const organizationEndpoints = [
+        '/api/businesses/my?limit=8',
+        '/api/analytics/dashboard/my?days=30',
+        '/api/payments/my?limit=8',
+        '/api/subscriptions/current',
+    ];
+
+    for (const endpoint of organizationEndpoints) {
+        const response = await request(apiBaseUrl, endpoint, {
+            token: owner.accessToken,
+            organizationId,
+        });
+        expectStatus(response, [200], `GET ${endpoint} (BUSINESS_OWNER)`);
+    }
+}
+
+async function runAdminRoleSmoke(apiBaseUrl) {
+    const adminEmail = process.env.SMOKE_PROD_ADMIN_EMAIL?.trim();
+    const adminPassword = process.env.SMOKE_PROD_ADMIN_PASSWORD?.trim();
+
+    if (!adminEmail || !adminPassword) {
+        console.log('Skipping ADMIN smoke: set SMOKE_PROD_ADMIN_EMAIL and SMOKE_PROD_ADMIN_PASSWORD');
+        return;
+    }
+
+    const admin = await loginRole(apiBaseUrl, 'ADMIN', adminEmail, adminPassword);
+
+    const adminJsonEndpoints = [
+        '/api/auth/2fa/status',
+        '/api/businesses/admin/all?limit=100',
+        '/api/businesses/admin/catalog-quality?limit=25',
+        '/api/analytics/growth/insights?days=30&limit=10',
+        '/api/analytics/market-insights?days=30&limit=10',
+        '/api/verification/admin/moderation-queue?limit=80',
+        '/api/reviews/moderation/flagged?limit=50',
+        '/api/analytics/market-reports?limit=20',
+        '/api/verification/admin/pending-businesses?limit=50',
+        '/api/health/dashboard',
+    ];
+
+    for (const endpoint of adminJsonEndpoints) {
+        const response = await request(apiBaseUrl, endpoint, {
+            token: admin.accessToken,
+        });
+        expectStatus(response, [200], `GET ${endpoint} (ADMIN)`);
+    }
+
+    const metricsResponse = await request(apiBaseUrl, '/api/observability/metrics', {
+        token: admin.accessToken,
+        accept: 'text/plain',
+    });
+    expectStatus(metricsResponse, [200], 'GET /api/observability/metrics (ADMIN)');
+    assert(
+        metricsResponse.text.includes('aquita_http_request_duration_seconds')
+        || metricsResponse.text.includes('aquita_http_requests_total'),
+        'Admin metrics payload is missing expected counters',
+    );
+}
+
+async function runOptionalAuthSmoke(apiBaseUrl, firstBusinessId) {
+    console.log('Running authenticated role checks');
+    await runUserRoleSmoke(apiBaseUrl, firstBusinessId);
+    await runOwnerRoleSmoke(apiBaseUrl);
+    await runAdminRoleSmoke(apiBaseUrl);
 }
 
 async function runWebSmoke(webBaseUrl) {
