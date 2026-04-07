@@ -368,16 +368,16 @@ export function Profile() {
                                 Vista personalizada según tu rol en la plataforma, con acceso rápido a tu actividad y configuraciones clave.
                             </p>
                         </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:min-w-[32rem]">
                             {profileHighlights.map((item) => (
-                                <div key={item.label} className="role-kpi-card">
+                                <article key={item.label} className="role-kpi-card">
                                     <p className="role-kpi-label">{item.label}</p>
                                     {item.compact ? (
-                                        <p className="mt-1 text-sm font-semibold text-white">{item.value}</p>
+                                        <p className="role-kpi-compact">{item.value}</p>
                                     ) : (
                                         <p className="role-kpi-value">{item.value}</p>
                                     )}
-                                </div>
+                                </article>
                             ))}
                         </div>
                     </div>
