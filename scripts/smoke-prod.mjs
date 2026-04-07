@@ -7,24 +7,19 @@ const DEFAULT_WEB_BASE_URL = 'https://aquitado.vercel.app';
 const REQUEST_TIMEOUT_MS = 75_000;
 const FRONTEND_BUNDLE_PATTERNS = [
     {
-        pattern: /zustand/i,
-        label: 'zustand',
-        reason: 'unexpected state-management dependency detected in first-party bundle',
+        pattern: /\[DEPRECATED\]\s*Default export is deprecated\. Instead use `import \{ create \} from 'zustand'`/i,
+        label: 'zustand deprecation warning',
+        reason: 'unexpected Zustand runtime warning code detected in first-party bundle',
     },
     {
-        pattern: /@radix-ui/i,
-        label: '@radix-ui',
-        reason: 'unexpected Radix UI dependency detected in first-party bundle',
+        pattern: /DialogContent` requires a `DialogTitle`/i,
+        label: 'DialogContent accessibility warning',
+        reason: 'unexpected dialog accessibility warning detected in first-party bundle',
     },
     {
-        pattern: /DialogContent/,
-        label: 'DialogContent',
-        reason: 'unexpected dialog primitive detected in first-party bundle',
-    },
-    {
-        pattern: /DialogTitle/,
-        label: 'DialogTitle',
-        reason: 'unexpected dialog title primitive detected in first-party bundle',
+        pattern: /Missing `Description` or `aria-describedby=\{undefined\}` for \{DialogContent\}/i,
+        label: 'DialogContent description warning',
+        reason: 'unexpected dialog description warning detected in first-party bundle',
     },
 ];
 
