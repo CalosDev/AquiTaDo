@@ -1,6 +1,6 @@
 const DEFAULT_API_BASE_URL = 'https://aquitado.onrender.com';
 const DEFAULT_WEB_BASE_URL = 'https://aquitado.vercel.app';
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 75_000;
 const FRONTEND_BUNDLE_PATTERNS = [
     {
         pattern: /zustand/i,

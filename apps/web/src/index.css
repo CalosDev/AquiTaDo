@@ -486,7 +486,7 @@
   }
 
   .role-kpi-card {
-    @apply relative overflow-hidden rounded-[24px] border border-white/16 bg-white/[0.11] px-5 py-4 backdrop-blur-md;
+    @apply relative min-h-[8.75rem] overflow-hidden rounded-[24px] border border-white/16 bg-white/[0.11] px-5 py-4 backdrop-blur-md;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.14),
       0 20px 36px -28px rgba(2, 6, 23, 0.62);
@@ -519,20 +519,20 @@
   }
 
   .role-kpi-value {
-    @apply relative z-[1] mt-3 font-display text-[2.7rem] font-bold leading-none text-white;
+    @apply relative z-[1] mt-3 min-h-[2.75rem] font-display text-[2.7rem] font-bold leading-none text-white tabular-nums;
     letter-spacing: -0.04em;
   }
 
   .role-kpi-compact {
-    @apply relative z-[1] mt-3 text-sm font-semibold leading-5 text-white;
+    @apply relative z-[1] mt-3 min-h-[2.5rem] text-sm font-semibold leading-5 text-white;
   }
 
   .role-kpi-skeleton {
-    @apply mt-3 h-9 w-20 animate-pulse rounded-xl bg-white/15;
+    @apply mt-3 h-11 w-20 animate-pulse rounded-xl bg-white/15;
   }
 
   .role-kpi-skeleton-compact {
-    @apply mt-3 h-5 w-28 animate-pulse rounded-lg bg-white/15;
+    @apply mt-3 h-10 w-28 animate-pulse rounded-lg bg-white/15;
   }
 
   .kpi-chip-soft {

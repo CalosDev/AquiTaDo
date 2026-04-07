@@ -18,7 +18,7 @@ export function ChangePasswordCard({
     className = '',
 }: ChangePasswordCardProps) {
     const navigate = useNavigate();
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -85,6 +85,17 @@ export function ChangePasswordCard({
             )}
 
             <form className="space-y-3" onSubmit={handleSubmit}>
+                <input
+                    className="sr-only"
+                    type="email"
+                    name="username"
+                    autoComplete="username"
+                    value={user?.email ?? ''}
+                    readOnly
+                    tabIndex={-1}
+                    aria-hidden="true"
+                />
+
                 <div>
                     <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 mb-1">
                         Contraseña actual

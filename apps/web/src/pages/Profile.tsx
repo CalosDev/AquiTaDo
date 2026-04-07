@@ -298,6 +298,121 @@ function getAdminMetricCards(adminProfile: NonNullable<ProfilePayload['adminProf
     ];
 }
 
+function ProfilePulseBlock({ className }: { className: string }) {
+    return <div className={`animate-pulse rounded-xl bg-slate-100 ${className}`}></div>;
+}
+
+function ProfileLoadingSkeleton({ profileType }: { profileType: ProfileType | null }) {
+    return (
+        <div className="space-y-6" aria-hidden="true">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="section-shell p-5 xl:col-span-2">
+                    <ProfilePulseBlock className="h-6 w-36" />
+                    <div className="mt-5 space-y-3">
+                        <ProfilePulseBlock className="h-11 w-full" />
+                        <ProfilePulseBlock className="h-11 w-full" />
+                        <ProfilePulseBlock className="h-28 w-full rounded-2xl" />
+                        <ProfilePulseBlock className="h-11 w-44" />
+                    </div>
+                </div>
+
+                <div className="section-shell p-5">
+                    <ProfilePulseBlock className="h-6 w-32" />
+                    <div className="mt-4 flex items-center gap-3">
+                        <ProfilePulseBlock className="h-14 w-14 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                            <ProfilePulseBlock className="h-4 w-32" />
+                            <ProfilePulseBlock className="h-3 w-44" />
+                        </div>
+                    </div>
+                    <div className="mt-5 space-y-3">
+                        {Array.from({ length: 3 }).map((_, index) => (
+                            <div key={`summary-skeleton-${index}`} className="dashboard-summary-item">
+                                <ProfilePulseBlock className="h-3 w-24" />
+                                <ProfilePulseBlock className="h-4 w-20" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div className="card p-5">
+                <ProfilePulseBlock className="h-6 w-44" />
+                <ProfilePulseBlock className="mt-3 h-4 w-[32rem] max-w-full" />
+                <div className="mt-5 space-y-3">
+                    <ProfilePulseBlock className="h-11 w-full" />
+                    <ProfilePulseBlock className="h-11 w-full" />
+                    <ProfilePulseBlock className="h-11 w-full" />
+                    <ProfilePulseBlock className="h-11 w-64" />
+                </div>
+            </div>
+
+            {profileType === 'USER' ? (
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                    {Array.from({ length: 2 }).map((_, index) => (
+                        <div key={`user-section-${index}`} className="section-shell p-5">
+                            <ProfilePulseBlock className="h-6 w-32" />
+                            <div className="mt-4 space-y-3">
+                                {Array.from({ length: 3 }).map((__, rowIndex) => (
+                                    <ProfilePulseBlock key={`user-row-${index}-${rowIndex}`} className="h-20 w-full rounded-2xl" />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
+            {profileType === 'BUSINESS_OWNER' ? (
+                <div className="section-shell p-5">
+                    <ProfilePulseBlock className="h-6 w-40" />
+                    <div className="mt-4 space-y-4">
+                        {Array.from({ length: 2 }).map((_, index) => (
+                            <div key={`owner-org-${index}`} className="rounded-xl border border-slate-100 p-4">
+                                <ProfilePulseBlock className="h-5 w-40" />
+                                <ProfilePulseBlock className="mt-2 h-4 w-56" />
+                                <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+                                    <ProfilePulseBlock className="h-20 w-full rounded-xl" />
+                                    <ProfilePulseBlock className="h-20 w-full rounded-xl" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+
+            {profileType === 'ADMIN' ? (
+                <div className="space-y-6">
+                    <div className="section-shell p-5">
+                        <ProfilePulseBlock className="h-6 w-48" />
+                        <ProfilePulseBlock className="mt-3 h-4 w-[30rem] max-w-full" />
+                        <ProfilePulseBlock className="mt-4 h-10 w-36" />
+                    </div>
+                    <div className="section-shell p-5">
+                        <ProfilePulseBlock className="h-6 w-44" />
+                        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {Array.from({ length: 6 }).map((_, index) => (
+                                <ProfilePulseBlock key={`admin-metric-${index}`} className="h-28 w-full rounded-2xl" />
+                            ))}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                        {Array.from({ length: 2 }).map((_, index) => (
+                            <div key={`admin-column-${index}`} className="section-shell p-5">
+                                <ProfilePulseBlock className="h-6 w-40" />
+                                <div className="mt-4 space-y-3">
+                                    {Array.from({ length: 3 }).map((__, rowIndex) => (
+                                        <ProfilePulseBlock key={`admin-row-${index}-${rowIndex}`} className="h-20 w-full rounded-2xl" />
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 export function Profile() {
     const { refreshProfile, user } = useAuth();
     const [loading, setLoading] = useState(true);
@@ -485,9 +600,7 @@ export function Profile() {
             )}
 
             {loading ? (
-                <div className="flex justify-center py-16">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
-                </div>
+                <ProfileLoadingSkeleton profileType={heroProfileType} />
             ) : !payload ? null : (
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
