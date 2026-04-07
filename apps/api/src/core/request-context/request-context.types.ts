@@ -1,3 +1,5 @@
+import { OrganizationRole, Role } from '../../generated/prisma/client';
+
 export interface RequestContextState {
     requestId: string | null;
     traceId: string | null;
@@ -5,7 +7,7 @@ export interface RequestContextState {
     method: string | null;
     path: string | null;
     userId: string | null;
-    userRole: string | null;
+    userRole: Role | null;
     organizationId: string | null;
-    organizationRole: string | null;
+    organizationRole: OrganizationRole | null;
 }

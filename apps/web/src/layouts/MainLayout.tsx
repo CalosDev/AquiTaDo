@@ -13,6 +13,13 @@ const FOOTER_HIDDEN_PREFIXES = [
     '/security',
 ];
 
+const COMPACT_FOOTER_PATHS = new Set([
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/reset-password',
+]);
+
 function resolveRouteSeo(pathname: string): { title: string; description: string; noindex?: boolean } {
     if (pathname === '/') {
         return {
@@ -39,6 +46,22 @@ function resolveRouteSeo(pathname: string): { title: string; description: string
         return {
             title: 'Iniciar Sesión | AquiTa.do',
             description: 'Inicia sesión para gestionar tu cuenta, reseñas y operaciones de negocio.',
+            noindex: true,
+        };
+    }
+
+    if (pathname === '/forgot-password') {
+        return {
+            title: 'Recuperar Acceso | AquiTa.do',
+            description: 'Solicita un enlace para recuperar el acceso a tu cuenta de AquiTa.do.',
+            noindex: true,
+        };
+    }
+
+    if (pathname === '/reset-password') {
+        return {
+            title: 'Nueva Clave | AquiTa.do',
+            description: 'Define una nueva clave para recuperar el acceso a tu cuenta.',
             noindex: true,
         };
     }
@@ -118,12 +141,11 @@ export function MainLayout() {
         ),
         [location.pathname],
     );
+    const useCompactFooter = showFooter && COMPACT_FOOTER_PATHS.has(location.pathname);
     const routeSeo = useMemo(
         () => resolveRouteSeo(location.pathname),
         [location.pathname],
     );
-    const layoutClassName = showFooter ? 'min-h-screen' : 'min-h-screen flex flex-col';
-    const mainClassName = showFooter ? '' : 'flex-1';
 
     useEffect(() => {
         applySeoMeta({
@@ -135,12 +157,12 @@ export function MainLayout() {
     }, [location.pathname, routeSeo.description, routeSeo.noindex, routeSeo.title]);
 
     return (
-        <div className={layoutClassName}>
+        <div className="min-h-screen flex flex-col">
             <Navbar />
-            <main className={mainClassName}>
+            <main className="flex flex-1 flex-col">
                 <Outlet />
             </main>
-            {showFooter && <Footer />}
+            {showFooter && <Footer compact={useCompactFooter} />}
         </div>
     );
 }

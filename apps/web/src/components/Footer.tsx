@@ -1,12 +1,54 @@
 import { Link } from 'react-router-dom';
 
-export function Footer() {
+type FooterProps = {
+    compact?: boolean;
+};
+
+export function Footer({ compact = false }: FooterProps) {
+    if (compact) {
+        return (
+            <footer className="footer-shell-compact border-t border-primary-100/60 text-slate-200">
+                <div className="flag-ribbon" aria-hidden="true"></div>
+                <div className="max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:px-8">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <Link to="/" className="inline-flex items-center gap-3">
+                            <div className="relative h-10 w-10 overflow-hidden rounded-2xl border border-primary-300/50 bg-white">
+                                <div className="absolute inset-y-0 left-0 w-1/2 bg-primary-700"></div>
+                                <div className="absolute inset-y-0 right-0 w-1/2 bg-accent-600"></div>
+                                <span className="absolute inset-0 flex items-center justify-center font-display text-base font-bold text-white">A</span>
+                            </div>
+                            <div>
+                                <p className="font-display text-xl font-bold text-white">
+                                    Aqui<span className="text-accent-400">Ta</span>.do
+                                </p>
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-primary-200">
+                                    Discovery local en RD
+                                </p>
+                            </div>
+                        </Link>
+
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
+                            <Link to="/businesses" className="transition-colors hover:text-white">Negocios</Link>
+                            <Link to="/about" className="transition-colors hover:text-white">Nosotros</Link>
+                            <Link to="/terms" className="transition-colors hover:text-white">Términos</Link>
+                            <Link to="/privacy" className="transition-colors hover:text-white">Privacidad</Link>
+                        </div>
+
+                        <p className="text-xs text-slate-400">
+                            (c) {new Date().getFullYear()} AquiTa.do
+                        </p>
+                    </div>
+                </div>
+            </footer>
+        );
+    }
+
     return (
-        <footer className="footer-shell mt-8 border-t border-primary-100/60 text-slate-200 sm:mt-10">
+        <footer className="footer-shell mt-4 border-t border-primary-100/60 text-slate-200 sm:mt-6">
             <div className="flag-ribbon" aria-hidden="true"></div>
-            <div className="max-w-7xl mx-auto px-4 py-14 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
                 <h2 className="sr-only">Navegación del pie de página</h2>
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                     <div className="footer-panel lg:col-span-5">
                         <Link to="/" className="inline-flex items-center gap-3">
                             <div className="relative h-11 w-11 overflow-hidden rounded-2xl border border-primary-300/60 bg-white">
@@ -49,9 +91,9 @@ export function Footer() {
                         <h3 className="font-display text-base font-semibold text-white">Plataforma</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
                             <li><Link to="/register" className="transition-colors hover:text-white">Crear cuenta</Link></li>
-                            <li><Link to="/login" className="transition-colors hover:text-white">Iniciar sesion</Link></li>
+                            <li><Link to="/login" className="transition-colors hover:text-white">Iniciar sesión</Link></li>
                             <li><Link to="/register-business" className="transition-colors hover:text-white">Registrar negocio</Link></li>
-                            <li><Link to="/terms" className="transition-colors hover:text-white">Terminos</Link></li>
+                            <li><Link to="/terms" className="transition-colors hover:text-white">Términos</Link></li>
                             <li><Link to="/privacy" className="transition-colors hover:text-white">Privacidad</Link></li>
                         </ul>
                     </div>
@@ -69,7 +111,7 @@ export function Footer() {
                     </div>
                 </div>
 
-                <div className="mt-10 flex flex-col gap-3 border-t border-primary-800/70 pt-6 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-8 flex flex-col gap-3 border-t border-primary-800/70 pt-5 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                     <p>(c) {new Date().getFullYear()} AquiTa.do. Todos los derechos reservados.</p>
                     <div className="flex items-center gap-4">
                         <Link to="/terms" className="transition-colors hover:text-white">Términos</Link>

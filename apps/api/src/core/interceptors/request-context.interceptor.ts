@@ -6,6 +6,7 @@ import {
     NestInterceptor,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
+import { RequestWithOrganizationContext } from '../../organizations/types/organization-context.type';
 import { RequestContextService } from '../request-context/request-context.service';
 import { RequestContextState } from '../request-context/request-context.types';
 
@@ -21,14 +22,7 @@ export class RequestContextInterceptor implements NestInterceptor {
             return next.handle();
         }
 
-        const request = context.switchToHttp().getRequest<{
-            method?: string;
-            path?: string;
-            originalUrl?: string;
-            user?: { id?: string; role?: string };
-            organizationContext?: { organizationId?: string; organizationRole?: string };
-            headers?: Record<string, string | string[] | undefined>;
-        }>();
+        const request = context.switchToHttp().getRequest<RequestWithOrganizationContext>();
 
         const response = context.switchToHttp().getResponse<{
             getHeader(name: string): string | number | string[] | undefined;

@@ -41,16 +41,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
                 message: 'Internal server error',
             };
 
-        this.logger.error(
-            JSON.stringify({
-                requestId,
-                traceId,
-                status,
-                method: request.method,
-                path: request.originalUrl || request.url,
-                error: exception instanceof Error ? exception.message : String(exception),
-            }),
-        );
+        const errorContext = JSON.stringify({
+            requestId,
+            traceId,
+            status,
+            method: request.method,
+            path: request.originalUrl || request.url,
+            error: exception instanceof Error ? exception.message : String(exception),
+        });
+
+        if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+            this.logger.error(
+                errorContext,
+                exception instanceof Error ? exception.stack : undefined,
+            );
+        } else {
+            this.logger.warn(errorContext);
+        }
 
         const payload = typeof baseErrorBody === 'string'
             ? { statusCode: status, message: baseErrorBody }

@@ -147,8 +147,8 @@ export class OrganizationsService {
         }));
     }
 
-    async findById(organizationId: string, userId: string, userRole: string) {
-        const actorRole = await this.resolveActorRole(organizationId, userId, userRole);
+    async findById(organizationId: string, userId: string) {
+        const actorRole = await this.resolveActorRole(organizationId, userId);
 
         const organization = await this.prisma.organization.findUnique({
             where: { id: organizationId },
@@ -165,8 +165,8 @@ export class OrganizationsService {
         };
     }
 
-    async update(organizationId: string, dto: UpdateOrganizationDto, userId: string, userRole: string) {
-        const actorRole = await this.resolveActorRole(organizationId, userId, userRole);
+    async update(organizationId: string, dto: UpdateOrganizationDto, userId: string) {
+        const actorRole = await this.resolveActorRole(organizationId, userId);
         this.assertCanManageOrganization(actorRole);
 
         const existing = await this.prisma.organization.findUnique({
@@ -222,8 +222,8 @@ export class OrganizationsService {
         return updatedOrganization;
     }
 
-    async listMembers(organizationId: string, userId: string, userRole: string) {
-        await this.resolveActorRole(organizationId, userId, userRole);
+    async listMembers(organizationId: string, userId: string) {
+        await this.resolveActorRole(organizationId, userId);
 
         return this.prisma.organizationMember.findMany({
             where: { organizationId },
@@ -241,8 +241,8 @@ export class OrganizationsService {
         });
     }
 
-    async listInvites(organizationId: string, userId: string, userRole: string) {
-        const actorRole = await this.resolveActorRole(organizationId, userId, userRole);
+    async listInvites(organizationId: string, userId: string) {
+        const actorRole = await this.resolveActorRole(organizationId, userId);
         this.assertCanManageOrganization(actorRole);
 
         return this.prisma.organizationInvite.findMany({
@@ -263,8 +263,8 @@ export class OrganizationsService {
         });
     }
 
-    async getSubscription(organizationId: string, userId: string, userRole: string) {
-        const actorRole = await this.resolveActorRole(organizationId, userId, userRole);
+    async getSubscription(organizationId: string, userId: string) {
+        const actorRole = await this.resolveActorRole(organizationId, userId);
 
         const organization = await this.prisma.organization.findUnique({
             where: { id: organizationId },
@@ -301,9 +301,8 @@ export class OrganizationsService {
         organizationId: string,
         dto: UpdateOrganizationSubscriptionDto,
         userId: string,
-        userRole: string,
     ) {
-        const actorRole = await this.resolveActorRole(organizationId, userId, userRole);
+        const actorRole = await this.resolveActorRole(organizationId, userId);
         if (actorRole !== 'OWNER') {
             throw new ForbiddenException('Solo el owner puede actualizar la suscripcion de la organizacion');
         }
@@ -424,8 +423,8 @@ export class OrganizationsService {
         };
     }
 
-    async getUsage(organizationId: string, userId: string, userRole: string) {
-        await this.resolveActorRole(organizationId, userId, userRole);
+    async getUsage(organizationId: string, userId: string) {
+        await this.resolveActorRole(organizationId, userId);
 
         const organization = await this.prisma.organization.findUnique({
             where: { id: organizationId },
@@ -456,8 +455,8 @@ export class OrganizationsService {
         };
     }
 
-    async listAuditLogs(organizationId: string, userId: string, userRole: string, limit = 50) {
-        await this.resolveActorRole(organizationId, userId, userRole);
+    async listAuditLogs(organizationId: string, userId: string, limit = 50) {
+        await this.resolveActorRole(organizationId, userId);
 
         const boundedLimit = Math.min(Math.max(limit, 1), 200);
 
@@ -481,9 +480,8 @@ export class OrganizationsService {
         organizationId: string,
         dto: InviteOrganizationMemberDto,
         userId: string,
-        userRole: string,
     ) {
-        const actorRole = await this.resolveActorRole(organizationId, userId, userRole);
+        const actorRole = await this.resolveActorRole(organizationId, userId);
         this.assertCanManageOrganization(actorRole);
 
         const inviteRole = dto.role ?? 'STAFF';
@@ -692,9 +690,8 @@ export class OrganizationsService {
         memberUserId: string,
         dto: UpdateOrganizationMemberRoleDto,
         actorUserId: string,
-        actorGlobalRole: string,
     ) {
-        const actorRole = await this.resolveActorRole(organizationId, actorUserId, actorGlobalRole);
+        const actorRole = await this.resolveActorRole(organizationId, actorUserId);
         this.assertCanManageOrganization(actorRole);
 
         const targetMembership = await this.prisma.organizationMember.findUnique({
@@ -774,9 +771,8 @@ export class OrganizationsService {
         organizationId: string,
         memberUserId: string,
         actorUserId: string,
-        actorGlobalRole: string,
     ) {
-        const actorRole = await this.resolveActorRole(organizationId, actorUserId, actorGlobalRole);
+        const actorRole = await this.resolveActorRole(organizationId, actorUserId);
         this.assertCanManageOrganization(actorRole);
 
         const targetMembership = await this.prisma.organizationMember.findUnique({
@@ -851,7 +847,6 @@ export class OrganizationsService {
     private async resolveActorRole(
         organizationId: string,
         userId: string,
-        _userRole: string,
     ): Promise<ActorOrgRole> {
         const organization = await this.prisma.organization.findUnique({
             where: { id: organizationId },

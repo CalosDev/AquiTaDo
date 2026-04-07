@@ -52,9 +52,8 @@ export class OrganizationsController {
     async findById(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
-        return this.organizationsService.findById(organizationId, userId, userRole);
+        return this.organizationsService.findById(organizationId, userId);
     }
 
     @Patch(':id')
@@ -62,36 +61,32 @@ export class OrganizationsController {
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Body() dto: UpdateOrganizationDto,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
-        return this.organizationsService.update(organizationId, dto, userId, userRole);
+        return this.organizationsService.update(organizationId, dto, userId);
     }
 
     @Get(':id/members')
     async listMembers(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
-        return this.organizationsService.listMembers(organizationId, userId, userRole);
+        return this.organizationsService.listMembers(organizationId, userId);
     }
 
     @Get(':id/invites')
     async listInvites(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
-        return this.organizationsService.listInvites(organizationId, userId, userRole);
+        return this.organizationsService.listInvites(organizationId, userId);
     }
 
     @Get(':id/subscription')
     async getSubscription(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
-        return this.organizationsService.getSubscription(organizationId, userId, userRole);
+        return this.organizationsService.getSubscription(organizationId, userId);
     }
 
     @Patch(':id/subscription')
@@ -99,18 +94,16 @@ export class OrganizationsController {
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Body() dto: UpdateOrganizationSubscriptionDto,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
-        return this.organizationsService.updateSubscription(organizationId, dto, userId, userRole);
+        return this.organizationsService.updateSubscription(organizationId, dto, userId);
     }
 
     @Get(':id/usage')
     async getUsage(
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
-        return this.organizationsService.getUsage(organizationId, userId, userRole);
+        return this.organizationsService.getUsage(organizationId, userId);
     }
 
     @Get(':id/audit-logs')
@@ -118,12 +111,10 @@ export class OrganizationsController {
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Query() query: ListOrganizationAuditLogsQueryDto,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
         return this.organizationsService.listAuditLogs(
             organizationId,
             userId,
-            userRole,
             query.limit,
         );
     }
@@ -134,9 +125,8 @@ export class OrganizationsController {
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Body() dto: InviteOrganizationMemberDto,
         @CurrentUser('id') userId: string,
-        @CurrentUser('role') userRole: string,
     ) {
-        return this.organizationsService.inviteMember(organizationId, dto, userId, userRole);
+        return this.organizationsService.inviteMember(organizationId, dto, userId);
     }
 
     @Post('invites/:token/accept')
@@ -155,14 +145,12 @@ export class OrganizationsController {
         @Param('userId', new ParseUUIDPipe()) memberUserId: string,
         @Body() dto: UpdateOrganizationMemberRoleDto,
         @CurrentUser('id') actorUserId: string,
-        @CurrentUser('role') actorGlobalRole: string,
     ) {
         return this.organizationsService.updateMemberRole(
             organizationId,
             memberUserId,
             dto,
             actorUserId,
-            actorGlobalRole,
         );
     }
 
@@ -171,13 +159,11 @@ export class OrganizationsController {
         @Param('id', new ParseUUIDPipe()) organizationId: string,
         @Param('userId', new ParseUUIDPipe()) memberUserId: string,
         @CurrentUser('id') actorUserId: string,
-        @CurrentUser('role') actorGlobalRole: string,
     ) {
         return this.organizationsService.removeMember(
             organizationId,
             memberUserId,
             actorUserId,
-            actorGlobalRole,
         );
     }
 }

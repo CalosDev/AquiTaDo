@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { AuthShell } from '../components/auth/AuthShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -25,6 +26,7 @@ export function Login() {
         event.preventDefault();
         setError('');
         setLoading(true);
+
         try {
             if (pendingGoogleIdToken) {
                 await loginWithGoogle(
@@ -47,6 +49,7 @@ export function Login() {
                     formData.twoFactorCode.trim() || undefined,
                 );
             }
+
             navigate('/app');
         } catch (err: unknown) {
             const requestError = err as { response?: { data?: { message?: string } } };
@@ -63,6 +66,7 @@ export function Login() {
     const handleGoogleCredential = async (idToken: string) => {
         setError('');
         setLoading(true);
+
         try {
             await loginWithGoogle(idToken);
             void trackGrowthEvent({
@@ -88,140 +92,146 @@ export function Login() {
     };
 
     return (
-        <div className="auth-stage">
-            <div className="auth-card">
-                    <div className="text-center mb-8">
-                        <div className="w-14 h-14 rounded-2xl gradient-hero flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 shadow-lg shadow-primary-500/30">
-                            A
-                        </div>
-                        <h1 className="font-display text-2xl font-bold text-slate-900">Bienvenido de vuelta</h1>
-                        <p className="mt-1 text-sm text-slate-500">Inicia sesión en tu cuenta</p>
+        <AuthShell
+            title="Bienvenido de vuelta"
+            subtitle="Inicia sesión en tu cuenta"
+            heroEyebrow="Acceso rápido"
+            heroTitle="Vuelve a tu cuenta con una experiencia más clara y útil."
+            heroDescription="Retoma favoritos, actividad, gestión de negocio y accesos sensibles desde una entrada mejor conectada con el resto de la plataforma."
+            highlights={[
+                'Acceso unificado para clientes y negocios',
+                'Ingreso con Google cuando esté disponible',
+                'Segundo factor para accesos sensibles',
+                'Diseño más consistente en toda la app',
+            ]}
+        >
+            {notice && (
+                <div className="alert-success mb-6">
+                    {notice}
+                </div>
+            )}
+
+            {error && (
+                <div className="alert-danger mb-6">
+                    {error}
+                </div>
+            )}
+
+            {googleClientId && (
+                <div className="mb-6 space-y-4">
+                    <GoogleIdentityButton
+                        clientId={googleClientId}
+                        text="signin_with"
+                        disabled={loading || Boolean(pendingGoogleIdToken)}
+                        onCredential={handleGoogleCredential}
+                    />
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+                        <div className="h-px flex-1 bg-slate-200"></div>
+                        <span>o</span>
+                        <div className="h-px flex-1 bg-slate-200"></div>
                     </div>
+                </div>
+            )}
 
-                    {notice && (
-                        <div className="alert-success mb-6">
-                            {notice}
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="alert-danger mb-6">
-                            {error}
-                        </div>
-                    )}
-
-                    {googleClientId && (
-                        <div className="mb-6 space-y-4">
-                            <GoogleIdentityButton
-                                clientId={googleClientId}
-                                text="signin_with"
-                                disabled={loading || Boolean(pendingGoogleIdToken)}
-                                onCredential={handleGoogleCredential}
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {!pendingGoogleIdToken && (
+                    <>
+                        <div>
+                            <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-slate-700">
+                                Correo electrónico
+                            </label>
+                            <input
+                                id="login-email"
+                                name="email"
+                                type="email"
+                                autoComplete="email"
+                                required
+                                value={formData.email}
+                                onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                                className="input-field"
+                                placeholder="tu@correo.com"
                             />
-                            <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
-                                <div className="h-px flex-1 bg-slate-200"></div>
-                                <span>o</span>
-                                <div className="h-px flex-1 bg-slate-200"></div>
-                            </div>
                         </div>
-                    )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {!pendingGoogleIdToken && (
-                            <>
-                                <div>
-                                    <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-slate-700">
-                                        Correo electrónico
-                                    </label>
-                                    <input
-                                        id="login-email"
-                                        name="email"
-                                        type="email"
-                                        autoComplete="email"
-                                        required
-                                        value={formData.email}
-                                        onChange={(event) => setFormData({ ...formData, email: event.target.value })}
-                                        className="input-field"
-                                        placeholder="tu@correo.com"
-                                    />
-                                </div>
-                                <div>
-                                    <div className="flex items-center justify-between gap-3 mb-1">
-                                        <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">
-                                            Contraseña
-                                        </label>
-                                        <Link to="/forgot-password" className="text-xs font-medium text-primary-600 hover:text-primary-700">
-                                            Olvidé mi contraseña
-                                        </Link>
-                                    </div>
-                                    <input
-                                        id="login-password"
-                                        name="password"
-                                        type="password"
-                                        autoComplete="current-password"
-                                        required
-                                        value={formData.password}
-                                        onChange={(event) => setFormData({ ...formData, password: event.target.value })}
-                                        className="input-field"
-                                        placeholder="********"
-                                    />
-                                </div>
-                            </>
-                        )}
-                        {pendingGoogleIdToken && (
-                            <div className="alert-warning space-y-3">
-                                <p>Tu cuenta requiere un segundo factor. Introduce el código 2FA para completar el acceso con Google.</p>
-                                <button
-                                    type="button"
-                                    className="text-xs font-semibold text-amber-900 hover:text-amber-950"
-                                    onClick={() => {
-                                        setPendingGoogleIdToken('');
-                                        setRequiresTwoFactor(false);
-                                        setFormData((current) => ({ ...current, twoFactorCode: '' }));
-                                        setError('');
-                                    }}
-                                >
-                                    Volver al acceso con correo y contraseña
-                                </button>
-                            </div>
-                        )}
-                        {requiresTwoFactor && (
-                            <div>
-                                <label htmlFor="login-2fa" className="mb-1 block text-sm font-medium text-slate-700">
-                                    Código 2FA (6 dígitos)
+                        <div>
+                            <div className="mb-1 flex items-center justify-between gap-3">
+                                <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">
+                                    Contraseña
                                 </label>
-                                <input
-                                    id="login-2fa"
-                                    name="one-time-code"
-                                    type="text"
-                                    autoComplete="one-time-code"
-                                    inputMode="numeric"
-                                    pattern="\d{6}"
-                                    maxLength={6}
-                                    required
-                                    value={formData.twoFactorCode}
-                                    onChange={(event) =>
-                                        setFormData({
-                                            ...formData,
-                                            twoFactorCode: event.target.value.replace(/\D/g, '').slice(0, 6),
-                                        })}
-                                    className="input-field"
-                                    placeholder="123456"
-                                />
+                                <Link to="/forgot-password" className="text-xs font-medium text-primary-600 hover:text-primary-700">
+                                    Olvidé mi contraseña
+                                </Link>
                             </div>
-                        )}
-                        <button type="submit" disabled={loading} className="btn-primary w-full">
-                            {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
-                        </button>
-                    </form>
+                            <input
+                                id="login-password"
+                                name="password"
+                                type="password"
+                                autoComplete="current-password"
+                                required
+                                value={formData.password}
+                                onChange={(event) => setFormData({ ...formData, password: event.target.value })}
+                                className="input-field"
+                                placeholder="********"
+                            />
+                        </div>
+                    </>
+                )}
 
-                    <p className="mt-6 text-center text-sm text-slate-500">
-                        ¿No tienes cuenta?{' '}
-                        <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                            Regístrate
-                        </Link>
-                    </p>
-            </div>
-        </div>
+                {pendingGoogleIdToken && (
+                    <div className="alert-warning space-y-3">
+                        <p>Tu cuenta requiere un segundo factor. Introduce el código 2FA para completar el acceso con Google.</p>
+                        <button
+                            type="button"
+                            className="text-xs font-semibold text-amber-900 hover:text-amber-950"
+                            onClick={() => {
+                                setPendingGoogleIdToken('');
+                                setRequiresTwoFactor(false);
+                                setFormData((current) => ({ ...current, twoFactorCode: '' }));
+                                setError('');
+                            }}
+                        >
+                            Volver al acceso con correo y contraseña
+                        </button>
+                    </div>
+                )}
+
+                {requiresTwoFactor && (
+                    <div>
+                        <label htmlFor="login-2fa" className="mb-1 block text-sm font-medium text-slate-700">
+                        Código 2FA (6 dígitos)
+                        </label>
+                        <input
+                            id="login-2fa"
+                            name="one-time-code"
+                            type="text"
+                            autoComplete="one-time-code"
+                            inputMode="numeric"
+                            pattern="\d{6}"
+                            maxLength={6}
+                            required
+                            value={formData.twoFactorCode}
+                            onChange={(event) =>
+                                setFormData({
+                                    ...formData,
+                                    twoFactorCode: event.target.value.replace(/\D/g, '').slice(0, 6),
+                                })}
+                            className="input-field"
+                            placeholder="123456"
+                        />
+                    </div>
+                )}
+
+                <button type="submit" disabled={loading} className="btn-primary w-full">
+                    {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
+                </button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-slate-500">
+                ¿No tienes cuenta?{' '}
+                <Link to="/register" className="font-medium text-primary-600 hover:text-primary-700">
+                    Regístrate
+                </Link>
+            </p>
+        </AuthShell>
     );
 }
