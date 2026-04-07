@@ -1,6 +1,28 @@
 const DEFAULT_API_BASE_URL = 'https://aquitado.onrender.com';
 const DEFAULT_WEB_BASE_URL = 'https://aquitado.vercel.app';
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 30_000;
+const FRONTEND_BUNDLE_PATTERNS = [
+    {
+        pattern: /zustand/i,
+        label: 'zustand',
+        reason: 'unexpected state-management dependency detected in first-party bundle',
+    },
+    {
+        pattern: /@radix-ui/i,
+        label: '@radix-ui',
+        reason: 'unexpected Radix UI dependency detected in first-party bundle',
+    },
+    {
+        pattern: /DialogContent/,
+        label: 'DialogContent',
+        reason: 'unexpected dialog primitive detected in first-party bundle',
+    },
+    {
+        pattern: /DialogTitle/,
+        label: 'DialogTitle',
+        reason: 'unexpected dialog title primitive detected in first-party bundle',
+    },
+];
 
 function normalizeBaseUrl(rawUrl, fallbackUrl) {
     const normalized = (rawUrl ?? fallbackUrl).trim().replace(/\/+$/, '');
@@ -100,6 +122,44 @@ function isExpectedCheckInError(response) {
         normalized.includes('ya hiciste check-in recientemente')
         || normalized.includes('alcanzaste el limite diario')
     );
+}
+
+function extractAssetPathsFromHtml(html) {
+    const assets = new Set();
+    const regex = /(?:src|href)="(\/assets\/[^"]+\.(?:js|css))"/g;
+    let match;
+
+    while ((match = regex.exec(html)) !== null) {
+        assets.add(match[1]);
+    }
+
+    return [...assets];
+}
+
+async function runBundleSignalSmoke(webBaseUrl, homeHtml) {
+    const html = typeof homeHtml === 'string' ? homeHtml : '';
+    assert(html.length > 0, 'Home HTML is empty');
+    assert(!html.includes('instrument.'), 'Home HTML unexpectedly references instrument.* script');
+
+    const assetPaths = extractAssetPathsFromHtml(html);
+    assert(assetPaths.length > 0, 'No first-party assets found in HTML');
+
+    const findings = [];
+
+    for (const assetPath of assetPaths) {
+        const response = await request(webBaseUrl, assetPath, { accept: '*/*' });
+        expectStatus(response, [200], `GET ${assetPath} (asset)`);
+
+        for (const signal of FRONTEND_BUNDLE_PATTERNS) {
+            if (signal.pattern.test(response.text)) {
+                findings.push(`${assetPath}: ${signal.label} (${signal.reason})`);
+            }
+        }
+    }
+
+    if (findings.length > 0) {
+        throw new Error(`Frontend bundle signal smoke failed. Suspicious matches found:\n- ${findings.join('\n- ')}`);
+    }
 }
 
 async function runApiSmoke(apiBaseUrl, skipCheckIns) {
@@ -227,6 +287,7 @@ async function runWebSmoke(webBaseUrl) {
     console.log(`Running web checks against ${webBaseUrl}`);
 
     const routes = ['/', '/businesses', '/login'];
+    let homeHtml = '';
     for (const route of routes) {
         const response = await request(webBaseUrl, route, { accept: 'text/html' });
         expectStatus(response, [200], `GET ${route} (web)`);
@@ -235,7 +296,12 @@ async function runWebSmoke(webBaseUrl) {
             contentType.includes('text/html'),
             `${route} should return text/html, got ${contentType || 'unknown'}`,
         );
+        if (route === '/') {
+            homeHtml = response.text;
+        }
     }
+
+    await runBundleSignalSmoke(webBaseUrl, homeHtml);
 }
 
 async function main() {
