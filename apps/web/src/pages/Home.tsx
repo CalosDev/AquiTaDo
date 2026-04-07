@@ -237,18 +237,14 @@ export function Home() {
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const registerBusinessPath = !isAuthenticated
         ? '/register'
-        : roleCapabilities.canAccessAdminPanel
-            ? '/admin'
-            : canRegisterBusiness
-                ? '/register-business'
-                : '/businesses';
+        : canRegisterBusiness
+            ? '/register-business'
+            : '/businesses';
     const registerBusinessLabel = !isAuthenticated
         ? 'Crear cuenta y registrar negocio'
-        : roleCapabilities.canAccessAdminPanel
-            ? 'Ir al panel admin'
-            : canRegisterBusiness
-                ? 'Registrar mi negocio'
-                : 'Explorar negocios';
+        : canRegisterBusiness
+            ? 'Registrar mi negocio'
+            : 'Explorar negocios';
 
     const topCategories = useMemo(
         () => [...categories].sort((a, b) => (b._count?.businesses ?? 0) - (a._count?.businesses ?? 0)),

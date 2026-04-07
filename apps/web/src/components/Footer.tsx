@@ -1,30 +1,6 @@
 import { Link } from 'react-router-dom';
-import { getRoleCapabilities } from '../auth/capabilities';
-import { useAuth } from '../context/useAuth';
 
 export function Footer() {
-    const { isAuthenticated, user } = useAuth();
-    const roleCapabilities = getRoleCapabilities(user?.role);
-    const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
-    const canAccessBusinessPanel = roleCapabilities.canAccessBusinessPanel;
-    const canAccessAdminPanel = roleCapabilities.canAccessAdminPanel;
-
-    const registerBusinessPath = !isAuthenticated
-        ? '/register'
-        : canAccessAdminPanel
-            ? '/admin'
-            : canRegisterBusiness
-                ? '/register-business'
-                : '/businesses';
-
-    const registerBusinessLabel = !isAuthenticated
-        ? 'Crear cuenta'
-        : canAccessAdminPanel
-            ? 'Panel admin'
-            : canRegisterBusiness
-                ? 'Registrar negocio'
-                : 'Explorar negocios';
-
     return (
         <footer className="footer-shell mt-8 border-t border-primary-100/60 text-slate-200 sm:mt-10">
             <div className="flag-ribbon" aria-hidden="true"></div>
@@ -70,18 +46,13 @@ export function Footer() {
                     </div>
 
                     <div className="footer-panel lg:col-span-2">
-                        <h3 className="font-display text-base font-semibold text-white">Negocios</h3>
+                        <h3 className="font-display text-base font-semibold text-white">Plataforma</h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                            <li><Link to={registerBusinessPath} className="transition-colors hover:text-white">{registerBusinessLabel}</Link></li>
-                            {isAuthenticated && canAccessBusinessPanel && (
-                                <li><Link to="/dashboard" className="transition-colors hover:text-white">Panel negocio</Link></li>
-                            )}
-                            {isAuthenticated && canAccessAdminPanel && (
-                                <>
-                                    <li><Link to="/admin" className="transition-colors hover:text-white">Panel admin</Link></li>
-                                    <li><Link to="/security" className="transition-colors hover:text-white">Seguridad</Link></li>
-                                </>
-                            )}
+                            <li><Link to="/register" className="transition-colors hover:text-white">Crear cuenta</Link></li>
+                            <li><Link to="/login" className="transition-colors hover:text-white">Iniciar sesion</Link></li>
+                            <li><Link to="/register-business" className="transition-colors hover:text-white">Registrar negocio</Link></li>
+                            <li><Link to="/terms" className="transition-colors hover:text-white">Terminos</Link></li>
+                            <li><Link to="/privacy" className="transition-colors hover:text-white">Privacidad</Link></li>
                         </ul>
                     </div>
 

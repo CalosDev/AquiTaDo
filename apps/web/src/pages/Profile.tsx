@@ -138,16 +138,6 @@ function formatMoney(value: string | number | null | undefined, currency = 'DOP'
     return formatCurrencyDo(value, currency);
 }
 
-function getRoleBadge(profileType: ProfileType) {
-    if (profileType === 'ADMIN') {
-        return 'bg-red-100 text-red-700';
-    }
-    if (profileType === 'BUSINESS_OWNER') {
-        return 'bg-primary-100 text-primary-700';
-    }
-    return 'bg-primary-100 text-primary-700';
-}
-
 function getProfileHeroClass(profileType: ProfileType) {
     if (profileType === 'ADMIN') {
         return 'role-hero role-hero-admin';
@@ -156,6 +146,80 @@ function getProfileHeroClass(profileType: ProfileType) {
         return 'role-hero role-hero-owner';
     }
     return 'role-hero role-hero-user';
+}
+
+function getProfileTypeLabel(profileType: ProfileType) {
+    if (profileType === 'ADMIN') {
+        return 'Administrador';
+    }
+    if (profileType === 'BUSINESS_OWNER') {
+        return 'Propietario de negocio';
+    }
+    return 'Cliente';
+}
+
+function getProfileHighlights(payload: ProfilePayload) {
+    if (payload.profileType === 'ADMIN' && payload.adminProfile) {
+        return [
+            { label: 'Usuarios', value: String(payload.adminProfile.metrics.totalUsers) },
+            { label: 'Negocios', value: String(payload.adminProfile.metrics.totalBusinesses) },
+            { label: 'Organizaciones', value: String(payload.adminProfile.metrics.totalOrganizations) },
+        ];
+    }
+
+    if (payload.profileType === 'BUSINESS_OWNER' && payload.businessProfile) {
+        const organizationCount = payload.businessProfile.organizations.length;
+        const businessCount = payload.businessProfile.organizations.reduce(
+            (total, organization) => total + organization._count.businesses,
+            0,
+        );
+
+        return [
+            { label: 'Organizaciones', value: String(organizationCount) },
+            { label: 'Negocios', value: String(businessCount) },
+            { label: 'Miembro desde', value: formatDateTime(payload.user.createdAt), compact: true },
+        ];
+    }
+
+    return [
+        { label: 'Resenas', value: String(payload.userProfile.reviewCount) },
+        { label: 'Reservas', value: String(payload.userProfile.bookingCount) },
+        { label: 'Miembro desde', value: formatDateTime(payload.user.createdAt), compact: true },
+    ];
+}
+
+function getProfileSummaryRows(payload: ProfilePayload) {
+    if (payload.profileType === 'ADMIN' && payload.adminProfile) {
+        return [
+            { label: 'Resenas moderadas', value: String(payload.adminProfile.metrics.totalReviews) },
+            { label: 'Reservas monitoreadas', value: String(payload.adminProfile.metrics.totalBookings) },
+            { label: 'Transacciones registradas', value: String(payload.adminProfile.metrics.totalTransactions) },
+        ];
+    }
+
+    if (payload.profileType === 'BUSINESS_OWNER' && payload.businessProfile) {
+        const organizationCount = payload.businessProfile.organizations.length;
+        const memberCount = payload.businessProfile.organizations.reduce(
+            (total, organization) => total + organization._count.members,
+            0,
+        );
+        const businessCount = payload.businessProfile.organizations.reduce(
+            (total, organization) => total + organization._count.businesses,
+            0,
+        );
+
+        return [
+            { label: 'Organizaciones activas', value: String(organizationCount) },
+            { label: 'Equipo vinculado', value: String(memberCount) },
+            { label: 'Negocios gestionados', value: String(businessCount) },
+        ];
+    }
+
+    return [
+        { label: 'Resenas publicadas', value: String(payload.userProfile.reviewCount) },
+        { label: 'Reservas creadas', value: String(payload.userProfile.bookingCount) },
+        { label: 'Cuenta creada', value: formatDateTime(payload.user.createdAt) },
+    ];
 }
 
 export function Profile() {
@@ -183,6 +247,14 @@ export function Profile() {
             .map((part) => part[0]?.toUpperCase() ?? '')
             .join('');
     }, [form.name, payload?.user.name]);
+    const profileHighlights = useMemo(
+        () => (payload ? getProfileHighlights(payload) : []),
+        [payload],
+    );
+    const profileSummaryRows = useMemo(
+        () => (payload ? getProfileSummaryRows(payload) : []),
+        [payload],
+    );
 
     const loadProfile = useCallback(async () => {
         setLoading(true);
@@ -290,25 +362,23 @@ export function Profile() {
                 <section className={`${getProfileHeroClass(payload.profileType)} mb-6`}>
                     <div className="relative z-[1] flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                         <div className="max-w-2xl">
-                            <div className="kpi-chip-soft w-fit">{payload.profileType}</div>
+                            <div className="kpi-chip-soft w-fit">{getProfileTypeLabel(payload.profileType)}</div>
                             <h1 className="mt-4 font-display text-3xl font-bold text-white md:text-4xl">Mi Perfil</h1>
                             <p className="mt-2 text-sm text-blue-100 md:text-base">
                                 Vista personalizada según tu rol en la plataforma, con acceso rápido a tu actividad y configuraciones clave.
                             </p>
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <div className="role-kpi-card">
-                                <p className="role-kpi-label">Reseñas</p>
-                                <p className="role-kpi-value">{payload.userProfile.reviewCount}</p>
-                            </div>
-                            <div className="role-kpi-card">
-                                <p className="role-kpi-label">Reservas</p>
-                                <p className="role-kpi-value">{payload.userProfile.bookingCount}</p>
-                            </div>
-                            <div className="role-kpi-card">
-                                <p className="role-kpi-label">Miembro desde</p>
-                                <p className="mt-1 text-sm font-semibold text-white">{formatDateTime(payload.user.createdAt)}</p>
-                            </div>
+                            {profileHighlights.map((item) => (
+                                <div key={item.label} className="role-kpi-card">
+                                    <p className="role-kpi-label">{item.label}</p>
+                                    {item.compact ? (
+                                        <p className="mt-1 text-sm font-semibold text-white">{item.value}</p>
+                                    ) : (
+                                        <p className="role-kpi-value">{item.value}</p>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </section>
@@ -396,7 +466,7 @@ export function Profile() {
                         </div>
 
                         <div className="section-shell p-5">
-                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-4">Resumen</h2>
+                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-4">Resumen del rol</h2>
                             <div className="flex items-center gap-3 mb-4">
                                 {currentAvatarUrl ? (
                                     <img
@@ -415,9 +485,11 @@ export function Profile() {
                                 </div>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
-                                <p>Resenas publicadas: <strong className="text-gray-900">{payload.userProfile.reviewCount}</strong></p>
-                                <p>Reservas creadas: <strong className="text-gray-900">{payload.userProfile.bookingCount}</strong></p>
-                                <p>Creado: <strong className="text-gray-900">{formatDateTime(payload.user.createdAt)}</strong></p>
+                                {profileSummaryRows.map((item) => (
+                                    <p key={item.label}>
+                                        {item.label}: <strong className="text-gray-900">{item.value}</strong>
+                                    </p>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -427,47 +499,49 @@ export function Profile() {
                         description="Actualiza tu contraseña de acceso. Al guardar, cerraremos tu sesión para que entres nuevamente con la nueva clave."
                     />
 
-                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                        <div className="section-shell p-5">
-                            <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis reseñas</h3>
-                            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                                {payload.userProfile.recentReviews.length > 0 ? payload.userProfile.recentReviews.map((review) => (
-                                    <div key={review.id} className="rounded-xl border border-gray-100 p-3">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <p className="font-medium text-gray-900">{review.business.name}</p>
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{review.rating}/5</span>
+                    {payload.profileType === 'USER' && (
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                            <div className="section-shell p-5">
+                                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis reseñas</h3>
+                                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                                    {payload.userProfile.recentReviews.length > 0 ? payload.userProfile.recentReviews.map((review) => (
+                                        <div key={review.id} className="rounded-xl border border-gray-100 p-3">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="font-medium text-gray-900">{review.business.name}</p>
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{review.rating}/5</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500">{formatDateTime(review.createdAt)} - {review.moderationStatus}</p>
+                                            <p className="text-sm text-gray-700 mt-1">{review.comment?.trim() || '(Sin comentario)'}</p>
                                         </div>
-                                        <p className="text-xs text-gray-500">{formatDateTime(review.createdAt)} - {review.moderationStatus}</p>
-                                        <p className="text-sm text-gray-700 mt-1">{review.comment?.trim() || '(Sin comentario)'}</p>
-                                    </div>
-                                )) : (
-                                    <p className="text-sm text-gray-500">Aún no tienes reseñas publicadas.</p>
-                                )}
+                                    )) : (
+                                        <p className="text-sm text-gray-500">Aún no tienes reseñas publicadas.</p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="section-shell p-5">
-                            <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis reservas</h3>
-                            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                                {payload.userProfile.recentBookings.length > 0 ? payload.userProfile.recentBookings.map((booking) => (
-                                    <div key={booking.id} className="rounded-xl border border-gray-100 p-3">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <p className="font-medium text-gray-900">{booking.business.name}</p>
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{booking.status}</span>
+                            <div className="section-shell p-5">
+                                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Mis reservas</h3>
+                                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                                    {payload.userProfile.recentBookings.length > 0 ? payload.userProfile.recentBookings.map((booking) => (
+                                        <div key={booking.id} className="rounded-xl border border-gray-100 p-3">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="font-medium text-gray-900">{booking.business.name}</p>
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{booking.status}</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500">{formatDateTime(booking.scheduledFor)}</p>
+                                            <p className="text-sm text-gray-700 mt-1">
+                                                Cotizado: {formatMoney(booking.quotedAmount, booking.currency)}
+                                                {' - '}
+                                                Deposito: {formatMoney(booking.depositAmount, booking.currency)}
+                                            </p>
                                         </div>
-                                        <p className="text-xs text-gray-500">{formatDateTime(booking.scheduledFor)}</p>
-                                        <p className="text-sm text-gray-700 mt-1">
-                                            Cotizado: {formatMoney(booking.quotedAmount, booking.currency)}
-                                            {' - '}
-                                            Deposito: {formatMoney(booking.depositAmount, booking.currency)}
-                                        </p>
-                                    </div>
-                                )) : (
-                                    <p className="text-sm text-gray-500">Aun no tienes reservas registradas.</p>
-                                )}
+                                    )) : (
+                                        <p className="text-sm text-gray-500">Aun no tienes reservas registradas.</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {payload.profileType === 'BUSINESS_OWNER' && payload.businessProfile && (
                         <div className="section-shell p-5">

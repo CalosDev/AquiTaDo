@@ -13,5 +13,8 @@ describe('Footer', () => {
 
         expect(screen.getByRole('link', { name: /aqui/i })).toBeInTheDocument();
         expect(screen.getByText(/Explora/i)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /crear cuenta/i })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /panel admin/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /seguridad/i })).not.toBeInTheDocument();
     });
 });

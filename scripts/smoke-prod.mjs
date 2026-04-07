@@ -1,5 +1,5 @@
-const DEFAULT_API_BASE_URL = 'http://localhost:3000';
-const DEFAULT_WEB_BASE_URL = 'http://localhost:5173';
+const DEFAULT_API_BASE_URL = 'https://aquitado.onrender.com';
+const DEFAULT_WEB_BASE_URL = 'https://aquitado.vercel.app';
 const REQUEST_TIMEOUT_MS = 10_000;
 
 function normalizeBaseUrl(rawUrl, fallbackUrl) {

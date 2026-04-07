@@ -94,7 +94,8 @@ export function GoogleIdentityButton({
     }, [onCredential]);
 
     useEffect(() => {
-        if (!clientId || !containerRef.current) {
+        const container = containerRef.current;
+        if (!clientId || !container) {
             return;
         }
 
@@ -104,11 +105,11 @@ export function GoogleIdentityButton({
 
         void loadGoogleIdentityScript()
             .then(() => {
-                if (cancelled || !containerRef.current || !window.google?.accounts?.id) {
+                if (cancelled || !window.google?.accounts?.id) {
                     return;
                 }
 
-                containerRef.current.innerHTML = '';
+                container.innerHTML = '';
                 window.google.accounts.id.initialize({
                     client_id: clientId,
                     callback: (response) => {
@@ -122,7 +123,7 @@ export function GoogleIdentityButton({
                     auto_select: false,
                     cancel_on_tap_outside: true,
                 });
-                window.google.accounts.id.renderButton(containerRef.current, {
+                window.google.accounts.id.renderButton(container, {
                     theme: 'outline',
                     size: 'large',
                     shape: 'pill',
@@ -142,9 +143,7 @@ export function GoogleIdentityButton({
 
         return () => {
             cancelled = true;
-            if (containerRef.current) {
-                containerRef.current.innerHTML = '';
-            }
+            container.innerHTML = '';
         };
     }, [clientId, text]);
 

@@ -122,6 +122,8 @@ export function MainLayout() {
         () => resolveRouteSeo(location.pathname),
         [location.pathname],
     );
+    const layoutClassName = showFooter ? 'min-h-screen' : 'min-h-screen flex flex-col';
+    const mainClassName = showFooter ? '' : 'flex-1';
 
     useEffect(() => {
         applySeoMeta({
@@ -133,9 +135,9 @@ export function MainLayout() {
     }, [location.pathname, routeSeo.description, routeSeo.noindex, routeSeo.title]);
 
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className={layoutClassName}>
             <Navbar />
-            <main className="flex-1">
+            <main className={mainClassName}>
                 <Outlet />
             </main>
             {showFooter && <Footer />}
