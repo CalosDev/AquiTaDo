@@ -839,7 +839,7 @@ export function BusinessesList() {
 
     
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 animate-fade-in">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
             {loadError && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {loadError}
@@ -888,15 +888,43 @@ export function BusinessesList() {
 
                 <div className="min-w-0">
                     {loading ? (
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {Array.from({ length: 3 }).map((_, index) => (
-                                <div key={index} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                                    <div className="aspect-[4/3] rounded-xl bg-slate-100 animate-pulse"></div>
-                                    <div className="mt-3 h-4 w-2/3 rounded bg-slate-100 animate-pulse"></div>
-                                    <div className="mt-2 h-3 w-1/2 rounded bg-slate-100 animate-pulse"></div>
-                                    <div className="mt-2 h-3 w-full rounded bg-slate-100 animate-pulse"></div>
-                                </div>
-                            ))}
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                {Array.from({ length: 3 }).map((_, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex min-h-[24rem] flex-col rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-40px_rgba(15,23,42,0.35)]"
+                                    >
+                                        <div className="relative overflow-hidden rounded-[1.35rem] bg-slate-100">
+                                            <div className="absolute left-3 top-3 h-7 w-24 rounded-full bg-white/80 animate-pulse"></div>
+                                            <div className="absolute left-28 top-3 h-7 w-20 rounded-full bg-white/70 animate-pulse"></div>
+                                            <div className="aspect-[4/3] animate-pulse bg-slate-100"></div>
+                                        </div>
+
+                                        <div className="mt-4 space-y-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="h-6 w-3/5 rounded-full bg-slate-100 animate-pulse"></div>
+                                                <div className="h-6 w-14 rounded-full bg-slate-100 animate-pulse"></div>
+                                            </div>
+
+                                            <div className="h-4 w-2/5 rounded-full bg-slate-100 animate-pulse"></div>
+                                            <div className="h-4 w-1/3 rounded-full bg-slate-100 animate-pulse"></div>
+                                            <div className="h-4 w-4/5 rounded-full bg-slate-100 animate-pulse"></div>
+
+                                            <div className="flex flex-wrap gap-2 pt-1">
+                                                <div className="h-7 w-24 rounded-full bg-slate-100 animate-pulse"></div>
+                                                <div className="h-7 w-36 rounded-full bg-slate-100 animate-pulse"></div>
+                                                <div className="h-7 w-24 rounded-full bg-slate-100 animate-pulse"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="h-4 w-40 rounded-full bg-slate-100 animate-pulse"></div>
+                                <div className="h-9 w-24 rounded-xl bg-slate-100 animate-pulse"></div>
+                            </div>
                         </div>
                     ) : sortedBusinesses.length > 0 ? (
                         <>

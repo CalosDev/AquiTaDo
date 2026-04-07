@@ -75,8 +75,8 @@ export function FiltersSidebar({
                     <section>
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Categorias</p>
                         {loading ? (
-                            <div className="mt-3 max-h-56 space-y-2 overflow-hidden pr-1" aria-hidden="true">
-                                {Array.from({ length: 7 }).map((_, index) => (
+                            <div className="mt-3 h-56 space-y-2 overflow-hidden pr-1" aria-hidden="true">
+                                {Array.from({ length: 10 }).map((_, index) => (
                                     <div key={`category-skeleton-${index}`} className="flex items-center gap-2">
                                         <div className="h-4 w-4 rounded border border-slate-200 bg-slate-100"></div>
                                         <div className="h-3.5 w-full rounded-full bg-slate-100"></div>

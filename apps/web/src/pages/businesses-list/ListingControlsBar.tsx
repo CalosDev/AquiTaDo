@@ -47,7 +47,7 @@ export function ListingControlsBar({
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="chip !bg-white !text-primary-700">{resultsCountLabel}</span>
+                        <span className="chip min-w-[11rem] justify-center !bg-white !text-primary-700">{resultsCountLabel}</span>
                         {currentView === 'map' ? (
                             <span className="chip !bg-white !text-slate-600">
                                 {mappableResultsCount} de {totalVisibleResults} visibles con punto en mapa
