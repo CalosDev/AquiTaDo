@@ -2,11 +2,12 @@ import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { Role } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface JwtPayload {
     sub: string;
-    role: string;
+    role: Role;
 }
 
 const jwtSessionUserSelect = {

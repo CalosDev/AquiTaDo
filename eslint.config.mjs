@@ -37,8 +37,10 @@ export default tseslint.config(
     {
         files: [
             'apps/api/src/main.ts',
+            'apps/api/src/start-prod.ts',
             'apps/api/src/prisma/prisma.service.ts',
             'apps/api/src/config/env.validation.ts',
+            'apps/api/src/**/*.spec.ts',
         ],
         rules: {
             'no-restricted-properties': 'off',

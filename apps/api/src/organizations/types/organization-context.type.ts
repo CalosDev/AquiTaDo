@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { OrganizationRole } from '../../generated/prisma/client';
+import { OrganizationRole, Role } from '../../generated/prisma/client';
 
 export interface OrganizationContext {
     organizationId: string;
@@ -10,7 +10,7 @@ export interface AuthenticatedRequestUser {
     id: string;
     email: string;
     name: string;
-    role: string;
+    role: Role;
 }
 
 export type RequestWithOrganizationContext = Request & {

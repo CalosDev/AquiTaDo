@@ -7,6 +7,8 @@ import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 const E2E_EMAIL_DOMAIN = '@e2e.aquita.local';
+const GOOGLE_TEST_CLIENT_ID = 'google-client-id.apps.googleusercontent.com';
+const E2E_THROTTLE_LIMIT = '1000';
 
 function makeRegisterPayload(seed: string) {
     return {
@@ -31,8 +33,8 @@ describe('AuthController (e2e)', () => {
 
     beforeAll(async () => {
         process.env.AUTH_DEBUG_RESET_TOKENS = 'true';
-        process.env.GOOGLE_OAUTH_CLIENT_ID = 'google-client-id.apps.googleusercontent.com';
-        process.env.THROTTLE_LIMIT = '1000';
+        process.env.GOOGLE_OAUTH_CLIENT_ID = GOOGLE_TEST_CLIENT_ID;
+        process.env.THROTTLE_LIMIT = E2E_THROTTLE_LIMIT;
 
         const moduleRef = await Test.createTestingModule({
             imports: [AppModule],
@@ -366,7 +368,7 @@ describe('AuthController (e2e)', () => {
     it('creates a new account from a valid Google identity token', async () => {
         const googleFetchMock = vi.fn().mockResolvedValue(
             mockJsonResponse({
-                aud: process.env.GOOGLE_OAUTH_CLIENT_ID,
+                aud: GOOGLE_TEST_CLIENT_ID,
                 email: 'google-user@e2e.aquita.local',
                 email_verified: 'true',
                 iss: 'https://accounts.google.com',
@@ -420,7 +422,7 @@ describe('AuthController (e2e)', () => {
 
         const googleFetchMock = vi.fn().mockResolvedValue(
             mockJsonResponse({
-                aud: process.env.GOOGLE_OAUTH_CLIENT_ID,
+                aud: GOOGLE_TEST_CLIENT_ID,
                 email: existingUser.email,
                 email_verified: 'true',
                 iss: 'accounts.google.com',

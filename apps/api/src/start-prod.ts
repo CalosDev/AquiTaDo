@@ -39,7 +39,7 @@ function spawnAndWait(command: string, args: string[], options: SpawnOptions = {
 
         child.once('exit', (code, signal) => {
             if (signal) {
-                rejectPromise(new Error(`El proceso "${command}" termino por la señal ${signal}`));
+                rejectPromise(new Error(`El proceso "${command}" termino por la senal ${signal}`));
                 return;
             }
 

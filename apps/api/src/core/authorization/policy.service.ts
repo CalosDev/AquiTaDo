@@ -1,11 +1,11 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { OrganizationRole } from '../../generated/prisma/client';
+import { OrganizationRole, Role } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ResourcePolicy } from './policy.types';
 
 type Principal = {
     id: string;
-    role: string;
+    role: Role;
 };
 
 type OrganizationContext = {

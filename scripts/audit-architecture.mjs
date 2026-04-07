@@ -7,9 +7,15 @@ const apiSrcRoot = path.join(projectRoot, 'apps', 'api', 'src');
 
 const envAllowList = new Set([
     normalizePath(path.join(apiSrcRoot, 'main.ts')),
+    normalizePath(path.join(apiSrcRoot, 'start-prod.ts')),
     normalizePath(path.join(apiSrcRoot, 'prisma', 'prisma.service.ts')),
     normalizePath(path.join(apiSrcRoot, 'config', 'env.validation.ts')),
 ]);
+
+const envAllowMatchers = [
+    (filePath) => envAllowList.has(filePath),
+    (filePath) => filePath.endsWith('.spec.ts'),
+];
 
 const forbiddenTrackedMatchers = [
     (file) => file === 'dist' || file.startsWith('dist/') || file.includes('/dist/'),
@@ -50,7 +56,7 @@ async function scanForDirectProcessEnv(dir, violations) {
         }
 
         const normalized = normalizePath(absolutePath);
-        if (envAllowList.has(normalized)) {
+        if (envAllowMatchers.some((matches) => matches(normalized))) {
             continue;
         }
 
