@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -78,17 +79,16 @@ export function ResetPassword() {
                 'Footer más ligero en pantallas auth',
             ]}
         >
-            {!token && (
-                <div className="alert-warning mb-6">
-                    El enlace de recuperación no es válido o está incompleto.
-                </div>
-            )}
-
-            {errorMessage && (
-                <div className="alert-danger mb-6">
-                    {errorMessage}
-                </div>
-            )}
+            <PageFeedbackStack
+                items={[
+                    {
+                        id: 'reset-password-token-warning',
+                        tone: 'warning',
+                        text: token ? '' : 'El enlace de recuperación no es válido o está incompleto.',
+                    },
+                    { id: 'reset-password-error', tone: 'danger', text: errorMessage },
+                ]}
+            />
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>

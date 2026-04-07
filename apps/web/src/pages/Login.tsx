@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { AuthShell } from '../components/auth/AuthShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
 import { useAuth } from '../context/useAuth';
@@ -105,17 +106,12 @@ export function Login() {
                 'Diseño más consistente en toda la app',
             ]}
         >
-            {notice && (
-                <div className="alert-success mb-6">
-                    {notice}
-                </div>
-            )}
-
-            {error && (
-                <div className="alert-danger mb-6">
-                    {error}
-                </div>
-            )}
+            <PageFeedbackStack
+                items={[
+                    { id: 'login-notice', tone: 'success', text: notice },
+                    { id: 'login-error', tone: 'danger', text: error },
+                ]}
+            />
 
             {googleClientId && (
                 <div className="mb-6 space-y-4">

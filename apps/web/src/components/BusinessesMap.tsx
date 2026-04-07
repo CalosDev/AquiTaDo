@@ -2,7 +2,6 @@ import { LatLngBounds } from 'leaflet';
 import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 
 const MAP_MARKER_COLORS = {
     selectedStroke: '#002d62',

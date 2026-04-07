@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { uploadApi, usersApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { ChangePasswordCard } from '../components/ChangePasswordCard';
+import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
+import type { UserRole } from '../auth/roles';
 import { formatCurrencyDo, formatDateTimeDo } from '../lib/market';
 
 type ProfileType = 'USER' | 'BUSINESS_OWNER' | 'ADMIN';
@@ -158,6 +160,19 @@ function getProfileTypeLabel(profileType: ProfileType) {
     return 'Cliente';
 }
 
+function resolveProfileTypeFromRole(role: UserRole | undefined): ProfileType | null {
+    if (role === 'ADMIN') {
+        return 'ADMIN';
+    }
+    if (role === 'BUSINESS_OWNER') {
+        return 'BUSINESS_OWNER';
+    }
+    if (role === 'USER') {
+        return 'USER';
+    }
+    return null;
+}
+
 function getProfileHighlights(payload: ProfilePayload) {
     if (payload.profileType === 'ADMIN' && payload.adminProfile) {
         return [
@@ -185,6 +200,30 @@ function getProfileHighlights(payload: ProfilePayload) {
         { label: 'Reseñas', value: String(payload.userProfile.reviewCount) },
         { label: 'Reservas', value: String(payload.userProfile.bookingCount) },
         { label: 'Miembro desde', value: formatDateTime(payload.user.createdAt), compact: true },
+    ];
+}
+
+function getProfileHighlightPlaceholders(profileType: ProfileType) {
+    if (profileType === 'ADMIN') {
+        return [
+            { label: 'Usuarios', value: '', compact: false },
+            { label: 'Negocios', value: '', compact: false },
+            { label: 'Organizaciones', value: '', compact: false },
+        ];
+    }
+
+    if (profileType === 'BUSINESS_OWNER') {
+        return [
+            { label: 'Organizaciones', value: '', compact: false },
+            { label: 'Negocios', value: '', compact: false },
+            { label: 'Miembro desde', value: '', compact: true },
+        ];
+    }
+
+    return [
+        { label: 'Reseñas', value: '', compact: false },
+        { label: 'Reservas', value: '', compact: false },
+        { label: 'Miembro desde', value: '', compact: true },
     ];
 }
 
@@ -260,7 +299,7 @@ function getAdminMetricCards(adminProfile: NonNullable<ProfilePayload['adminProf
 }
 
 export function Profile() {
-    const { refreshProfile } = useAuth();
+    const { refreshProfile, user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [avatarUploading, setAvatarUploading] = useState(false);
@@ -291,6 +330,10 @@ export function Profile() {
     const profileSummaryRows = useMemo(
         () => (payload ? getProfileSummaryRows(payload) : []),
         [payload],
+    );
+    const heroProfileType = useMemo(
+        () => payload?.profileType ?? resolveProfileTypeFromRole(user?.role),
+        [payload?.profileType, user?.role],
     );
     const adminMetricCards = useMemo(
         () => (payload?.profileType === 'ADMIN' && payload.adminProfile ? getAdminMetricCards(payload.adminProfile) : []),
@@ -399,24 +442,35 @@ export function Profile() {
 
     return (
         <div className="page-shell max-w-6xl py-10">
-            {payload?.profileType ? (
-                <section className={`${getProfileHeroClass(payload.profileType)} mb-6`}>
+            <PageFeedbackStack
+                items={[
+                    { id: 'profile-error', tone: 'danger', text: errorMessage },
+                    { id: 'profile-success', tone: 'info', text: successMessage },
+                ]}
+            />
+
+            {heroProfileType ? (
+                <section className={`${getProfileHeroClass(heroProfileType)} mb-6`} aria-busy={loading}>
                     <div className="relative z-[1] flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                         <div className="max-w-2xl">
-                            <div className="kpi-chip-soft w-fit">{getProfileTypeLabel(payload.profileType)}</div>
+                            <div className="kpi-chip-soft w-fit">{getProfileTypeLabel(heroProfileType)}</div>
                             <h1 className="mt-4 font-display text-3xl font-bold text-white md:text-4xl">Mi Perfil</h1>
                             <p className="mt-2 text-sm text-blue-100 md:text-base">
                                 Vista personalizada según tu rol en la plataforma, con acceso rápido a tu actividad y configuraciones clave.
                             </p>
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:min-w-[32rem]">
-                            {profileHighlights.map((item) => (
+                            {(payload ? profileHighlights : getProfileHighlightPlaceholders(heroProfileType)).map((item) => (
                                 <article key={item.label} className="role-kpi-card">
                                     <p className="role-kpi-label">{item.label}</p>
-                                    {item.compact ? (
-                                        <p className="role-kpi-compact">{item.value}</p>
+                                    {payload ? (
+                                        item.compact ? (
+                                            <p className="role-kpi-compact">{item.value}</p>
+                                        ) : (
+                                            <p className="role-kpi-value">{item.value}</p>
+                                        )
                                     ) : (
-                                        <p className="role-kpi-value">{item.value}</p>
+                                        <div className={item.compact ? 'role-kpi-skeleton-compact' : 'role-kpi-skeleton'} />
                                     )}
                                 </article>
                             ))}
@@ -427,18 +481,6 @@ export function Profile() {
                 <div className="mb-6">
                     <h1 className="font-display text-3xl font-bold text-gray-900">Mi Perfil</h1>
                     <p className="text-sm text-gray-500">Vista personalizada según tu rol en la plataforma.</p>
-                </div>
-            )}
-
-            {errorMessage && (
-                <div className="alert-danger mb-4">
-                    {errorMessage}
-                </div>
-            )}
-
-            {successMessage && (
-                <div className="alert-info mb-4">
-                    {successMessage}
                 </div>
             )}
 

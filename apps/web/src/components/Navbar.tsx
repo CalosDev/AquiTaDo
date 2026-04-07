@@ -32,8 +32,8 @@ function isPathActive(pathname: string, target: string): boolean {
 }
 
 export function Navbar() {
-    const { isAuthenticated, user, logout } = useAuth();
-    const { activeOrganization } = useOrganization();
+    const { isAuthenticated, loading, user, logout } = useAuth();
+    const { activeOrganization, loading: organizationLoading } = useOrganization();
     const navigate = useNavigate();
     const location = useLocation();
     const [menuOpen, setMenuOpen] = useState(false);
@@ -45,6 +45,7 @@ export function Navbar() {
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const organizationName = activeOrganization?.name?.trim() ?? '';
     const firstName = user?.name?.split(' ')[0] ?? 'Cuenta';
+    const navBootstrapping = loading || (isAuthenticated && organizationLoading);
     const businessesActive = location.pathname === '/businesses'
         || location.pathname.startsWith('/businesses/')
         || location.pathname.startsWith('/negocios/');
@@ -150,7 +151,7 @@ export function Navbar() {
                 <div className="flag-ribbon" aria-hidden="true"></div>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between gap-4">
-                        <Link to="/" className="group inline-flex items-center gap-3">
+                        <Link to="/" className="group inline-flex shrink-0 items-center gap-3">
                             <div className="relative h-10 w-10 overflow-hidden rounded-2xl border border-primary-200 bg-white shadow-md shadow-primary-200/60">
                                 <div className="absolute inset-y-0 left-0 w-1/2 bg-primary-700"></div>
                                 <div className="absolute inset-y-0 right-0 w-1/2 bg-accent-600"></div>
@@ -166,7 +167,19 @@ export function Navbar() {
                             </div>
                         </Link>
 
-                        <div className="hidden min-w-0 items-center gap-3 xl:flex 2xl:gap-4">
+                        <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 xl:flex 2xl:gap-4">
+                            {navBootstrapping ? (
+                                <div className="flex min-w-0 items-center justify-end gap-3">
+                                    <div className="nav-cluster flex items-center gap-3 px-4 py-2">
+                                        <span className="h-4 w-20 animate-pulse rounded-full bg-slate-100" />
+                                        <span className="h-4 w-16 animate-pulse rounded-full bg-slate-100" />
+                                        <span className="h-4 w-20 animate-pulse rounded-full bg-slate-100" />
+                                    </div>
+                                    <div className="h-10 w-28 animate-pulse rounded-full border border-slate-200 bg-white/90" />
+                                    <div className="h-10 w-36 animate-pulse rounded-full bg-primary-100/80" />
+                                </div>
+                            ) : (
+                                <>
                             <div className="nav-cluster flex min-w-0 items-center gap-4">
                                 <Link
                                     to="/businesses"
@@ -294,38 +307,49 @@ export function Navbar() {
                                     </Link>
                                 </div>
                             )}
+                                </>
+                            )}
                         </div>
 
-                        <div className="hidden min-w-0 items-center gap-2 lg:flex xl:hidden">
-                            <Link
-                                to="/businesses"
-                                className={desktopNavClass(businessesActive)}
-                                aria-current={businessesActive ? 'page' : undefined}
-                                onMouseEnter={() => preloadRouteChunk('/businesses')}
-                                onFocus={() => preloadRouteChunk('/businesses')}
-                            >
-                                Negocios
-                            </Link>
-                            {isAuthenticated && (
-                                <Link
-                                    to={roleHomePath}
-                                    className={desktopNavClass(roleHomeActive)}
-                                    aria-current={roleHomeActive ? 'page' : undefined}
-                                    onMouseEnter={() => preloadRouteChunk(roleHomePath)}
-                                    onFocus={() => preloadRouteChunk(roleHomePath)}
-                                >
-                                    {roleHomeLabel}
-                                </Link>
-                            )}
-                            {canRegisterBusiness && (
-                                <Link
-                                    to="/register-business"
-                                    className="btn-accent !px-4 !py-2 text-sm whitespace-nowrap"
-                                    onMouseEnter={() => preloadRouteChunk('/register-business')}
-                                    onFocus={() => preloadRouteChunk('/register-business')}
-                                >
-                                    + Negocio
-                                </Link>
+                        <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 lg:flex xl:hidden">
+                            {navBootstrapping ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="h-10 w-20 animate-pulse rounded-full border border-slate-200 bg-white/90" />
+                                    <div className="h-10 w-24 animate-pulse rounded-full border border-slate-200 bg-white/90" />
+                                </div>
+                            ) : (
+                                <>
+                                    <Link
+                                        to="/businesses"
+                                        className={desktopNavClass(businessesActive)}
+                                        aria-current={businessesActive ? 'page' : undefined}
+                                        onMouseEnter={() => preloadRouteChunk('/businesses')}
+                                        onFocus={() => preloadRouteChunk('/businesses')}
+                                    >
+                                        Negocios
+                                    </Link>
+                                    {isAuthenticated && (
+                                        <Link
+                                            to={roleHomePath}
+                                            className={desktopNavClass(roleHomeActive)}
+                                            aria-current={roleHomeActive ? 'page' : undefined}
+                                            onMouseEnter={() => preloadRouteChunk(roleHomePath)}
+                                            onFocus={() => preloadRouteChunk(roleHomePath)}
+                                        >
+                                            {roleHomeLabel}
+                                        </Link>
+                                    )}
+                                    {canRegisterBusiness && (
+                                        <Link
+                                            to="/register-business"
+                                            className="btn-accent !px-4 !py-2 text-sm whitespace-nowrap"
+                                            onMouseEnter={() => preloadRouteChunk('/register-business')}
+                                            onFocus={() => preloadRouteChunk('/register-business')}
+                                        >
+                                            + Negocio
+                                        </Link>
+                                    )}
+                                </>
                             )}
                         </div>
 

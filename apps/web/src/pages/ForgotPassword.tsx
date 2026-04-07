@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -51,17 +52,12 @@ export function ForgotPassword() {
                 'Continuidad visual con login y registro',
             ]}
         >
-            {errorMessage && (
-                <div className="alert-danger mb-6">
-                    {errorMessage}
-                </div>
-            )}
-
-            {successMessage && (
-                <div className="alert-success mb-6">
-                    {successMessage}
-                </div>
-            )}
+            <PageFeedbackStack
+                items={[
+                    { id: 'forgot-password-error', tone: 'danger', text: errorMessage },
+                    { id: 'forgot-password-success', tone: 'success', text: successMessage },
+                ]}
+            />
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>

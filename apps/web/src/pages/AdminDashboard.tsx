@@ -24,6 +24,7 @@ import {
 import { GrowthInsightsPanel } from './admin-dashboard/GrowthInsightsPanel';
 import { VerificationQueueSection } from './admin-dashboard/VerificationQueueSection';
 import type { GrowthInsightsSnapshot, ModerationQueueItem } from './admin-dashboard/types';
+import { PageFeedbackStack } from '../components/PageFeedbackStack';
 
 interface Business {
     id: string;
@@ -808,6 +809,12 @@ export function AdminDashboard() {
 
     return (
         <div className="page-shell max-w-6xl animate-fade-in">
+            <PageFeedbackStack
+                items={[
+                    { id: 'admin-dashboard-error', tone: 'danger', text: errorMessage },
+                    { id: 'admin-dashboard-success', tone: 'info', text: successMessage },
+                ]}
+            />
             
             <section className="role-hero role-hero-admin mb-8">
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-200 font-semibold">Panel Admin</p>
@@ -839,26 +846,6 @@ export function AdminDashboard() {
             <p className="text-gray-500 mb-8">
                 Gestión de negocios, categorías, moderación y observabilidad en un solo panel.
             </p>
-
-            {errorMessage && (
-                <div
-                    role="alert"
-                    aria-live="assertive"
-                    className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-                >
-                    {errorMessage}
-                </div>
-            )}
-
-            {successMessage && (
-                <div
-                    role="status"
-                    aria-live="polite"
-                    className="mb-4 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700"
-                >
-                    {successMessage}
-                </div>
-            )}
 
             <div className="flex flex-wrap gap-2 mb-6">
                 {tabs.map((tab) => (

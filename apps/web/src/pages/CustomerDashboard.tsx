@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { favoritesApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
 import { formatDateTimeDo } from '../lib/market';
 
@@ -162,6 +163,14 @@ export function CustomerDashboard() {
 
     return (
         <div className="page-shell space-y-8 animate-fade-in">
+            <PageFeedbackStack
+                items={[
+                    { id: 'customer-dashboard-error', tone: 'danger', text: error },
+                    { id: 'customer-dashboard-favorites-error', tone: 'danger', text: favoritesErrorMessage },
+                    { id: 'customer-dashboard-favorites-info', tone: 'info', text: favoritesInfoMessage },
+                ]}
+            />
+
             <section className="role-hero role-hero-user">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">Panel cliente</p>
                 <h1 className="mt-2 font-display text-3xl font-bold text-white">
@@ -191,22 +200,6 @@ export function CustomerDashboard() {
                     </Link>
                 </div>
             </section>
-
-            {error && (
-                <section role="alert" aria-live="assertive" className="alert-danger">
-                    <p>{error}</p>
-                </section>
-            )}
-            {favoritesErrorMessage && (
-                <section role="alert" aria-live="assertive" className="alert-danger">
-                    <p>{favoritesErrorMessage}</p>
-                </section>
-            )}
-            {favoritesInfoMessage && (
-                <section role="status" aria-live="polite" className="alert-info">
-                    <p>{favoritesInfoMessage}</p>
-                </section>
-            )}
 
             <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <article className="section-shell p-6">

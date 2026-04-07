@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { analyticsApi, businessApi, verificationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useOrganization } from '../context/useOrganization';
 import { formatDateTimeDo } from '../lib/market';
 
@@ -291,6 +292,13 @@ export function DashboardBusiness() {
 
     return (
         <div className="page-shell space-y-6 animate-fade-in">
+            <PageFeedbackStack
+                items={[
+                    { id: 'business-dashboard-error', tone: 'danger', text: errorMessage },
+                    { id: 'business-dashboard-success', tone: 'info', text: successMessage },
+                ]}
+            />
+
             <section className="role-hero role-hero-owner">
                 <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel de negocio</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Estado del catálogo y visibilidad</h1>
@@ -361,17 +369,6 @@ export function DashboardBusiness() {
                             Ver directorio publico
                         </Link>
                     </div>
-                </section>
-            )}
-
-            {errorMessage && (
-                <section role="alert" aria-live="assertive" className="alert-danger">
-                    <p>{errorMessage}</p>
-                </section>
-            )}
-            {successMessage && (
-                <section role="status" aria-live="polite" className="alert-info">
-                    <p>{successMessage}</p>
                 </section>
             )}
 
