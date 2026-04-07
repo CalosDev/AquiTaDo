@@ -1,5 +1,3 @@
-import { getOrCreateSessionId, getOrCreateVisitorId } from './clientContext';
-
 export type FrontendRole = 'ANONYMOUS' | 'USER' | 'BUSINESS_OWNER' | 'ADMIN';
 type FrontendSignalKind = 'ROUTE_VIEW' | 'WEB_VITAL' | 'CLIENT_ERROR';
 type WebVitalName = 'CLS' | 'FCP' | 'LCP';
@@ -106,8 +104,6 @@ function sendFrontendSignal(payload: FrontendSignalPayload) {
         ...payload,
         route: normalizeFrontendRoute(payload.route),
         role: toRoleLabel(payload.role),
-        visitorId: getOrCreateVisitorId(),
-        sessionId: getOrCreateSessionId(),
     });
 
     if (typeof navigator.sendBeacon === 'function') {
