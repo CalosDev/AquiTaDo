@@ -168,7 +168,7 @@ export function CustomerDashboard() {
                     Hola, {user?.name?.split(' ')[0] ?? 'Usuario'}
                 </h1>
                 <p className="mt-2 max-w-2xl text-blue-100">
-                    Organiza tus negocios favoritos, compara listas y vuelve rapido a los perfiles que te interesan.
+                    Organiza tus negocios favoritos, compara listas y vuelve rápido a los perfiles que te interesan.
                 </p>
 
                 <div className="mt-5 role-kpi-grid">
@@ -222,8 +222,8 @@ export function CustomerDashboard() {
 
                     {favorites.length === 0 ? (
                         <EmptyPanel
-                            title="Aun no has guardado negocios"
-                            description="Explora el directorio, compara perfiles y guarda los lugares que quieras revisar despues."
+                            title="Aún no has guardado negocios"
+                            description="Explora el directorio, compara perfiles y guarda los lugares que quieras revisar después."
                             primaryAction={(
                                 <Link to="/businesses" className="btn-primary inline-flex text-sm">
                                     Empezar a explorar

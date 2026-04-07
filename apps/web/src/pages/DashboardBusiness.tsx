@@ -183,7 +183,7 @@ export function DashboardBusiness() {
                 }),
             );
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificacion documental'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificación documental'));
         }
     }, []);
 
@@ -264,9 +264,9 @@ export function DashboardBusiness() {
                 notes: verificationNotes.trim() || undefined,
             });
             await loadVerificationData(selectedBusinessId);
-            setSuccessMessage('Solicitud de verificacion enviada');
+            setSuccessMessage('Solicitud de verificación enviada');
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificacion'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificación'));
         } finally {
             setSaving(false);
         }
@@ -292,10 +292,10 @@ export function DashboardBusiness() {
     return (
         <div className="page-shell space-y-6 animate-fade-in">
             <section className="role-hero role-hero-owner">
-                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
-                <h1 className="font-display text-3xl font-bold text-white mt-2">Estado del catalogo y visibilidad</h1>
+                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel de negocio</p>
+                <h1 className="font-display text-3xl font-bold text-white mt-2">Estado del catálogo y visibilidad</h1>
                 <p className="text-blue-100 mt-2 max-w-2xl">
-                    Vista enfocada en calidad de ficha, visibilidad organica y verificacion documental.
+                    Vista enfocada en calidad de ficha, visibilidad orgánica y verificación documental.
                 </p>
 
                 <div className="mt-5 role-kpi-grid">
@@ -308,12 +308,12 @@ export function DashboardBusiness() {
                         <p className="role-kpi-value">{totals.views ?? 0}</p>
                     </article>
                     <article className="role-kpi-card">
-                        <p className="role-kpi-label">Conversion</p>
+                        <p className="role-kpi-label">Conversión</p>
                         <p className="role-kpi-value">{totals.conversionRate ?? 0}%</p>
                     </article>
                     <article className="role-kpi-card">
                         <p className="role-kpi-label">Perfiles fuertes</p>
-                        <p className="mt-1 font-display text-xl font-bold text-white">
+                        <p className="role-kpi-value">
                             {completeProfiles}
                         </p>
                     </article>
@@ -351,7 +351,7 @@ export function DashboardBusiness() {
                     <p className="text-sm uppercase tracking-wide text-primary-700 font-semibold">Primer paso</p>
                     <h2 className="font-display text-2xl font-bold text-slate-900 mt-2">Registra tu primer negocio</h2>
                     <p className="text-slate-600 mt-2 max-w-2xl">
-                        Tu panel de negocio se activa despues de crear el primer negocio. En ese proceso se prepara tu organizacion interna y la verificacion documental.
+                        Tu panel de negocio se activa después de crear el primer negocio. En ese proceso se prepara tu organización interna y la verificación documental.
                     </p>
                     <div className="mt-5 flex flex-wrap gap-3">
                         <Link className="btn-primary" to="/register-business">
@@ -389,7 +389,7 @@ export function DashboardBusiness() {
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.clicks ?? 0}</p>
                 </article>
                 <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversion</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversión</p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{totals.conversionRate ?? 0}%</p>
                 </article>
                 <article className="panel-premium p-5">
@@ -417,7 +417,7 @@ export function DashboardBusiness() {
                         )}
                     </div>
                     {businesses.length === 0 ? (
-                        <p className="text-sm text-gray-500">Aun no tienes negocios creados.</p>
+                        <p className="text-sm text-gray-500">Aún no tienes negocios creados.</p>
                     ) : (
                         <div className="space-y-2">
                             {businesses.map((business) => (
@@ -433,7 +433,7 @@ export function DashboardBusiness() {
                                 >
                                     <p className="font-medium text-slate-900">{business.name}</p>
                                     <p className="text-xs text-slate-500 mt-1">
-                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificacion'}
+                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificación'}
                                     </p>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         <span className="text-[11px] rounded-full bg-primary-50 px-2 py-1 text-primary-700">
@@ -476,7 +476,7 @@ export function DashboardBusiness() {
                             Negocio seleccionado: <strong>{selectedBusiness.name}</strong>
                         </p>
                     ) : (
-                        <p className="text-sm text-slate-500">Selecciona un negocio para gestionar su verificacion.</p>
+                        <p className="text-sm text-slate-500">Selecciona un negocio para gestionar su verificación.</p>
                     )}
 
                     {verificationStatus?.verificationSubmittedAt && (
@@ -525,11 +525,11 @@ export function DashboardBusiness() {
                     </form>
 
                     <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-3">
-                        <h3 className="font-semibold text-slate-900">Enviar solicitud de revision</h3>
+                        <h3 className="font-semibold text-slate-900">Enviar solicitud de revisión</h3>
                         <textarea
                             className="input-field text-sm"
                             rows={3}
-                            placeholder="Notas para el equipo de verificacion (opcional)"
+                            placeholder="Notas para el equipo de verificación (opcional)"
                             value={verificationNotes}
                             onChange={(event) => setVerificationNotes(event.target.value)}
                             disabled={!selectedBusinessId || saving}
@@ -540,7 +540,7 @@ export function DashboardBusiness() {
                             onClick={() => void handleSubmitBusinessVerification()}
                             disabled={!selectedBusinessId || saving}
                         >
-                            {saving ? 'Enviando...' : 'Solicitar verificacion'}
+                            {saving ? 'Enviando...' : 'Solicitar verificación'}
                         </button>
                     </div>
 

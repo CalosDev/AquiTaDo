@@ -309,6 +309,62 @@
     box-shadow: 0 22px 42px -26px rgba(0, 45, 98, 0.45);
   }
 
+  .dashboard-stat-card {
+    @apply relative overflow-hidden rounded-[26px] border border-slate-200/85 bg-white/96 px-5 py-4;
+    box-shadow: 0 22px 36px -28px rgba(15, 23, 42, 0.28);
+  }
+
+  .dashboard-stat-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.11) 0%, rgba(59, 130, 246, 0) 34%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 42%);
+    pointer-events: none;
+  }
+
+  .dashboard-stat-card::after {
+    content: '';
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    top: 0;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #002d62 0%, #0f5ec6 58%, #ce1126 100%);
+    opacity: 0.92;
+  }
+
+  .dashboard-stat-label {
+    @apply relative z-[1] text-[10px] font-extrabold uppercase tracking-[0.22em] text-slate-500;
+  }
+
+  .dashboard-stat-value {
+    @apply relative z-[1] mt-3 font-display text-[2.25rem] font-bold leading-none text-slate-900;
+    letter-spacing: -0.04em;
+  }
+
+  .dashboard-stat-meta {
+    @apply relative z-[1] mt-2 text-xs font-medium text-slate-500;
+  }
+
+  .dashboard-summary-list {
+    @apply space-y-2.5;
+  }
+
+  .dashboard-summary-item {
+    @apply flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-3;
+  }
+
+  .dashboard-summary-label {
+    @apply text-sm font-medium text-slate-600;
+  }
+
+  .dashboard-summary-value {
+    @apply text-sm font-semibold text-slate-900;
+  }
+
   .footer-shell {
     background:
       radial-gradient(circle at 14% 0%, rgba(59, 130, 246, 0.16) 0%, rgba(59, 130, 246, 0) 26%),

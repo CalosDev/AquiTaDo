@@ -182,7 +182,7 @@ function getProfileHighlights(payload: ProfilePayload) {
     }
 
     return [
-        { label: 'Resenas', value: String(payload.userProfile.reviewCount) },
+        { label: 'Reseñas', value: String(payload.userProfile.reviewCount) },
         { label: 'Reservas', value: String(payload.userProfile.bookingCount) },
         { label: 'Miembro desde', value: formatDateTime(payload.user.createdAt), compact: true },
     ];
@@ -191,7 +191,7 @@ function getProfileHighlights(payload: ProfilePayload) {
 function getProfileSummaryRows(payload: ProfilePayload) {
     if (payload.profileType === 'ADMIN' && payload.adminProfile) {
         return [
-            { label: 'Resenas moderadas', value: String(payload.adminProfile.metrics.totalReviews) },
+            { label: 'Reseñas moderadas', value: String(payload.adminProfile.metrics.totalReviews) },
             { label: 'Reservas monitoreadas', value: String(payload.adminProfile.metrics.totalBookings) },
             { label: 'Transacciones registradas', value: String(payload.adminProfile.metrics.totalTransactions) },
         ];
@@ -216,9 +216,46 @@ function getProfileSummaryRows(payload: ProfilePayload) {
     }
 
     return [
-        { label: 'Resenas publicadas', value: String(payload.userProfile.reviewCount) },
+        { label: 'Reseñas publicadas', value: String(payload.userProfile.reviewCount) },
         { label: 'Reservas creadas', value: String(payload.userProfile.bookingCount) },
         { label: 'Cuenta creada', value: formatDateTime(payload.user.createdAt) },
+    ];
+}
+
+function getAdminMetricCards(adminProfile: NonNullable<ProfilePayload['adminProfile']>) {
+    const { metrics } = adminProfile;
+
+    return [
+        {
+            label: 'Usuarios registrados',
+            value: String(metrics.totalUsers),
+            meta: 'Cuentas creadas en la plataforma',
+        },
+        {
+            label: 'Organizaciones activas',
+            value: String(metrics.totalOrganizations),
+            meta: 'Equipos y marcas gestionadas',
+        },
+        {
+            label: 'Negocios publicados',
+            value: String(metrics.totalBusinesses),
+            meta: 'Fichas vivas en el catálogo',
+        },
+        {
+            label: 'Reseñas moderadas',
+            value: String(metrics.totalReviews),
+            meta: 'Contenido evaluado por confianza',
+        },
+        {
+            label: 'Reservas monitoreadas',
+            value: String(metrics.totalBookings),
+            meta: 'Solicitudes de atención registradas',
+        },
+        {
+            label: 'Transacciones registradas',
+            value: String(metrics.totalTransactions),
+            meta: 'Operaciones de cobro contabilizadas',
+        },
     ];
 }
 
@@ -253,6 +290,10 @@ export function Profile() {
     );
     const profileSummaryRows = useMemo(
         () => (payload ? getProfileSummaryRows(payload) : []),
+        [payload],
+    );
+    const adminMetricCards = useMemo(
+        () => (payload?.profileType === 'ADMIN' && payload.adminProfile ? getAdminMetricCards(payload.adminProfile) : []),
         [payload],
     );
 
@@ -456,7 +497,7 @@ export function Profile() {
                                         ) : null}
                                     </div>
                                     <p className="mt-2 text-xs text-gray-500">
-                                        JPG, PNG o WebP. Maximo 5 MB. La foto se guarda desde el sistema, ya no por URL manual.
+                                        JPG, PNG o WebP. Máximo 5 MB. La foto se guarda desde el sistema, ya no por URL manual.
                                     </p>
                                 </div>
                                 <button type="submit" className="btn-primary text-sm" disabled={saving}>
@@ -484,11 +525,12 @@ export function Profile() {
                                     <p className="text-xs text-gray-500">{payload.user.email}</p>
                                 </div>
                             </div>
-                            <div className="space-y-1 text-sm text-gray-600">
+                            <div className="dashboard-summary-list">
                                 {profileSummaryRows.map((item) => (
-                                    <p key={item.label}>
-                                        {item.label}: <strong className="text-gray-900">{item.value}</strong>
-                                    </p>
+                                    <div key={item.label} className="dashboard-summary-item">
+                                        <span className="dashboard-summary-label">{item.label}</span>
+                                        <strong className="dashboard-summary-value">{item.value}</strong>
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -536,7 +578,7 @@ export function Profile() {
                                             </p>
                                         </div>
                                     )) : (
-                                        <p className="text-sm text-gray-500">Aun no tienes reservas registradas.</p>
+                                        <p className="text-sm text-gray-500">Aún no tienes reservas registradas.</p>
                                     )}
                                 </div>
                             </div>
@@ -595,32 +637,15 @@ export function Profile() {
                             </div>
 
                             <div className="section-shell p-5">
-                                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Perfil admin</h3>
+                                <h3 className="font-display text-lg font-semibold text-gray-900 mb-3">Panel administrativo</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                                    <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                                        <p className="text-xs text-gray-500">Usuarios</p>
-                                        <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalUsers}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                                        <p className="text-xs text-gray-500">Organizaciones</p>
-                                        <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalOrganizations}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                                        <p className="text-xs text-gray-500">Negocios</p>
-                                        <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalBusinesses}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                                        <p className="text-xs text-gray-500">Resenas</p>
-                                        <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalReviews}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                                        <p className="text-xs text-gray-500">Reservas</p>
-                                        <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalBookings}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                                        <p className="text-xs text-gray-500">Transacciones</p>
-                                        <p className="text-2xl font-semibold text-gray-900">{payload.adminProfile.metrics.totalTransactions}</p>
-                                    </div>
+                                    {adminMetricCards.map((metric) => (
+                                        <article key={metric.label} className="dashboard-stat-card">
+                                            <p className="dashboard-stat-label">{metric.label}</p>
+                                            <p className="dashboard-stat-value">{metric.value}</p>
+                                            <p className="dashboard-stat-meta">{metric.meta}</p>
+                                        </article>
+                                    ))}
                                 </div>
                             </div>
 
@@ -644,7 +669,7 @@ export function Profile() {
                                 </div>
 
                                 <div className="section-shell p-5">
-                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Ultimas organizaciones</h4>
+                                    <h4 className="font-display text-base font-semibold text-gray-900 mb-3">Últimas organizaciones</h4>
                                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                         {payload.adminProfile.latestOrganizations.length > 0 ? payload.adminProfile.latestOrganizations.map((organization) => (
                                             <div key={organization.id} className="rounded-xl border border-gray-100 p-3">
