@@ -907,8 +907,61 @@ export function BusinessDetails() {
 
     if (loading) {
         return (
-            <div className="flex justify-center py-32">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8" aria-busy="true">
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                    <div className="space-y-6 lg:col-span-2" aria-hidden="true">
+                        <div className="panel-premium overflow-hidden">
+                            <div className="h-[320px] animate-pulse bg-slate-100 md:h-[380px]"></div>
+                            <div className="space-y-4 px-6 py-5">
+                                <div className="flex flex-wrap gap-2">
+                                    <div className="h-7 w-24 rounded-full bg-slate-100"></div>
+                                    <div className="h-7 w-28 rounded-full bg-slate-100"></div>
+                                </div>
+                                <div className="h-8 w-3/4 rounded-full bg-slate-100"></div>
+                                <div className="h-4 w-5/6 rounded-full bg-slate-100"></div>
+                                <div className="h-4 w-2/3 rounded-full bg-slate-100"></div>
+                            </div>
+                        </div>
+
+                        <div className="panel-premium space-y-4 px-6 py-5">
+                            <div className="h-5 w-36 rounded-full bg-slate-100"></div>
+                            <div className="h-4 w-full rounded-full bg-slate-100"></div>
+                            <div className="h-4 w-full rounded-full bg-slate-100"></div>
+                            <div className="h-4 w-4/5 rounded-full bg-slate-100"></div>
+                        </div>
+
+                        <div className="panel-premium px-6 py-5">
+                            <div className="h-5 w-44 rounded-full bg-slate-100"></div>
+                            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                {Array.from({ length: 4 }).map((_, index) => (
+                                    <div key={`business-details-skeleton-${index}`} className="rounded-2xl border border-slate-200 p-4">
+                                        <div className="h-4 w-1/2 rounded-full bg-slate-100"></div>
+                                        <div className="mt-3 h-3.5 w-full rounded-full bg-slate-100"></div>
+                                        <div className="mt-2 h-3.5 w-4/5 rounded-full bg-slate-100"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6" aria-hidden="true">
+                        <div className="panel-premium px-5 py-6">
+                            <div className="h-5 w-32 rounded-full bg-slate-100"></div>
+                            <div className="mt-5 h-11 w-full rounded-2xl bg-slate-100"></div>
+                            <div className="mt-3 h-11 w-full rounded-2xl bg-slate-100"></div>
+                            <div className="mt-5 h-24 w-full rounded-[1.5rem] bg-slate-100"></div>
+                        </div>
+
+                        <div className="panel-premium px-5 py-6">
+                            <div className="h-5 w-40 rounded-full bg-slate-100"></div>
+                            <div className="mt-4 space-y-3">
+                                {Array.from({ length: 5 }).map((_, index) => (
+                                    <div key={`sidebar-skeleton-${index}`} className="h-4 w-full rounded-full bg-slate-100"></div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }

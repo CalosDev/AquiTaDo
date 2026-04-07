@@ -162,6 +162,7 @@ export function Register() {
                         id="register-name"
                         type="text"
                         required
+                        autoComplete="name"
                         value={formData.name}
                         onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                         className="input-field"
@@ -177,6 +178,7 @@ export function Register() {
                         id="register-email"
                         type="email"
                         required
+                        autoComplete="email"
                         value={formData.email}
                         onChange={(event) => setFormData({ ...formData, email: event.target.value })}
                         className="input-field"
@@ -212,6 +214,7 @@ export function Register() {
                     <input
                         id="register-phone"
                         type="tel"
+                        autoComplete="tel"
                         value={formData.phone}
                         onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
                         className="input-field"
@@ -228,6 +231,7 @@ export function Register() {
                         type="password"
                         required
                         minLength={8}
+                        autoComplete="new-password"
                         value={formData.password}
                         onChange={(event) => setFormData({ ...formData, password: event.target.value })}
                         className="input-field"
@@ -244,6 +248,7 @@ export function Register() {
                         type="password"
                         required
                         minLength={8}
+                        autoComplete="new-password"
                         value={formData.confirmPassword}
                         onChange={(event) => setFormData({ ...formData, confirmPassword: event.target.value })}
                         className="input-field"

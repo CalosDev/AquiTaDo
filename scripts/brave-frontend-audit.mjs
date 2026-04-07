@@ -237,7 +237,7 @@ async function auditPage(baseUrl, url, outputDir) {
         expression: `(() => {
             const shifts = window.__AQUITA_LAYOUT_SHIFTS__ || [];
             const cls = shifts.reduce((total, shift) => total + (shift.value || 0), 0);
-            return JSON.stringify({
+            return {
                 title: document.title,
                 pathname: location.pathname,
                 cls,
@@ -249,11 +249,25 @@ async function auditPage(baseUrl, url, outputDir) {
                 viewportHeight: window.innerHeight,
                 footerCount: document.querySelectorAll('footer').length,
                 navCount: document.querySelectorAll('nav').length,
-            });
+            };
         })()`,
+        awaitPromise: true,
         returnByValue: true,
     });
-    const metrics = JSON.parse(evaluation.result.value);
+    const metrics = evaluation.result?.value ?? {
+        title: '',
+        pathname: '',
+        cls: null,
+        shiftCount: 0,
+        shifts: [],
+        bodyClassName: '',
+        htmlClassName: '',
+        scrollHeight: null,
+        viewportHeight: null,
+        footerCount: 0,
+        navCount: 0,
+        evaluationError: evaluation.result?.description ?? 'Missing evaluation result',
+    };
 
     const fileSafeName = url
         .replace(/^https?:\/\//, '')

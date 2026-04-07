@@ -10,7 +10,7 @@ import { AppModule } from './app.module';
 import { ObservabilityService } from './observability/observability.service';
 
 type CorsSettings = {
-    origin: string | string[] | boolean;
+    origin: string | string[] | boolean | ((requestOrigin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => void);
     credentials: boolean;
     methods: string[];
     allowedHeaders: string[];
@@ -43,8 +43,26 @@ function normalizeCorsOrigin(value: string): string | null {
     }
 }
 
+function isTrustedVercelPreviewOrigin(origin: string): boolean {
+    try {
+        const { protocol, hostname } = new URL(origin);
+        if (protocol !== 'https:') {
+            return false;
+        }
+
+        if (hostname === 'aquitado.vercel.app') {
+            return true;
+        }
+
+        return /^aquitado-[a-z0-9-]+\.vercel\.app$/i.test(hostname);
+    } catch {
+        return false;
+    }
+}
+
 function resolveCorsSettings(): CorsSettings {
     const rawCorsOrigin = process.env.CORS_ORIGIN?.trim();
+    const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEW_ORIGINS?.trim() || 'true').toLowerCase() !== 'false';
     const methods = parseCsvConfig(
         process.env.CORS_ALLOWED_METHODS,
         ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -118,8 +136,28 @@ function resolveCorsSettings(): CorsSettings {
         };
     }
 
+    const allowedOrigins = new Set(origins);
+
     return {
-        origin: origins.length === 1 ? origins[0] : origins,
+        origin: (requestOrigin, callback) => {
+            if (!requestOrigin) {
+                callback(null, true);
+                return;
+            }
+
+            const normalizedRequestOrigin = normalizeCorsOrigin(requestOrigin);
+            if (normalizedRequestOrigin && allowedOrigins.has(normalizedRequestOrigin)) {
+                callback(null, true);
+                return;
+            }
+
+            if (allowVercelPreviews && isTrustedVercelPreviewOrigin(requestOrigin)) {
+                callback(null, true);
+                return;
+            }
+
+            callback(null, false);
+        },
         credentials: true,
         methods,
         allowedHeaders,

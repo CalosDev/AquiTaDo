@@ -97,6 +97,7 @@ export function BusinessesList() {
     const [sponsoredPlacements, setSponsoredPlacements] = useState<SponsoredPlacement[]>([]);
     const [favoriteBusinessIds, setFavoriteBusinessIds] = useState<Set<string>>(new Set());
     const [favoriteProcessingId, setFavoriteProcessingId] = useState<string | null>(null);
+    const [filtersLoading, setFiltersLoading] = useState(true);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -287,6 +288,7 @@ export function BusinessesList() {
     }, [mappableBusinesses, selectedBusinessId]);
 
     const loadFilters = useCallback(async () => {
+        setFiltersLoading(true);
         try {
             const [catRes, provRes] = await Promise.all([
                 categoryApi.getAll(),
@@ -296,6 +298,8 @@ export function BusinessesList() {
             setProvinces(provRes.data);
         } catch (error) {
             setLoadError(getApiErrorMessage(error, 'No se pudieron cargar los filtros'));
+        } finally {
+            setFiltersLoading(false);
         }
     }, []);
 
@@ -874,6 +878,7 @@ export function BusinessesList() {
                     currentSector={currentSector}
                     currentVerified={currentVerified}
                     filtersOpen={filtersOpen}
+                    loading={filtersLoading}
                     onClearFilters={handleClearFilters}
                     onFeatureChange={(value) => updateFilter('feature', value)}
                     onTrackedFilterChange={handleTrackedFilterChange}
@@ -884,7 +889,7 @@ export function BusinessesList() {
                 <div className="min-w-0">
                     {loading ? (
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {Array.from({ length: 9 }).map((_, index) => (
+                            {Array.from({ length: 3 }).map((_, index) => (
                                 <div key={index} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                                     <div className="aspect-[4/3] rounded-xl bg-slate-100 animate-pulse"></div>
                                     <div className="mt-3 h-4 w-2/3 rounded bg-slate-100 animate-pulse"></div>

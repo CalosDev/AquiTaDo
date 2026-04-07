@@ -13,6 +13,7 @@ interface FiltersSidebarProps {
     currentSector: string;
     currentVerified: boolean;
     filtersOpen: boolean;
+    loading: boolean;
     onClearFilters: () => void;
     onFeatureChange: (value: string) => void;
     onTrackedFilterChange: (key: string, value: string, metadata: { source: string }) => void;
@@ -32,6 +33,7 @@ export function FiltersSidebar({
     currentSector,
     currentVerified,
     filtersOpen,
+    loading,
     onClearFilters,
     onFeatureChange,
     onTrackedFilterChange,
@@ -72,22 +74,33 @@ export function FiltersSidebar({
                 <div className="mt-5 space-y-6">
                     <section>
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Categorias</p>
-                        <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
-                            {categoryOptions.map((category) => (
-                                <label key={category.id} className="flex items-center gap-2 text-sm text-slate-600">
-                                    <input
-                                        type="checkbox"
-                                        checked={currentCategory === category.id}
-                                        onChange={(event) => onTrackedFilterChange('categoryId', event.target.checked ? category.id : '', { source: 'sidebar-category' })}
-                                        className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500/30"
-                                    />
-                                    <span>
-                                        {formatPublicCategoryIcon(category.icon) ? `${formatPublicCategoryIcon(category.icon)} ` : ''}
-                                        {formatPublicCategoryName(category.name)}
-                                    </span>
-                                </label>
-                            ))}
-                        </div>
+                        {loading ? (
+                            <div className="mt-3 max-h-56 space-y-2 overflow-hidden pr-1" aria-hidden="true">
+                                {Array.from({ length: 7 }).map((_, index) => (
+                                    <div key={`category-skeleton-${index}`} className="flex items-center gap-2">
+                                        <div className="h-4 w-4 rounded border border-slate-200 bg-slate-100"></div>
+                                        <div className="h-3.5 w-full rounded-full bg-slate-100"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+                                {categoryOptions.map((category) => (
+                                    <label key={category.id} className="flex items-center gap-2 text-sm text-slate-600">
+                                        <input
+                                            type="checkbox"
+                                            checked={currentCategory === category.id}
+                                            onChange={(event) => onTrackedFilterChange('categoryId', event.target.checked ? category.id : '', { source: 'sidebar-category' })}
+                                            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500/30"
+                                        />
+                                        <span>
+                                            {formatPublicCategoryIcon(category.icon) ? `${formatPublicCategoryIcon(category.icon)} ` : ''}
+                                            {formatPublicCategoryName(category.name)}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
                     </section>
 
                     <section>
@@ -97,9 +110,10 @@ export function FiltersSidebar({
                                 id="businesses-province"
                                 value={currentProvince}
                                 onChange={(event) => onTrackedFilterChange('provinceId', event.target.value, { source: 'sidebar-province' })}
+                                disabled={loading}
                                 className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                             >
-                                <option value="">Todas las provincias</option>
+                                <option value="">{loading ? 'Cargando provincias...' : 'Todas las provincias'}</option>
                                 {provinces.map((province) => (
                                     <option key={province.id} value={province.id}>
                                         {province.name}
@@ -111,10 +125,12 @@ export function FiltersSidebar({
                                 id="businesses-city"
                                 value={currentCity}
                                 onChange={(event) => onTrackedFilterChange('cityId', event.target.value, { source: 'sidebar-city' })}
-                                disabled={!currentProvince}
+                                disabled={loading || !currentProvince}
                                 className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 disabled:bg-slate-50 disabled:text-slate-400"
                             >
-                                <option value="">{currentProvince ? 'Todas las ciudades' : 'Selecciona una provincia'}</option>
+                                <option value="">
+                                    {loading ? 'Cargando ciudades...' : currentProvince ? 'Todas las ciudades' : 'Selecciona una provincia'}
+                                </option>
                                 {cities.map((city) => (
                                     <option key={city.id} value={city.id}>
                                         {city.name}
@@ -126,10 +142,12 @@ export function FiltersSidebar({
                                 id="businesses-sector"
                                 value={currentSector}
                                 onChange={(event) => onTrackedFilterChange('sectorId', event.target.value, { source: 'sidebar-sector' })}
-                                disabled={!currentCity || sectors.length === 0}
+                                disabled={loading || !currentCity || sectors.length === 0}
                                 className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 disabled:bg-slate-50 disabled:text-slate-400"
                             >
-                                <option value="">{currentCity ? 'Todos los sectores' : 'Selecciona una ciudad'}</option>
+                                <option value="">
+                                    {loading ? 'Cargando sectores...' : currentCity ? 'Todos los sectores' : 'Selecciona una ciudad'}
+                                </option>
                                 {sectors.map((sector) => (
                                     <option key={sector.id} value={sector.id}>
                                         {sector.name}
@@ -148,6 +166,7 @@ export function FiltersSidebar({
                                 placeholder="Ej: delivery, parqueo, pet friendly"
                                 value={currentFeature}
                                 onChange={(event) => onFeatureChange(event.target.value)}
+                                disabled={loading}
                                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                             />
                         </div>

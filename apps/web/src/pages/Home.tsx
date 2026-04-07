@@ -527,7 +527,7 @@ export function Home() {
                         </div>
 
                         <div className="lg:col-span-5">
-                            <div className="hero-accent-ring p-6 md:p-7 text-white">
+                            <div className="hero-accent-ring min-h-[420px] p-6 md:min-h-[460px] md:p-7 text-white">
                                 <p className="text-xs uppercase tracking-[0.18em] text-blue-200 font-semibold">Radar local</p>
                                 <h2 className="mt-2 font-display text-2xl font-bold">Qué está moviendo el mercado</h2>
 
@@ -547,7 +547,21 @@ export function Home() {
                                 </div>
 
                                 <div className="mt-5 space-y-3">
-                                    {topRadarCategories.length > 0 ? topRadarCategories.map((category, index) => (
+                                    {loading ? Array.from({ length: 4 }).map((_, index) => (
+                                        <div
+                                            key={`radar-skeleton-${index}`}
+                                            className="hero-radar-item !cursor-default !justify-between"
+                                            aria-hidden="true"
+                                        >
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold text-white/70">
+                                                    {index + 1}
+                                                </span>
+                                                <span className="h-3.5 w-32 rounded-full bg-white/20"></span>
+                                            </div>
+                                            <span className="h-3.5 w-12 rounded-full bg-white/15"></span>
+                                        </div>
+                                    )) : topRadarCategories.length > 0 ? topRadarCategories.map((category, index) => (
                                         <Link
                                             key={category.id}
                                             to={category.slug ? `/negocios/categoria/${category.slug}` : `/businesses?categoryId=${category.id}`}
@@ -895,7 +909,25 @@ export function Home() {
                     <Link to="/businesses" className="btn-secondary text-sm w-fit">Ver todo el directorio</Link>
                 </div>
 
-                {recentBusinesses.length === 0 ? (
+                {loading ? (
+                    <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                        {Array.from({ length: 3 }).map((_, index) => (
+                            <div
+                                key={`recent-business-skeleton-${index}`}
+                                className="listing-card overflow-hidden p-0"
+                                aria-hidden="true"
+                            >
+                                <div className="listing-card-media h-48 animate-pulse bg-slate-100"></div>
+                                <div className="space-y-3 p-5">
+                                    <div className="h-6 w-2/3 rounded-full bg-slate-100"></div>
+                                    <div className="h-3.5 w-1/2 rounded-full bg-slate-100"></div>
+                                    <div className="h-3.5 w-full rounded-full bg-slate-100"></div>
+                                    <div className="h-3.5 w-5/6 rounded-full bg-slate-100"></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : recentBusinesses.length === 0 ? (
                     <div className="section-shell mt-6 p-10 text-center">
                         <p className="font-display text-2xl font-semibold text-slate-800">Aún no hay negocios registrados.</p>
                         <p className="mt-2 text-sm text-slate-600">Aporta la primera ficha útil para esa zona o categoría.</p>
