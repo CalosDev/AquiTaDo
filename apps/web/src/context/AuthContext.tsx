@@ -40,6 +40,16 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const SESSION_HINT_STORAGE_KEY = 'aquita_has_session';
 const canUseWindow = typeof window !== 'undefined';
 
+function shouldBootstrapSession(): boolean {
+    if (!canUseWindow) {
+        return true;
+    }
+
+    const savedToken = getAccessToken();
+    const hasSessionHint = localStorage.getItem(SESSION_HINT_STORAGE_KEY) === '1';
+    return Boolean(savedToken || hasSessionHint);
+}
+
 function isTokenExpiredOrNearExpiry(token: string): boolean {
     try {
         const payload = JSON.parse(atob(token.split('.')[1] ?? ''));
@@ -58,7 +68,7 @@ function isTokenExpiredOrNearExpiry(token: string): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(() => shouldBootstrapSession());
 
     const clearSession = useCallback(() => {
         setToken(null);
