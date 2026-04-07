@@ -20,7 +20,7 @@ function resolveApiBaseUrl(rawBaseUrl: string): string {
 
 function resolveApiTimeoutMs(rawTimeoutMs: string | number | undefined): number {
     const parsed = Number(rawTimeoutMs);
-    if (!Number.isFinite(parsed) || parsed < 1_000) {
+    if (!Number.isFinite(parsed) || parsed < 15_000) {
         return 30_000;
     }
 
@@ -89,7 +89,10 @@ const api = axios.create({
     },
 });
 
-type RetryableRequestConfig = AxiosRequestConfig & { _retry?: boolean };
+type RetryableRequestConfig = AxiosRequestConfig & {
+    _retry?: boolean;
+    _transientRetryCount?: number;
+};
 
 let refreshRequestPromise: Promise<string | null> | null = null;
 
@@ -113,6 +116,48 @@ function shouldSkipRefresh(url: string | undefined): boolean {
         url.includes('/auth/register') ||
         url.includes('/auth/refresh') ||
         url.includes('/auth/logout')
+    );
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
+function isTransientRequestFailure(error: AxiosError): boolean {
+    const status = error.response?.status;
+    const normalizedCode = error.code?.toUpperCase();
+
+    return (
+        normalizedCode === 'ECONNABORTED'
+        || normalizedCode === 'ETIMEDOUT'
+        || normalizedCode === 'ERR_NETWORK'
+        || status === 408
+        || status === 425
+        || status === 429
+        || status === 502
+        || status === 503
+        || status === 504
+    );
+}
+
+function shouldRetryTransientRequest(
+    error: AxiosError,
+    originalRequest: RetryableRequestConfig | undefined,
+): originalRequest is RetryableRequestConfig {
+    if (!originalRequest) {
+        return false;
+    }
+
+    const method = (originalRequest.method ?? 'get').toLowerCase();
+    const retriesUsed = originalRequest._transientRetryCount ?? 0;
+
+    return (
+        method === 'get'
+        && !shouldSkipRefresh(originalRequest.url)
+        && retriesUsed < 1
+        && isTransientRequestFailure(error)
     );
 }
 
@@ -216,6 +261,13 @@ api.interceptors.response.use(
                 window.location.assign('/login');
             }
         }
+
+        if (shouldRetryTransientRequest(error, originalRequest)) {
+            originalRequest._transientRetryCount = (originalRequest._transientRetryCount ?? 0) + 1;
+            await sleep(800 * originalRequest._transientRetryCount);
+            return api(originalRequest);
+        }
+
         return Promise.reject(error);
     }
 );

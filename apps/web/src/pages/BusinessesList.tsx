@@ -1,9 +1,10 @@
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { getApiErrorMessage } from '../api/error';
+import { getApiErrorMessage, isApiTimeoutError } from '../api/error';
 import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationApi } from '../api/endpoints';
 import { BusinessesMap } from '../components/BusinessesMap';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { businessPriceRangeLabel } from '../lib/businessProfile';
@@ -100,6 +101,7 @@ export function BusinessesList() {
     const [filtersLoading, setFiltersLoading] = useState(true);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
+    const [loadErrorType, setLoadErrorType] = useState<'timeout' | 'generic' | null>(null);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [sortKey, setSortKey] = useState<'relevance' | 'rating' | 'distance' | 'name'>('relevance');
     const showSponsoredAds = featureFlags.sponsoredAds;
@@ -297,6 +299,7 @@ export function BusinessesList() {
             setCategories(catRes.data);
             setProvinces(provRes.data);
         } catch (error) {
+            setLoadErrorType(isApiTimeoutError(error) ? 'timeout' : 'generic');
             setLoadError(getApiErrorMessage(error, 'No se pudieron cargar los filtros'));
         } finally {
             setFiltersLoading(false);
@@ -373,6 +376,7 @@ export function BusinessesList() {
     const loadBusinesses = useCallback(async () => {
         setLoading(true);
         setLoadError('');
+        setLoadErrorType(null);
         try {
             const params: Record<string, string | number | boolean> = { page: currentPage, limit: PAGE_SIZE };
             if (currentSearch) params.search = currentSearch;
@@ -406,6 +410,7 @@ export function BusinessesList() {
             setTotalPages(businessesRes.data.totalPages || 0);
             setSponsoredPlacements(showSponsoredAds ? ((sponsoredRes?.data || []) as SponsoredPlacement[]) : []);
         } catch (error) {
+            setLoadErrorType(isApiTimeoutError(error) ? 'timeout' : 'generic');
             setLoadError(getApiErrorMessage(error, 'No se pudieron cargar los negocios'));
         } finally {
             setLoading(false);
@@ -840,11 +845,19 @@ export function BusinessesList() {
     
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
-            {loadError && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {loadError}
-                </div>
-            )}
+            <PageFeedbackStack
+                items={
+                    loadError
+                        ? [
+                            {
+                                id: 'businesses-load-error',
+                                tone: 'danger',
+                                text: loadError,
+                            },
+                        ]
+                        : []
+                }
+            />
 
             <h1 className="sr-only">{listingHeading}</h1>
 
@@ -924,6 +937,41 @@ export function BusinessesList() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="h-4 w-40 rounded-full bg-slate-100 animate-pulse"></div>
                                 <div className="h-9 w-24 rounded-xl bg-slate-100 animate-pulse"></div>
+                            </div>
+                        </div>
+                    ) : loadError ? (
+                        <div className="rounded-[1.75rem] border border-accent-100 bg-white p-6 shadow-[0_28px_80px_-42px_rgba(15,23,42,0.28)] sm:p-8">
+                            <div className="max-w-2xl">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-500">
+                                    {loadErrorType === 'timeout' ? 'Servicio despertando' : 'No pudimos completar la carga'}
+                                </p>
+                                <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-slate-900">
+                                    {loadErrorType === 'timeout'
+                                        ? 'La carga está tardando más de lo normal'
+                                        : 'Hubo un problema al traer los negocios'}
+                                </h2>
+                                <p className="mt-2 max-w-xl text-sm text-slate-600">
+                                    {loadErrorType === 'timeout'
+                                        ? 'Estamos reintentando cuando el servicio tarda en responder. Puedes volver a intentar sin perder tus filtros.'
+                                        : 'Revisa tu conexión o vuelve a intentarlo en unos segundos. Mientras tanto, tu contexto de búsqueda se mantiene.'}
+                                </p>
+                            </div>
+
+                            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                                <button
+                                    type="button"
+                                    onClick={() => void loadBusinesses()}
+                                    className="inline-flex items-center justify-center rounded-2xl bg-primary-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-800"
+                                >
+                                    Reintentar carga
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleClearFilters}
+                                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                                >
+                                    Limpiar filtros
+                                </button>
                             </div>
                         </div>
                     ) : sortedBusinesses.length > 0 ? (

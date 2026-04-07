@@ -1,5 +1,9 @@
 import { randomUUID } from 'crypto';
 
+import { loadOptionalSmokeEnv } from './lib/load-smoke-env.mjs';
+
+loadOptionalSmokeEnv();
+
 const DEFAULT_API_BASE_URL = 'http://localhost:3000';
 const REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_SMOKE_PASSWORD = 'SmokePass123!';

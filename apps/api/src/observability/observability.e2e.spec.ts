@@ -6,6 +6,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
+import { FrontendSignalKind } from './dto/frontend-observability.dto';
 
 const OBSERVABILITY_EMAIL_DOMAIN = '@e2e-observability.aquita.local';
 
@@ -102,5 +103,51 @@ describe('ObservabilityController (e2e)', () => {
         expect(response.text).toContain('# HELP');
         expect(response.text).toContain('aquita_');
     });
-});
 
+    it('accepts frontend observability signals without authentication and exposes metrics to admin', async () => {
+        await request(app.getHttpServer())
+            .post('/api/observability/frontend')
+            .send({
+                kind: FrontendSignalKind.ROUTE_VIEW,
+                route: '/businesses/supermercado-bravo',
+                role: 'ANONYMOUS',
+            })
+            .expect(202);
+
+        await request(app.getHttpServer())
+            .post('/api/observability/frontend')
+            .send({
+                kind: FrontendSignalKind.WEB_VITAL,
+                route: '/profile',
+                metricName: 'CLS',
+                value: 0.04,
+                rating: 'good',
+                role: 'ADMIN',
+            })
+            .expect(202);
+
+        await request(app.getHttpServer())
+            .post('/api/observability/frontend')
+            .send({
+                kind: FrontendSignalKind.CLIENT_ERROR,
+                route: '/dashboard/businesses/123/edit',
+                source: 'window.error',
+                role: 'BUSINESS_OWNER',
+            })
+            .expect(202);
+
+        const admin = await createUser('ADMIN');
+        const token = signToken(admin.id, admin.role);
+
+        const response = await request(app.getHttpServer())
+            .get('/api/observability/metrics')
+            .set('Authorization', `Bearer ${token}`)
+            .expect(200);
+
+        expect(response.text).toContain('aquita_frontend_route_views_total');
+        expect(response.text).toContain('aquita_frontend_client_errors_total');
+        expect(response.text).toContain('aquita_frontend_web_vital_value');
+        expect(response.text).toContain('/businesses/:slug');
+        expect(response.text).toContain('/dashboard/businesses/:id/edit');
+    });
+});

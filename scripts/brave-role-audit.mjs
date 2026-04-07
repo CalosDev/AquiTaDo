@@ -3,6 +3,9 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { loadOptionalSmokeEnv } from './lib/load-smoke-env.mjs';
+
+loadOptionalSmokeEnv();
 
 const DEFAULT_API_BASE_URL = 'http://localhost:3000';
 const DEFAULT_APP_BASE_URL = 'http://localhost:8080';
@@ -80,6 +83,16 @@ function toSlug(value) {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
+}
+
+function firstEnv(...keys) {
+    for (const key of keys) {
+        const value = process.env[key]?.trim();
+        if (value) {
+            return value;
+        }
+    }
+    return null;
 }
 
 async function request(apiBaseUrl, requestPath, options = {}) {
@@ -268,8 +281,8 @@ async function loadCatalog(apiBaseUrl) {
 }
 
 async function resolveAdminActor(apiBaseUrl) {
-    const email = process.env.BRAVE_AUDIT_ADMIN_EMAIL?.trim();
-    const password = process.env.BRAVE_AUDIT_ADMIN_PASSWORD?.trim();
+    const email = firstEnv('BRAVE_AUDIT_ADMIN_EMAIL', 'SMOKE_PROD_ADMIN_EMAIL');
+    const password = firstEnv('BRAVE_AUDIT_ADMIN_PASSWORD', 'SMOKE_PROD_ADMIN_PASSWORD');
 
     if (email && password) {
         return loginActor(apiBaseUrl, {
@@ -288,6 +301,105 @@ async function resolveAdminActor(apiBaseUrl) {
     }
 
     return null;
+}
+
+async function resolveUserActor(apiBaseUrl, runId) {
+    const email = firstEnv('BRAVE_AUDIT_USER_EMAIL', 'SMOKE_PROD_USER_EMAIL');
+    const password = firstEnv('BRAVE_AUDIT_USER_PASSWORD', 'SMOKE_PROD_USER_PASSWORD');
+
+    if (email && password) {
+        return loginActor(apiBaseUrl, {
+            email,
+            password,
+            label: 'customer',
+        });
+    }
+
+    if (!isLocalApiBaseUrl(apiBaseUrl)) {
+        return null;
+    }
+
+    return registerActor(apiBaseUrl, {
+        runId,
+        label: 'customer',
+        role: 'USER',
+        name: 'Role Audit Customer',
+        phone: '+18095550021',
+    });
+}
+
+async function resolveOwnerActor(apiBaseUrl, runId) {
+    const email = firstEnv('BRAVE_AUDIT_OWNER_EMAIL', 'SMOKE_PROD_OWNER_EMAIL', 'SMOKE_PROD_BUSINESS_OWNER_EMAIL');
+    const password = firstEnv('BRAVE_AUDIT_OWNER_PASSWORD', 'SMOKE_PROD_OWNER_PASSWORD', 'SMOKE_PROD_BUSINESS_OWNER_PASSWORD');
+
+    if (email && password) {
+        return loginActor(apiBaseUrl, {
+            email,
+            password,
+            label: 'owner',
+        });
+    }
+
+    if (!isLocalApiBaseUrl(apiBaseUrl)) {
+        return null;
+    }
+
+    return registerActor(apiBaseUrl, {
+        runId,
+        label: 'owner',
+        role: 'BUSINESS_OWNER',
+        name: 'Role Audit Owner',
+        phone: '+18095550022',
+    });
+}
+
+async function listOrganizations(apiBaseUrl, actor) {
+    const response = await request(apiBaseUrl, '/api/organizations/mine', {
+        token: actor.accessToken,
+    });
+    assertStatus(response, [200], 'GET /api/organizations/mine');
+    const organizations = Array.isArray(response.json)
+        ? response.json
+        : Array.isArray(response.json?.data)
+            ? response.json.data
+            : [];
+    return organizations;
+}
+
+async function resolveOwnerOrganizationId(apiBaseUrl, owner) {
+    const explicitOrganizationId = firstEnv(
+        'BRAVE_AUDIT_OWNER_ORGANIZATION_ID',
+        'SMOKE_PROD_OWNER_ORGANIZATION_ID',
+    );
+    if (explicitOrganizationId) {
+        return explicitOrganizationId;
+    }
+
+    const organizations = await listOrganizations(apiBaseUrl, owner);
+    return organizations[0]?.id ?? null;
+}
+
+async function resolveOwnerBusinessId(apiBaseUrl, owner, organizationId) {
+    const explicitBusinessId = firstEnv('BRAVE_AUDIT_OWNER_BUSINESS_ID');
+    if (explicitBusinessId) {
+        return explicitBusinessId;
+    }
+    if (!organizationId) {
+        return null;
+    }
+
+    const response = await request(apiBaseUrl, '/api/businesses/my?limit=1', {
+        token: owner.accessToken,
+        organizationId,
+    });
+    assertStatus(response, [200], 'GET /api/businesses/my?limit=1');
+
+    const businesses = Array.isArray(response.json?.data)
+        ? response.json.data
+        : Array.isArray(response.json)
+            ? response.json
+            : [];
+    return businesses[0]?.id ?? null;
 }
 
 async function createOrganization(apiBaseUrl, owner, runId) {
@@ -648,88 +760,89 @@ async function run() {
     const runId = randomUUID().slice(0, 8);
 
     console.log(`Running Brave role audit against ${appBaseUrl} (api=${apiBaseUrl}, run=${runId})`);
-
-    const catalog = await loadCatalog(apiBaseUrl);
-    const customer = await registerActor(apiBaseUrl, {
-        runId,
-        label: 'customer',
-        role: 'USER',
-        name: 'Role Audit Customer',
-        phone: '+18095550021',
-    });
-    const owner = await registerActor(apiBaseUrl, {
-        runId,
-        label: 'owner',
-        role: 'BUSINESS_OWNER',
-        name: 'Role Audit Owner',
-        phone: '+18095550022',
-    });
+    const customer = await resolveUserActor(apiBaseUrl, runId);
+    const owner = await resolveOwnerActor(apiBaseUrl, runId);
     const admin = await resolveAdminActor(apiBaseUrl);
-    const organizationId = await createOrganization(apiBaseUrl, owner, runId);
-    const businessId = await createBusiness(apiBaseUrl, owner, organizationId, catalog, runId);
-    await verifyBusinessIfAdminAvailable(apiBaseUrl, admin, businessId);
+    let organizationId = null;
+    let businessId = null;
+
+    if (owner) {
+        if (isLocalApiBaseUrl(apiBaseUrl)) {
+            const catalog = await loadCatalog(apiBaseUrl);
+            organizationId = await createOrganization(apiBaseUrl, owner, runId);
+            businessId = await createBusiness(apiBaseUrl, owner, organizationId, catalog, runId);
+            await verifyBusinessIfAdminAvailable(apiBaseUrl, admin, businessId);
+        } else {
+            organizationId = await resolveOwnerOrganizationId(apiBaseUrl, owner);
+            businessId = await resolveOwnerBusinessId(apiBaseUrl, owner, organizationId);
+        }
+    }
 
     const scenarios = [
-        {
-            label: 'customer-profile',
-            role: 'USER',
-            url: `${appBaseUrl}/profile`,
-            session: {
-                accessToken: customer.accessToken,
-                user: customer.user,
-                activeOrganizationId: null,
+        ...(customer ? [
+            {
+                label: 'customer-profile',
+                role: 'USER',
+                url: `${appBaseUrl}/profile`,
+                session: {
+                    accessToken: customer.accessToken,
+                    user: customer.user,
+                    activeOrganizationId: null,
+                },
             },
-        },
-        {
-            label: 'customer-dashboard',
-            role: 'USER',
-            url: `${appBaseUrl}/app/customer`,
-            session: {
-                accessToken: customer.accessToken,
-                user: customer.user,
-                activeOrganizationId: null,
+            {
+                label: 'customer-dashboard',
+                role: 'USER',
+                url: `${appBaseUrl}/app/customer`,
+                session: {
+                    accessToken: customer.accessToken,
+                    user: customer.user,
+                    activeOrganizationId: null,
+                },
             },
-        },
-        {
-            label: 'owner-profile',
-            role: 'BUSINESS_OWNER',
-            url: `${appBaseUrl}/profile`,
-            session: {
-                accessToken: owner.accessToken,
-                user: owner.user,
-                activeOrganizationId: organizationId,
+        ] : []),
+        ...(owner ? [
+            {
+                label: 'owner-profile',
+                role: 'BUSINESS_OWNER',
+                url: `${appBaseUrl}/profile`,
+                session: {
+                    accessToken: owner.accessToken,
+                    user: owner.user,
+                    activeOrganizationId: organizationId,
+                },
             },
-        },
-        {
-            label: 'owner-dashboard',
-            role: 'BUSINESS_OWNER',
-            url: `${appBaseUrl}/dashboard`,
-            session: {
-                accessToken: owner.accessToken,
-                user: owner.user,
-                activeOrganizationId: organizationId,
+            {
+                label: 'owner-dashboard',
+                role: 'BUSINESS_OWNER',
+                url: `${appBaseUrl}/dashboard`,
+                session: {
+                    accessToken: owner.accessToken,
+                    user: owner.user,
+                    activeOrganizationId: organizationId,
+                },
             },
-        },
-        {
-            label: 'owner-register-business',
-            role: 'BUSINESS_OWNER',
-            url: `${appBaseUrl}/register-business`,
-            session: {
-                accessToken: owner.accessToken,
-                user: owner.user,
-                activeOrganizationId: organizationId,
+            {
+                label: 'owner-register-business',
+                role: 'BUSINESS_OWNER',
+                url: `${appBaseUrl}/register-business`,
+                session: {
+                    accessToken: owner.accessToken,
+                    user: owner.user,
+                    activeOrganizationId: organizationId,
+                },
             },
-        },
-        {
-            label: 'owner-edit-business',
-            role: 'BUSINESS_OWNER',
-            url: `${appBaseUrl}/dashboard/businesses/${businessId}/edit`,
-            session: {
-                accessToken: owner.accessToken,
-                user: owner.user,
-                activeOrganizationId: organizationId,
-            },
-        },
+            ...(businessId ? [{
+                label: 'owner-edit-business',
+                role: 'BUSINESS_OWNER',
+                url: `${appBaseUrl}/dashboard/businesses/${businessId}/edit`,
+                session: {
+                    accessToken: owner.accessToken,
+                    user: owner.user,
+                    activeOrganizationId: organizationId,
+                },
+            }] : []),
+        ] : []),
     ];
 
     if (admin) {
@@ -766,6 +879,8 @@ async function run() {
             },
         );
     }
+
+    assert(scenarios.length > 0, 'Brave role audit has no runnable scenarios. Configure .env.smoke.local or BRAVE_AUDIT_* credentials.');
 
     const profileDir = await mkdtemp(path.join(tmpdir(), 'aquita-brave-role-profile-'));
     const outputDir = path.join(process.cwd(), 'output', 'brave-role-audit');

@@ -2,6 +2,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { OrganizationProvider } from './context/OrganizationContext';
+import { FrontendObservabilityBridge } from './components/FrontendObservabilityBridge';
 import { AppRouter } from './routes/Router';
 import { queryClient } from './lib/queryClient';
 
@@ -11,6 +12,7 @@ function App() {
             <BrowserRouter>
                 <AuthProvider>
                     <OrganizationProvider>
+                        <FrontendObservabilityBridge />
                         <AppRouter />
                     </OrganizationProvider>
                 </AuthProvider>

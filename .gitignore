@@ -4,6 +4,8 @@ build/
 output/
 .env
 .env.local
+.env.smoke
+.env.smoke.local
 *.log
 .DS_Store
 coverage/

@@ -1,3 +1,7 @@
+import { loadOptionalSmokeEnv } from './lib/load-smoke-env.mjs';
+
+loadOptionalSmokeEnv();
+
 const DEFAULT_API_BASE_URL = 'https://aquitado.onrender.com';
 const DEFAULT_WEB_BASE_URL = 'https://aquitado.vercel.app';
 const REQUEST_TIMEOUT_MS = 75_000;

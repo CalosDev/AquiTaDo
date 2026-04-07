@@ -6,6 +6,7 @@ import {
     collectDefaultMetrics,
     register,
 } from 'prom-client';
+import { FrontendSignalKind, TrackFrontendSignalDto } from './dto/frontend-observability.dto';
 
 let defaultMetricsCollected = false;
 
@@ -59,6 +60,9 @@ export class ObservabilityService {
     private readonly externalDependencyHistogram: Histogram<string>;
     private readonly externalDependencyCounter: Counter<string>;
     private readonly rateLimitCounter: Counter<string>;
+    private readonly frontendRouteViewCounter: Counter<string>;
+    private readonly frontendClientErrorCounter: Counter<string>;
+    private readonly frontendWebVitalHistogram: Histogram<string>;
     private readonly dependencySamples = new Map<
     string,
     {
@@ -113,6 +117,28 @@ export class ObservabilityService {
             'aquita_rate_limit_hits_total',
             'Rate limit denials by policy and identifier',
             ['policy', 'identifier'],
+        );
+
+        this.frontendRouteViewCounter = getOrCreateCounter(
+            this.registry,
+            'aquita_frontend_route_views_total',
+            'Frontend route views reported by the web client',
+            ['route', 'role'],
+        );
+
+        this.frontendClientErrorCounter = getOrCreateCounter(
+            this.registry,
+            'aquita_frontend_client_errors_total',
+            'Frontend JavaScript errors reported by the web client',
+            ['route', 'source', 'role'],
+        );
+
+        this.frontendWebVitalHistogram = getOrCreateHistogram(
+            this.registry,
+            'aquita_frontend_web_vital_value',
+            'Frontend web vital values reported by the web client',
+            ['metric', 'route', 'rating', 'role'],
+            [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 4, 8],
         );
     }
 
@@ -180,6 +206,33 @@ export class ObservabilityService {
         });
     }
 
+    trackFrontendSignal(dto: TrackFrontendSignalDto): void {
+        const route = this.normalizeFrontendRoute(dto.route);
+        const role = this.normalizeFrontendRole(dto.role);
+
+        if (dto.kind === FrontendSignalKind.ROUTE_VIEW) {
+            this.frontendRouteViewCounter.inc({ route, role });
+            return;
+        }
+
+        if (dto.kind === FrontendSignalKind.CLIENT_ERROR) {
+            const source = this.normalizeFrontendSource(dto.source);
+            this.frontendClientErrorCounter.inc({ route, source, role });
+            return;
+        }
+
+        if (dto.kind === FrontendSignalKind.WEB_VITAL) {
+            const metric = this.normalizeFrontendMetric(dto.metricName);
+            const rating = this.normalizeFrontendRating(dto.rating);
+            const value = Number.isFinite(dto.value) ? Number(dto.value) : 0;
+
+            this.frontendWebVitalHistogram.observe(
+                { metric, route, rating, role },
+                Math.max(0, value),
+            );
+        }
+    }
+
     getDependencyHealthSnapshot(
         thresholdsMs?: Record<string, number>,
     ): Array<{
@@ -244,6 +297,68 @@ export class ObservabilityService {
 
     async getMetrics(): Promise<string> {
         return this.registry.metrics();
+    }
+
+    private normalizeFrontendRole(role?: string): string {
+        switch ((role ?? '').trim().toUpperCase()) {
+            case 'USER':
+            case 'BUSINESS_OWNER':
+            case 'ADMIN':
+                return role!.trim().toUpperCase();
+            default:
+                return 'ANONYMOUS';
+        }
+    }
+
+    private normalizeFrontendSource(source?: string): string {
+        const normalized = (source ?? '').trim().toLowerCase();
+        if (!normalized) {
+            return 'unknown';
+        }
+        return normalized.replace(/[^a-z0-9_-]/g, '_').slice(0, 32) || 'unknown';
+    }
+
+    private normalizeFrontendMetric(metricName?: string): string {
+        const normalized = (metricName ?? '').trim().toUpperCase();
+        if (!normalized) {
+            return 'UNKNOWN';
+        }
+        return normalized.replace(/[^A-Z0-9_-]/g, '_').slice(0, 24) || 'UNKNOWN';
+    }
+
+    private normalizeFrontendRating(rating?: string): string {
+        switch ((rating ?? '').trim()) {
+            case 'good':
+            case 'needs-improvement':
+            case 'poor':
+                return rating!;
+            default:
+                return 'unknown';
+        }
+    }
+
+    private normalizeFrontendRoute(route: string): string {
+        const trimmed = (route || '/').trim() || '/';
+        const withoutQuery = trimmed.split('?')[0]?.split('#')[0] || '/';
+        let normalized = withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
+
+        normalized = normalized
+            .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?=\/|$)/gi, '/:id')
+            .replace(/\/\d+(?=\/|$)/g, '/:id');
+
+        if (/^\/businesses\/[^/]+$/i.test(normalized)) {
+            return '/businesses/:slug';
+        }
+
+        if (/^\/negocios\/[^/]+\/[^/]+$/i.test(normalized)) {
+            return '/negocios/:scope/:slug';
+        }
+
+        if (normalized.length > 160) {
+            normalized = normalized.slice(0, 160);
+        }
+
+        return normalized.toLowerCase();
     }
 
     private percentile(values: number[], percentile: number): number {

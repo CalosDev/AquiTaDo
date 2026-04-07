@@ -4,12 +4,17 @@ interface ApiErrorPayload {
     message?: string | string[];
 }
 
-export function getApiErrorMessage(error: unknown, fallback = 'Ocurrio un error inesperado'): string {
-    if (axios.isAxiosError<ApiErrorPayload>(error)) {
-        if (
+export function isApiTimeoutError(error: unknown): boolean {
+    return axios.isAxiosError<ApiErrorPayload>(error)
+        && (
             error.code === 'ECONNABORTED'
             || error.message.toLowerCase().includes('timeout')
-        ) {
+        );
+}
+
+export function getApiErrorMessage(error: unknown, fallback = 'Ocurrio un error inesperado'): string {
+    if (axios.isAxiosError<ApiErrorPayload>(error)) {
+        if (isApiTimeoutError(error)) {
             return 'La solicitud supero el tiempo de espera. Intenta de nuevo.';
         }
 
