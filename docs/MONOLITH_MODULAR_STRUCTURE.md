@@ -7,7 +7,6 @@ apps/api/src
 |   |-- events/                  # domain event bus (async projections)
 |   |-- filters/                 # global exception mapping
 |   |-- interceptors/            # request context + JSON:API response
-|   |-- persistence/             # BaseRepository + BaseService
 |   |-- request-context/         # AsyncLocalStorage request scope
 |
 |-- prisma/                      # Prisma service and DB connection policies
