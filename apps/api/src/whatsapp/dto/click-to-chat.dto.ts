@@ -1,5 +1,6 @@
 import {
     IsBoolean,
+    IsDefined,
     IsNumber,
     IsOptional,
     IsString,
@@ -10,6 +11,7 @@ import {
 } from 'class-validator';
 
 export class CreateClickToChatDto {
+    @IsDefined()
     @IsUUID()
     businessId!: string;
 
@@ -52,6 +54,7 @@ export class ListWhatsAppConversationsDto {
 }
 
 export class UpdateWhatsAppConversationStatusDto {
+    @IsDefined()
     @IsString()
     status!: 'OPEN' | 'CLOSED' | 'ESCALATED';
 

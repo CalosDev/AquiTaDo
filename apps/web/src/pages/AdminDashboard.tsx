@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '../api/error';
 import {
-    aiApi,
     analyticsApi,
     businessApi,
     categoryApi,
@@ -132,14 +131,6 @@ interface FlaggedReview {
     };
 }
 
-interface ReviewAiSentimentInsight {
-    reviewId: string;
-    sentiment: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
-    score: number;
-    summary: string | null;
-    isNegative: boolean;
-}
-
 interface OperationalDashboardSnapshot {
     status: 'up' | 'degraded' | 'down';
     timestamp: string;
@@ -155,15 +146,6 @@ interface OperationalDashboardSnapshot {
                 maxConnections?: number;
                 saturationPct?: number;
             };
-        };
-        ai?: {
-            status?: 'up' | 'degraded' | 'down';
-            thresholdMs?: number;
-            operations?: Array<{
-                operation: string;
-                p95Ms: number;
-                errorRatePct: number;
-            }>;
         };
         email?: {
             status?: 'up' | 'degraded' | 'down';
@@ -290,8 +272,6 @@ export function AdminDashboard() {
     const [marketReportDetail, setMarketReportDetail] = useState<MarketReportDetail | null>(null);
     const [marketReportLoading, setMarketReportLoading] = useState(false);
     const [flaggedReviews, setFlaggedReviews] = useState<FlaggedReview[]>([]);
-    const [reviewAiInsights, setReviewAiInsights] = useState<Record<string, ReviewAiSentimentInsight>>({});
-    const [analyzingReviewId, setAnalyzingReviewId] = useState<string | null>(null);
     const [moderationQueue, setModerationQueue] = useState<ModerationQueueItem[]>([]);
     const [generatingReport, setGeneratingReport] = useState(false);
     const [observabilityLoading, setObservabilityLoading] = useState(false);
@@ -791,26 +771,6 @@ export function AdminDashboard() {
             setProcessingId(null);
         }
     };
-
-    const handleAnalyzeFlaggedReview = async (reviewId: string) => {
-        setAnalyzingReviewId(reviewId);
-        setErrorMessage('');
-        setSuccessMessage('');
-        try {
-            const response = await aiApi.analyzeReviewSentiment(reviewId);
-            const payload = response.data as ReviewAiSentimentInsight;
-            setReviewAiInsights((current) => ({
-                ...current,
-                [reviewId]: payload,
-            }));
-            setSuccessMessage('Análisis de IA generado para la reseña');
-        } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo analizar la reseña con IA'));
-        } finally {
-            setAnalyzingReviewId(null);
-        }
-    };
-
     const tabs = [
         { key: 'businesses', label: 'Negocios', icon: 'N' },
         { key: 'categories', label: 'Categorías', icon: 'C' },
@@ -1538,15 +1498,7 @@ export function AdminDashboard() {
                                             {review.moderationReason ? (
                                                 <p className="text-xs text-red-700 mt-1">{review.moderationReason}</p>
                                             ) : null}
-                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                <button
-                                                    type="button"
-                                                    className="btn-secondary text-xs"
-                                                    disabled={analyzingReviewId === review.id}
-                                                    onClick={() => void handleAnalyzeFlaggedReview(review.id)}
-                                                >
-                                                    {analyzingReviewId === review.id ? 'Analizando IA...' : 'Analizar IA'}
-                                                </button>
+                                            <div className="flex flex-wrap gap-2 mt-2">
                                                 <button
                                                     type="button"
                                                     className="btn-primary text-xs"
@@ -1563,21 +1515,7 @@ export function AdminDashboard() {
                                                 >
                                                     Mantener en cola
                                                 </button>
-                                            </div>
-                                            {reviewAiInsights[review.id] ? (
-                                                <div className="mt-2 rounded-lg border border-primary-100 bg-primary-50 p-2 text-xs text-gray-700">
-                                                    <p>
-                                                        Sentimiento: <strong>{reviewAiInsights[review.id].sentiment}</strong>
-                                                        {' '}({(reviewAiInsights[review.id].score * 100).toFixed(0)}%)
-                                                    </p>
-                                                    {reviewAiInsights[review.id].isNegative ? (
-                                                        <p className="text-red-700 mt-1 font-medium">Alerta: reseña negativa detectada.</p>
-                                                    ) : null}
-                                                    {reviewAiInsights[review.id].summary ? (
-                                                        <p className="mt-1">{reviewAiInsights[review.id].summary}</p>
-                                                    ) : null}
-                                                </div>
-                                            ) : null}
+                                            </div>
                                         </div>
                                     )) : (
                                         <p className="text-sm text-gray-500">No hay reseñas sospechosas en este momento.</p>
@@ -1720,9 +1658,6 @@ export function AdminDashboard() {
                                             </span>
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.database?.pool?.status)}`}>
                                                 Pool DB {String(operationalHealth.checks?.database?.pool?.status || 'down').toUpperCase()}
-                                            </span>
-                                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.ai?.status)}`}>
-                                                AI {String(operationalHealth.checks?.ai?.status || 'down').toUpperCase()}
                                             </span>
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.email?.status)}`}>
                                                 Email {String(operationalHealth.checks?.email?.status || 'down').toUpperCase()}

@@ -10,7 +10,7 @@ Este documento resume la capa SRE/Growth implementada para AquiTa.do y como oper
 - Salud avanzada en `GET /api/health/dashboard`:
   - Estado DB + esquema.
   - Saturacion de pool de conexiones.
-  - p95 y error-rate de dependencias AI y WhatsApp.
+  - p95 y error-rate de dependencias externas (email y WhatsApp).
   - Criticidad configurable por dependencia para evitar falsos `down` del servicio.
 
 ## 2) Seguridad Defensiva
@@ -19,7 +19,6 @@ Este documento resume la capa SRE/Growth implementada para AquiTa.do y como oper
 - Politicas por endpoint:
   - `default`
   - `search`
-  - `ai`
 - CORS estricto configurable por variables:
   - `CORS_ALLOWED_METHODS`
   - `CORS_ALLOWED_HEADERS`
@@ -110,13 +109,11 @@ Definir al menos:
   - `RATE_LIMIT_*`
   - `CORS_*`
 - Salud:
-  - `HEALTH_AI_P95_MAX_MS`
   - `HEALTH_EMAIL_P95_MAX_MS`
   - `HEALTH_WHATSAPP_P95_MAX_MS`
   - `HEALTH_DB_POOL_WARN_RATIO`
   - `HEALTH_DB_POOL_CRITICAL_RATIO`
   - `HEALTH_DEPENDENCY_CRITICAL_MIN_SAMPLES`
-  - `HEALTH_AI_CRITICAL`
   - `HEALTH_EMAIL_CRITICAL`
   - `HEALTH_WHATSAPP_CRITICAL`
   - `HEALTH_DB_POOL_CRITICAL_RATIO`

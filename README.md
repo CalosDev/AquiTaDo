@@ -124,7 +124,6 @@ Servicios:
 - `THROTTLE_TTL_MS=60000`
 - `THROTTLE_LIMIT=120`
 - `RATE_LIMIT_SEARCH_IP_LIMIT=120`
-- `RATE_LIMIT_AI_IP_LIMIT=30`
 - `REDIS_URL=redis://localhost:6379`
 - `REDIS_CACHE_TTL_SECONDS=120`
 - `BULLMQ_PREFIX=aquita`
@@ -139,15 +138,6 @@ Servicios:
 - `NOMINATIM_USER_AGENT=AquiTaDo-Geocoder/1.0 (+https://aquitado.vercel.app)` (requerido por politica del proveedor)
 - `NOMINATIM_EMAIL=` (opcional, recomendado para identificar contacto)
 - `NOMINATIM_MIN_INTERVAL_MS=1100` (evita exceder limites de uso)
-- `AI_PROVIDER=auto` (`auto|gemini|local`)
-- `AI_EMBEDDING_DIMENSIONS=1536` (mantener en 1536 por compatibilidad pgvector actual)
-- `GEMINI_API_KEY=...` (opcional, recomendado para plan gratis inicial)
-- `GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`
-- `GEMINI_MODEL_EMBEDDING=gemini-embedding-001`
-- `GEMINI_MODEL_CHAT=gemini-2.0-flash`
-- `GROQ_API_KEY=...` (opcional, fallback automatico de chat cuando Gemini falle por cuota)
-- `GROQ_BASE_URL=https://api.groq.com/openai/v1`
-- `GROQ_MODEL_CHAT=llama-3.3-70b-versatile`
 - `WHATSAPP_ENABLED=false`
 - `WHATSAPP_VERIFY_TOKEN=...` (requerido si `WHATSAPP_ENABLED=true`)
 - `WHATSAPP_GRAPH_BASE_URL=https://graph.facebook.com`
@@ -157,13 +147,11 @@ Servicios:
 - `CIRCUIT_BREAKER_FAILURE_THRESHOLD=5`
 - `CIRCUIT_BREAKER_COOLDOWN_MS=60000`
 - `JSON_API_RESPONSE_ENABLED=false`
-- `HEALTH_AI_P95_MAX_MS=2500`
 - `HEALTH_EMAIL_P95_MAX_MS=4000`
 - `HEALTH_WHATSAPP_P95_MAX_MS=3000`
 - `HEALTH_DB_POOL_WARN_RATIO=0.75`
 - `HEALTH_DB_POOL_CRITICAL_RATIO=0.9`
 - `HEALTH_DEPENDENCY_CRITICAL_MIN_SAMPLES=3`
-- `HEALTH_AI_CRITICAL=false`
 - `HEALTH_EMAIL_CRITICAL=false`
 - `HEALTH_WHATSAPP_CRITICAL=false`
 
@@ -271,11 +259,6 @@ Arranque de produccion del API:
 | GET | /api/provinces | No | Listar provincias |
 | GET | /api/provinces/:id/cities | No | Ciudades por provincia |
 | POST | /api/reviews | Si | Crear resena |
-| POST | /api/ai/concierge/query | No | Busqueda conversacional RAG |
-| PATCH | /api/ai/businesses/:businessId/assistant-config | Si (OWNER/MANAGER) | Configurar auto-respondedor IA |
-| POST | /api/ai/businesses/:businessId/reindex | Si (OWNER/MANAGER) | Reindexar embedding semantico |
-| POST | /api/ai/businesses/:businessId/auto-reply | Si (OWNER/MANAGER/STAFF) | Probar respuesta IA del negocio |
-| POST | /api/ai/reviews/:reviewId/analyze | Si (OWNER/MANAGER/STAFF) | Analizar sentimiento de resena |
 | GET | /api/whatsapp/webhook | No | Verificacion webhook Meta |
 | POST | /api/whatsapp/webhook | No | Recepcion de mensajes WhatsApp |
 | POST | /api/whatsapp/click-to-chat | Opcional | Generar link WhatsApp y registrar conversion |
@@ -343,25 +326,12 @@ Separacion aplicada:
 - `pnpm smoke:full`: Smoke integral (API + datos base + marketplace publico + health web)
 - `pnpm smoke:saas`: Smoke end-to-end local con matriz real de roles (`USER`, `BUSINESS_OWNER`, `ADMIN`)
 - `pnpm smoke:prod`: Smoke de produccion (publico + roles opcionales por credenciales)
-- `pnpm ai:reindex:embeddings`: Reindex masivo de embeddings IA para negocios verificados
 - `pnpm db:generate`: Prisma generate
 - `pnpm db:migrate`: Prisma migrate dev (flujo local interactivo)
 - `pnpm db:migrate:deploy`: Prisma migrate deploy
 - `pnpm db:status`: Estado actual de migraciones aplicadas
 - `pnpm db:seed`: Seed inicial
 
-Reindex IA (Gemini) con filtros opcionales:
-
-```bash
-# Reindex de todos los negocios verificados (requiere AI_PROVIDER activo y API key)
-pnpm ai:reindex:embeddings
-
-# Reindex de una organizacion especifica
-AI_REINDEX_ORGANIZATION_ID=org_uuid pnpm ai:reindex:embeddings
-
-# Reindex limitado
-AI_REINDEX_LIMIT=100 pnpm ai:reindex:embeddings
-```
 
 Smoke SaaS local por roles:
 
@@ -430,5 +400,5 @@ Variables soportadas por `pnpm alerts:prod`:
 
 Notas operativas para `GET /api/health/dashboard`:
 
-- `HEALTH_AI_CRITICAL`, `HEALTH_EMAIL_CRITICAL` y `HEALTH_WHATSAPP_CRITICAL` controlan si una dependencia externa puede bajar el estado global a `down`.
+- `HEALTH_EMAIL_CRITICAL` y `HEALTH_WHATSAPP_CRITICAL` controlan si una dependencia externa puede bajar el estado global a `down`.
 - Por defecto esas dependencias quedan como senales operativas visibles, pero no tiran el servicio completo a `down` a menos que se marque explicitamente.

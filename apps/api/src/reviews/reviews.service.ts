@@ -1,13 +1,9 @@
 import {
     BadRequestException,
-    Inject,
     Injectable,
-    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
-import { AiService } from '../ai/ai.service';
-import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReputationService } from '../reputation/reputation.service';
 import {
@@ -17,17 +13,9 @@ import {
 
 @Injectable()
 export class ReviewsService {
-    private readonly logger = new Logger(ReviewsService.name);
-
     constructor(
-        @Inject(PrismaService)
         private readonly prisma: PrismaService,
-        @Inject(ReputationService)
         private readonly reputationService: ReputationService,
-        @Inject(AiService)
-        private readonly aiService: AiService,
-        @Inject(NotificationsQueueService)
-        private readonly notificationsQueueService: NotificationsQueueService,
     ) { }
 
     async create(dto: CreateReviewDto, userId: string) {
@@ -44,7 +32,7 @@ export class ReviewsService {
         }
 
         if (!business.verified) {
-            throw new BadRequestException('No puedes reseñar un negocio no verificado');
+            throw new BadRequestException('No puedes resenar un negocio no verificado');
         }
 
         const recentReviewsCount = await this.prisma.review.count({
@@ -57,7 +45,7 @@ export class ReviewsService {
         });
 
         if (recentReviewsCount >= 8) {
-            throw new BadRequestException('Has alcanzado el límite temporal de reseñas. Intenta más tarde.');
+            throw new BadRequestException('Has alcanzado el limite temporal de resenas. Intenta mas tarde.');
         }
 
         const existingReview = await this.prisma.review.findFirst({
@@ -68,7 +56,7 @@ export class ReviewsService {
         });
 
         if (existingReview) {
-            throw new BadRequestException('Ya has dejado una reseña para este negocio');
+            throw new BadRequestException('Ya has dejado una resena para este negocio');
         }
 
         const moderation = await this.resolveModerationDecision(
@@ -98,9 +86,6 @@ export class ReviewsService {
             });
 
             await this.reputationService.recalculateBusinessReputation(dto.businessId);
-            if (createdReview.moderationStatus === 'APPROVED' && !createdReview.isSpam) {
-                void this.processReviewSentiment(createdReview.id);
-            }
 
             return createdReview;
         } catch (error) {
@@ -108,7 +93,7 @@ export class ReviewsService {
                 error instanceof Prisma.PrismaClientKnownRequestError &&
                 error.code === 'P2002'
             ) {
-                throw new BadRequestException('Ya has dejado una reseña para este negocio');
+            throw new BadRequestException('Ya has dejado una resena para este negocio');
             }
 
             if (
@@ -245,10 +230,6 @@ export class ReviewsService {
             }),
         ]);
 
-        if (updatedReview.moderationStatus === 'APPROVED' && !updatedReview.isSpam) {
-            void this.processReviewSentiment(updatedReview.id);
-        }
-
         return updatedReview;
     }
 
@@ -297,7 +278,7 @@ export class ReviewsService {
             ]);
 
             if (ratingOnlyBurst >= 5) {
-                reasons.push('Patrón masivo de reseñas sin comentario');
+                reasons.push('Patron masivo de resenas sin comentario');
             }
 
             if (extremeRatingBurst >= 4) {
@@ -310,7 +291,7 @@ export class ReviewsService {
         }
 
         if (/(.)\1{5,}/.test(comment)) {
-            reasons.push('Patrón repetitivo sospechoso');
+            reasons.push('Patron repetitivo sospechoso');
         }
 
         const uppercaseRatio = comment.replace(/[^A-Z]/g, '').length / comment.replace(/\s/g, '').length;
@@ -348,7 +329,7 @@ export class ReviewsService {
         if (comment.length >= 40) {
             const repeatedToken = /\b([a-z0-9]{3,})\b(?:\s+\1\b){2,}/i.test(normalizedCommentCompacted);
             if (repeatedToken) {
-                reasons.push('Repetición anómala de términos');
+                reasons.push('Repeticion anomala de terminos');
             }
         }
 
@@ -406,7 +387,7 @@ export class ReviewsService {
         }
 
         if (userReviewBurst >= 5) {
-            reasons.push('Actividad de reseñas inusual');
+            reasons.push('Actividad de resenas inusual');
         }
 
         if (normalizedCommentCompacted) {
@@ -424,7 +405,7 @@ export class ReviewsService {
                 },
             });
             if (coordinatedCommentCount >= 2) {
-                reasons.push('Patrón coordinado de comentario');
+                reasons.push('Patron coordinado de comentario');
             }
         }
 
@@ -436,36 +417,5 @@ export class ReviewsService {
             status: 'FLAGGED',
             reason: reasons.join('; ').slice(0, 255),
         };
-    }
-
-    private async processReviewSentiment(reviewId: string): Promise<void> {
-        try {
-            const analysis = await this.aiService.analyzeReviewSentiment(reviewId);
-            if (!analysis.isNegative) {
-                return;
-            }
-
-            const business = await this.prisma.business.findUnique({
-                where: { id: analysis.businessId },
-                select: {
-                    whatsapp: true,
-                },
-            });
-
-            await this.notificationsQueueService.enqueueNegativeReviewAlert({
-                organizationId: analysis.organizationId,
-                businessId: analysis.businessId,
-                businessName: analysis.businessName,
-                businessWhatsapp: business?.whatsapp ?? null,
-                reviewId: analysis.reviewId,
-                summary: analysis.summary || 'Se detecto feedback negativo sin resumen textual.',
-            });
-
-            await this.aiService.markReviewSentimentAlerted(reviewId);
-        } catch (error) {
-            this.logger.warn(
-                `No se pudo procesar el sentimiento para la reseña "${reviewId}" (${error instanceof Error ? error.message : String(error)})`,
-            );
-        }
     }
 }

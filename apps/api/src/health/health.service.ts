@@ -108,10 +108,8 @@ export class HealthService {
 
     async getOperationalDashboard() {
         const startedAt = Date.now();
-        const aiLatencyThresholdMs = this.resolveNumber('HEALTH_AI_P95_MAX_MS', 2_500);
         const emailLatencyThresholdMs = this.resolveNumber('HEALTH_EMAIL_P95_MAX_MS', 4_000);
         const whatsappLatencyThresholdMs = this.resolveNumber('HEALTH_WHATSAPP_P95_MAX_MS', 3_000);
-        const aiCritical = this.resolveBooleanLike('HEALTH_AI_CRITICAL', false);
         const emailCritical = this.resolveBooleanLike('HEALTH_EMAIL_CRITICAL', false);
         const whatsappCritical = this.resolveBooleanLike('HEALTH_WHATSAPP_CRITICAL', false);
         const dbWarnThreshold = this.resolveNumber('HEALTH_DB_POOL_WARN_RATIO', 0.75);
@@ -185,21 +183,13 @@ export class HealthService {
                 : 'up';
 
         const dependencySnapshots = this.observabilityService.getDependencyHealthSnapshot({
-            ai: aiLatencyThresholdMs,
             email: emailLatencyThresholdMs,
             whatsapp: whatsappLatencyThresholdMs,
         });
 
-        const aiDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'ai');
         const emailDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'email');
         const whatsappDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'whatsapp');
 
-        const aiHealth = this.summarizeDependencyGroup(
-            aiDependencies,
-            aiLatencyThresholdMs,
-            dependencyCriticalMinSamples,
-            aiCritical,
-        );
         const emailHealth = emailProviderConfigured
             ? this.summarizeDependencyGroup(
                 emailDependencies,
@@ -223,13 +213,10 @@ export class HealthService {
 
         const overallStatus = !schemaReady
             || dbPoolStatus === 'down'
-            || (aiHealth.critical && aiHealth.status === 'down')
             || (emailHealth.critical && emailHealth.status === 'down')
             || (whatsappHealth.critical && whatsappHealth.status === 'down')
             ? 'down'
             : dbPoolStatus === 'degraded'
-                || aiHealth.status === 'degraded'
-                || aiHealth.status === 'down'
                 || emailHealth.status === 'down'
                 || whatsappHealth.status === 'degraded'
                 || whatsappHealth.status === 'down'
@@ -254,7 +241,6 @@ export class HealthService {
                         saturationPct: Number((dbPoolRatio * 100).toFixed(2)),
                     },
                 },
-                ai: aiHealth,
                 email: emailHealth,
                 whatsapp: whatsappHealth,
             },

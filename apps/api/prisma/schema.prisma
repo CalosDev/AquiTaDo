@@ -188,18 +188,6 @@ enum AdWalletTopupStatus {
   CANCELED
 }
 
-enum EmbeddingStatus {
-  PENDING
-  INDEXED
-  FAILED
-}
-
-enum ReviewSentiment {
-  POSITIVE
-  NEUTRAL
-  NEGATIVE
-}
-
 enum WhatsAppConversationStatus {
   OPEN
   CLOSED
@@ -337,9 +325,7 @@ model Business {
   riskScore               Int                        @default(0)
   reputationScore         Decimal                    @default(0) @db.Decimal(6, 2)
   reputationTier          BusinessTier               @default(BRONZE)
-  aiAutoResponderEnabled  Boolean                    @default(false)
-  aiAutoResponderPrompt   String?                    @db.Text
-  aiLastEmbeddedAt        DateTime?
+  autoResponderEnabled    Boolean                    @default(false)
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
@@ -366,10 +352,8 @@ model Business {
   conversations         Conversation[]
   whatsappConversations WhatsAppConversation[]
   whatsappClickEvents   WhatsAppClickConversion[]
-  embeddings            BusinessEmbedding[]
   verificationDocuments BusinessVerificationDocument[]
   adCampaigns           AdCampaign[]
-  sentimentInsights     ReviewSentimentInsight[]
   notificationJobs      NotificationJob[]
   growthEvents          GrowthEvent[]
   favoritedByUsers      UserFavoriteBusiness[]
@@ -423,8 +407,6 @@ model Organization {
   whatsappConversations WhatsAppConversation[]
   whatsappWebhookEvents WhatsAppWebhookEvent[]
   whatsappClickEvents   WhatsAppClickConversion[]
-  embeddings            BusinessEmbedding[]
-  sentimentInsights     ReviewSentimentInsight[]
   notificationJobs      NotificationJob[]
   adCampaigns           AdCampaign[]
   verificationDocuments BusinessVerificationDocument[]
@@ -655,8 +637,6 @@ model Review {
   user       User     @relation(fields: [userId], references: [id])
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  sentiment  ReviewSentimentInsight?
-
   @@unique([userId, businessId])
   @@index([businessId])
   @@index([userId])
@@ -1225,27 +1205,6 @@ model AdWalletTopup {
   @@map("ad_wallet_topups")
 }
 
-model BusinessEmbedding {
-  id             String          @id @default(uuid())
-  businessId     String          @unique
-  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  content        String          @db.Text
-  embedding      Json
-  dimensions     Int             @default(1536)
-  provider       String          @default("gemini") @db.VarChar(40)
-  status         EmbeddingStatus @default(PENDING)
-  errorMessage   String?         @db.VarChar(500)
-  sourceChecksum String?         @db.VarChar(128)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-
-  @@index([organizationId, status, updatedAt])
-  @@index([businessId, updatedAt])
-  @@map("business_embeddings")
-}
-
 model WhatsAppConversation {
   id                  String                     @id @default(uuid())
   organizationId      String
@@ -1332,27 +1291,6 @@ model WhatsAppClickConversion {
   @@index([organizationId, clickedAt])
   @@index([userId, clickedAt])
   @@map("whatsapp_click_conversions")
-}
-
-model ReviewSentimentInsight {
-  id             String          @id @default(uuid())
-  reviewId       String          @unique
-  review         Review          @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  businessId     String
-  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sentiment      ReviewSentiment
-  score          Decimal         @db.Decimal(5, 4)
-  summary        String?         @db.VarChar(500)
-  model          String?         @db.VarChar(80)
-  alertedAt      DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-
-  @@index([organizationId, sentiment, createdAt])
-  @@index([businessId, createdAt])
-  @@map("review_sentiment_insights")
 }
 
 model NotificationJob {

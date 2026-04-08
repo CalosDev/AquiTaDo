@@ -191,11 +191,6 @@ export class AdvancedRateLimitGuard implements CanActivate {
                 ipLimit: 120,
                 apiKeyLimit: 600,
             },
-            ai: {
-                windowSeconds: 60,
-                ipLimit: 30,
-                apiKeyLimit: 180,
-            },
             lead: {
                 windowSeconds: 60,
                 ipLimit: 20,

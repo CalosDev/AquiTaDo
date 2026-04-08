@@ -224,17 +224,6 @@ async function runApiSmoke(apiBaseUrl, skipCheckIns) {
     const metricsUnauthorized = await request(apiBaseUrl, '/api/observability/metrics');
     expectStatus(metricsUnauthorized, [401, 403], 'GET /api/observability/metrics without token');
 
-    const aiQuery = await request(apiBaseUrl, '/api/ai/concierge/query', {
-        method: 'POST',
-        body: {
-            query: 'Comida criolla con parqueo en Santo Domingo',
-            limit: 4,
-        },
-    });
-    expectStatus(aiQuery, [200, 201], 'POST /api/ai/concierge/query');
-    assert(typeof aiQuery.json?.answer === 'string', 'AI concierge answer is missing');
-    assert(Array.isArray(aiQuery.json?.data), 'AI concierge data must be an array');
-
     if (skipCheckIns) {
         console.log('Skipping check-in stats validation: SMOKE_PROD_SKIP_CHECKINS=1');
     } else {

@@ -30,7 +30,6 @@ import { FavoritesModule } from './favorites/favorites.module';
 import { CheckInsModule } from './checkins/checkins.module';
 import { ResilienceModule } from './resilience/resilience.module';
 import { ObservabilityModule } from './observability/observability.module';
-import { AiModule } from './ai/ai.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -96,7 +95,6 @@ import { SecurityModule } from './security/security.module';
         VerificationModule,
         FavoritesModule,
         CheckInsModule,
-        AiModule,
         WhatsAppModule,
         NotificationsModule,
     ],

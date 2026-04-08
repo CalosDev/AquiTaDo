@@ -509,33 +509,6 @@ export const checkinsApi = {
         api.get(`/checkins/business/${businessId}/stats`),
 };
 
-// ---- AI Concierge ----
-export const aiApi = {
-    askConcierge: (data: {
-        query: string;
-        categoryId?: string;
-        provinceId?: string;
-        cityId?: string;
-        lat?: number;
-        lng?: number;
-        limit?: number;
-    }) => api.post('/ai/concierge/query', data),
-    getAssistantConfig: (businessId: string) =>
-        api.get(`/ai/businesses/${businessId}/assistant-config`),
-    updateAssistantConfig: (
-        businessId: string,
-        data: { enabled?: boolean; customPrompt?: string },
-    ) => api.patch(`/ai/businesses/${businessId}/assistant-config`, data),
-    reindexBusiness: (businessId: string) =>
-        api.post(`/ai/businesses/${businessId}/reindex`, {}),
-    generateAutoReply: (
-        businessId: string,
-        data: { message: string; customerName?: string },
-    ) => api.post(`/ai/businesses/${businessId}/auto-reply`, data),
-    analyzeReviewSentiment: (reviewId: string) =>
-        api.post(`/ai/reviews/${reviewId}/analyze`, {}),
-};
-
 // ---- Reputation ----
 export const reputationApi = {
     getRankings: (params?: { provinceId?: string; limit?: number }) =>

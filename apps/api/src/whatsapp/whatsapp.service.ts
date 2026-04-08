@@ -10,7 +10,6 @@ import { createHash } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { GrowthEventType, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { AiService } from '../ai/ai.service';
 import {
     CreateClickToChatDto,
     ListWhatsAppConversationsDto,
@@ -35,13 +34,9 @@ export class WhatsAppService {
     private readonly verifyToken: string | null;
 
     constructor(
-        @Inject(PrismaService)
         private readonly prisma: PrismaService,
         @Inject(ConfigService)
         private readonly configService: ConfigService,
-        @Inject(AiService)
-        private readonly aiService: AiService,
-        @Inject(WhatsAppOutboundService)
         private readonly whatsAppOutboundService: WhatsAppOutboundService,
     ) {
         this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN')?.trim() || null;
@@ -301,7 +296,7 @@ export class WhatsAppService {
             id: string;
             name: string;
             organizationId: string;
-            aiAutoResponderEnabled: boolean;
+            autoResponderEnabled: boolean;
             latitude: number | null;
             longitude: number | null;
         } | null = null;
@@ -313,7 +308,7 @@ export class WhatsAppService {
                     id: true,
                     name: true,
                     organizationId: true,
-                    aiAutoResponderEnabled: true,
+                    autoResponderEnabled: true,
                     latitude: true,
                     longitude: true,
                 },
@@ -452,18 +447,21 @@ export class WhatsAppService {
                     address: true,
                     latitude: true,
                     longitude: true,
-                    aiAutoResponderEnabled: true,
+                    autoResponderEnabled: true,
                 },
             });
 
-            if (business?.aiAutoResponderEnabled) {
-                const autoReply = await this.aiService.generateBusinessAutoReply(
-                    business.id,
-                    normalizedText,
-                    profileName ?? undefined,
-                );
-
-                const text = `${autoReply.reply}\n\nPara hablar con el equipo, responde a este chat y te asistimos.`;
+            if (business?.autoResponderEnabled) {
+                const greeting = profileName?.trim()
+                    ? `Hola ${profileName.trim()},`
+                    : 'Hola,';
+                const text = [
+                    `${greeting} gracias por escribir a ${business.name}.`,
+                    normalizedText
+                        ? `Recibimos tu mensaje: "${normalizedText}".`
+                        : 'Recibimos tu consulta correctamente.',
+                    'Nuestro equipo te respondera por este chat lo antes posible.',
+                ].join('\n\n');
                 if (
                     typeof business.latitude === 'number'
                     && typeof business.longitude === 'number'
@@ -483,36 +481,15 @@ export class WhatsAppService {
             }
         }
 
-        const concierge = await this.aiService.askConcierge({
-            query: normalizedText,
-            limit: 5,
-        });
-
-        const top = concierge.data.slice(0, 3);
-        const links = top.map((entry, index) => `${index + 1}. ${entry.name}: ${entry.link}`).join('\n');
-        const text = [
-            concierge.answer,
-            links ? '\nOpciones sugeridas:\n' + links : '',
-            '\nSi quieres, dime presupuesto, zona o tipo de comida y lo afinamos.',
-        ].join('\n');
-
-        const firstWithLocation = top.find(
-            (entry) => typeof entry.latitude === 'number' && typeof entry.longitude === 'number',
-        );
-
-        if (firstWithLocation && typeof firstWithLocation.latitude === 'number' && typeof firstWithLocation.longitude === 'number') {
-            return {
-                text,
-                location: {
-                    latitude: firstWithLocation.latitude,
-                    longitude: firstWithLocation.longitude,
-                    name: firstWithLocation.name,
-                    address: firstWithLocation.address,
-                },
-            };
-        }
-
-        return { text };
+        return {
+            text: [
+                'Gracias por escribir a AquiTa.do.',
+                normalizedText
+                    ? `Tomamos nota de tu mensaje: "${normalizedText}".`
+                    : 'Tomamos nota de tu consulta.',
+                'Para encontrar negocios disponibles ahora mismo, visita https://aquitado.vercel.app/businesses.',
+            ].join('\n\n'),
+        };
     }
 
     private parseIncomingMessages(payload: unknown): ParsedIncomingMessage[] {

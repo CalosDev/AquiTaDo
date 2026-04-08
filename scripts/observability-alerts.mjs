@@ -153,7 +153,7 @@ function evaluateHealth(health, readiness, dashboard, issues) {
         addIssue(issues, 'warn', 'Pool de base de datos en zona de advertencia', dashboard?.checks?.database?.pool);
     }
 
-    for (const dependency of ['ai', 'email', 'whatsapp']) {
+    for (const dependency of ['email', 'whatsapp']) {
         const dependencyState = dashboard?.checks?.[dependency];
         if (!dependencyState) {
             continue;

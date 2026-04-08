@@ -202,7 +202,6 @@ describe('HealthService', () => {
             expiredPendingTokens: 2,
         });
         expect(getDependencyHealthSnapshot).toHaveBeenCalledWith({
-            ai: 2500,
             email: 4000,
             whatsapp: 3000,
         });
@@ -231,14 +230,14 @@ describe('HealthService', () => {
         } as unknown as PrismaService;
         const getDependencyHealthSnapshot = vi.fn().mockReturnValue([
             {
-                dependency: 'ai',
-                operation: 'chat_completion',
+                dependency: 'whatsapp',
+                operation: 'click_to_chat',
                 samples: 1,
                 p50Ms: 2100,
                 p95Ms: 2100,
                 errorRatePct: 100,
                 lastSeenAt: new Date().toISOString(),
-                latencyThresholdMs: 2500,
+                latencyThresholdMs: 3000,
                 healthy: false,
             },
         ]);
@@ -252,7 +251,7 @@ describe('HealthService', () => {
         const result = await service.getOperationalDashboard();
 
         expect(result.status).toBe('degraded');
-        expect(result.checks?.ai?.status).toBe('degraded');
+        expect(result.checks?.whatsapp?.status).toBe('degraded');
     });
 
     it('treats optional dependency downtime as degraded instead of down', async () => {
@@ -278,14 +277,14 @@ describe('HealthService', () => {
         } as unknown as PrismaService;
         const getDependencyHealthSnapshot = vi.fn().mockReturnValue([
             {
-                dependency: 'ai',
-                operation: 'chat_completion',
+                dependency: 'whatsapp',
+                operation: 'click_to_chat',
                 samples: 3,
                 p50Ms: 1800,
-                p95Ms: 2100,
+                p95Ms: 3100,
                 errorRatePct: 100,
                 lastSeenAt: new Date().toISOString(),
-                latencyThresholdMs: 2500,
+                latencyThresholdMs: 3000,
                 healthy: false,
             },
         ]);
@@ -299,7 +298,7 @@ describe('HealthService', () => {
         const result = await service.getOperationalDashboard();
 
         expect(result.status).toBe('degraded');
-        expect(result.checks?.ai).toMatchObject({
+        expect(result.checks?.whatsapp).toMatchObject({
             status: 'down',
             critical: false,
         });
@@ -328,19 +327,19 @@ describe('HealthService', () => {
         } as unknown as PrismaService;
         const getDependencyHealthSnapshot = vi.fn().mockReturnValue([
             {
-                dependency: 'ai',
-                operation: 'chat_completion',
+                dependency: 'whatsapp',
+                operation: 'click_to_chat',
                 samples: 3,
                 p50Ms: 1800,
-                p95Ms: 2100,
+                p95Ms: 3200,
                 errorRatePct: 100,
                 lastSeenAt: new Date().toISOString(),
-                latencyThresholdMs: 2500,
+                latencyThresholdMs: 3000,
                 healthy: false,
             },
         ]);
         const configGet = vi.fn((key: string) => {
-            if (key === 'HEALTH_AI_CRITICAL') {
+            if (key === 'HEALTH_WHATSAPP_CRITICAL') {
                 return 'true';
             }
             return undefined;
@@ -358,7 +357,7 @@ describe('HealthService', () => {
         const result = await service.getOperationalDashboard();
 
         expect(result.status).toBe('down');
-        expect(result.checks?.ai).toMatchObject({
+        expect(result.checks?.whatsapp).toMatchObject({
             status: 'down',
             critical: true,
         });

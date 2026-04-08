@@ -27,7 +27,6 @@
     "smoke:brave:roles:mobile": "node scripts/brave-role-audit-mobile.mjs",
     "perf:prod": "node scripts/perf-benchmark.mjs",
     "keepwarm:prod": "node scripts/keep-warm-prod.mjs",
-    "ai:reindex:embeddings": "pnpm --filter @aquita/api ai:reindex:embeddings",
     "db:migrate": "pnpm --filter @aquita/api prisma:migrate",
     "db:migrate:deploy": "pnpm --filter @aquita/api prisma:migrate:deploy",
     "db:status": "pnpm --filter @aquita/api prisma:migrate:status",

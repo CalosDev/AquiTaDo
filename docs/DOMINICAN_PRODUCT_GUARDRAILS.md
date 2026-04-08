@@ -22,15 +22,14 @@ This document defines the non-negotiable product rules to keep AquiTa.do:
 - Never fabricate data (prices, availability, ratings, schedules).
 - If data is missing, return a transparent message and next action.
 
-## 3) AI Behavioral Rules
+## 3) Recommendation and Messaging Rules
 
-All AI features (concierge, auto-reply, sentiment summaries) must:
+Discovery, contact prompts and product guidance must:
 
 - Stay in Dominican context.
 - Prefer concise answers with actionable next step.
-- Use only retrieved context for recommendations.
-- Explicitly avoid unsupported claims.
-- Keep output useful for conversion (reserve, contact, compare).
+- Avoid unsupported claims about businesses, availability or reputation.
+- Keep output useful for conversion (contact, compare, reserve when aplique).
 
 ## 4) Compliance and Business Data
 
