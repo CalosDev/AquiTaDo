@@ -26,7 +26,7 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
     'con-delivery': {
         label: 'Negocios con delivery',
         feature: 'delivery',
-        description: 'Encuentra negocios que ofrecen delivery en República Dominicana.',
+        description: 'Encuentra negocios que ofrecen delivery en Republica Dominicana.',
     },
     'pet-friendly': {
         label: 'Negocios pet friendly',
@@ -41,7 +41,7 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
     'con-reservas': {
         label: 'Negocios con reservaciones',
         feature: 'reservaciones',
-        description: 'Compara negocios que aceptan reservaciones en línea o por WhatsApp.',
+        description: 'Compara negocios que aceptan reservaciones en linea o por WhatsApp.',
     },
     accesibles: {
         label: 'Negocios accesibles',
@@ -49,6 +49,12 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
         description: 'Listado de negocios con facilidades de accesibilidad.',
     },
 };
+
+const NO_RESULTS_SUGGESTIONS = [
+    { to: '/negocios/intencion/con-delivery', label: 'Con delivery' },
+    { to: '/negocios/intencion/con-reservas', label: 'Con reservas' },
+    { to: '/negocios/intencion/pet-friendly', label: 'Pet friendly' },
+] as const;
 
 const PAGE_SIZE = 12;
 const loadBusinessesMapModule = () => import('../components/BusinessesMap');
@@ -778,20 +784,20 @@ export function BusinessesList() {
             : activeCategory && activeProvince
             ? `${activeCategoryDisplayName} en ${activeProvince.name}`
             : activeCategory
-                ? `${activeCategoryDisplayName} en República Dominicana`
+                ? `${activeCategoryDisplayName} en Republica Dominicana`
                 : activeProvince
                     ? `Negocios en ${activeProvince.name}`
-                    : 'Directorio de negocios en República Dominicana';
+                    : 'Directorio de negocios en Republica Dominicana';
 
         const descriptionBase = activeIntent
             ? `${activeIntent.description} Contacta por WhatsApp o teléfono desde AquiTa.do.`
             : activeCategory && activeProvince
             ? `Descubre ${activeCategoryDisplayName.toLowerCase()} en ${activeProvince.name}. Compara opciones locales, contacta por WhatsApp y reserva en AquiTa.do.`
             : activeCategory
-                ? `Explora ${activeCategoryDisplayName.toLowerCase()} en República Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
+                ? `Explora ${activeCategoryDisplayName.toLowerCase()} en Republica Dominicana. Filtra, compara y contacta negocios verificados en AquiTa.do.`
                 : activeProvince
                     ? `Encuentra negocios locales en ${activeProvince.name}. Descubre perfiles verificados, reseñas y canales de contacto.`
-                    : 'Explora negocios locales en República Dominicana. Filtra por categoría y provincia para encontrar opciones verificadas.';
+                    : 'Explora negocios locales en Republica Dominicana. Filtra por categoría y provincia para encontrar opciones verificadas.';
 
         applySeoMeta({
             title: `${headingBase} | AquiTa.do`,
@@ -1285,8 +1291,10 @@ export function BusinessesList() {
                         </>
                     ) : (
                         <div className="discovery-callout px-6 py-16 text-center text-slate-500">
-                            <p className="text-sm font-semibold text-slate-700">No se encontraron negocios</p>
-                            <p className="mt-2 text-sm">Prueba otros filtros o intenta con otra busqueda.</p>
+                            <p className="text-sm font-semibold text-slate-700">No encontramos coincidencias con esta combinacion</p>
+                            <p className="mt-2 text-sm leading-relaxed">
+                                Ajusta uno o dos filtros, cambia la provincia o prueba una intencion rapida para descubrir negocios cercanos.
+                            </p>
                             <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                                 <button
                                     type="button"
@@ -1299,6 +1307,17 @@ export function BusinessesList() {
                                     Volver al inicio
                                 </Link>
                             </div>
+                            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                                {NO_RESULTS_SUGGESTIONS.map((suggestion) => (
+                                    <Link
+                                        key={suggestion.to}
+                                        to={suggestion.to}
+                                        className="chip transition hover:!bg-primary-50 hover:!text-primary-700"
+                                    >
+                                        {suggestion.label}
+                                    </Link>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1306,5 +1325,6 @@ export function BusinessesList() {
         </div>
     );
 }
+
 
 

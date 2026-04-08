@@ -20,6 +20,8 @@ interface ReviewsSectionProps {
     submittingReview: boolean;
 }
 
+const STAR_SYMBOL = String.fromCharCode(9733);
+
 export function ReviewsSection({
     averageRating,
     averageRatingNumber,
@@ -67,12 +69,15 @@ export function ReviewsSection({
 
                 {isAuthenticated && !isCustomerRole && (
                     <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        Las resenas estan habilitadas para cuentas tipo cliente.
+                        Las resenas estan habilitadas solo para cuentas tipo cliente.
                     </div>
                 )}
 
                 {isAuthenticated && isCustomerRole && (
                     <form onSubmit={onSubmit} className="mb-6 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
+                        <p className="mb-3 text-sm leading-relaxed text-slate-600">
+                            Comparte una experiencia concreta para ayudar a otros usuarios a decidir con mas contexto.
+                        </p>
                         <div className="mb-3 flex items-center gap-3">
                             <span className="text-sm font-medium text-slate-600">Tu calificacion:</span>
                             <div className="flex gap-1.5">
@@ -86,7 +91,7 @@ export function ReviewsSection({
                                             star <= reviewForm.rating ? 'text-amber-400' : 'text-slate-300'
                                         }`}
                                     >
-                                        ★
+                                        {STAR_SYMBOL}
                                     </button>
                                 ))}
                             </div>
@@ -146,7 +151,7 @@ export function ReviewsSection({
                     ))}
                     {!reviewsLoading && reviews.length === 0 && (
                         <p className="py-4 text-center text-sm text-slate-500">
-                            Aun no hay resenas. Se el primero en opinar.
+                            Aun no hay resenas. Se el primero en compartir tu experiencia.
                         </p>
                     )}
                 </div>

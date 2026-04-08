@@ -119,6 +119,24 @@ export function SidebarPanel({
         { href: business.facebookUrl, label: 'Facebook' },
         { href: business.tiktokUrl, label: 'TikTok' },
     ].filter((entry): entry is { href: string; label: string } => Boolean(entry.href));
+    const recommendedContactHint = business.whatsapp
+        ? {
+            title: 'Canal recomendado',
+            description: canUseCustomerContactFlows
+                ? 'WhatsApp suele ser la via mas rapida para confirmar disponibilidad, horarios o precios el mismo dia.'
+                : 'Si este negocio responde por WhatsApp, suele ser el canal mas rapido para una consulta corta.',
+        }
+        : business.phone
+            ? {
+                title: 'Mejor siguiente paso',
+                description: 'Llama si necesitas resolver disponibilidad inmediata, ubicacion o una coordinacion rapida.',
+            }
+            : business.email
+                ? {
+                    title: 'Mejor siguiente paso',
+                    description: 'Usa email si necesitas compartir mas contexto, documentos o una solicitud detallada.',
+                }
+                : null;
 
     return (
         <div className="space-y-6">
@@ -178,7 +196,7 @@ export function SidebarPanel({
                                 {showBookings ? <MetricCard label="Reservas completadas" value={String(reputationProfile.metrics.bookings.completed)} /> : null}
                             </div>
                         ) : (
-                            <p className="text-xs text-slate-500">Perfil de reputacion aun no disponible para este negocio.</p>
+                            <p className="text-xs text-slate-500">Perfil de reputacion todavia no disponible para este negocio.</p>
                         )}
                     </div>
 
@@ -203,7 +221,7 @@ export function SidebarPanel({
                             />
                         ) : null}
                         <ContactRow icon="Dir" label="Direccion" tone="primary" value={business.address} />
-                        {business.website ? <ContactRow action={{ href: business.website, external: true }} icon="Web" label="Website" tone="neutral" value={business.website} /> : null}
+                        {business.website ? <ContactRow action={{ href: business.website, external: true }} icon="Web" label="Sitio web" tone="neutral" value={business.website} /> : null}
                         {business.email ? <ContactRow action={{ href: `mailto:${business.email}` }} icon="Mail" label="Email" tone="neutral" value={business.email} /> : null}
 
                         {socialLinks.length > 0 ? (
@@ -216,6 +234,17 @@ export function SidebarPanel({
                                         </a>
                                     ))}
                                 </div>
+                            </div>
+                        ) : null}
+
+                        {recommendedContactHint ? (
+                            <div className="rounded-[1.25rem] border border-primary-100 bg-primary-50/70 px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700">
+                                    {recommendedContactHint.title}
+                                </p>
+                                <p className="mt-1 text-sm leading-relaxed text-slate-700">
+                                    {recommendedContactHint.description}
+                                </p>
                             </div>
                         ) : null}
 
@@ -254,8 +283,8 @@ export function SidebarPanel({
                                 <h3 className="font-display font-semibold text-gray-900">{isAdminRole ? 'Herramientas de moderacion' : 'Herramientas de gestion'}</h3>
                                 <p className="text-sm text-slate-700">
                                     {isAdminRole
-                                        ? 'Gestiona verificaciones, calidad de datos y cumplimiento desde el panel administrativo.'
-                                        : 'Gestiona tu operacion comercial desde tu panel de negocio.'}
+                                        ? 'Revisa verificaciones, calidad de datos y cumplimiento desde el panel administrativo.'
+                                        : 'Gestiona tu operacion comercial, mensajes y publicaciones desde tu panel de negocio.'}
                                 </p>
                                 <Link to={isAdminRole ? '/admin' : '/dashboard'} className="btn-secondary inline-flex text-sm">
                                     {isAdminRole ? 'Ir a Panel Admin' : 'Ir a Panel Negocio'}
@@ -310,6 +339,9 @@ export function SidebarPanel({
 
                                         {!isAuthenticated ? (
                                             <form onSubmit={onPublicLeadSubmit} className="space-y-3">
+                                                <p className="text-sm leading-relaxed text-slate-600">
+                                                    Pide informacion, horarios o precios sin crear cuenta. Si luego quieres dar seguimiento, puedes iniciar sesion.
+                                                </p>
                                                 <input
                                                     className="input-field text-sm"
                                                     placeholder="Tu nombre"
@@ -331,12 +363,12 @@ export function SidebarPanel({
                                                 <textarea
                                                     className="input-field text-sm"
                                                     rows={3}
-                                                    placeholder="Que necesitas?"
+                                                    placeholder="Que necesitas confirmar?"
                                                     value={publicLeadForm.message}
                                                     onChange={(event) => onPublicLeadFormChange((previous) => ({ ...previous, message: event.target.value }))}
                                                 />
                                                 <button type="submit" className="btn-primary w-full text-sm" disabled={submittingPublicLead}>
-                                                    {submittingPublicLead ? 'Enviando...' : 'Solicitar cotizacion sin cuenta'}
+                                                    {submittingPublicLead ? 'Enviando...' : 'Enviar consulta sin cuenta'}
                                                 </button>
                                                 <p className="text-xs text-gray-500">
                                                     Ya tienes cuenta? <Link to="/login" className="font-medium underline">Inicia sesion</Link>
@@ -346,6 +378,9 @@ export function SidebarPanel({
 
                                         {isAuthenticated && isCustomerRole ? (
                                             <form onSubmit={onMessageSubmit} className="space-y-3">
+                                                <p className="text-sm leading-relaxed text-slate-600">
+                                                    Incluye fecha, cantidad y contexto para que el negocio pueda responderte con algo mas util.
+                                                </p>
                                                 <input
                                                     className="input-field text-sm"
                                                     placeholder="Asunto (opcional)"
