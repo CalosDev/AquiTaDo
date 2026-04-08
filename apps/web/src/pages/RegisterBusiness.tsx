@@ -935,8 +935,15 @@ export function RegisterBusiness() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
-            <div className="card p-8">
+        <div className="page-shell max-w-5xl space-y-6">
+            <section className="role-hero role-hero-owner">
+                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
+                <h1 className="font-display text-3xl font-bold text-white mt-2">Registra tu negocio</h1>
+                <p className="text-blue-100 mt-2 max-w-2xl">
+                    Completa 4 pasos para publicar tu negocio con una presentacion clara y confiable.
+                </p>
+            </section>
+            <div className="section-shell p-8">
                 <div className="text-center mb-8">
                     <h1 className="font-display text-3xl font-bold text-gray-900">Registra tu negocio</h1>
                     <p className="text-gray-500 mt-2">
@@ -951,8 +958,40 @@ export function RegisterBusiness() {
                 )}
 
                 {loadingData ? (
-                    <div className="flex justify-center py-12">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                    <div className="space-y-6" aria-busy="true">
+                        <div className="space-y-3">
+                            <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                                <div className="h-full w-1/4 rounded-full bg-primary-200 animate-pulse"></div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {Array.from({ length: TOTAL_REGISTER_STEPS }).map((_, index) => (
+                                    <div
+                                        key={index}
+                                        className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
+                                    >
+                                        <div className="h-3 w-16 rounded-full bg-gray-200 animate-pulse"></div>
+                                        <div className="mt-2 h-4 w-24 rounded-full bg-gray-200 animate-pulse"></div>
+                                        <div className="mt-2 h-3 w-20 rounded-full bg-gray-100 animate-pulse"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-100 p-5">
+                            <div className="mb-4 rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
+                                <div className="h-3 w-40 rounded-full bg-primary-200 animate-pulse"></div>
+                                <div className="mt-3 h-6 w-64 rounded-full bg-white/80 animate-pulse"></div>
+                                <div className="mt-3 h-4 w-full max-w-xl rounded-full bg-white/70 animate-pulse"></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {Array.from({ length: 6 }).map((_, index) => (
+                                    <div
+                                        key={index}
+                                        className={`rounded-2xl bg-gray-100 animate-pulse ${index === 0 ? 'md:col-span-2 h-24' : 'h-12'}`}
+                                    ></div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 ) : (
                     <form onSubmit={(event) => void handleSubmit(event)} className="space-y-6">

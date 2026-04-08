@@ -40,6 +40,51 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const SESSION_HINT_STORAGE_KEY = 'aquita_has_session';
 const canUseWindow = typeof window !== 'undefined';
 
+function normalizeStoredUser(value: unknown): User | null {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const candidate = value as Partial<User>;
+    if (
+        typeof candidate.id !== 'string'
+        || typeof candidate.name !== 'string'
+        || typeof candidate.email !== 'string'
+    ) {
+        return null;
+    }
+
+    return {
+        id: candidate.id,
+        name: candidate.name,
+        email: candidate.email,
+        phone: typeof candidate.phone === 'string' ? candidate.phone : undefined,
+        avatarUrl: typeof candidate.avatarUrl === 'string' ? candidate.avatarUrl : null,
+        role: isUserRole(candidate.role) ? candidate.role : 'USER',
+        twoFactorEnabled: typeof candidate.twoFactorEnabled === 'boolean'
+            ? candidate.twoFactorEnabled
+            : undefined,
+    };
+}
+
+function readStoredUser(): User | null {
+    if (!canUseWindow) {
+        return null;
+    }
+
+    const rawUser = localStorage.getItem('user');
+    if (!rawUser) {
+        return null;
+    }
+
+    try {
+        return normalizeStoredUser(JSON.parse(rawUser));
+    } catch {
+        localStorage.removeItem('user');
+        return null;
+    }
+}
+
 function shouldBootstrapSession(): boolean {
     if (!canUseWindow) {
         return true;
@@ -66,8 +111,8 @@ function isTokenExpiredOrNearExpiry(token: string): boolean {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(null);
+    const [user, setUser] = useState<User | null>(() => readStoredUser());
+    const [token, setToken] = useState<string | null>(() => (canUseWindow ? getAccessToken() : null));
     const [loading, setLoading] = useState(() => shouldBootstrapSession());
 
     const clearSession = useCallback(() => {

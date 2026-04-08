@@ -5,6 +5,11 @@ loadOptionalSmokeEnv();
 const DEFAULT_API_BASE_URL = 'https://aquitado.onrender.com';
 const DEFAULT_WEB_BASE_URL = 'https://aquitado.vercel.app';
 const REQUEST_TIMEOUT_MS = 75_000;
+const DEFAULT_SMOKE_PASSWORD = 'SmokePass123!';
+const DEFAULT_PROD_SMOKE_USER_EMAIL = 'smoke.user.aquitado@example.com';
+const DEFAULT_PROD_SMOKE_OWNER_EMAIL = 'smoke.owner.aquitado@example.com';
+const DEFAULT_PROD_SMOKE_ADMIN_EMAIL = 'admin@aquita.do';
+const DEFAULT_PROD_SMOKE_ADMIN_PASSWORD = 'admin12345';
 const FRONTEND_BUNDLE_PATTERNS = [
     {
         pattern: /\[DEPRECATED\]\s*Default export is deprecated\. Instead use `import \{ create \} from 'zustand'`/i,
@@ -29,6 +34,16 @@ function normalizeBaseUrl(rawUrl, fallbackUrl) {
         throw new Error('Base URL cannot be empty');
     }
     return normalized;
+}
+
+function pickEnv(...keys) {
+    for (const key of keys) {
+        const value = process.env[key]?.trim();
+        if (value) {
+            return value;
+        }
+    }
+    return null;
 }
 
 function assert(condition, message) {
@@ -189,6 +204,8 @@ async function runApiSmoke(apiBaseUrl, skipCheckIns) {
     const provinces = await request(apiBaseUrl, '/api/provinces');
     expectStatus(provinces, [200], 'GET /api/provinces');
     assert(Array.isArray(provinces.json) && provinces.json.length > 0, 'No provinces found');
+    const firstProvinceId = provinces.json?.[0]?.id;
+    assert(typeof firstProvinceId === 'string', 'No province id available for smoke checks');
 
     const businesses = await request(apiBaseUrl, '/api/businesses?limit=3');
     expectStatus(businesses, [200], 'GET /api/businesses');
@@ -224,10 +241,31 @@ async function runApiSmoke(apiBaseUrl, skipCheckIns) {
         assert(checkInStats.json?.businessId === firstBusinessId, 'Check-in stats returned unexpected business id');
     }
 
-    return { firstBusinessId };
+    return { firstBusinessId, firstProvinceId };
 }
 
-async function loginRole(apiBaseUrl, label, email, password) {
+function normalizeActor(label, email, password, payload) {
+    const accessToken = payload?.accessToken;
+    assert(typeof accessToken === 'string', `${label} login did not return accessToken`);
+
+    return {
+        label,
+        email,
+        password,
+        accessToken,
+        user: payload?.user ?? null,
+    };
+}
+
+function assertActorRole(actor, expectedRole, label) {
+    const actualRole = actor.user?.role;
+    assert(
+        actualRole === expectedRole,
+        `${label} resolved with unexpected role ${String(actualRole || 'unknown')}; expected ${expectedRole}`,
+    );
+}
+
+async function tryLoginRole(apiBaseUrl, label, email, password) {
     const login = await request(apiBaseUrl, '/api/auth/login', {
         method: 'POST',
         body: {
@@ -235,28 +273,215 @@ async function loginRole(apiBaseUrl, label, email, password) {
             password,
         },
     });
-    expectStatus(login, [200], `POST /api/auth/login (${label})`);
 
-    const accessToken = login.json?.accessToken;
-    assert(typeof accessToken === 'string', `${label} login did not return accessToken`);
+    if (login.status === 200) {
+        return normalizeActor(label, email, password, login.json);
+    }
 
-    return {
+    if ([400, 401, 403, 404].includes(login.status)) {
+        return null;
+    }
+
+    throw new Error(
+        `POST /api/auth/login (${label}) failed with HTTP ${login.status}. Response: ${formatResponsePayload(login)}`,
+    );
+}
+
+async function loginRole(apiBaseUrl, label, email, password) {
+    const actor = await tryLoginRole(apiBaseUrl, label, email, password);
+    assert(actor, `${label} login rejected the provided credentials for ${email}`);
+    return actor;
+}
+
+async function registerRole(apiBaseUrl, options) {
+    const {
         label,
-        accessToken,
-        user: login.json?.user ?? null,
-    };
+        role,
+        email,
+        password = DEFAULT_SMOKE_PASSWORD,
+        name,
+        phone,
+    } = options;
+
+    const register = await request(apiBaseUrl, '/api/auth/register', {
+        method: 'POST',
+        body: {
+            name,
+            email,
+            password,
+            phone,
+            role,
+        },
+    });
+
+    if (register.status === 201) {
+        return normalizeActor(label, email, password, register.json);
+    }
+
+    if (register.status === 409) {
+        throw new Error(
+            `${label} smoke actor ${email} already exists but could not be logged in. ` +
+            `Reset that account password or provide explicit SMOKE_PROD credentials.`,
+        );
+    }
+
+    throw new Error(
+        `POST /api/auth/register (${label}) failed with HTTP ${register.status}. Response: ${formatResponsePayload(register)}`,
+    );
+}
+
+async function ensureSmokeActor(apiBaseUrl, options) {
+    const {
+        label,
+        role,
+        emailKeys,
+        passwordKeys,
+        defaultEmail,
+        defaultPassword = DEFAULT_SMOKE_PASSWORD,
+        name,
+        phone,
+    } = options;
+
+    const configuredEmail = pickEnv(...emailKeys);
+    const configuredPassword = pickEnv(...passwordKeys);
+
+    assert(
+        Boolean(configuredEmail) === Boolean(configuredPassword),
+        `${label} smoke requires both email and password when one of them is configured`,
+    );
+
+    if (configuredEmail && configuredPassword) {
+        const actor = await loginRole(apiBaseUrl, label, configuredEmail, configuredPassword);
+        assertActorRole(actor, role, label);
+        return actor;
+    }
+
+    const existingActor = await tryLoginRole(apiBaseUrl, label, defaultEmail, defaultPassword);
+    if (existingActor) {
+        assertActorRole(existingActor, role, label);
+        return existingActor;
+    }
+
+    const registeredActor = await registerRole(apiBaseUrl, {
+        label,
+        role,
+        email: defaultEmail,
+        password: defaultPassword,
+        name,
+        phone,
+    });
+    assertActorRole(registeredActor, role, label);
+    return registeredActor;
+}
+
+async function listOwnerOrganizations(apiBaseUrl, owner) {
+    const response = await request(apiBaseUrl, '/api/organizations/mine', {
+        token: owner.accessToken,
+    });
+    expectStatus(response, [200], 'GET /api/organizations/mine (BUSINESS_OWNER)');
+
+    if (Array.isArray(response.json)) {
+        return response.json;
+    }
+    if (Array.isArray(response.json?.data)) {
+        return response.json.data;
+    }
+    return [];
+}
+
+async function createOwnerOrganization(apiBaseUrl, owner) {
+    const response = await request(apiBaseUrl, '/api/organizations', {
+        method: 'POST',
+        token: owner.accessToken,
+        body: {
+            name: 'Smoke Prod Owner Organization',
+        },
+    });
+    expectStatus(response, [201], 'POST /api/organizations (BUSINESS_OWNER)');
+    const organizationId = response.json?.id;
+    assert(typeof organizationId === 'string', 'Created organization is missing an id');
+    return organizationId;
+}
+
+async function ensureOwnerOrganization(apiBaseUrl, owner) {
+    const explicitOrganizationId = pickEnv('SMOKE_PROD_OWNER_ORGANIZATION_ID');
+    if (explicitOrganizationId) {
+        return explicitOrganizationId;
+    }
+
+    const organizations = await listOwnerOrganizations(apiBaseUrl, owner);
+    const firstOrganizationId = organizations[0]?.id;
+    if (typeof firstOrganizationId === 'string') {
+        return firstOrganizationId;
+    }
+
+    return createOwnerOrganization(apiBaseUrl, owner);
+}
+
+async function listOwnerBusinesses(apiBaseUrl, owner, organizationId) {
+    const response = await request(apiBaseUrl, '/api/businesses/my?limit=8', {
+        token: owner.accessToken,
+        organizationId,
+    });
+    expectStatus(response, [200], 'GET /api/businesses/my?limit=8 (BUSINESS_OWNER)');
+
+    if (Array.isArray(response.json?.data)) {
+        return response.json.data;
+    }
+    if (Array.isArray(response.json)) {
+        return response.json;
+    }
+    return [];
+}
+
+async function createOwnerBusiness(apiBaseUrl, owner, organizationId, provinceId) {
+    const response = await request(apiBaseUrl, '/api/businesses', {
+        method: 'POST',
+        token: owner.accessToken,
+        organizationId,
+        body: {
+            name: 'Smoke Prod Owner Business',
+            description: 'Business created automatically by production smoke coverage.',
+            phone: '+18095550030',
+            whatsapp: '+18095550031',
+            address: 'Avenida John F. Kennedy 123, Santo Domingo',
+            provinceId,
+            latitude: 18.4861,
+            longitude: -69.9312,
+        },
+    });
+    expectStatus(response, [201], 'POST /api/businesses (BUSINESS_OWNER)');
+
+    const businessId = response.json?.id;
+    assert(typeof businessId === 'string', 'Created business is missing an id');
+    return businessId;
+}
+
+async function ensureOwnerBusiness(apiBaseUrl, owner, organizationId, provinceId) {
+    const explicitBusinessId = pickEnv('SMOKE_PROD_OWNER_BUSINESS_ID');
+    if (explicitBusinessId) {
+        return explicitBusinessId;
+    }
+
+    const businesses = await listOwnerBusinesses(apiBaseUrl, owner, organizationId);
+    const firstBusinessId = businesses[0]?.id;
+    if (typeof firstBusinessId === 'string') {
+        return firstBusinessId;
+    }
+
+    return createOwnerBusiness(apiBaseUrl, owner, organizationId, provinceId);
 }
 
 async function runUserRoleSmoke(apiBaseUrl, firstBusinessId) {
-    const userEmail = process.env.SMOKE_PROD_USER_EMAIL?.trim();
-    const userPassword = process.env.SMOKE_PROD_USER_PASSWORD?.trim();
-
-    if (!userEmail || !userPassword) {
-        console.log('Skipping USER smoke: set SMOKE_PROD_USER_EMAIL and SMOKE_PROD_USER_PASSWORD');
-        return;
-    }
-
-    const user = await loginRole(apiBaseUrl, 'USER', userEmail, userPassword);
+    const user = await ensureSmokeActor(apiBaseUrl, {
+        label: 'USER',
+        role: 'USER',
+        emailKeys: ['SMOKE_PROD_USER_EMAIL'],
+        passwordKeys: ['SMOKE_PROD_USER_PASSWORD'],
+        defaultEmail: DEFAULT_PROD_SMOKE_USER_EMAIL,
+        name: 'Smoke Prod User',
+        phone: '+18095550028',
+    });
 
     const endpoints = [
         '/api/users/me',
@@ -301,22 +526,19 @@ async function runUserRoleSmoke(apiBaseUrl, firstBusinessId) {
     );
 }
 
-async function runOwnerRoleSmoke(apiBaseUrl) {
-    const ownerEmail =
-        process.env.SMOKE_PROD_OWNER_EMAIL?.trim()
-        || process.env.SMOKE_PROD_BUSINESS_OWNER_EMAIL?.trim();
-    const ownerPassword =
-        process.env.SMOKE_PROD_OWNER_PASSWORD?.trim()
-        || process.env.SMOKE_PROD_BUSINESS_OWNER_PASSWORD?.trim();
+async function runOwnerRoleSmoke(apiBaseUrl, firstProvinceId) {
+    const owner = await ensureSmokeActor(apiBaseUrl, {
+        label: 'BUSINESS_OWNER',
+        role: 'BUSINESS_OWNER',
+        emailKeys: ['SMOKE_PROD_OWNER_EMAIL', 'SMOKE_PROD_BUSINESS_OWNER_EMAIL'],
+        passwordKeys: ['SMOKE_PROD_OWNER_PASSWORD', 'SMOKE_PROD_BUSINESS_OWNER_PASSWORD'],
+        defaultEmail: DEFAULT_PROD_SMOKE_OWNER_EMAIL,
+        name: 'Smoke Prod Owner',
+        phone: '+18095550029',
+    });
 
-    if (!ownerEmail || !ownerPassword) {
-        console.log(
-            'Skipping BUSINESS_OWNER smoke: set SMOKE_PROD_OWNER_EMAIL/SMOKE_PROD_OWNER_PASSWORD',
-        );
-        return;
-    }
-
-    const owner = await loginRole(apiBaseUrl, 'BUSINESS_OWNER', ownerEmail, ownerPassword);
+    const organizationId = await ensureOwnerOrganization(apiBaseUrl, owner);
+    const businessId = await ensureOwnerBusiness(apiBaseUrl, owner, organizationId, firstProvinceId);
 
     const meEndpoints = [
         '/api/users/me',
@@ -325,27 +547,11 @@ async function runOwnerRoleSmoke(apiBaseUrl) {
         '/api/organizations/mine',
     ];
 
-    let organizationsResponse = null;
     for (const endpoint of meEndpoints) {
         const response = await request(apiBaseUrl, endpoint, {
             token: owner.accessToken,
         });
         expectStatus(response, [200], `GET ${endpoint} (BUSINESS_OWNER)`);
-        if (endpoint === '/api/organizations/mine') {
-            organizationsResponse = response;
-        }
-    }
-
-    const explicitOrganizationId = process.env.SMOKE_PROD_OWNER_ORGANIZATION_ID?.trim();
-    const organizationId =
-        explicitOrganizationId
-        || organizationsResponse?.json?.[0]?.id
-        || organizationsResponse?.json?.data?.[0]?.id
-        || null;
-
-    if (!organizationId) {
-        console.log('Skipping organization-scoped BUSINESS_OWNER checks: no organization id available');
-        return;
     }
 
     const organizationEndpoints = [
@@ -362,18 +568,36 @@ async function runOwnerRoleSmoke(apiBaseUrl) {
         });
         expectStatus(response, [200], `GET ${endpoint} (BUSINESS_OWNER)`);
     }
+
+    const ownerBusinesses = await request(apiBaseUrl, '/api/businesses/my?limit=8', {
+        token: owner.accessToken,
+        organizationId,
+    });
+    expectStatus(ownerBusinesses, [200], 'GET /api/businesses/my?limit=8 verification (BUSINESS_OWNER)');
+    const businesses = Array.isArray(ownerBusinesses.json?.data)
+        ? ownerBusinesses.json.data
+        : Array.isArray(ownerBusinesses.json)
+            ? ownerBusinesses.json
+            : [];
+    assert(
+        businesses.some((business) => business?.id === businessId),
+        'BUSINESS_OWNER smoke could not confirm an accessible business in the active organization',
+    );
 }
 
 async function runAdminRoleSmoke(apiBaseUrl) {
-    const adminEmail = process.env.SMOKE_PROD_ADMIN_EMAIL?.trim();
-    const adminPassword = process.env.SMOKE_PROD_ADMIN_PASSWORD?.trim();
+    const configuredEmail = pickEnv('SMOKE_PROD_ADMIN_EMAIL');
+    const configuredPassword = pickEnv('SMOKE_PROD_ADMIN_PASSWORD');
 
-    if (!adminEmail || !adminPassword) {
-        console.log('Skipping ADMIN smoke: set SMOKE_PROD_ADMIN_EMAIL and SMOKE_PROD_ADMIN_PASSWORD');
-        return;
-    }
+    assert(
+        Boolean(configuredEmail) === Boolean(configuredPassword),
+        'ADMIN smoke requires both SMOKE_PROD_ADMIN_EMAIL and SMOKE_PROD_ADMIN_PASSWORD when one is configured',
+    );
 
+    const adminEmail = configuredEmail ?? DEFAULT_PROD_SMOKE_ADMIN_EMAIL;
+    const adminPassword = configuredPassword ?? DEFAULT_PROD_SMOKE_ADMIN_PASSWORD;
     const admin = await loginRole(apiBaseUrl, 'ADMIN', adminEmail, adminPassword);
+    assertActorRole(admin, 'ADMIN', 'ADMIN');
 
     const adminJsonEndpoints = [
         '/api/auth/2fa/status',
@@ -407,10 +631,15 @@ async function runAdminRoleSmoke(apiBaseUrl) {
     );
 }
 
-async function runOptionalAuthSmoke(apiBaseUrl, firstBusinessId) {
+async function runOptionalAuthSmoke(apiBaseUrl, firstBusinessId, firstProvinceId) {
+    if (process.env.SMOKE_PROD_SKIP_AUTH === '1') {
+        console.log('Skipping authenticated role checks: SMOKE_PROD_SKIP_AUTH=1');
+        return;
+    }
+
     console.log('Running authenticated role checks');
     await runUserRoleSmoke(apiBaseUrl, firstBusinessId);
-    await runOwnerRoleSmoke(apiBaseUrl);
+    await runOwnerRoleSmoke(apiBaseUrl, firstProvinceId);
     await runAdminRoleSmoke(apiBaseUrl);
 }
 
@@ -453,8 +682,8 @@ async function main() {
     const skipCheckIns = process.env.SMOKE_PROD_SKIP_CHECKINS === '1';
 
     console.log(`Starting production smoke (api=${apiBaseUrl}, web=${webBaseUrl})`);
-    const { firstBusinessId } = await runApiSmoke(apiBaseUrl, skipCheckIns);
-    await runOptionalAuthSmoke(apiBaseUrl, firstBusinessId);
+    const { firstBusinessId, firstProvinceId } = await runApiSmoke(apiBaseUrl, skipCheckIns);
+    await runOptionalAuthSmoke(apiBaseUrl, firstBusinessId, firstProvinceId);
     await runWebSmoke(webBaseUrl);
     console.log('Production smoke passed');
 }

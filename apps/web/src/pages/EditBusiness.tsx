@@ -406,13 +406,23 @@ export function EditBusiness() {
 
     if (loading) {
         return (
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
-                <div className="h-10 w-72 rounded-xl bg-gray-100 animate-pulse mb-4"></div>
-                <div className="h-5 w-96 max-w-full rounded-lg bg-gray-100 animate-pulse mb-8"></div>
-                <div className="card p-8">
+            <div className="page-shell max-w-5xl space-y-6">
+                <section className="role-hero role-hero-owner" aria-busy="true">
+                    <div className="h-4 w-28 rounded-full bg-white/20 animate-pulse"></div>
+                    <div className="mt-3 h-10 w-64 max-w-full rounded-2xl bg-white/20 animate-pulse"></div>
+                    <div className="mt-3 h-5 w-full max-w-2xl rounded-xl bg-white/15 animate-pulse"></div>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                        <div className="h-11 w-36 rounded-full bg-white/15 animate-pulse"></div>
+                        <div className="h-11 w-40 rounded-full bg-white/15 animate-pulse"></div>
+                    </div>
+                </section>
+                <div className="section-shell p-6 lg:p-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {Array.from({ length: 8 }).map((_, index) => (
-                            <div key={index} className="h-10 rounded-lg bg-gray-100 animate-pulse"></div>
+                        {Array.from({ length: 10 }).map((_, index) => (
+                            <div
+                                key={index}
+                                className={`rounded-2xl bg-gray-100 animate-pulse ${index < 2 ? 'md:col-span-2 h-24' : 'h-12'}`}
+                            ></div>
                         ))}
                     </div>
                 </div>
@@ -422,8 +432,15 @@ export function EditBusiness() {
 
     if (!business) {
         return (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
-                <div className="card p-8">
+            <div className="page-shell max-w-5xl space-y-6">
+                <section className="role-hero role-hero-owner">
+                    <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
+                    <h1 className="font-display text-3xl font-bold text-white mt-2">Editar negocio</h1>
+                    <p className="text-blue-100 mt-2 max-w-2xl">
+                        Verifica que el negocio existe y que pertenece a tu organizacion.
+                    </p>
+                </section>
+                <div className="section-shell p-8">
                     <h1 className="font-display text-2xl font-bold text-gray-900">No se pudo abrir esta edición</h1>
                     <p className="text-gray-600 mt-2">
                         Verifica que el negocio existe y que pertenece a tu organización.
@@ -441,7 +458,7 @@ export function EditBusiness() {
     }
 
     return (
-        <div className="page-shell max-w-5xl space-y-6 animate-fade-in">
+        <div className="page-shell max-w-5xl space-y-6">
             <section className="role-hero role-hero-owner">
                 <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Editar negocio</h1>

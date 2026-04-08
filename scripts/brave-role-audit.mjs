@@ -11,6 +11,10 @@ const DEFAULT_API_BASE_URL = 'http://localhost:3000';
 const DEFAULT_APP_BASE_URL = 'http://localhost:8080';
 const REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_SMOKE_PASSWORD = 'SmokePass123!';
+const DEFAULT_REMOTE_SMOKE_USER_EMAIL = 'smoke.user.aquitado@example.com';
+const DEFAULT_REMOTE_SMOKE_OWNER_EMAIL = 'smoke.owner.aquitado@example.com';
+const DEFAULT_REMOTE_SMOKE_ADMIN_EMAIL = 'admin@aquita.do';
+const DEFAULT_REMOTE_SMOKE_ADMIN_PASSWORD = 'admin12345';
 const LOCAL_ADMIN_EMAIL = 'admin@aquita.do';
 const LOCAL_ADMIN_PASSWORD = 'admin12345';
 const BRAVE_PATH = process.env.BRAVE_PATH
@@ -56,6 +60,13 @@ function assert(condition, message) {
     }
 }
 
+function assertActorRole(actor, expectedRole, label) {
+    assert(
+        actor.role === expectedRole,
+        `${label} resolved with unexpected role ${String(actor.role || 'unknown')}; expected ${expectedRole}`,
+    );
+}
+
 function formatResponsePayload(response) {
     if (response.json !== null) {
         return JSON.stringify(response.json);
@@ -72,6 +83,7 @@ function isExtensionNoise(text) {
         text.includes('layout-shift observer unavailable')
         || text.includes('Vercel Toolbar')
         || text.includes('instrument.')
+        || text.includes('Failed to load resource: net::ERR_BLOCKED_BY_CLIENT')
         || text.includes('Default export is deprecated. Instead use `import { create } from \'zustand\'`.')
         || text.includes('`DialogContent` requires a `DialogTitle`')
         || text.includes('Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.')
@@ -191,7 +203,7 @@ async function registerActor(apiBaseUrl, options) {
         password = DEFAULT_SMOKE_PASSWORD,
     } = options;
 
-    const email = `${label}.${runId}@example.com`;
+    const email = options.email ?? `${label}.${runId}@example.com`;
     const registerResponse = await request(apiBaseUrl, '/api/auth/register', {
         method: 'POST',
         body: {
@@ -219,7 +231,7 @@ async function registerActor(apiBaseUrl, options) {
     };
 }
 
-async function loginActor(apiBaseUrl, options) {
+async function tryLoginActor(apiBaseUrl, options) {
     const { email, password, label } = options;
     const loginResponse = await request(apiBaseUrl, '/api/auth/login', {
         method: 'POST',
@@ -228,21 +240,84 @@ async function loginActor(apiBaseUrl, options) {
             password,
         },
     });
-    assertStatus(loginResponse, [200], `POST /api/auth/login (${label})`);
 
-    const accessToken = loginResponse.json?.accessToken;
-    const user = normalizeActorUser(loginResponse.json?.user);
-    assert(typeof accessToken === 'string', `Missing access token for ${label}`);
+    if (loginResponse.status === 200) {
+        const accessToken = loginResponse.json?.accessToken;
+        const user = normalizeActorUser(loginResponse.json?.user);
+        assert(typeof accessToken === 'string', `Missing access token for ${label}`);
 
-    return {
+        return {
+            label,
+            role: user.role,
+            email,
+            password,
+            userId: user.id,
+            accessToken,
+            user,
+        };
+    }
+
+    if ([400, 401, 403, 404].includes(loginResponse.status)) {
+        return null;
+    }
+
+    throw new Error(
+        `POST /api/auth/login (${label}) failed with HTTP ${loginResponse.status}. Response: ${formatResponsePayload(loginResponse)}`,
+    );
+}
+
+async function loginActor(apiBaseUrl, options) {
+    const { email, password, label } = options;
+    const actor = await tryLoginActor(apiBaseUrl, { email, password, label });
+    assert(actor, `${label} login rejected the provided credentials for ${email}`);
+    return actor;
+}
+
+async function resolveOrCreateActor(apiBaseUrl, options) {
+    const {
+        runId,
         label,
-        role: user.role,
+        role,
+        name,
+        phone,
+        defaultEmail,
+        defaultPassword = DEFAULT_SMOKE_PASSWORD,
         email,
         password,
-        userId: user.id,
-        accessToken,
-        user,
-    };
+    } = options;
+
+    assert(
+        Boolean(email) === Boolean(password),
+        `${label} role audit requires both email and password when one is configured`,
+    );
+
+    if (email && password) {
+        const actor = await loginActor(apiBaseUrl, { email, password, label });
+        assertActorRole(actor, role, label);
+        return actor;
+    }
+
+    const existingActor = await tryLoginActor(apiBaseUrl, {
+        email: defaultEmail,
+        password: defaultPassword,
+        label,
+    });
+    if (existingActor) {
+        assertActorRole(existingActor, role, label);
+        return existingActor;
+    }
+
+    const registeredActor = await registerActor(apiBaseUrl, {
+        runId,
+        label,
+        role,
+        name,
+        phone,
+        password: defaultPassword,
+        email: defaultEmail,
+    });
+    assertActorRole(registeredActor, role, label);
+    return registeredActor;
 }
 
 async function loadCatalog(apiBaseUrl) {
@@ -284,47 +359,53 @@ async function resolveAdminActor(apiBaseUrl) {
     const email = firstEnv('BRAVE_AUDIT_ADMIN_EMAIL', 'SMOKE_PROD_ADMIN_EMAIL');
     const password = firstEnv('BRAVE_AUDIT_ADMIN_PASSWORD', 'SMOKE_PROD_ADMIN_PASSWORD');
 
+    assert(
+        Boolean(email) === Boolean(password),
+        'admin role audit requires both email and password when one is configured',
+    );
+
     if (email && password) {
-        return loginActor(apiBaseUrl, {
+        const actor = await loginActor(apiBaseUrl, {
             email,
             password,
             label: 'admin',
         });
+        assertActorRole(actor, 'ADMIN', 'admin');
+        return actor;
     }
 
     if (isLocalApiBaseUrl(apiBaseUrl)) {
-        return loginActor(apiBaseUrl, {
+        const actor = await loginActor(apiBaseUrl, {
             email: LOCAL_ADMIN_EMAIL,
             password: LOCAL_ADMIN_PASSWORD,
             label: 'admin',
         });
+        assertActorRole(actor, 'ADMIN', 'admin');
+        return actor;
     }
 
-    return null;
+    const actor = await loginActor(apiBaseUrl, {
+        email: DEFAULT_REMOTE_SMOKE_ADMIN_EMAIL,
+        password: DEFAULT_REMOTE_SMOKE_ADMIN_PASSWORD,
+        label: 'admin',
+    });
+    assertActorRole(actor, 'ADMIN', 'admin');
+    return actor;
 }
 
 async function resolveUserActor(apiBaseUrl, runId) {
     const email = firstEnv('BRAVE_AUDIT_USER_EMAIL', 'SMOKE_PROD_USER_EMAIL');
     const password = firstEnv('BRAVE_AUDIT_USER_PASSWORD', 'SMOKE_PROD_USER_PASSWORD');
 
-    if (email && password) {
-        return loginActor(apiBaseUrl, {
-            email,
-            password,
-            label: 'customer',
-        });
-    }
-
-    if (!isLocalApiBaseUrl(apiBaseUrl)) {
-        return null;
-    }
-
-    return registerActor(apiBaseUrl, {
+    return resolveOrCreateActor(apiBaseUrl, {
         runId,
         label: 'customer',
         role: 'USER',
         name: 'Role Audit Customer',
         phone: '+18095550021',
+        email,
+        password,
+        defaultEmail: DEFAULT_REMOTE_SMOKE_USER_EMAIL,
     });
 }
 
@@ -332,24 +413,15 @@ async function resolveOwnerActor(apiBaseUrl, runId) {
     const email = firstEnv('BRAVE_AUDIT_OWNER_EMAIL', 'SMOKE_PROD_OWNER_EMAIL', 'SMOKE_PROD_BUSINESS_OWNER_EMAIL');
     const password = firstEnv('BRAVE_AUDIT_OWNER_PASSWORD', 'SMOKE_PROD_OWNER_PASSWORD', 'SMOKE_PROD_BUSINESS_OWNER_PASSWORD');
 
-    if (email && password) {
-        return loginActor(apiBaseUrl, {
-            email,
-            password,
-            label: 'owner',
-        });
-    }
-
-    if (!isLocalApiBaseUrl(apiBaseUrl)) {
-        return null;
-    }
-
-    return registerActor(apiBaseUrl, {
+    return resolveOrCreateActor(apiBaseUrl, {
         runId,
         label: 'owner',
         role: 'BUSINESS_OWNER',
         name: 'Role Audit Owner',
         phone: '+18095550022',
+        email,
+        password,
+        defaultEmail: DEFAULT_REMOTE_SMOKE_OWNER_EMAIL,
     });
 }
 
@@ -646,6 +718,9 @@ async function auditScenario(baseUrl, scenario, outputDir) {
         if (params.type === 'Document' && params.errorText === 'net::ERR_ABORTED' && params.canceled) {
             return;
         }
+        if (params.type === 'Ping' && params.errorText === 'net::ERR_BLOCKED_BY_CLIENT') {
+            return;
+        }
         networkFailures.push({
             type: params.type,
             errorText: params.errorText,
@@ -767,14 +842,16 @@ async function run() {
     let businessId = null;
 
     if (owner) {
-        if (isLocalApiBaseUrl(apiBaseUrl)) {
-            const catalog = await loadCatalog(apiBaseUrl);
+        organizationId = await resolveOwnerOrganizationId(apiBaseUrl, owner);
+        if (!organizationId) {
             organizationId = await createOrganization(apiBaseUrl, owner, runId);
+        }
+
+        businessId = await resolveOwnerBusinessId(apiBaseUrl, owner, organizationId);
+        if (!businessId) {
+            const catalog = await loadCatalog(apiBaseUrl);
             businessId = await createBusiness(apiBaseUrl, owner, organizationId, catalog, runId);
             await verifyBusinessIfAdminAvailable(apiBaseUrl, admin, businessId);
-        } else {
-            organizationId = await resolveOwnerOrganizationId(apiBaseUrl, owner);
-            businessId = await resolveOwnerBusinessId(apiBaseUrl, owner, organizationId);
         }
     }
 
