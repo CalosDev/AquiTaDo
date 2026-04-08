@@ -62,10 +62,10 @@ export function AdminSecurity() {
         try {
             const response = await authApi.setupTwoFactor();
             setSetup(response.data as TwoFactorSetup);
-            setSuccessMessage('Escanea el QR con tu app autenticadora y luego confirma con el código de 6 dígitos.');
+            setSuccessMessage('Escanea el QR con tu app autenticadora y luego confirma con el codigo de 6 digitos.');
             await loadStatus();
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar la configuración 2FA'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar la configuracion 2FA'));
         } finally {
             setSaving(false);
         }
@@ -80,7 +80,7 @@ export function AdminSecurity() {
             setCode('');
             setSetup(null);
             await loadStatus();
-            setSuccessMessage('2FA habilitado. Cierra sesión y vuelve a entrar para aplicar el cambio.');
+            setSuccessMessage('2FA habilitado. Cierra sesion y vuelve a entrar para aplicar el cambio.');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo habilitar 2FA'));
         } finally {
@@ -97,7 +97,7 @@ export function AdminSecurity() {
             setCode('');
             setSetup(null);
             await loadStatus();
-            setSuccessMessage('2FA deshabilitado. Cierra sesión y vuelve a entrar para aplicar el cambio.');
+            setSuccessMessage('2FA deshabilitado. Cierra sesion y vuelve a entrar para aplicar el cambio.');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo deshabilitar 2FA'));
         } finally {
@@ -109,13 +109,23 @@ export function AdminSecurity() {
         void logout().finally(() => navigate('/login'));
     };
 
+    const securityBadgeClass = status?.enabled
+        ? 'bg-primary-50 text-primary-700'
+        : 'bg-accent-50 text-accent-700';
+    const policyBadgeClass = status?.required
+        ? 'bg-primary-50 text-primary-700'
+        : 'bg-amber-50 text-amber-700';
+    const nextStepCopy = status?.enabled
+        ? 'Mantener codigos de respaldo y cerrar sesiones antiguas'
+        : 'Generar QR y activar 2FA antes de abrir accesos';
+
     if (user?.role !== 'ADMIN') {
         return (
             <div className="page-shell-narrow">
                 <div className="section-shell p-6">
-                    <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">Acceso restringido</h1>
+                    <h1 className="mb-2 font-display text-2xl font-bold text-gray-900">Acceso restringido</h1>
                     <p className="text-sm text-gray-600">
-                        Esta sección solo está disponible para administradores de plataforma.
+                        Esta seccion solo esta disponible para administradores de plataforma.
                     </p>
                     <div className="mt-4">
                         <Link to="/" className="btn-secondary text-sm">Volver al inicio</Link>
@@ -128,63 +138,87 @@ export function AdminSecurity() {
     return (
         <div className="page-shell max-w-5xl space-y-6">
             <section className="role-hero role-hero-admin">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-200 font-semibold">Seguridad admin</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">Seguridad admin</p>
                 <h1 className="mt-2 font-display text-3xl font-bold text-white">Seguridad de Administrador</h1>
                 <p className="mt-2 max-w-2xl text-slate-200">
-                    Gestiona segundo factor, endurecimiento de acceso y cambios sensibles de sesión para la cuenta administrativa.
+                    Gestiona segundo factor, endurecimiento de acceso y cambios sensibles de sesion para la cuenta administrativa.
                 </p>
+                <div className="role-hero-actions">
+                    <div className="hero-metric-card w-full max-w-xs">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">Cuenta activa</p>
+                        <p className="mt-2 text-sm font-semibold text-white">{user.email ?? 'admin@aquita.do'}</p>
+                    </div>
+                    <div className="hero-metric-card w-full max-w-xs">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">Politica</p>
+                        <p className="mt-2 text-sm font-semibold text-white">
+                            {status?.required ? '2FA obligatorio para admin' : '2FA recomendado para admin'}
+                        </p>
+                    </div>
+                    <div className="hero-metric-card w-full max-w-xs">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">Estado actual</p>
+                        <p className="mt-2 text-sm font-semibold text-white">
+                            {status?.enabled ? 'Cuenta reforzada con 2FA' : 'Cuenta pendiente de reforzar'}
+                        </p>
+                    </div>
+                </div>
             </section>
 
-            {errorMessage && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errorMessage}
-                </div>
-            )}
-
-            {successMessage && (
-                <div className="mb-4 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">
-                    {successMessage}
-                </div>
-            )}
+            {errorMessage && <div className="alert-danger">{errorMessage}</div>}
+            {successMessage && <div className="alert-success">{successMessage}</div>}
 
             {loading ? (
                 <div className="flex justify-center py-16">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+                    <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary-600"></div>
                 </div>
             ) : (
                 <div className="space-y-6">
                     <ChangePasswordCard
-                        title="Cambiar contraseña admin"
-                        description="Rota tu credencial principal antes de abrir la plataforma al público. Al guardar, cerraremos tu sesión para obligar un nuevo login."
+                        title="Cambiar contrasena admin"
+                        description="Rota tu credencial principal antes de abrir la plataforma al publico. Al guardar, cerraremos tu sesion para obligar un nuevo login."
                     />
 
                     <div className="section-shell p-5">
-                        <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Estado actual</h2>
-                        <div className="space-y-2 text-sm text-gray-700">
-                            <p>
-                                Estado:{' '}
-                                <strong className={status?.enabled ? 'text-primary-700' : 'text-red-700'}>
-                                    {status?.enabled ? '2FA activo' : '2FA inactivo'}
-                                </strong>
-                            </p>
-                            {status?.enabledAt && (
-                                <p>
-                                    Activo desde:{' '}
-                                    <strong className="text-gray-900">{formatDateTimeDo(status.enabledAt)}</strong>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h2 className="font-display text-lg font-semibold text-gray-900">Estado actual</h2>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    Revisa el nivel de endurecimiento antes de administrar accesos o sesiones.
                                 </p>
-                            )}
-                            <p>
-                                Política requerida para admins:{' '}
-                                <strong className={status?.required ? 'text-primary-700' : 'text-amber-700'}>
-                                    {status?.required ? 'Sí' : 'No'}
-                                </strong>
-                            </p>
+                            </div>
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${securityBadgeClass}`}>
+                                {status?.enabled ? '2FA activo' : '2FA pendiente'}
+                            </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">2FA</p>
+                                <p className={`mt-3 text-lg font-semibold ${status?.enabled ? 'text-primary-700' : 'text-accent-700'}`}>
+                                    {status?.enabled ? 'Proteccion activa' : 'Proteccion inactiva'}
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Politica</p>
+                                <p className={`mt-3 text-lg font-semibold ${policyBadgeClass.includes('primary') ? 'text-primary-700' : 'text-amber-700'}`}>
+                                    {status?.required ? 'Obligatoria' : 'Recomendada'}
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Activo desde</p>
+                                <p className="mt-3 text-sm font-semibold text-gray-900">
+                                    {status?.enabledAt ? formatDateTimeDo(status.enabledAt) : 'Aun no configurado'}
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Siguiente paso</p>
+                                <p className="mt-3 text-sm font-semibold text-gray-900">{nextStepCopy}</p>
+                            </div>
                         </div>
                     </div>
 
                     {!status?.enabled && (
                         <div className="section-shell p-5">
-                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Configurar 2FA</h2>
+                            <h2 className="mb-3 font-display text-lg font-semibold text-gray-900">Configurar 2FA</h2>
                             {!setup ? (
                                 <button
                                     type="button"
@@ -195,13 +229,13 @@ export function AdminSecurity() {
                                     {saving ? 'Procesando...' : 'Generar QR y secreto'}
                                 </button>
                             ) : (
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                     <div className="rounded-2xl border border-primary-100 bg-primary-50 p-4">
-                                        <p className="text-sm font-semibold text-primary-900 mb-2">Escanea este QR</p>
+                                        <p className="mb-2 text-sm font-semibold text-primary-900">Escanea este QR</p>
                                         {qrUrl ? (
                                             <img
                                                 src={qrUrl}
-                                                alt="QR de configuración 2FA"
+                                                alt="QR de configuracion 2FA"
                                                 className="h-52 w-52 rounded-xl border border-primary-200 bg-white p-2"
                                                 loading="lazy"
                                             />
@@ -209,20 +243,20 @@ export function AdminSecurity() {
                                     </div>
                                     <div className="rounded-2xl border border-primary-100 bg-white p-4">
                                         <p className="text-sm font-semibold text-gray-900">Secreto manual</p>
-                                        <p className="mt-1 font-mono text-xs break-all text-primary-900">{setup.secret}</p>
+                                        <p className="mt-1 break-all font-mono text-xs text-primary-900">{setup.secret}</p>
                                         <a
-                                            className="inline-block mt-3 text-xs text-primary-700 underline"
+                                            className="mt-3 inline-block text-xs text-primary-700 underline"
                                             href={setup.otpauthUrl}
                                         >
                                             Abrir enlace otpauth
                                         </a>
                                         <div className="mt-4">
-                                            <label htmlFor="totp-code-enable" className="block text-xs font-semibold text-gray-700 mb-1">
-                                                Código de 6 dígitos
+                                            <label htmlFor="totp-code-enable" className="mb-1 block text-xs font-semibold text-gray-700">
+                                                Codigo de 6 digitos
                                             </label>
                                             <input
                                                 id="totp-code-enable"
-                                                className="input-field text-sm max-w-[220px]"
+                                                className="input-field max-w-[220px] text-sm"
                                                 inputMode="numeric"
                                                 maxLength={6}
                                                 placeholder="123456"
@@ -232,7 +266,7 @@ export function AdminSecurity() {
                                         </div>
                                         <button
                                             type="button"
-                                            className="btn-accent text-sm mt-3"
+                                            className="btn-accent mt-3 text-sm"
                                             disabled={saving || code.trim().length !== 6}
                                             onClick={() => void handleEnable()}
                                         >
@@ -246,16 +280,16 @@ export function AdminSecurity() {
 
                     {status?.enabled && (
                         <div className="section-shell p-5">
-                            <h2 className="font-display text-lg font-semibold text-gray-900 mb-3">Deshabilitar 2FA</h2>
-                            <p className="text-sm text-gray-600 mb-3">
-                                Solo deshabilita 2FA en casos de recuperación. Esta acción reduce seguridad.
+                            <h2 className="mb-3 font-display text-lg font-semibold text-gray-900">Deshabilitar 2FA</h2>
+                            <p className="mb-3 text-sm text-gray-600">
+                                Solo deshabilita 2FA en casos de recuperacion. Esta accion reduce seguridad.
                             </p>
-                            <label htmlFor="totp-code-disable" className="block text-xs font-semibold text-gray-700 mb-1">
-                                Código actual de 6 dígitos
+                            <label htmlFor="totp-code-disable" className="mb-1 block text-xs font-semibold text-gray-700">
+                                Codigo actual de 6 digitos
                             </label>
                             <input
                                 id="totp-code-disable"
-                                className="input-field text-sm max-w-[220px]"
+                                className="input-field max-w-[220px] text-sm"
                                 inputMode="numeric"
                                 maxLength={6}
                                 placeholder="123456"
@@ -264,7 +298,7 @@ export function AdminSecurity() {
                             />
                             <button
                                 type="button"
-                                className="btn-secondary text-sm mt-3"
+                                className="btn-secondary mt-3 text-sm"
                                 disabled={saving || code.trim().length !== 6}
                                 onClick={() => void handleDisable()}
                             >
@@ -274,13 +308,20 @@ export function AdminSecurity() {
                     )}
 
                     <div className="section-shell p-5">
-                        <h2 className="font-display text-lg font-semibold text-gray-900 mb-2">Aplicar cambios de sesión</h2>
-                        <p className="text-sm text-gray-600 mb-3">
-                            Para cerrar sesiones anteriores y aplicar políticas de admin, vuelve a iniciar sesión.
-                        </p>
-                        <button type="button" onClick={handleLogout} className="btn-secondary text-sm">
-                            Cerrar sesión ahora
-                        </button>
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                            <div>
+                                <h2 className="font-display text-lg font-semibold text-gray-900">Aplicar cambios de sesion</h2>
+                                <p className="mt-2 text-sm text-gray-600">
+                                    Cuando actives o desactives 2FA, vuelve a iniciar sesion para cerrar sesiones antiguas
+                                    y asegurar que la politica nueva quede aplicada en todos tus accesos.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <button type="button" onClick={handleLogout} className="btn-secondary text-sm">
+                                    Cerrar sesion ahora
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

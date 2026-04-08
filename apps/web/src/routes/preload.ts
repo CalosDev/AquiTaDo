@@ -149,10 +149,17 @@ export function preloadLikelyRoutesForSession(options: {
     isAuthenticated: boolean;
     role?: UserRole;
 }): void {
-    preloadMany(['home', 'businessesList', 'businessDetails']);
-
     if (!options.isAuthenticated) {
-        preloadMany(['login', 'register', 'forgotPassword', 'resetPassword', 'about']);
+        preloadMany([
+            'home',
+            'businessesList',
+            'businessDetails',
+            'login',
+            'register',
+            'forgotPassword',
+            'resetPassword',
+            'about',
+        ]);
         return;
     }
 

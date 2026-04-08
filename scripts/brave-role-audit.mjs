@@ -97,6 +97,28 @@ function isExtensionNoise(text) {
     );
 }
 
+function isTransientFailure(report) {
+    if (report.httpFailures.length > 0) {
+        return false;
+    }
+
+    const failureTexts = report.networkFailures
+        .map((entry) => String(entry.errorText ?? '').trim())
+        .filter(Boolean);
+
+    if (failureTexts.length === 0) {
+        return false;
+    }
+
+    return failureTexts.every((text) => (
+        text === 'net::ERR_FAILED'
+        || text === 'net::ERR_NAME_NOT_RESOLVED'
+        || text === 'net::ERR_CONNECTION_CLOSED'
+        || text === 'net::ERR_CONNECTION_RESET'
+        || text === 'net::ERR_ABORTED'
+    ));
+}
+
 function toSlug(value) {
     return value
         .toLowerCase()
@@ -734,6 +756,7 @@ async function auditScenario(baseUrl, scenario, outputDir) {
             type: params.type,
             errorText: params.errorText,
             canceled: params.canceled,
+            url: requestUrls.get(params.requestId) || '',
         });
     });
     client.on('Network.requestWillBeSent', (params) => {
@@ -873,8 +896,14 @@ async function auditScenario(baseUrl, scenario, outputDir) {
 }
 
 async function run() {
-    const apiBaseUrl = normalizeBaseUrl(process.env.BRAVE_AUDIT_API_URL, DEFAULT_API_BASE_URL);
-    const appBaseUrl = normalizeBaseUrl(process.env.BRAVE_AUDIT_APP_URL, DEFAULT_APP_BASE_URL);
+    const apiBaseUrl = normalizeBaseUrl(
+        firstEnv('BRAVE_AUDIT_API_URL', 'SMOKE_PROD_API_BASE_URL'),
+        DEFAULT_API_BASE_URL,
+    );
+    const appBaseUrl = normalizeBaseUrl(
+        firstEnv('BRAVE_AUDIT_APP_URL', 'SMOKE_PROD_WEB_BASE_URL'),
+        DEFAULT_APP_BASE_URL,
+    );
     const runId = randomUUID().slice(0, 8);
 
     console.log(`Running Brave role audit against ${appBaseUrl} (api=${apiBaseUrl}, run=${runId})`);
@@ -1026,7 +1055,12 @@ async function run() {
         const reports = [];
         for (const scenario of scenarios) {
             console.log(`Auditing ${scenario.label} -> ${scenario.url}`);
-            const report = await auditScenario(baseUrl, scenario, outputDir);
+            let report = await auditScenario(baseUrl, scenario, outputDir);
+            if (isTransientFailure(report)) {
+                console.warn(`Transient network failure detected in ${scenario.label}; retrying once`);
+                await delay(1_500);
+                report = await auditScenario(baseUrl, scenario, outputDir);
+            }
             reports.push(report);
             console.log(JSON.stringify({
                 label: report.label,

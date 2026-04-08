@@ -69,6 +69,14 @@ function expectStatus(response, allowedStatusCodes, label) {
     );
 }
 
+function toIsoFromNow({ minutes = 0, hours = 0, days = 0 } = {}) {
+    const date = new Date();
+    date.setMinutes(date.getMinutes() + minutes);
+    date.setHours(date.getHours() + hours);
+    date.setDate(date.getDate() + days);
+    return date.toISOString();
+}
+
 async function request(baseUrl, path, options = {}) {
     const {
         method = 'GET',
@@ -498,6 +506,110 @@ async function runUserRoleSmoke(apiBaseUrl, firstBusinessId) {
         expectStatus(response, [200], `GET ${endpoint} (USER)`);
     }
 
+    if (process.env.SMOKE_PROD_MUTATE_USER === '1') {
+        console.log('Running USER reversible mutations');
+
+        const favoriteOn = await request(apiBaseUrl, '/api/favorites/businesses/toggle', {
+            method: 'POST',
+            token: user.accessToken,
+            body: {
+                businessId: firstBusinessId,
+            },
+        });
+        expectStatus(favoriteOn, [200, 201], 'POST /api/favorites/businesses/toggle (USER on)');
+
+        const favoriteCheckOn = await request(
+            apiBaseUrl,
+            `/api/favorites/businesses/my?businessId=${encodeURIComponent(firstBusinessId)}&limit=1`,
+            { token: user.accessToken },
+        );
+        expectStatus(favoriteCheckOn, [200], 'GET /api/favorites/businesses/my?businessId=... (USER on)');
+        assert(
+            Array.isArray(favoriteCheckOn.json?.data)
+            && favoriteCheckOn.json.data.some((entry) => entry?.businessId === firstBusinessId),
+            'USER mutable smoke could not confirm the favorite business after toggle on',
+        );
+
+        const listName = `Smoke Prod List ${Date.now()}`;
+        const createList = await request(apiBaseUrl, '/api/favorites/lists', {
+            method: 'POST',
+            token: user.accessToken,
+            body: {
+                name: listName,
+                description: 'Temporary list created by production smoke coverage.',
+                isPublic: false,
+            },
+        });
+        expectStatus(createList, [200, 201], 'POST /api/favorites/lists (USER)');
+        const listId = createList.json?.id;
+        assert(typeof listId === 'string', 'USER mutable smoke did not receive a favorite list id');
+
+        try {
+            const addItem = await request(apiBaseUrl, `/api/favorites/lists/${listId}/items`, {
+                method: 'POST',
+                token: user.accessToken,
+                body: {
+                    businessId: firstBusinessId,
+                },
+            });
+            expectStatus(addItem, [200, 201], 'POST /api/favorites/lists/:id/items (USER)');
+
+            const listCheck = await request(apiBaseUrl, '/api/favorites/lists/my?limit=20', {
+                token: user.accessToken,
+            });
+            expectStatus(listCheck, [200], 'GET /api/favorites/lists/my?limit=20 (USER)');
+
+            const createdList = Array.isArray(listCheck.json?.data)
+                ? listCheck.json.data.find((entry) => entry?.id === listId)
+                : null;
+            assert(createdList, 'USER mutable smoke could not reload the created favorite list');
+            assert(
+                Array.isArray(createdList.items)
+                && createdList.items.some((item) => item?.businessId === firstBusinessId),
+                'USER mutable smoke could not confirm the business inside the created list',
+            );
+
+            const removeItem = await request(
+                apiBaseUrl,
+                `/api/favorites/lists/${listId}/items/${firstBusinessId}`,
+                {
+                    method: 'DELETE',
+                    token: user.accessToken,
+                },
+            );
+            expectStatus(removeItem, [200], 'DELETE /api/favorites/lists/:id/items/:businessId (USER)');
+        } finally {
+            const deleteList = await request(apiBaseUrl, `/api/favorites/lists/${listId}`, {
+                method: 'DELETE',
+                token: user.accessToken,
+            });
+            expectStatus(deleteList, [200], 'DELETE /api/favorites/lists/:id (USER)');
+        }
+
+        const favoriteOff = await request(apiBaseUrl, '/api/favorites/businesses/toggle', {
+            method: 'POST',
+            token: user.accessToken,
+            body: {
+                businessId: firstBusinessId,
+            },
+        });
+        expectStatus(favoriteOff, [200, 201], 'POST /api/favorites/businesses/toggle (USER off)');
+
+        const favoriteCheckOff = await request(
+            apiBaseUrl,
+            `/api/favorites/businesses/my?businessId=${encodeURIComponent(firstBusinessId)}&limit=1`,
+            { token: user.accessToken },
+        );
+        expectStatus(favoriteCheckOff, [200], 'GET /api/favorites/businesses/my?businessId=... (USER off)');
+        assert(
+            Array.isArray(favoriteCheckOff.json?.data)
+            && favoriteCheckOff.json.data.length === 0,
+            'USER mutable smoke expected the favorite business to be removed after toggle off',
+        );
+    } else {
+        console.log('Skipping USER reversible mutations: set SMOKE_PROD_MUTATE_USER=1 to enable');
+    }
+
     if (process.env.SMOKE_PROD_CHECKIN_CREATE !== '1') {
         console.log('Skipping USER check-in create: set SMOKE_PROD_CHECKIN_CREATE=1 to enable');
         return;
@@ -583,6 +695,82 @@ async function runOwnerRoleSmoke(apiBaseUrl, firstProvinceId) {
         businesses.some((business) => business?.id === businessId),
         'BUSINESS_OWNER smoke could not confirm an accessible business in the active organization',
     );
+
+    if (process.env.SMOKE_PROD_MUTATE_OWNER === '1') {
+        console.log('Running BUSINESS_OWNER no-op organization update');
+
+        const organizationDetails = await request(apiBaseUrl, `/api/organizations/${organizationId}`, {
+            token: owner.accessToken,
+        });
+        expectStatus(organizationDetails, [200], 'GET /api/organizations/:id (BUSINESS_OWNER)');
+        const organizationName = organizationDetails.json?.name;
+        assert(typeof organizationName === 'string' && organizationName.trim().length > 0, 'Owner organization is missing a name');
+
+        const noopUpdate = await request(apiBaseUrl, `/api/organizations/${organizationId}`, {
+            method: 'PATCH',
+            token: owner.accessToken,
+            body: {
+                name: organizationName.trim(),
+            },
+        });
+        expectStatus(noopUpdate, [200], 'PATCH /api/organizations/:id no-op (BUSINESS_OWNER)');
+        assert(
+            noopUpdate.json?.name === organizationName.trim(),
+            'BUSINESS_OWNER no-op organization update returned an unexpected name',
+        );
+    } else {
+        console.log('Skipping BUSINESS_OWNER no-op mutation: set SMOKE_PROD_MUTATE_OWNER=1 to enable');
+    }
+
+    if (process.env.SMOKE_PROD_OWNER_PROMOTION_CREATE === '1') {
+        console.log('Running BUSINESS_OWNER reversible promotion create/delete');
+
+        const createPromotion = await request(apiBaseUrl, '/api/promotions', {
+            method: 'POST',
+            token: owner.accessToken,
+            organizationId,
+            body: {
+                businessId,
+                title: `Smoke Promotion ${Date.now()}`,
+                description: 'Temporary promotion created by production smoke coverage.',
+                discountType: 'PERCENTAGE',
+                discountValue: 10,
+                startsAt: toIsoFromNow({ minutes: 15 }),
+                endsAt: toIsoFromNow({ days: 1 }),
+                isFlashOffer: false,
+                isActive: false,
+            },
+        });
+        expectStatus(createPromotion, [200, 201], 'POST /api/promotions (BUSINESS_OWNER)');
+        const promotionId = createPromotion.json?.id;
+        assert(typeof promotionId === 'string', 'BUSINESS_OWNER reversible promotion did not return an id');
+
+        try {
+            const listPromotions = await request(
+                apiBaseUrl,
+                `/api/promotions/my?businessId=${encodeURIComponent(businessId)}&limit=10`,
+                {
+                    token: owner.accessToken,
+                    organizationId,
+                },
+            );
+            expectStatus(listPromotions, [200], 'GET /api/promotions/my?businessId=... (BUSINESS_OWNER)');
+            assert(
+                Array.isArray(listPromotions.json?.data)
+                && listPromotions.json.data.some((entry) => entry?.id === promotionId),
+                'BUSINESS_OWNER reversible promotion could not be reloaded from /api/promotions/my',
+            );
+        } finally {
+            const deletePromotion = await request(apiBaseUrl, `/api/promotions/${promotionId}`, {
+                method: 'DELETE',
+                token: owner.accessToken,
+                organizationId,
+            });
+            expectStatus(deletePromotion, [200], 'DELETE /api/promotions/:id (BUSINESS_OWNER)');
+        }
+    } else {
+        console.log('Skipping BUSINESS_OWNER promotion cycle: set SMOKE_PROD_OWNER_PROMOTION_CREATE=1 to enable');
+    }
 }
 
 async function runAdminRoleSmoke(apiBaseUrl) {
@@ -610,6 +798,7 @@ async function runAdminRoleSmoke(apiBaseUrl) {
         '/api/analytics/market-reports?limit=20',
         '/api/verification/admin/pending-businesses?limit=50',
         '/api/health/dashboard',
+        '/api/observability/summary',
     ];
 
     for (const endpoint of adminJsonEndpoints) {

@@ -943,16 +943,64 @@ export function RegisterBusiness() {
                     Completa 4 pasos para publicar tu negocio con una presentacion clara y confiable.
                 </p>
             </section>
-            <div className="section-shell p-8">
-                <div className="text-center mb-8">
-                    <h1 className="font-display text-3xl font-bold text-gray-900">Registra tu negocio</h1>
-                    <p className="text-gray-500 mt-2">
-                        Completa 4 pasos y publica tu negocio en AquiTa.do
-                    </p>
+            <div className="section-shell p-6 sm:p-8">
+                <div className="mb-8 grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,340px)]">
+                    <div className="rounded-[28px] border border-primary-100 bg-gradient-to-br from-primary-50 via-white to-white p-5 sm:p-6">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="chip">Registro guiado</span>
+                            <span className="chip">Paso {currentStep} de {TOTAL_REGISTER_STEPS}</span>
+                        </div>
+                        <h2 className="mt-4 font-display text-3xl font-bold text-slate-900">
+                            {currentStepMeta.title}
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600 sm:text-base">
+                            {currentStepMeta.subtitle}. {currentStepUnlock.detail}
+                        </p>
+                        <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-600">
+                            <span className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white px-3 py-2 font-medium">
+                                Progreso {progressPercentage}%
+                            </span>
+                            <span className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white px-3 py-2 font-medium">
+                                {currentStepActionLabel}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="rounded-[28px] border border-slate-200 bg-slate-950/[0.03] p-5">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Salud del onboarding
+                        </p>
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                            <div className="rounded-2xl border border-white bg-white px-4 py-4 shadow-sm">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Avance
+                                </p>
+                                <p className="mt-2 font-display text-3xl font-bold text-slate-900">{progressPercentage}%</p>
+                            </div>
+                            <div className="rounded-2xl border border-white bg-white px-4 py-4 shadow-sm">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Checks
+                                </p>
+                                <p className="mt-2 font-display text-3xl font-bold text-slate-900">{completedVisibilityChecks}</p>
+                            </div>
+                            <div className="rounded-2xl border border-white bg-white px-4 py-4 shadow-sm">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Pendientes
+                                </p>
+                                <p className="mt-2 font-display text-3xl font-bold text-amber-700">{remainingPublishNeeds.length}</p>
+                            </div>
+                            <div className="rounded-2xl border border-white bg-white px-4 py-4 shadow-sm">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Imagenes
+                                </p>
+                                <p className="mt-2 font-display text-3xl font-bold text-slate-900">{selectedImages.length}</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-3 mb-6">
+                    <div className="alert-danger mb-6">
                         {error}
                     </div>
                 )}
@@ -996,6 +1044,19 @@ export function RegisterBusiness() {
                 ) : (
                     <form onSubmit={(event) => void handleSubmit(event)} className="space-y-6">
                         <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        Navegacion por pasos
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        Avanza solo cuando cada bloque tenga la informacion suficiente para discovery y confianza.
+                                    </p>
+                                </div>
+                                <p className="text-sm font-semibold text-primary-700">
+                                    {progressPercentage}% completado
+                                </p>
+                            </div>
                             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-gradient-to-r from-primary-600 to-accent-500 transition-all duration-300"

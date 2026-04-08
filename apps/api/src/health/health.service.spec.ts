@@ -207,4 +207,51 @@ describe('HealthService', () => {
             whatsapp: 3000,
         });
     });
+
+    it('keeps low-sample dependency failures as degraded instead of down', async () => {
+        const queryRaw = vi.fn().mockResolvedValue([
+            {
+                ping: 1,
+                businesses: 'businesses',
+                categories: 'categories',
+                active_connections: 8,
+                max_connections: 100,
+            },
+        ]);
+        const passwordResetToken = {
+            count: vi.fn()
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0),
+        };
+        const prisma = {
+            $queryRaw: queryRaw,
+            passwordResetToken,
+        } as unknown as PrismaService;
+        const getDependencyHealthSnapshot = vi.fn().mockReturnValue([
+            {
+                dependency: 'ai',
+                operation: 'chat_completion',
+                samples: 1,
+                p50Ms: 2100,
+                p95Ms: 2100,
+                errorRatePct: 100,
+                lastSeenAt: new Date().toISOString(),
+                latencyThresholdMs: 2500,
+                healthy: false,
+            },
+        ]);
+
+        const service = createService(prisma, {
+            observability: {
+                getDependencyHealthSnapshot,
+            },
+        });
+
+        const result = await service.getOperationalDashboard();
+
+        expect(result.status).toBe('degraded');
+        expect(result.checks?.ai?.status).toBe('degraded');
+    });
 });

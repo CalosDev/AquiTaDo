@@ -52,6 +52,8 @@ export interface FrontendHealthSummary {
     totalRouteViews: number;
     totalClientErrors: number;
     totalPoorVitals: number;
+    warnAlerts: number;
+    criticalAlerts: number;
     busiestRoutes: FrontendRouteViewSnapshot[];
     clientErrors: FrontendClientErrorSnapshot[];
     poorVitals: FrontendWebVitalSnapshot[];
@@ -71,6 +73,8 @@ export const EMPTY_FRONTEND_HEALTH_SUMMARY: FrontendHealthSummary = {
     totalRouteViews: 0,
     totalClientErrors: 0,
     totalPoorVitals: 0,
+    warnAlerts: 0,
+    criticalAlerts: 0,
     busiestRoutes: [],
     clientErrors: [],
     poorVitals: [],

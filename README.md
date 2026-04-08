@@ -377,6 +377,8 @@ Ejemplo smoke en produccion (PowerShell):
 $env:SMOKE_PROD_API_BASE_URL="https://aquitado.onrender.com"
 $env:SMOKE_PROD_WEB_BASE_URL="https://aquitado.vercel.app"
 $env:SMOKE_PROD_SKIP_CHECKINS="1"   # usar "0" cuando migracion check-ins este aplicada
+$env:SMOKE_PROD_MUTATE_USER="1"     # toggle favorito + crear/eliminar lista temporal
+$env:SMOKE_PROD_MUTATE_OWNER="1"    # PATCH no-op de organizacion del owner
 $env:SMOKE_PROD_USER_EMAIL="user@example.com"
 $env:SMOKE_PROD_USER_PASSWORD="..."
 $env:SMOKE_PROD_OWNER_EMAIL="owner@example.com"
@@ -392,8 +394,29 @@ Variables soportadas por `pnpm smoke:prod`:
 - `SMOKE_PROD_WEB_BASE_URL`: frontend productivo o de staging.
 - `SMOKE_PROD_SKIP_CHECKINS=1`: omite la validacion publica de check-ins si el entorno aun no la tiene lista.
 - `SMOKE_PROD_SKIP_WEB=1`: omite las rutas web cuando solo quieres validar API.
+- `SMOKE_PROD_MUTATE_USER=1`: activa mutaciones reversibles del actor `USER` (`toggle` de favorito y ciclo crear/agregar/eliminar lista).
+- `SMOKE_PROD_MUTATE_OWNER=1`: activa un `PATCH` no-op sobre la organizacion del `BUSINESS_OWNER` para validar permisos de escritura sin cambiar datos visibles.
 - `SMOKE_PROD_CHECKIN_CREATE=1`: habilita un `POST /api/checkins` real en el actor `USER`.
+- `SMOKE_PROD_OWNER_PROMOTION_CREATE=1`: activa un ciclo reversible crear/eliminar promocion draft para `BUSINESS_OWNER`. Requiere tenant con suscripcion compatible.
 - `SMOKE_PROD_USER_EMAIL` / `SMOKE_PROD_USER_PASSWORD`: smoke autenticado de cliente final.
 - `SMOKE_PROD_OWNER_EMAIL` / `SMOKE_PROD_OWNER_PASSWORD`: smoke autenticado de propietario de negocio.
 - `SMOKE_PROD_OWNER_ORGANIZATION_ID`: fuerza el tenant a usar para endpoints con `x-organization-id`.
 - `SMOKE_PROD_ADMIN_EMAIL` / `SMOKE_PROD_ADMIN_PASSWORD`: smoke autenticado del panel admin y observabilidad.
+
+Alertas operativas de produccion:
+
+```powershell
+$env:SMOKE_PROD_API_BASE_URL="https://aquitado.onrender.com"
+$env:SMOKE_PROD_ADMIN_EMAIL="admin@example.com"
+$env:SMOKE_PROD_ADMIN_PASSWORD="..."
+pnpm alerts:prod
+```
+
+Variables soportadas por `pnpm alerts:prod`:
+
+- `SMOKE_PROD_API_BASE_URL`: API productiva o de staging.
+- `SMOKE_PROD_ADMIN_EMAIL` / `SMOKE_PROD_ADMIN_PASSWORD`: admin para consultar dashboard operacional y resumen frontend.
+- `SMOKE_PROD_ALERT_CLIENT_ERRORS_WARN`: umbral de advertencia para errores cliente acumulados. Default `5`.
+- `SMOKE_PROD_ALERT_POOR_VITALS_WARN`: umbral de advertencia para web vitals no saludables acumulados. Default `5`.
+- `SMOKE_PROD_ALERT_FAIL_ON_WARN=1`: hace fallar el script tambien cuando solo hay `warn`, no solo `critical`.
+- `SMOKE_PROD_REQUIRE_EMAIL=1`: trata email transaccional sin configurar como un error critico en vez de advertencia.

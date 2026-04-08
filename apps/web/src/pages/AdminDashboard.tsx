@@ -1842,7 +1842,7 @@ export function AdminDashboard() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <p className="text-xs text-gray-500">Route views</p>
                                         <p className="text-xl font-semibold text-gray-900">{frontendHealthSummary.totalRouteViews}</p>
@@ -1858,6 +1858,14 @@ export function AdminDashboard() {
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <p className="text-xs text-gray-500">Alertas activas</p>
                                         <p className="text-xl font-semibold text-gray-900">{frontendHealthSummary.alerts.length}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-red-100 bg-red-50 p-3">
+                                        <p className="text-xs text-red-600">Alertas criticas</p>
+                                        <p className="text-xl font-semibold text-red-700">{frontendHealthSummary.criticalAlerts}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
+                                        <p className="text-xs text-amber-700">Alertas warn</p>
+                                        <p className="text-xl font-semibold text-amber-800">{frontendHealthSummary.warnAlerts}</p>
                                     </div>
                                 </div>
 

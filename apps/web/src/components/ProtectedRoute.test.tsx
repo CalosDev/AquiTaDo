@@ -1,5 +1,5 @@
-import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { renderWithProviders } from '../test/renderWithProviders';
@@ -18,6 +18,13 @@ const OWNER = {
     role: 'BUSINESS_OWNER' as const,
 };
 
+const ADMIN = {
+    id: 'admin-1',
+    name: 'Admin RD',
+    email: 'admin@aquita.do',
+    role: 'ADMIN' as const,
+};
+
 function renderRoute({
     initialPath,
     isAuthenticated,
@@ -27,7 +34,7 @@ function renderRoute({
 }: {
     initialPath: string;
     isAuthenticated: boolean;
-    user: typeof USER | typeof OWNER | null;
+    user: typeof USER | typeof OWNER | typeof ADMIN | null;
     roles?: Array<'USER' | 'BUSINESS_OWNER' | 'ADMIN'>;
     unauthorizedRedirectTo?: string;
 }) {
@@ -38,6 +45,14 @@ function renderRoute({
                 element={(
                     <ProtectedRoute roles={roles} unauthorizedRedirectTo={unauthorizedRedirectTo}>
                         <div>contenido protegido</div>
+                    </ProtectedRoute>
+                )}
+            />
+            <Route
+                path="/admin"
+                element={(
+                    <ProtectedRoute roles={['ADMIN']}>
+                        <div>contenido admin</div>
                     </ProtectedRoute>
                 )}
             />
@@ -54,6 +69,10 @@ function renderRoute({
 }
 
 describe('ProtectedRoute', () => {
+    afterEach(() => {
+        cleanup();
+    });
+
     it('redirects unauthenticated users to login', () => {
         renderRoute({
             initialPath: '/dashboard',
@@ -97,5 +116,36 @@ describe('ProtectedRoute', () => {
         });
 
         expect(screen.getByText('contenido protegido')).toBeInTheDocument();
+    });
+
+    it('redirects admin away from owner-only dashboard to admin home', () => {
+        renderRoute({
+            initialPath: '/dashboard',
+            isAuthenticated: true,
+            user: ADMIN,
+            roles: ['BUSINESS_OWNER'],
+        });
+
+        expect(screen.getByText('contenido admin')).toBeInTheDocument();
+    });
+
+    it('redirects business owner away from admin-only route to owner home', () => {
+        renderRoute({
+            initialPath: '/admin',
+            isAuthenticated: true,
+            user: OWNER,
+        });
+
+        expect(screen.getByText('contenido protegido')).toBeInTheDocument();
+    });
+
+    it('redirects user away from admin-only route to customer home', () => {
+        renderRoute({
+            initialPath: '/admin',
+            isAuthenticated: true,
+            user: USER,
+        });
+
+        expect(screen.getByText('panel cliente')).toBeInTheDocument();
     });
 });

@@ -113,6 +113,7 @@ export class HealthService {
         const whatsappLatencyThresholdMs = this.resolveNumber('HEALTH_WHATSAPP_P95_MAX_MS', 3_000);
         const dbWarnThreshold = this.resolveNumber('HEALTH_DB_POOL_WARN_RATIO', 0.75);
         const dbCriticalThreshold = this.resolveNumber('HEALTH_DB_POOL_CRITICAL_RATIO', 0.9);
+        const dependencyCriticalMinSamples = this.resolveNumber('HEALTH_DEPENDENCY_CRITICAL_MIN_SAMPLES', 3);
         const emailProviderConfigured = this.isTransactionalEmailConfigured();
         const now = new Date();
         const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -190,16 +191,20 @@ export class HealthService {
         const emailDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'email');
         const whatsappDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'whatsapp');
 
-        const aiHealth = this.summarizeDependencyGroup(aiDependencies, aiLatencyThresholdMs);
+        const aiHealth = this.summarizeDependencyGroup(aiDependencies, aiLatencyThresholdMs, dependencyCriticalMinSamples);
         const emailHealth = emailProviderConfigured
-            ? this.summarizeDependencyGroup(emailDependencies, emailLatencyThresholdMs)
+            ? this.summarizeDependencyGroup(emailDependencies, emailLatencyThresholdMs, dependencyCriticalMinSamples)
             : {
                 status: 'down' as const,
                 reason: 'not_configured',
                 thresholdMs: emailLatencyThresholdMs,
                 operations: [],
             };
-        const whatsappHealth = this.summarizeDependencyGroup(whatsappDependencies, whatsappLatencyThresholdMs);
+        const whatsappHealth = this.summarizeDependencyGroup(
+            whatsappDependencies,
+            whatsappLatencyThresholdMs,
+            dependencyCriticalMinSamples,
+        );
 
         const overallStatus = !schemaReady || dbPoolStatus === 'down' || aiHealth.status === 'down' || whatsappHealth.status === 'down'
             ? 'down'
@@ -255,6 +260,7 @@ export class HealthService {
             latencyThresholdMs: number;
         }>,
         thresholdMs: number,
+        minimumCriticalSamples: number,
     ) {
         if (items.length === 0) {
             return {
@@ -265,7 +271,9 @@ export class HealthService {
             };
         }
 
-        const hasDown = items.some((item) => !item.healthy && item.errorRatePct >= 20);
+        const hasDown = items.some(
+            (item) => !item.healthy && item.errorRatePct >= 20 && item.samples >= minimumCriticalSamples,
+        );
         const hasDegraded = items.some((item) => !item.healthy);
 
         return {

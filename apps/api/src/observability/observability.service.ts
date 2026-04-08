@@ -315,6 +315,8 @@ export class ObservabilityService {
         totalRouteViews: number;
         totalClientErrors: number;
         totalPoorVitals: number;
+        warnAlerts: number;
+        criticalAlerts: number;
         busiestRoutes: FrontendRouteViewSnapshot[];
         clientErrors: FrontendClientErrorSnapshot[];
         poorVitals: FrontendWebVitalSnapshot[];
@@ -409,6 +411,8 @@ export class ObservabilityService {
                 (sum, entry) => sum + (entry.rating !== 'good' ? entry.count : 0),
                 0,
             ),
+            warnAlerts: alerts.filter((entry) => entry.level === 'warn').length,
+            criticalAlerts: alerts.filter((entry) => entry.level === 'critical').length,
             busiestRoutes,
             clientErrors,
             poorVitals,

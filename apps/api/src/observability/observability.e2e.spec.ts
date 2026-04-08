@@ -136,6 +136,18 @@ describe('ObservabilityController (e2e)', () => {
             })
             .expect(202);
 
+        await request(app.getHttpServer())
+            .post('/api/observability/frontend')
+            .send({
+                kind: FrontendSignalKind.WEB_VITAL,
+                route: '/admin',
+                metricName: 'LCP',
+                value: 4.8,
+                rating: 'poor',
+                role: 'ADMIN',
+            })
+            .expect(202);
+
         const admin = await createUser('ADMIN');
         const token = signToken(admin.id, admin.role);
 
@@ -147,6 +159,8 @@ describe('ObservabilityController (e2e)', () => {
         expect(response.body.totalRouteViews).toBeGreaterThan(0);
         expect(response.body.totalClientErrors).toBeGreaterThan(0);
         expect(response.body.totalPoorVitals).toBeGreaterThan(0);
+        expect(response.body.warnAlerts).toBeGreaterThan(0);
+        expect(response.body.criticalAlerts).toBeGreaterThan(0);
         expect(response.body.busiestRoutes).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
