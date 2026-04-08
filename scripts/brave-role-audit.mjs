@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -19,17 +20,15 @@ const LOCAL_ADMIN_EMAIL = 'admin@aquita.do';
 const LOCAL_ADMIN_PASSWORD = 'admin12345';
 const BRAVE_PATH = process.env.BRAVE_PATH
     || 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe';
-const VERCEL_EXTENSION_PATH = process.env.VERCEL_EXTENSION_PATH
-    || path.join(
-        process.env.LOCALAPPDATA ?? '',
-        'BraveSoftware',
-        'Brave-Browser',
-        'User Data',
-        'Default',
-        'Extensions',
-        'lahhiofdgnbcgmemekkmjnpifojdaelb',
-        '1.4.1_0',
-    );
+const VERCEL_EXTENSION_ROOT = path.join(
+    process.env.LOCALAPPDATA ?? '',
+    'BraveSoftware',
+    'Brave-Browser',
+    'User Data',
+    'Default',
+    'Extensions',
+    'lahhiofdgnbcgmemekkmjnpifojdaelb',
+);
 const DEBUG_PORT = Number(process.env.BRAVE_ROLE_AUDIT_DEBUG_PORT ?? '9224');
 const DEFAULT_SETTLE_MS = Number(process.env.BRAVE_ROLE_AUDIT_SETTLE_MS ?? '3500');
 const VIEWPORT_WIDTH = Number(process.env.BRAVE_ROLE_AUDIT_VIEWPORT_WIDTH ?? '1440');
@@ -185,6 +184,29 @@ function firstEnv(...keys) {
         }
     }
     return null;
+}
+
+async function resolveVercelExtensionPath() {
+    const configuredPath = process.env.VERCEL_EXTENSION_PATH?.trim();
+    if (configuredPath) {
+        return existsSync(configuredPath) ? configuredPath : null;
+    }
+
+    if (!existsSync(VERCEL_EXTENSION_ROOT)) {
+        return null;
+    }
+
+    const candidates = await readdir(VERCEL_EXTENSION_ROOT, { withFileTypes: true });
+    const versions = candidates
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
+
+    if (versions.length === 0) {
+        return null;
+    }
+
+    return path.join(VERCEL_EXTENSION_ROOT, versions[0]);
 }
 
 async function request(apiBaseUrl, requestPath, options = {}) {
@@ -1089,15 +1111,29 @@ async function run() {
     await mkdir(outputDir, { recursive: true });
 
     const baseUrl = `http://127.0.0.1:${DEBUG_PORT}`;
-    const brave = spawn(BRAVE_PATH, [
+    const resolvedExtensionPath = await resolveVercelExtensionPath();
+    if (!resolvedExtensionPath) {
+        console.warn('Vercel Toolbar extension path was not found; continuing without the extension.');
+    }
+
+    const braveArgs = [
         `--remote-debugging-port=${DEBUG_PORT}`,
         '--no-first-run',
         '--no-default-browser-check',
         `--user-data-dir=${profileDir}`,
-        `--disable-extensions-except=${VERCEL_EXTENSION_PATH}`,
-        `--load-extension=${VERCEL_EXTENSION_PATH}`,
         'about:blank',
-    ], {
+    ];
+
+    if (resolvedExtensionPath) {
+        braveArgs.splice(
+            braveArgs.length - 1,
+            0,
+            `--disable-extensions-except=${resolvedExtensionPath}`,
+            `--load-extension=${resolvedExtensionPath}`,
+        );
+    }
+
+    const brave = spawn(BRAVE_PATH, braveArgs, {
         stdio: 'ignore',
         detached: process.platform !== 'win32',
         windowsHide: false,
