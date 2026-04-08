@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
     Counter,
     Histogram,
@@ -6,9 +6,14 @@ import {
     collectDefaultMetrics,
     register,
 } from 'prom-client';
+import { RedisService } from '../cache/redis.service';
 import { FrontendSignalKind, TrackFrontendSignalDto } from './dto/frontend-observability.dto';
 
 let defaultMetricsCollected = false;
+const FRONTEND_OBSERVABILITY_TTL_SECONDS = 60 * 60 * 24 * 7;
+const FRONTEND_ROUTE_VIEW_REDIS_KEY = 'observability:frontend:route-views:v1';
+const FRONTEND_CLIENT_ERROR_REDIS_KEY = 'observability:frontend:client-errors:v1';
+const FRONTEND_WEB_VITAL_REDIS_KEY = 'observability:frontend:web-vitals:v1';
 
 type FrontendRouteViewSnapshot = {
     route: string;
@@ -147,7 +152,10 @@ export class ObservabilityService {
     }
     >();
 
-    constructor() {
+    constructor(
+        @Inject(RedisService)
+        private readonly redisService: RedisService,
+    ) {
         if (!defaultMetricsCollected) {
             collectDefaultMetrics({
                 prefix: 'aquita_',
@@ -310,7 +318,7 @@ export class ObservabilityService {
         }
     }
 
-    getFrontendHealthSnapshot(): {
+    async getFrontendHealthSnapshot(): Promise<{
         generatedAt: string;
         totalRouteViews: number;
         totalClientErrors: number;
@@ -321,8 +329,12 @@ export class ObservabilityService {
         clientErrors: FrontendClientErrorSnapshot[];
         poorVitals: FrontendWebVitalSnapshot[];
         alerts: FrontendAlertSnapshot[];
-    } {
-        const busiestRoutes = [...this.frontendRouteViewSamples.values()]
+    }> {
+        const routeViewEntries = await this.getFrontendRouteViewEntries();
+        const clientErrorEntries = await this.getFrontendClientErrorEntries();
+        const webVitalEntries = await this.getFrontendWebVitalEntries();
+
+        const busiestRoutes = routeViewEntries
             .sort((left, right) => {
                 if (right.count !== left.count) {
                     return right.count - left.count;
@@ -337,7 +349,7 @@ export class ObservabilityService {
                 lastSeenAt: entry.lastSeenAt ? new Date(entry.lastSeenAt).toISOString() : null,
             }));
 
-        const clientErrors = [...this.frontendClientErrorSamples.values()]
+        const clientErrors = clientErrorEntries
             .sort((left, right) => {
                 if (right.count !== left.count) {
                     return right.count - left.count;
@@ -353,7 +365,7 @@ export class ObservabilityService {
                 lastSeenAt: entry.lastSeenAt ? new Date(entry.lastSeenAt).toISOString() : null,
             }));
 
-        const poorVitals = [...this.frontendWebVitalSamples.values()]
+        const poorVitals = webVitalEntries
             .filter((entry) => entry.rating !== 'good')
             .sort((left, right) => {
                 if (right.worstValue !== left.worstValue) {
@@ -405,9 +417,9 @@ export class ObservabilityService {
 
         return {
             generatedAt: new Date().toISOString(),
-            totalRouteViews: [...this.frontendRouteViewSamples.values()].reduce((sum, entry) => sum + entry.count, 0),
-            totalClientErrors: [...this.frontendClientErrorSamples.values()].reduce((sum, entry) => sum + entry.count, 0),
-            totalPoorVitals: [...this.frontendWebVitalSamples.values()].reduce(
+            totalRouteViews: routeViewEntries.reduce((sum, entry) => sum + entry.count, 0),
+            totalClientErrors: clientErrorEntries.reduce((sum, entry) => sum + entry.count, 0),
+            totalPoorVitals: webVitalEntries.reduce(
                 (sum, entry) => sum + (entry.rating !== 'good' ? entry.count : 0),
                 0,
             ),
@@ -559,6 +571,23 @@ export class ObservabilityService {
         current.count += 1;
         current.lastSeenAt = Date.now();
         this.frontendRouteViewSamples.set(key, current);
+        void this.persistRedisAggregateUpdate<typeof current>(
+            FRONTEND_ROUTE_VIEW_REDIS_KEY,
+            key,
+            () => ({
+                route,
+                role,
+                count: 1,
+                lastSeenAt: current.lastSeenAt,
+            }),
+            (existing) => ({
+                ...existing,
+                route,
+                role,
+                count: existing.count + 1,
+                lastSeenAt: current.lastSeenAt,
+            }),
+        );
     }
 
     private trackFrontendClientError(route: string, role: string, source: string): void {
@@ -573,6 +602,25 @@ export class ObservabilityService {
         current.count += 1;
         current.lastSeenAt = Date.now();
         this.frontendClientErrorSamples.set(key, current);
+        void this.persistRedisAggregateUpdate<typeof current>(
+            FRONTEND_CLIENT_ERROR_REDIS_KEY,
+            key,
+            () => ({
+                route,
+                role,
+                source,
+                count: 1,
+                lastSeenAt: current.lastSeenAt,
+            }),
+            (existing) => ({
+                ...existing,
+                route,
+                role,
+                source,
+                count: existing.count + 1,
+                lastSeenAt: current.lastSeenAt,
+            }),
+        );
     }
 
     private trackFrontendWebVital(
@@ -598,6 +646,117 @@ export class ObservabilityService {
         current.worstValue = Math.max(current.worstValue, value);
         current.lastSeenAt = Date.now();
         this.frontendWebVitalSamples.set(key, current);
+        void this.persistRedisAggregateUpdate<typeof current>(
+            FRONTEND_WEB_VITAL_REDIS_KEY,
+            key,
+            () => ({
+                route,
+                role,
+                metric,
+                rating,
+                count: 1,
+                latestValue: value,
+                worstValue: Math.max(0, value),
+                lastSeenAt: current.lastSeenAt,
+            }),
+            (existing) => ({
+                ...existing,
+                route,
+                role,
+                metric,
+                rating,
+                count: existing.count + 1,
+                latestValue: value,
+                worstValue: Math.max(existing.worstValue, value),
+                lastSeenAt: current.lastSeenAt,
+            }),
+        );
+    }
+
+    private async getFrontendRouteViewEntries(): Promise<Array<{
+        route: string;
+        role: string;
+        count: number;
+        lastSeenAt: number;
+    }>> {
+        const cached = await this.redisService.getJson<Record<string, {
+            route: string;
+            role: string;
+            count: number;
+            lastSeenAt: number;
+        }>>(FRONTEND_ROUTE_VIEW_REDIS_KEY);
+
+        if (cached && Object.keys(cached).length > 0) {
+            return Object.values(cached);
+        }
+
+        return [...this.frontendRouteViewSamples.values()];
+    }
+
+    private async getFrontendClientErrorEntries(): Promise<Array<{
+        route: string;
+        role: string;
+        source: string;
+        count: number;
+        lastSeenAt: number;
+    }>> {
+        const cached = await this.redisService.getJson<Record<string, {
+            route: string;
+            role: string;
+            source: string;
+            count: number;
+            lastSeenAt: number;
+        }>>(FRONTEND_CLIENT_ERROR_REDIS_KEY);
+
+        if (cached && Object.keys(cached).length > 0) {
+            return Object.values(cached);
+        }
+
+        return [...this.frontendClientErrorSamples.values()];
+    }
+
+    private async getFrontendWebVitalEntries(): Promise<Array<{
+        route: string;
+        role: string;
+        metric: string;
+        rating: string;
+        count: number;
+        latestValue: number;
+        worstValue: number;
+        lastSeenAt: number;
+    }>> {
+        const cached = await this.redisService.getJson<Record<string, {
+            route: string;
+            role: string;
+            metric: string;
+            rating: string;
+            count: number;
+            latestValue: number;
+            worstValue: number;
+            lastSeenAt: number;
+        }>>(FRONTEND_WEB_VITAL_REDIS_KEY);
+
+        if (cached && Object.keys(cached).length > 0) {
+            return Object.values(cached);
+        }
+
+        return [...this.frontendWebVitalSamples.values()];
+    }
+
+    private async persistRedisAggregateUpdate<T>(
+        key: string,
+        entryKey: string,
+        createInitial: () => T,
+        merge: (existing: T) => T,
+    ): Promise<void> {
+        if (!this.redisService.isReady()) {
+            return;
+        }
+
+        const current = await this.redisService.getJson<Record<string, T>>(key);
+        const next = current ?? {};
+        next[entryKey] = entryKey in next ? merge(next[entryKey] as T) : createInitial();
+        await this.redisService.setJson(key, next, FRONTEND_OBSERVABILITY_TTL_SECONDS);
     }
 
     private percentile(values: number[], percentile: number): number {
