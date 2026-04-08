@@ -985,7 +985,12 @@ export class BusinessesService {
         let slug = baseSlug;
         let counter = 1;
 
-        while (await this.prisma.business.findUnique({ where: { slug } })) {
+        while (
+            await this.prisma.business.findUnique({
+                where: { slug },
+                select: { id: true },
+            })
+        ) {
             slug = `${baseSlug}-${counter}`;
             counter++;
         }
