@@ -117,14 +117,25 @@ export function verificationStatusClass(status: BusinessVerificationState): stri
     return 'bg-yellow-100 text-yellow-700';
 }
 
-export function healthStatusClass(status: 'up' | 'degraded' | 'down' | undefined): string {
+export function healthStatusClass(status: 'up' | 'degraded' | 'down' | 'disabled' | undefined): string {
     if (status === 'up') {
         return 'bg-primary-100 text-primary-700';
     }
     if (status === 'degraded') {
         return 'bg-amber-100 text-amber-700';
     }
+    if (status === 'disabled') {
+        return 'bg-slate-100 text-slate-600';
+    }
     return 'bg-red-100 text-red-700';
+}
+
+export function healthStatusLabel(status: 'up' | 'degraded' | 'down' | 'disabled' | undefined): string {
+    if (status === 'disabled') {
+        return 'DISABLED';
+    }
+
+    return String(status || 'down').toUpperCase();
 }
 
 export function frontendAlertClass(level: 'warn' | 'critical'): string {

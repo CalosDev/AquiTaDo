@@ -3,7 +3,7 @@ import { loadOptionalSmokeEnv } from './lib/load-smoke-env.mjs';
 loadOptionalSmokeEnv();
 
 const DEFAULT_API_BASE_URL = 'https://aquitado.onrender.com';
-const REQUEST_TIMEOUT_MS = 60_000;
+const REQUEST_TIMEOUT_MS = 90_000;
 const DEFAULT_ADMIN_EMAIL = 'admin@aquita.do';
 const DEFAULT_ADMIN_PASSWORD = 'admin12345';
 
@@ -162,7 +162,7 @@ function evaluateHealth(health, readiness, dashboard, issues) {
         const dependencyCritical = dependencyState.critical === true;
 
         const emailNotConfigured = dependency === 'email'
-            && dependencyState.status === 'down'
+            && (dependencyState.status === 'down' || dependencyState.status === 'disabled')
             && dependencyState.reason === 'not_configured';
 
         if (emailNotConfigured && !shouldRequireEmail()) {
@@ -172,6 +172,10 @@ function evaluateHealth(health, readiness, dashboard, issues) {
                 'Dependencia email no esta configurada en produccion',
                 dependencyState,
             );
+            continue;
+        }
+
+        if (dependencyState.status === 'disabled') {
             continue;
         }
 

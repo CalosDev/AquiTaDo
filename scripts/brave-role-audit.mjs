@@ -67,21 +67,53 @@ function assert(condition, message) {
     }
 }
 
-async function ensureUrlReachable(baseUrl, label, pathName) {
+async function ensureApiReachable(baseUrl) {
     try {
-        const response = await fetch(`${baseUrl}${pathName}`, {
-            headers: {
-                accept: label === 'API' ? 'application/json' : 'text/html',
-            },
+        const healthResponse = await fetch(`${baseUrl}/api/health`, {
+            headers: { accept: 'application/json' },
         });
-        if (response.ok) {
-            return;
+        if (!healthResponse.ok) {
+            throw new Error(`GET /api/health returned HTTP ${healthResponse.status}`);
         }
-        throw new Error(`HTTP ${response.status}`);
+
+        const healthPayload = await healthResponse.json();
+        if (healthPayload?.service !== 'aquita-api' || healthPayload?.status !== 'ok') {
+            throw new Error('GET /api/health did not return the AquiTa API fingerprint');
+        }
+
+        const summaryResponse = await fetch(`${baseUrl}/api/observability/summary`, {
+            headers: { accept: 'application/json' },
+        });
+        if (![401, 403].includes(summaryResponse.status)) {
+            throw new Error(
+                `GET /api/observability/summary returned HTTP ${summaryResponse.status}; expected protected route (401/403)`,
+            );
+        }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(
-            `${label} at ${baseUrl} is not reachable (${message}). Start the target app first or point ${label === 'Frontend' ? 'BRAVE_AUDIT_APP_URL' : 'BRAVE_AUDIT_API_URL'} to a live environment.`,
+            `API at ${baseUrl} is not the expected AquiTa target (${message}). Start the correct app first or point BRAVE_AUDIT_API_URL to a live environment.`,
+        );
+    }
+}
+
+async function ensureFrontendReachable(baseUrl) {
+    try {
+        const response = await fetch(`${baseUrl}/login`, {
+            headers: { accept: 'text/html' },
+        });
+        if (!response.ok) {
+            throw new Error(`GET /login returned HTTP ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!contentType.includes('text/html')) {
+            throw new Error(`GET /login returned unexpected content-type ${contentType || 'unknown'}`);
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+            `Frontend at ${baseUrl} is not reachable (${message}). Start the target app first or point BRAVE_AUDIT_APP_URL to a live environment.`,
         );
     }
 }
@@ -926,8 +958,8 @@ async function run() {
     const runId = randomUUID().slice(0, 8);
 
     console.log(`Running Brave role audit against ${appBaseUrl} (api=${apiBaseUrl}, run=${runId})`);
-    await ensureUrlReachable(apiBaseUrl, 'API', '/api/health');
-    await ensureUrlReachable(appBaseUrl, 'Frontend', '/login');
+    await ensureApiReachable(apiBaseUrl);
+    await ensureFrontendReachable(appBaseUrl);
     const customer = await resolveUserActor(apiBaseUrl, runId);
     const owner = await resolveOwnerActor(apiBaseUrl, runId);
     const admin = await resolveAdminActor(apiBaseUrl);

@@ -9,10 +9,6 @@ type SpawnOptions = {
 
 const appRoot = resolve(__dirname, '..');
 
-function log(message: string): void {
-    process.stdout.write(`[start:prod] ${message}\n`);
-}
-
 function logError(message: string): void {
     process.stderr.write(`[start:prod] ${message}\n`);
 }

@@ -15,6 +15,7 @@ import {
     frontendAlertClass,
     frontendVitalClass,
     healthStatusClass,
+    healthStatusLabel,
     normalizeBusinessVerificationStatus,
     parseObservabilitySummary,
     toSlug,
@@ -132,23 +133,23 @@ interface FlaggedReview {
 }
 
 interface OperationalDashboardSnapshot {
-    status: 'up' | 'degraded' | 'down';
+    status: 'up' | 'degraded' | 'down' | 'disabled';
     timestamp: string;
     uptimeSeconds: number;
     responseTimeMs?: number;
     checks?: {
         database?: {
-            status?: 'up' | 'degraded' | 'down';
+            status?: 'up' | 'degraded' | 'down' | 'disabled';
             schema?: 'up' | 'down';
             pool?: {
-                status?: 'up' | 'degraded' | 'down';
+                status?: 'up' | 'degraded' | 'down' | 'disabled';
                 activeConnections?: number;
                 maxConnections?: number;
                 saturationPct?: number;
             };
         };
         email?: {
-            status?: 'up' | 'degraded' | 'down';
+            status?: 'up' | 'degraded' | 'down' | 'disabled';
             thresholdMs?: number;
             reason?: string;
             operations?: Array<{
@@ -158,7 +159,7 @@ interface OperationalDashboardSnapshot {
             }>;
         };
         whatsapp?: {
-            status?: 'up' | 'degraded' | 'down';
+            status?: 'up' | 'degraded' | 'down' | 'disabled';
             thresholdMs?: number;
             operations?: Array<{
                 operation: string;
@@ -480,7 +481,7 @@ export function AdminDashboard() {
             setCatalogQuality((response.data || null) as CatalogQualitySnapshot | null);
         } catch (error) {
             setCatalogQuality(null);
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la calidad del catalogo'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la calidad del catálogo'));
         } finally {
             setCatalogQualityLoading(false);
         }
@@ -1288,9 +1289,9 @@ export function AdminDashboard() {
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div>
-                                        <h3 className="font-display font-semibold text-gray-900">Curacion del catalogo</h3>
+                                        <h3 className="font-display font-semibold text-gray-900">Curación del catálogo</h3>
                                         <p className="text-sm text-gray-600 mt-1">
-                                            Prioriza perfiles incompletos y posibles duplicados antes de seguir creciendo el catalogo.
+                                            Prioriza perfiles incompletos y posibles duplicados antes de seguir creciendo el catálogo.
                                         </p>
                                     </div>
                                     <button
@@ -1651,25 +1652,25 @@ export function AdminDashboard() {
                                     <div className="space-y-3">
                                         <div className="flex flex-wrap gap-2">
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.status)}`}>
-                                                Plataforma {operationalHealth.status.toUpperCase()}
+                                                Plataforma {healthStatusLabel(operationalHealth.status)}
                                             </span>
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.database?.status)}`}>
-                                                DB {String(operationalHealth.checks?.database?.status || 'down').toUpperCase()}
+                                                DB {healthStatusLabel(operationalHealth.checks?.database?.status)}
                                             </span>
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.database?.pool?.status)}`}>
-                                                Pool DB {String(operationalHealth.checks?.database?.pool?.status || 'down').toUpperCase()}
+                                                Pool DB {healthStatusLabel(operationalHealth.checks?.database?.pool?.status)}
                                             </span>
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.email?.status)}`}>
-                                                Email {String(operationalHealth.checks?.email?.status || 'down').toUpperCase()}
+                                                Email {healthStatusLabel(operationalHealth.checks?.email?.status)}
                                             </span>
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${healthStatusClass(operationalHealth.checks?.whatsapp?.status)}`}>
-                                                WhatsApp {String(operationalHealth.checks?.whatsapp?.status || 'down').toUpperCase()}
+                                                WhatsApp {healthStatusLabel(operationalHealth.checks?.whatsapp?.status)}
                                             </span>
                                         </div>
 
                                         <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                             <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
-                                                <p className="text-xs text-gray-500">Saturacion DB</p>
+                                                <p className="text-xs text-gray-500">Saturación DB</p>
                                                 <p className="text-xl font-semibold text-gray-900">
                                                     {operationalHealth.checks?.database?.pool?.saturationPct ?? 0}%
                                                 </p>
@@ -1837,7 +1838,7 @@ export function AdminDashboard() {
                                     </div>
 
                                     <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                                        <h4 className="font-display text-sm font-semibold text-gray-900">Rutas mas vistas</h4>
+                                        <h4 className="font-display text-sm font-semibold text-gray-900">Rutas más vistas</h4>
                                         <div className="mt-3 space-y-3">
                                             {frontendHealthSummary.busiestRoutes.length > 0 ? (
                                                 frontendHealthSummary.busiestRoutes.slice(0, 5).map((entry) => (
@@ -1853,7 +1854,7 @@ export function AdminDashboard() {
                                                 ))
                                             ) : (
                                                 <p className="text-sm text-gray-500">
-                                                    Aun no hay suficientes vistas de rutas reportadas.
+                                                    Aún no hay suficientes vistas de rutas reportadas.
                                                 </p>
                                             )}
                                         </div>
@@ -1892,7 +1893,7 @@ export function AdminDashboard() {
                             <div className="card p-5">
                                 <h3 className="font-display font-semibold text-gray-900 mb-3">Raw metrics (Prometheus)</h3>
                                 <pre className="max-h-[420px] overflow-auto rounded-xl border border-gray-100 bg-slate-950 p-4 text-[11px] leading-5 text-slate-100">
-                                    {observabilityRaw || 'Sin datos de metricas'}
+                                    {observabilityRaw || 'Sin datos de métricas'}
                                 </pre>
                             </div>
                         </div>

@@ -396,7 +396,7 @@ export class ObservabilityService {
                 message: `${entry.count} error(es) cliente en ${entry.route}`,
             })),
             ...poorVitals.map((entry) => ({
-                level: entry.rating === 'poor' ? 'critical' as const : 'warn' as const,
+                level: entry.rating === 'poor' && entry.count >= 3 ? 'critical' as const : 'warn' as const,
                 kind: 'web-vital' as const,
                 route: entry.route,
                 role: entry.role,

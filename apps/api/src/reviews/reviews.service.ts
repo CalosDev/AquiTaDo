@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    Inject,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
@@ -14,7 +15,9 @@ import {
 @Injectable()
 export class ReviewsService {
     constructor(
+        @Inject(PrismaService)
         private readonly prisma: PrismaService,
+        @Inject(ReputationService)
         private readonly reputationService: ReputationService,
     ) { }
 

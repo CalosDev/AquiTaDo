@@ -191,7 +191,7 @@ describe('HealthService', () => {
 
         const result = await service.getOperationalDashboard();
 
-        expect(result.status).toBe('degraded');
+        expect(result.status).toBe('up');
         expect(result.checks?.email?.status).toBe('up');
         expect(result.passwordReset).toMatchObject({
             providerConfigured: true,
@@ -250,7 +250,7 @@ describe('HealthService', () => {
 
         const result = await service.getOperationalDashboard();
 
-        expect(result.status).toBe('degraded');
+        expect(result.status).toBe('up');
         expect(result.checks?.whatsapp?.status).toBe('degraded');
     });
 
@@ -297,7 +297,7 @@ describe('HealthService', () => {
 
         const result = await service.getOperationalDashboard();
 
-        expect(result.status).toBe('degraded');
+        expect(result.status).toBe('up');
         expect(result.checks?.whatsapp).toMatchObject({
             status: 'down',
             critical: false,

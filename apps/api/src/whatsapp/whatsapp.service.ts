@@ -34,9 +34,11 @@ export class WhatsAppService {
     private readonly verifyToken: string | null;
 
     constructor(
+        @Inject(PrismaService)
         private readonly prisma: PrismaService,
         @Inject(ConfigService)
         private readonly configService: ConfigService,
+        @Inject(WhatsAppOutboundService)
         private readonly whatsAppOutboundService: WhatsAppOutboundService,
     ) {
         this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN')?.trim() || null;

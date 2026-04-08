@@ -160,7 +160,7 @@ describe('ObservabilityController (e2e)', () => {
         expect(response.body.totalClientErrors).toBeGreaterThan(0);
         expect(response.body.totalPoorVitals).toBeGreaterThan(0);
         expect(response.body.warnAlerts).toBeGreaterThan(0);
-        expect(response.body.criticalAlerts).toBeGreaterThan(0);
+        expect(response.body.criticalAlerts).toBe(0);
         expect(response.body.busiestRoutes).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({

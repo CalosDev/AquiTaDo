@@ -19,6 +19,24 @@ type HealthPayload = {
     responseTimeMs?: number;
 };
 
+type DependencyHealthStatus = 'up' | 'degraded' | 'down' | 'disabled';
+
+type DependencyHealthSummary = {
+    status: DependencyHealthStatus;
+    reason?: 'not_configured' | 'no_samples';
+    critical: boolean;
+    thresholdMs: number;
+    operations: Array<{
+        operation: string;
+        samples: number;
+        p95Ms: number;
+        errorRatePct: number;
+        lastSeenAt: string | null;
+        latencyThresholdMs: number;
+        healthy: boolean;
+    }>;
+};
+
 @Injectable()
 export class HealthService {
     constructor(
@@ -198,7 +216,7 @@ export class HealthService {
                 emailCritical,
             )
             : {
-                status: 'down' as const,
+                status: emailCritical ? 'down' as const : 'disabled' as const,
                 reason: 'not_configured',
                 critical: emailCritical,
                 thresholdMs: emailLatencyThresholdMs,
@@ -211,16 +229,33 @@ export class HealthService {
             whatsappCritical,
         );
 
+        const optionalDependencyIsImpacting = (dependency: Pick<DependencyHealthSummary, 'status' | 'critical'>) => {
+            if (dependency.status === 'disabled') {
+                return false;
+            }
+
+            if (dependency.critical && dependency.status === 'down') {
+                return 'down';
+            }
+
+            if (dependency.critical && dependency.status === 'degraded') {
+                return 'degraded';
+            }
+
+            return false;
+        };
+
+        const emailImpact = optionalDependencyIsImpacting(emailHealth);
+        const whatsappImpact = optionalDependencyIsImpacting(whatsappHealth);
+
         const overallStatus = !schemaReady
             || dbPoolStatus === 'down'
-            || (emailHealth.critical && emailHealth.status === 'down')
-            || (whatsappHealth.critical && whatsappHealth.status === 'down')
+            || emailImpact === 'down'
+            || whatsappImpact === 'down'
             ? 'down'
             : dbPoolStatus === 'degraded'
-                || emailHealth.status === 'down'
-                || whatsappHealth.status === 'degraded'
-                || whatsappHealth.status === 'down'
-                || emailHealth.status !== 'up'
+                || emailImpact === 'degraded'
+                || whatsappImpact === 'degraded'
                 ? 'degraded'
                 : 'up';
 
@@ -270,10 +305,10 @@ export class HealthService {
         thresholdMs: number,
         minimumCriticalSamples: number,
         critical: boolean,
-    ) {
+    ): DependencyHealthSummary {
         if (items.length === 0) {
             return {
-                status: 'degraded',
+                status: critical ? 'degraded' as const : 'disabled' as const,
                 reason: 'no_samples',
                 critical,
                 thresholdMs,

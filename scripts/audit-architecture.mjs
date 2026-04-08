@@ -8,6 +8,7 @@ const apiSrcRoot = path.join(projectRoot, 'apps', 'api', 'src');
 const envAllowList = new Set([
     normalizePath(path.join(apiSrcRoot, 'main.ts')),
     normalizePath(path.join(apiSrcRoot, 'start-prod.ts')),
+    normalizePath(path.join(apiSrcRoot, 'bootstrap', 'migrate-on-start.ts')),
     normalizePath(path.join(apiSrcRoot, 'prisma', 'prisma.service.ts')),
     normalizePath(path.join(apiSrcRoot, 'config', 'env.validation.ts')),
 ]);
