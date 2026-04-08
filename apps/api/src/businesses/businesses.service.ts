@@ -40,8 +40,8 @@ import {
 } from './businesses.helpers';
 import {
     adminListBusinessSelect,
+    businessDetailBaseSelect,
     catalogQualityBusinessSelect,
-    fullBusinessDetailInclude,
     fullBusinessInclude,
     mineListBusinessSelect,
 } from './businesses.selects';
@@ -969,45 +969,131 @@ export class BusinessesService {
     }
 
     private findBusinessByIdWithReviews(id: string) {
-        return this.prisma.business.findFirst({
-            where: {
-                id,
-                deletedAt: null,
-            },
-            include: fullBusinessDetailInclude,
+        return this.findBusinessDetail({
+            id,
+            deletedAt: null,
         });
     }
 
     private findBusinessBySlugWithReviews(slug: string) {
-        return this.prisma.business.findFirst({
-            where: {
-                slug,
-                deletedAt: null,
-            },
-            include: fullBusinessDetailInclude,
+        return this.findBusinessDetail({
+            slug,
+            deletedAt: null,
         });
     }
 
     private findPublicBusinessById(id: string) {
-        return this.prisma.business.findFirst({
-            where: {
-                id,
-                verified: true,
-                deletedAt: null,
-            },
-            include: fullBusinessDetailInclude,
+        return this.findBusinessDetail({
+            id,
+            verified: true,
+            deletedAt: null,
         });
     }
 
     private findPublicBusinessBySlug(slug: string) {
-        return this.prisma.business.findFirst({
-            where: {
-                slug,
-                verified: true,
-                deletedAt: null,
-            },
-            include: fullBusinessDetailInclude,
+        return this.findBusinessDetail({
+            slug,
+            verified: true,
+            deletedAt: null,
         });
+    }
+
+    private async findBusinessDetail(where: Prisma.BusinessWhereInput) {
+        const business = await this.prisma.business.findFirst({
+            where,
+            select: businessDetailBaseSelect,
+        });
+
+        if (!business) {
+            return null;
+        }
+
+        const [features, reviews] = await Promise.all([
+            this.safeLoadBusinessFeatures(business.id),
+            this.safeLoadBusinessReviews(business.id),
+        ]);
+
+        return {
+            ...business,
+            features,
+            reviews,
+        };
+    }
+
+    private async safeLoadBusinessFeatures(businessId: string) {
+        try {
+            return await this.prisma.businessFeature.findMany({
+                where: { businessId },
+                select: {
+                    feature: {
+                        select: { id: true, name: true },
+                    },
+                },
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Could not load business features for "${businessId}" (${error instanceof Error ? error.message : String(error)})`,
+            );
+            return [];
+        }
+    }
+
+    private async safeLoadBusinessReviews(businessId: string) {
+        try {
+            const reviews = await this.prisma.review.findMany({
+                where: {
+                    businessId,
+                    moderationStatus: 'APPROVED',
+                    isSpam: false,
+                },
+                select: {
+                    id: true,
+                    rating: true,
+                    comment: true,
+                    createdAt: true,
+                    userId: true,
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+            });
+
+            if (reviews.length === 0) {
+                return [];
+            }
+
+            let usersById = new Map<string, { id: string; name: string }>();
+
+            try {
+                const users = await this.prisma.user.findMany({
+                    where: {
+                        id: { in: [...new Set(reviews.map((review) => review.userId))] },
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                });
+
+                usersById = new Map(users.map((user) => [user.id, user]));
+            } catch (error) {
+                this.logger.warn(
+                    `Could not resolve review authors for "${businessId}" (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }
+
+            return reviews.map((review) => ({
+                ...review,
+                user: usersById.get(review.userId) ?? {
+                    id: review.userId,
+                    name: 'Usuario',
+                },
+            }));
+        } catch (error) {
+            this.logger.warn(
+                `Could not load business reviews for "${businessId}" (${error instanceof Error ? error.message : String(error)})`,
+            );
+            return [];
+        }
     }
 
     private async ensureOwnerOrganization(

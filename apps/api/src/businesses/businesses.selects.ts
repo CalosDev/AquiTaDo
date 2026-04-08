@@ -68,6 +68,78 @@ export const fullBusinessDetailInclude = {
     reviews: approvedBusinessReviewsInclude,
 } satisfies Prisma.BusinessInclude;
 
+export const businessDetailBaseSelect = {
+    id: true,
+    name: true,
+    slug: true,
+    description: true,
+    phone: true,
+    whatsapp: true,
+    website: true,
+    email: true,
+    instagramUrl: true,
+    facebookUrl: true,
+    tiktokUrl: true,
+    priceRange: true,
+    address: true,
+    latitude: true,
+    longitude: true,
+    verified: true,
+    verifiedAt: true,
+    verificationStatus: true,
+    verificationSubmittedAt: true,
+    verificationReviewedAt: true,
+    verificationNotes: true,
+    riskScore: true,
+    reputationScore: true,
+    reputationTier: true,
+    createdAt: true,
+    updatedAt: true,
+    ownerId: true,
+    organizationId: true,
+    provinceId: true,
+    cityId: true,
+    sectorId: true,
+    owner: {
+        select: { id: true, name: true },
+    },
+    organization: {
+        select: { id: true, name: true, slug: true },
+    },
+    province: {
+        select: { id: true, name: true, slug: true },
+    },
+    city: {
+        select: { id: true, name: true, slug: true },
+    },
+    sector: {
+        select: { id: true, name: true, slug: true },
+    },
+    categories: {
+        select: {
+            category: {
+                select: { id: true, name: true, slug: true, icon: true, parentId: true },
+            },
+        },
+    },
+    images: {
+        select: { id: true, url: true, isCover: true, caption: true, type: true },
+        orderBy: businessImageOrderBy,
+    },
+    hours: {
+        select: {
+            dayOfWeek: true,
+            opensAt: true,
+            closesAt: true,
+            closed: true,
+        },
+        orderBy: businessHoursOrderBy,
+    },
+    _count: {
+        select: { reviews: true },
+    },
+} satisfies Prisma.BusinessSelect;
+
 export const publicListBusinessSelect = {
     id: true,
     name: true,

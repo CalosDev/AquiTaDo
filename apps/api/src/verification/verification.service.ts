@@ -730,13 +730,14 @@ export class VerificationService {
             const now = new Date();
             const reviewStatus = dto.status;
             const shouldVerify = reviewStatus === 'VERIFIED';
+            const notificationNotes = dto.notes?.trim() || null;
 
             const updatedBusiness = await tx.business.update({
                 where: { id: businessId },
                 data: {
                     verificationStatus: reviewStatus,
                     verificationReviewedAt: now,
-                    verificationNotes: dto.notes?.trim() || null,
+                    verificationNotes: notificationNotes,
                     verified: shouldVerify,
                     verifiedAt: shouldVerify ? now : null,
                 },
@@ -767,8 +768,6 @@ export class VerificationService {
                         rejectionReason: null,
                     },
                 });
-
-                await this.reputationService.recalculateBusinessReputation(businessId, tx);
             } else if (reviewStatus === 'REJECTED' || reviewStatus === 'SUSPENDED') {
                 await tx.businessVerificationDocument.updateMany({
                     where: {
@@ -784,20 +783,37 @@ export class VerificationService {
                 });
             }
 
-            await recalculateBusinessRiskScore(tx, businessId);
-
             return {
                 updatedBusiness,
+                shouldRecalculateReputation: shouldVerify,
                 notificationPayload: {
                     organizationId: business.organizationId,
                     businessId: business.id,
                     ownerPhone: business.owner?.phone ?? business.whatsapp ?? null,
                     businessName: business.name,
                     status: reviewStatus,
-                    notes: dto.notes?.trim() || null,
+                    notes: notificationNotes,
                 },
             };
         });
+
+        if (result.shouldRecalculateReputation) {
+            try {
+                await this.reputationService.recalculateBusinessReputation(businessId);
+            } catch (error) {
+                this.logger.warn(
+                    `No se pudo recalcular la reputacion del negocio "${businessId}" despues de revision (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }
+        }
+
+        try {
+            await recalculateBusinessRiskScore(this.prisma, businessId);
+        } catch (error) {
+            this.logger.warn(
+                `No se pudo recalcular el riesgo del negocio "${businessId}" despues de revision (${error instanceof Error ? error.message : String(error)})`,
+            );
+        }
 
         try {
             await this.notificationsQueueService.enqueueVerificationAlert(result.notificationPayload);
