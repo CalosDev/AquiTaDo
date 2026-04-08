@@ -7,6 +7,7 @@ import {
     NotFoundException,
     ForbiddenException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { GrowthEventType, OrganizationRole, Prisma, SalesLeadStage } from '../generated/prisma/client';
@@ -353,6 +354,7 @@ export class BusinessesService {
         const instagramUrl = normalizeOptionalText(dto.instagramUrl) ?? null;
         const facebookUrl = normalizeOptionalText(dto.facebookUrl) ?? null;
         const tiktokUrl = normalizeOptionalText(dto.tiktokUrl) ?? null;
+        const businessId = randomUUID();
         const coordinates = await this.resolveCoordinatesForBusiness({
             address: dto.address,
             provinceId: dto.provinceId,
@@ -381,6 +383,7 @@ export class BusinessesService {
 
                 const insertedBusinesses = await tx.$queryRaw<Array<{ id: string; slug: string }>>`
                     INSERT INTO "businesses" (
+                        "id",
                         "name",
                         "slug",
                         "description",
@@ -402,6 +405,7 @@ export class BusinessesService {
                         "sectorId"
                     )
                     VALUES (
+                        ${businessId},
                         ${dto.name},
                         ${slug},
                         ${dto.description},
