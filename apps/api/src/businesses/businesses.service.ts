@@ -631,7 +631,10 @@ export class BusinessesService {
     ) {
         const business = await this.prisma.business.findUnique({
             where: { id },
-            include: {
+            select: {
+                id: true,
+                slug: true,
+                organizationId: true,
                 images: {
                     select: { url: true },
                 },
