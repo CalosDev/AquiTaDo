@@ -33,7 +33,7 @@ function isPathActive(pathname: string, target: string): boolean {
 
 export function Navbar() {
     const { isAuthenticated, loading, user, logout } = useAuth();
-    const { activeOrganization, loading: organizationLoading } = useOrganization();
+    const { activeOrganization } = useOrganization();
     const navigate = useNavigate();
     const location = useLocation();
     const [menuOpen, setMenuOpen] = useState(false);
@@ -45,7 +45,7 @@ export function Navbar() {
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const organizationName = activeOrganization?.name?.trim() ?? '';
     const firstName = user?.name?.split(' ')[0] ?? 'Cuenta';
-    const navBootstrapping = loading || (isAuthenticated && organizationLoading);
+    const navBootstrapping = loading;
     const businessesActive = location.pathname === '/businesses'
         || location.pathname.startsWith('/businesses/')
         || location.pathname.startsWith('/negocios/');
@@ -269,14 +269,14 @@ export function Navbar() {
                                             >
                                                 Hola, {firstName}
                                             </Link>
-                                            {organizationName && (
-                                                <p
-                                                    className="hidden max-w-[170px] truncate text-[11px] leading-tight text-slate-500 2xl:block"
-                                                    title={organizationName}
-                                                >
-                                                    {organizationName}
-                                                </p>
-                                            )}
+                                            <p
+                                                className={`hidden max-w-[170px] truncate text-[11px] leading-tight 2xl:block ${
+                                                    organizationName ? 'text-slate-500' : 'text-transparent'
+                                                }`}
+                                                title={organizationName || undefined}
+                                            >
+                                                {organizationName || 'Organizacion activa'}
+                                            </p>
                                         </div>
                                         <button
                                             type="button"
