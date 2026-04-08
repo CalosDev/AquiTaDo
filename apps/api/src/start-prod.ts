@@ -1,6 +1,6 @@
-import { spawn } from 'child_process';
-import { existsSync } from 'fs';
 import { resolve } from 'path';
+import { spawn } from 'child_process';
+import { runMigrationsIfAvailable } from './bootstrap/migrate-on-start';
 
 type SpawnOptions = {
     cwd?: string;
@@ -8,14 +8,6 @@ type SpawnOptions = {
 };
 
 const appRoot = resolve(__dirname, '..');
-const workspaceRoot = resolve(appRoot, '..', '..');
-const isWindows = process.platform === 'win32';
-const prismaExecutableName = isWindows ? 'prisma.cmd' : 'prisma';
-const prismaSchemaPath = resolve(appRoot, 'prisma', 'schema.prisma');
-const prismaExecutableCandidates = [
-    resolve(appRoot, 'node_modules', '.bin', prismaExecutableName),
-    resolve(workspaceRoot, 'node_modules', '.bin', prismaExecutableName),
-];
 
 function log(message: string): void {
     process.stdout.write(`[start:prod] ${message}\n`);
@@ -51,50 +43,6 @@ function spawnAndWait(command: string, args: string[], options: SpawnOptions = {
             resolvePromise();
         });
     });
-}
-
-function shouldAttemptMigrateOnStart(): boolean {
-    const rawValue = process.env['PRISMA_MIGRATE_ON_START']?.trim().toLowerCase();
-    return rawValue !== 'false';
-}
-
-function resolvePrismaExecutable(): string | null {
-    return prismaExecutableCandidates.find((candidate) => existsSync(candidate)) ?? null;
-}
-
-async function runMigrationsIfAvailable(): Promise<void> {
-    if (!shouldAttemptMigrateOnStart()) {
-        log('Saltando migrate deploy porque PRISMA_MIGRATE_ON_START=false.');
-        return;
-    }
-
-    if (!process.env['DATABASE_URL']) {
-        log('Saltando migrate deploy porque DATABASE_URL no esta configurada.');
-        return;
-    }
-
-    if (!existsSync(prismaSchemaPath)) {
-        log('Saltando migrate deploy porque no existe prisma/schema.prisma en este runtime.');
-        return;
-    }
-
-    const prismaExecutable = resolvePrismaExecutable();
-
-    if (!prismaExecutable) {
-        log('Saltando migrate deploy porque Prisma CLI no esta disponible en este runtime.');
-        return;
-    }
-
-    log('Ejecutando prisma migrate deploy antes de levantar la API...');
-    await spawnAndWait(
-        prismaExecutable,
-        ['migrate', 'deploy', '--schema', prismaSchemaPath],
-        {
-            cwd: appRoot,
-            env: process.env,
-        },
-    );
-    log('Migraciones aplicadas o ya alineadas.');
 }
 
 async function startApi(): Promise<void> {

@@ -7,6 +7,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { runMigrationsIfAvailable } from './bootstrap/migrate-on-start';
 import { ObservabilityService } from './observability/observability.service';
 
 type CorsSettings = {
@@ -230,6 +231,8 @@ function buildTraceparent(traceId: string): string {
 }
 
 async function bootstrap() {
+    await runMigrationsIfAvailable();
+
     const logger = new Logger('Bootstrap');
     const httpLogger = new Logger('HTTP');
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
