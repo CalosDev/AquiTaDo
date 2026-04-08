@@ -42,7 +42,6 @@ import {
     adminListBusinessSelect,
     businessDetailBaseSelect,
     catalogQualityBusinessSelect,
-    fullBusinessInclude,
     mineListBusinessSelect,
 } from './businesses.selects';
 
@@ -426,9 +425,11 @@ export class BusinessesService {
                             }
                             : undefined,
                     },
-                    include: fullBusinessInclude,
+                    select: {
+                        id: true,
+                        slug: true,
+                    },
                 });
-                await this.syncBusinessLocation(tx, business.id, coordinates.latitude, coordinates.longitude);
 
                 // Only promote regular users; never downgrade admin users.
                 await tx.user.updateMany({
@@ -439,9 +440,16 @@ export class BusinessesService {
                 return business;
             });
 
+            await this.syncBusinessLocation(this.prisma, createdBusiness.id, coordinates.latitude, coordinates.longitude);
+
             this.publishBusinessChangedEvent(createdBusiness.id, createdBusiness.slug, 'created');
 
-            return decorateBusinessProfile(createdBusiness as Record<string, any>);
+            const hydratedBusiness = await this.findBusinessByIdWithReviews(createdBusiness.id);
+            if (!hydratedBusiness) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            return decorateBusinessProfile(hydratedBusiness as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -602,19 +610,38 @@ export class BusinessesService {
                             }
                             : undefined,
                     },
-                    include: fullBusinessInclude,
+                    select: {
+                        id: true,
+                        slug: true,
+                        latitude: true,
+                        longitude: true,
+                    },
                 });
 
                 const nextLatitude = updatedBusiness.latitude ?? business.latitude ?? undefined;
                 const nextLongitude = updatedBusiness.longitude ?? business.longitude ?? undefined;
-                await this.syncBusinessLocation(tx, id, nextLatitude, nextLongitude);
-
-                return updatedBusiness;
+                return {
+                    ...updatedBusiness,
+                    nextLatitude,
+                    nextLongitude,
+                };
             });
+
+            await this.syncBusinessLocation(
+                this.prisma,
+                id,
+                updatedBusiness.nextLatitude,
+                updatedBusiness.nextLongitude,
+            );
 
             this.publishBusinessChangedEvent(updatedBusiness.id, updatedBusiness.slug, 'updated');
 
-            return decorateBusinessProfile(updatedBusiness as Record<string, any>);
+            const hydratedBusiness = await this.findBusinessByIdWithReviews(updatedBusiness.id);
+            if (!hydratedBusiness) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            return decorateBusinessProfile(hydratedBusiness as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -801,13 +828,21 @@ export class BusinessesService {
                     verificationStatus: 'VERIFIED',
                     verificationReviewedAt: new Date(),
                 },
-                include: fullBusinessInclude,
+                select: {
+                    id: true,
+                    slug: true,
+                },
             });
 
             await this.reputationService.recalculateBusinessReputation(id);
             this.publishBusinessChangedEvent(id, business.slug, 'verified');
 
-            return decorateBusinessProfile(business as Record<string, any>);
+            const hydratedBusiness = await this.findBusinessByIdWithReviews(id);
+            if (!hydratedBusiness) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            return decorateBusinessProfile(hydratedBusiness as Record<string, any>);
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
