@@ -9,7 +9,7 @@ type SpawnOptions = {
 
 const isWindows = process.platform === 'win32';
 const prismaExecutableName = isWindows ? 'prisma.cmd' : 'prisma';
-const appRoot = resolve(__dirname, '..');
+const appRoot = resolve(__dirname, '..', '..');
 const workspaceRoot = resolve(appRoot, '..', '..');
 const prismaSchemaPath = resolve(appRoot, 'prisma', 'schema.prisma');
 const prismaExecutableCandidates = [
