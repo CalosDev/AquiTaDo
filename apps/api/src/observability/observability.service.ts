@@ -10,6 +10,45 @@ import { FrontendSignalKind, TrackFrontendSignalDto } from './dto/frontend-obser
 
 let defaultMetricsCollected = false;
 
+type FrontendRouteViewSnapshot = {
+    route: string;
+    role: string;
+    count: number;
+    lastSeenAt: string | null;
+};
+
+type FrontendClientErrorSnapshot = {
+    route: string;
+    role: string;
+    source: string;
+    count: number;
+    lastSeenAt: string | null;
+};
+
+type FrontendWebVitalSnapshot = {
+    route: string;
+    role: string;
+    metric: string;
+    rating: string;
+    count: number;
+    latestValue: number;
+    worstValue: number;
+    lastSeenAt: string | null;
+};
+
+type FrontendAlertSnapshot = {
+    level: 'warn' | 'critical';
+    kind: 'client-error' | 'web-vital';
+    route: string;
+    role: string;
+    message: string;
+    source?: string;
+    metric?: string;
+    rating?: string;
+    value?: number;
+    count?: number;
+};
+
 function getOrCreateCounter(
     registry: Registry,
     name: string,
@@ -54,6 +93,9 @@ function getOrCreateHistogram(
 export class ObservabilityService {
     private readonly maxDependencySamples = 180;
     private readonly defaultLatencyThresholdMs = 1_800;
+    private readonly maxFrontendRouteSnapshots = 40;
+    private readonly maxFrontendClientErrorSnapshots = 20;
+    private readonly maxFrontendVitalSnapshots = 20;
     private readonly registry = register;
     private readonly requestCounter: Counter<string>;
     private readonly requestDurationHistogram: Histogram<string>;
@@ -69,6 +111,38 @@ export class ObservabilityService {
         latencies: number[];
         successCount: number;
         failureCount: number;
+        lastSeenAt: number;
+    }
+    >();
+    private readonly frontendRouteViewSamples = new Map<
+    string,
+    {
+        route: string;
+        role: string;
+        count: number;
+        lastSeenAt: number;
+    }
+    >();
+    private readonly frontendClientErrorSamples = new Map<
+    string,
+    {
+        route: string;
+        role: string;
+        source: string;
+        count: number;
+        lastSeenAt: number;
+    }
+    >();
+    private readonly frontendWebVitalSamples = new Map<
+    string,
+    {
+        route: string;
+        role: string;
+        metric: string;
+        rating: string;
+        count: number;
+        latestValue: number;
+        worstValue: number;
         lastSeenAt: number;
     }
     >();
@@ -212,12 +286,14 @@ export class ObservabilityService {
 
         if (dto.kind === FrontendSignalKind.ROUTE_VIEW) {
             this.frontendRouteViewCounter.inc({ route, role });
+            this.trackFrontendRouteView(route, role);
             return;
         }
 
         if (dto.kind === FrontendSignalKind.CLIENT_ERROR) {
             const source = this.normalizeFrontendSource(dto.source);
             this.frontendClientErrorCounter.inc({ route, source, role });
+            this.trackFrontendClientError(route, role, source);
             return;
         }
 
@@ -230,7 +306,114 @@ export class ObservabilityService {
                 { metric, route, rating, role },
                 Math.max(0, value),
             );
+            this.trackFrontendWebVital(route, role, metric, rating, value);
         }
+    }
+
+    getFrontendHealthSnapshot(): {
+        generatedAt: string;
+        totalRouteViews: number;
+        totalClientErrors: number;
+        totalPoorVitals: number;
+        busiestRoutes: FrontendRouteViewSnapshot[];
+        clientErrors: FrontendClientErrorSnapshot[];
+        poorVitals: FrontendWebVitalSnapshot[];
+        alerts: FrontendAlertSnapshot[];
+    } {
+        const busiestRoutes = [...this.frontendRouteViewSamples.values()]
+            .sort((left, right) => {
+                if (right.count !== left.count) {
+                    return right.count - left.count;
+                }
+                return right.lastSeenAt - left.lastSeenAt;
+            })
+            .slice(0, this.maxFrontendRouteSnapshots)
+            .map((entry) => ({
+                route: entry.route,
+                role: entry.role,
+                count: entry.count,
+                lastSeenAt: entry.lastSeenAt ? new Date(entry.lastSeenAt).toISOString() : null,
+            }));
+
+        const clientErrors = [...this.frontendClientErrorSamples.values()]
+            .sort((left, right) => {
+                if (right.count !== left.count) {
+                    return right.count - left.count;
+                }
+                return right.lastSeenAt - left.lastSeenAt;
+            })
+            .slice(0, this.maxFrontendClientErrorSnapshots)
+            .map((entry) => ({
+                route: entry.route,
+                role: entry.role,
+                source: entry.source,
+                count: entry.count,
+                lastSeenAt: entry.lastSeenAt ? new Date(entry.lastSeenAt).toISOString() : null,
+            }));
+
+        const poorVitals = [...this.frontendWebVitalSamples.values()]
+            .filter((entry) => entry.rating !== 'good')
+            .sort((left, right) => {
+                if (right.worstValue !== left.worstValue) {
+                    return right.worstValue - left.worstValue;
+                }
+                return right.lastSeenAt - left.lastSeenAt;
+            })
+            .slice(0, this.maxFrontendVitalSnapshots)
+            .map((entry) => ({
+                route: entry.route,
+                role: entry.role,
+                metric: entry.metric,
+                rating: entry.rating,
+                count: entry.count,
+                latestValue: entry.latestValue,
+                worstValue: entry.worstValue,
+                lastSeenAt: entry.lastSeenAt ? new Date(entry.lastSeenAt).toISOString() : null,
+            }));
+
+        const alerts: FrontendAlertSnapshot[] = [
+            ...clientErrors.map((entry) => ({
+                level: entry.count >= 3 ? 'critical' as const : 'warn' as const,
+                kind: 'client-error' as const,
+                route: entry.route,
+                role: entry.role,
+                source: entry.source,
+                count: entry.count,
+                message: `${entry.count} error(es) cliente en ${entry.route}`,
+            })),
+            ...poorVitals.map((entry) => ({
+                level: entry.rating === 'poor' ? 'critical' as const : 'warn' as const,
+                kind: 'web-vital' as const,
+                route: entry.route,
+                role: entry.role,
+                metric: entry.metric,
+                rating: entry.rating,
+                value: entry.worstValue,
+                count: entry.count,
+                message: `${entry.metric} ${entry.rating} en ${entry.route}`,
+            })),
+        ]
+            .sort((left, right) => {
+                if (left.level !== right.level) {
+                    return left.level === 'critical' ? -1 : 1;
+                }
+                return (right.count ?? 0) - (left.count ?? 0);
+            })
+            .slice(0, 8);
+
+        return {
+            generatedAt: new Date().toISOString(),
+            totalRouteViews: [...this.frontendRouteViewSamples.values()].reduce((sum, entry) => sum + entry.count, 0),
+            totalClientErrors: [...this.frontendClientErrorSamples.values()].reduce((sum, entry) => sum + entry.count, 0),
+            totalPoorVitals: [...this.frontendWebVitalSamples.values()].reduce(
+                (sum, entry) => sum + (entry.rating !== 'good' ? entry.count : 0),
+                0,
+            ),
+            busiestRoutes,
+            clientErrors,
+            poorVitals,
+            alerts,
+        };
     }
 
     getDependencyHealthSnapshot(
@@ -359,6 +542,58 @@ export class ObservabilityService {
         }
 
         return normalized.toLowerCase();
+    }
+
+    private trackFrontendRouteView(route: string, role: string): void {
+        const key = `${role}:${route}`;
+        const current = this.frontendRouteViewSamples.get(key) ?? {
+            route,
+            role,
+            count: 0,
+            lastSeenAt: 0,
+        };
+        current.count += 1;
+        current.lastSeenAt = Date.now();
+        this.frontendRouteViewSamples.set(key, current);
+    }
+
+    private trackFrontendClientError(route: string, role: string, source: string): void {
+        const key = `${role}:${route}:${source}`;
+        const current = this.frontendClientErrorSamples.get(key) ?? {
+            route,
+            role,
+            source,
+            count: 0,
+            lastSeenAt: 0,
+        };
+        current.count += 1;
+        current.lastSeenAt = Date.now();
+        this.frontendClientErrorSamples.set(key, current);
+    }
+
+    private trackFrontendWebVital(
+        route: string,
+        role: string,
+        metric: string,
+        rating: string,
+        value: number,
+    ): void {
+        const key = `${role}:${route}:${metric}:${rating}`;
+        const current = this.frontendWebVitalSamples.get(key) ?? {
+            route,
+            role,
+            metric,
+            rating,
+            count: 0,
+            latestValue: 0,
+            worstValue: 0,
+            lastSeenAt: 0,
+        };
+        current.count += 1;
+        current.latestValue = value;
+        current.worstValue = Math.max(current.worstValue, value);
+        current.lastSeenAt = Date.now();
+        this.frontendWebVitalSamples.set(key, current);
     }
 
     private percentile(values: number[], percentile: number): number {

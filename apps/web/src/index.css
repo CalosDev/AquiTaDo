@@ -482,15 +482,15 @@
   }
 
   .role-hero-actions {
-    @apply mt-5 flex min-h-12 flex-wrap items-start gap-3;
+    @apply mt-5 grid min-h-12 grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-start;
   }
 
   .role-hero-action {
-    @apply inline-flex min-w-[11rem] justify-center;
+    @apply inline-flex min-h-11 w-full justify-center sm:w-auto sm:min-w-[11rem];
   }
 
   .role-hero-action-skeleton {
-    @apply inline-flex h-11 min-w-[11rem] items-center justify-center rounded-2xl border border-white/15 bg-white/15 text-transparent;
+    @apply inline-flex h-11 w-full items-center justify-center rounded-2xl border border-white/15 bg-white/15 text-transparent sm:w-auto sm:min-w-[11rem];
     box-shadow: none;
   }
 

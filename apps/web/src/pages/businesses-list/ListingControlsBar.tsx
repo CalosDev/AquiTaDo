@@ -5,6 +5,7 @@ interface ListingControlsBarProps {
     currentView: ListingViewMode;
     filtersOpen: boolean;
     mappableResultsCount: number;
+    onMapIntent?: () => void;
     onProvinceChange: (value: string) => void;
     onSearchInputChange: (value: string) => void;
     onSortChange: (value: 'relevance' | 'rating' | 'distance' | 'name') => void;
@@ -22,6 +23,7 @@ export function ListingControlsBar({
     currentView,
     filtersOpen,
     mappableResultsCount,
+    onMapIntent,
     onProvinceChange,
     onSearchInputChange,
     onSortChange,
@@ -113,6 +115,8 @@ export function ListingControlsBar({
                                 <button
                                     type="button"
                                     onClick={() => onViewModeChange('map')}
+                                    onMouseEnter={onMapIntent}
+                                    onFocus={onMapIntent}
                                     aria-pressed={currentView === 'map'}
                                     className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
                                         currentView === 'map' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'

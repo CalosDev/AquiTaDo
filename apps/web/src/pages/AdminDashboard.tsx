@@ -11,7 +11,10 @@ import {
     verificationApi,
 } from '../api/endpoints';
 import {
+    EMPTY_FRONTEND_HEALTH_SUMMARY,
     EMPTY_OBSERVABILITY_SUMMARY,
+    frontendAlertClass,
+    frontendVitalClass,
     healthStatusClass,
     normalizeBusinessVerificationStatus,
     parseObservabilitySummary,
@@ -19,6 +22,7 @@ import {
     verificationStatusClass,
     verificationStatusLabel,
     type BusinessVerificationState,
+    type FrontendHealthSummary,
     type ObservabilitySummary,
 } from './admin-dashboard/helpers';
 import { GrowthInsightsPanel } from './admin-dashboard/GrowthInsightsPanel';
@@ -294,6 +298,7 @@ export function AdminDashboard() {
     const [insightsLoading, setInsightsLoading] = useState(false);
     const [observabilityRaw, setObservabilityRaw] = useState('');
     const [observabilitySummary, setObservabilitySummary] = useState<ObservabilitySummary>(EMPTY_OBSERVABILITY_SUMMARY);
+    const [frontendHealthSummary, setFrontendHealthSummary] = useState<FrontendHealthSummary>(EMPTY_FRONTEND_HEALTH_SUMMARY);
     const [operationalHealth, setOperationalHealth] = useState<OperationalDashboardSnapshot | null>(null);
     const [operationalHealthLoading, setOperationalHealthLoading] = useState(false);
 
@@ -466,13 +471,20 @@ export function AdminDashboard() {
         setObservabilityLoading(true);
         setErrorMessage('');
         try {
-            const response = await observabilityApi.getMetrics();
-            const payload = typeof response.data === 'string'
-                ? response.data
-                : String(response.data ?? '');
+            const [metricsResponse, summaryResponse] = await Promise.all([
+                observabilityApi.getMetrics(),
+                observabilityApi.getSummary(),
+            ]);
+            const payload = typeof metricsResponse.data === 'string'
+                ? metricsResponse.data
+                : String(metricsResponse.data ?? '');
             setObservabilityRaw(payload);
             setObservabilitySummary(parseObservabilitySummary(payload));
+            setFrontendHealthSummary(
+                (summaryResponse.data || EMPTY_FRONTEND_HEALTH_SUMMARY) as FrontendHealthSummary,
+            );
         } catch (error) {
+            setFrontendHealthSummary(EMPTY_FRONTEND_HEALTH_SUMMARY);
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar observabilidad'));
         } finally {
             setObservabilityLoading(false);
@@ -1811,6 +1823,125 @@ export function AdminDashboard() {
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <p className="text-xs text-gray-500">Fallas externas</p>
                                         <p className="text-xl font-semibold text-purple-700">{observabilitySummary.externalFailures}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="card p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                                    <div>
+                                        <h3 className="font-display font-semibold text-gray-900">Salud frontend</h3>
+                                        <p className="mt-1 text-sm text-gray-600">
+                                            Errores cliente, web vitals y rutas calientes reportadas por usuarios reales.
+                                        </p>
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                        {frontendHealthSummary.generatedAt
+                                            ? `Actualizado ${new Date(frontendHealthSummary.generatedAt).toLocaleString()}`
+                                            : 'Sin muestras recientes'}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Route views</p>
+                                        <p className="text-xl font-semibold text-gray-900">{frontendHealthSummary.totalRouteViews}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Errores cliente</p>
+                                        <p className="text-xl font-semibold text-red-700">{frontendHealthSummary.totalClientErrors}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Vitals no saludables</p>
+                                        <p className="text-xl font-semibold text-amber-700">{frontendHealthSummary.totalPoorVitals}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                        <p className="text-xs text-gray-500">Alertas activas</p>
+                                        <p className="text-xl font-semibold text-gray-900">{frontendHealthSummary.alerts.length}</p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-1 xl:grid-cols-3 gap-4">
+                                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                                        <h4 className="font-display text-sm font-semibold text-gray-900">Alertas prioritarias</h4>
+                                        <div className="mt-3 space-y-3">
+                                            {frontendHealthSummary.alerts.length > 0 ? (
+                                                frontendHealthSummary.alerts.map((alert) => (
+                                                    <div
+                                                        key={`${alert.kind}-${alert.route}-${alert.role}-${alert.metric ?? alert.source ?? 'general'}`}
+                                                        className={`rounded-xl border px-3 py-3 ${frontendAlertClass(alert.level)}`}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <p className="text-sm font-medium">{alert.message}</p>
+                                                            <span className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                                                                {alert.level}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-xs opacity-80">
+                                                            {alert.route} · {alert.role}
+                                                            {alert.metric ? ` · ${alert.metric}` : ''}
+                                                            {alert.source ? ` · ${alert.source}` : ''}
+                                                            {typeof alert.value === 'number' ? ` · ${alert.value}` : ''}
+                                                        </p>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-sm text-gray-500">
+                                                    No hay alertas activas en el frontend.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                                        <h4 className="font-display text-sm font-semibold text-gray-900">Rutas mas vistas</h4>
+                                        <div className="mt-3 space-y-3">
+                                            {frontendHealthSummary.busiestRoutes.length > 0 ? (
+                                                frontendHealthSummary.busiestRoutes.slice(0, 5).map((entry) => (
+                                                    <div key={`${entry.route}-${entry.role}`} className="rounded-xl border border-white bg-white px-3 py-3">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <p className="text-sm font-medium text-gray-900">{entry.route}</p>
+                                                            <span className="text-sm font-semibold text-primary-700">{entry.count}</span>
+                                                        </div>
+                                                        <p className="mt-2 text-xs text-gray-500">
+                                                            {entry.role} · {entry.lastSeenAt ? new Date(entry.lastSeenAt).toLocaleString() : 'sin fecha'}
+                                                        </p>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-sm text-gray-500">
+                                                    Aun no hay suficientes vistas de rutas reportadas.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                                        <h4 className="font-display text-sm font-semibold text-gray-900">Web vitals delicados</h4>
+                                        <div className="mt-3 space-y-3">
+                                            {frontendHealthSummary.poorVitals.length > 0 ? (
+                                                frontendHealthSummary.poorVitals.slice(0, 5).map((entry) => (
+                                                    <div key={`${entry.route}-${entry.role}-${entry.metric}-${entry.rating}`} className="rounded-xl border border-white bg-white px-3 py-3">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <p className="text-sm font-medium text-gray-900">{entry.metric}</p>
+                                                            <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${frontendVitalClass(entry.rating)}`}>
+                                                                {entry.rating}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-xs text-gray-500">
+                                                            {entry.route} · {entry.role}
+                                                        </p>
+                                                        <p className="mt-2 text-xs text-gray-600">
+                                                            Peor valor {entry.worstValue} · Ultimo {entry.latestValue} · muestras {entry.count}
+                                                        </p>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-sm text-gray-500">
+                                                    No hay web vitals en estado delicado.
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -1,8 +1,7 @@
-import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage, isApiTimeoutError } from '../api/error';
 import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationApi } from '../api/endpoints';
-import { BusinessesMap } from '../components/BusinessesMap';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
@@ -52,6 +51,11 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
 };
 
 const PAGE_SIZE = 12;
+const loadBusinessesMapModule = () => import('../components/BusinessesMap');
+const BusinessesMapLazy = lazy(async () => {
+    const module = await loadBusinessesMapModule();
+    return { default: module.BusinessesMap };
+});
 
 function buildPagination(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
     if (totalPages <= 7) {
@@ -289,6 +293,12 @@ export function BusinessesList() {
         }
     }, [mappableBusinesses, selectedBusinessId]);
 
+    useEffect(() => {
+        if (currentView === 'map') {
+            void loadBusinessesMapModule();
+        }
+    }, [currentView]);
+
     const loadFilters = useCallback(async () => {
         setFiltersLoading(true);
         try {
@@ -396,19 +406,24 @@ export function BusinessesList() {
             if (currentOpenNow) params.openNow = true;
             if (currentVerified) params.verified = true;
 
-            const businessesRes = await businessApi.getAll(params);
-            const sponsoredRes = showSponsoredAds
-                ? await adsApi.getPlacements({
+            const sponsoredPlacementsPromise = showSponsoredAds
+                ? adsApi.getPlacements({
                     provinceId: currentProvince || undefined,
                     categoryId: currentCategory || undefined,
                     limit: 3,
                 })
-                : null;
+                    .then((response) => ((response.data || []) as SponsoredPlacement[]))
+                    .catch(() => [] as SponsoredPlacement[])
+                : Promise.resolve([] as SponsoredPlacement[]);
+            const [businessesRes, nextSponsoredPlacements] = await Promise.all([
+                businessApi.getAll(params),
+                sponsoredPlacementsPromise,
+            ]);
 
             setBusinesses(businessesRes.data.data || []);
             setTotal(businessesRes.data.total || 0);
             setTotalPages(businessesRes.data.totalPages || 0);
-            setSponsoredPlacements(showSponsoredAds ? ((sponsoredRes?.data || []) as SponsoredPlacement[]) : []);
+            setSponsoredPlacements(nextSponsoredPlacements);
         } catch (error) {
             setLoadErrorType(isApiTimeoutError(error) ? 'timeout' : 'generic');
             setLoadError(getApiErrorMessage(error, 'No se pudieron cargar los negocios'));
@@ -592,6 +607,10 @@ export function BusinessesList() {
     const handleViewModeChange = useCallback((nextView: ListingViewMode) => {
         if (nextView === currentView) {
             return;
+        }
+
+        if (nextView === 'map') {
+            void loadBusinessesMapModule();
         }
 
         trackListingEvent('LISTING_VIEW_CHANGE', {
@@ -866,6 +885,7 @@ export function BusinessesList() {
                 currentView={currentView}
                 filtersOpen={filtersOpen}
                 mappableResultsCount={mappableBusinesses.length}
+                onMapIntent={() => void loadBusinessesMapModule()}
                 onProvinceChange={(value) => handleTrackedFilterChange('provinceId', value, { source: 'topbar-province' })}
                 onSearchInputChange={setSearchInput}
                 onSortChange={handleSortChange}
@@ -1022,13 +1042,21 @@ export function BusinessesList() {
                                             </Link>
                                         ) : null}
                                     </div>
-                                    <BusinessesMap
+                                    <Suspense
+                                        fallback={(
+                                            <div className="h-[420px] overflow-hidden rounded-2xl border border-primary-100/80 bg-white shadow-sm">
+                                                <div className="h-full w-full animate-pulse bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.12),_transparent_55%),linear-gradient(135deg,_rgba(248,250,252,0.95),_rgba(226,232,240,0.9))]" />
+                                            </div>
+                                        )}
+                                    >
+                                        <BusinessesMapLazy
                                         businesses={sortedBusinesses}
                                         selectedBusinessId={selectedBusinessId}
                                         onSelectBusiness={handleMapSelectBusiness}
                                         onOpenBusiness={(businessId) => trackBusinessClick(businessId, 'listing-map-selected')}
                                         emptyLabel="No hay coordenadas suficientes en esta página para dibujar el mapa todavía."
-                                    />
+                                        />
+                                    </Suspense>
                                 </div>
                             ) : null}
 

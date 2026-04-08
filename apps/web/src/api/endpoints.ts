@@ -613,6 +613,7 @@ export const verificationApi = {
 // ---- Observability ----
 export const observabilityApi = {
     getMetrics: () => api.get<string>('/observability/metrics', { responseType: 'text' }),
+    getSummary: () => api.get('/observability/summary'),
 };
 
 // ---- Health ----

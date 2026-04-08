@@ -23,6 +23,7 @@
     "smoke:saas": "node scripts/smoke-saas.mjs",
     "smoke:prod": "node scripts/smoke-prod.mjs",
     "smoke:brave:roles": "node scripts/brave-role-audit.mjs",
+    "smoke:brave:roles:mobile": "node scripts/brave-role-audit-mobile.mjs",
     "perf:prod": "node scripts/perf-benchmark.mjs",
     "keepwarm:prod": "node scripts/keep-warm-prod.mjs",
     "ai:reindex:embeddings": "pnpm --filter @aquita/api ai:reindex:embeddings",

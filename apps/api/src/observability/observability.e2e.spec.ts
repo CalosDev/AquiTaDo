@@ -104,6 +104,90 @@ describe('ObservabilityController (e2e)', () => {
         expect(response.text).toContain('aquita_');
     });
 
+    it('returns a frontend health summary to admins', async () => {
+        await request(app.getHttpServer())
+            .post('/api/observability/frontend')
+            .send({
+                kind: FrontendSignalKind.ROUTE_VIEW,
+                route: '/admin',
+                role: 'ADMIN',
+            })
+            .expect(202);
+
+        await request(app.getHttpServer())
+            .post('/api/observability/frontend')
+            .send({
+                kind: FrontendSignalKind.CLIENT_ERROR,
+                route: '/dashboard/businesses/456/edit',
+                source: 'window.error',
+                role: 'BUSINESS_OWNER',
+            })
+            .expect(202);
+
+        await request(app.getHttpServer())
+            .post('/api/observability/frontend')
+            .send({
+                kind: FrontendSignalKind.WEB_VITAL,
+                route: '/dashboard/businesses/456/edit',
+                metricName: 'CLS',
+                value: 0.19,
+                rating: 'needs-improvement',
+                role: 'BUSINESS_OWNER',
+            })
+            .expect(202);
+
+        const admin = await createUser('ADMIN');
+        const token = signToken(admin.id, admin.role);
+
+        const response = await request(app.getHttpServer())
+            .get('/api/observability/summary')
+            .set('Authorization', `Bearer ${token}`)
+            .expect(200);
+
+        expect(response.body.totalRouteViews).toBeGreaterThan(0);
+        expect(response.body.totalClientErrors).toBeGreaterThan(0);
+        expect(response.body.totalPoorVitals).toBeGreaterThan(0);
+        expect(response.body.busiestRoutes).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    route: '/admin',
+                    role: 'ADMIN',
+                }),
+            ]),
+        );
+        expect(response.body.clientErrors).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    route: '/dashboard/businesses/:id/edit',
+                    role: 'BUSINESS_OWNER',
+                    source: 'window_error',
+                }),
+            ]),
+        );
+        expect(response.body.poorVitals).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    route: '/dashboard/businesses/:id/edit',
+                    role: 'BUSINESS_OWNER',
+                    metric: 'CLS',
+                    rating: 'needs-improvement',
+                }),
+            ]),
+        );
+        expect(response.body.alerts).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    kind: 'client-error',
+                    route: '/dashboard/businesses/:id/edit',
+                }),
+                expect.objectContaining({
+                    kind: 'web-vital',
+                    route: '/dashboard/businesses/:id/edit',
+                }),
+            ]),
+        );
+    });
+
     it('accepts frontend observability signals without authentication and exposes metrics to admin', async () => {
         await request(app.getHttpServer())
             .post('/api/observability/frontend')

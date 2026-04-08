@@ -409,8 +409,8 @@ export function EditBusiness() {
             <div className="page-shell max-w-5xl space-y-6">
                 <section className="role-hero role-hero-owner" aria-busy="true">
                     <div className="h-4 w-28 rounded-full bg-white/20 animate-pulse"></div>
-                    <div className="mt-3 h-10 w-64 max-w-full rounded-2xl bg-white/20 animate-pulse"></div>
-                    <div className="mt-3 max-w-2xl space-y-2">
+                    <div className="mt-2 h-9 w-64 max-w-full rounded-2xl bg-white/20 animate-pulse"></div>
+                    <div className="mt-2 min-h-[3.5rem] max-w-2xl space-y-2">
                         <div className="h-5 w-full rounded-xl bg-white/15 animate-pulse"></div>
                         <div className="h-5 w-3/4 rounded-xl bg-white/10 animate-pulse"></div>
                     </div>

@@ -8,12 +8,73 @@ export interface ObservabilitySummary {
     externalFailures: number;
 }
 
+export interface FrontendRouteViewSnapshot {
+    route: string;
+    role: string;
+    count: number;
+    lastSeenAt: string | null;
+}
+
+export interface FrontendClientErrorSnapshot {
+    route: string;
+    role: string;
+    source: string;
+    count: number;
+    lastSeenAt: string | null;
+}
+
+export interface FrontendWebVitalSnapshot {
+    route: string;
+    role: string;
+    metric: string;
+    rating: string;
+    count: number;
+    latestValue: number;
+    worstValue: number;
+    lastSeenAt: string | null;
+}
+
+export interface FrontendAlertSnapshot {
+    level: 'warn' | 'critical';
+    kind: 'client-error' | 'web-vital';
+    route: string;
+    role: string;
+    message: string;
+    source?: string;
+    metric?: string;
+    rating?: string;
+    value?: number;
+    count?: number;
+}
+
+export interface FrontendHealthSummary {
+    generatedAt: string | null;
+    totalRouteViews: number;
+    totalClientErrors: number;
+    totalPoorVitals: number;
+    busiestRoutes: FrontendRouteViewSnapshot[];
+    clientErrors: FrontendClientErrorSnapshot[];
+    poorVitals: FrontendWebVitalSnapshot[];
+    alerts: FrontendAlertSnapshot[];
+}
+
 export const EMPTY_OBSERVABILITY_SUMMARY: ObservabilitySummary = {
     totalRequests: 0,
     errors5xx: 0,
     averageLatencyMs: 0,
     rateLimitHits: 0,
     externalFailures: 0,
+};
+
+export const EMPTY_FRONTEND_HEALTH_SUMMARY: FrontendHealthSummary = {
+    generatedAt: null,
+    totalRouteViews: 0,
+    totalClientErrors: 0,
+    totalPoorVitals: 0,
+    busiestRoutes: [],
+    clientErrors: [],
+    poorVitals: [],
+    alerts: [],
 };
 
 export function normalizeBusinessVerificationStatus(
@@ -60,6 +121,25 @@ export function healthStatusClass(status: 'up' | 'degraded' | 'down' | undefined
         return 'bg-amber-100 text-amber-700';
     }
     return 'bg-red-100 text-red-700';
+}
+
+export function frontendAlertClass(level: 'warn' | 'critical'): string {
+    if (level === 'critical') {
+        return 'border-red-200 bg-red-50 text-red-800';
+    }
+
+    return 'border-amber-200 bg-amber-50 text-amber-800';
+}
+
+export function frontendVitalClass(rating: string): string {
+    if (rating === 'poor') {
+        return 'bg-red-100 text-red-700';
+    }
+    if (rating === 'needs-improvement') {
+        return 'bg-amber-100 text-amber-700';
+    }
+
+    return 'bg-primary-100 text-primary-700';
 }
 
 export function parseObservabilitySummary(metricText: string): ObservabilitySummary {

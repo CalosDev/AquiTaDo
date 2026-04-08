@@ -32,6 +32,13 @@ const VERCEL_EXTENSION_PATH = process.env.VERCEL_EXTENSION_PATH
     );
 const DEBUG_PORT = Number(process.env.BRAVE_ROLE_AUDIT_DEBUG_PORT ?? '9224');
 const DEFAULT_SETTLE_MS = Number(process.env.BRAVE_ROLE_AUDIT_SETTLE_MS ?? '3500');
+const VIEWPORT_WIDTH = Number(process.env.BRAVE_ROLE_AUDIT_VIEWPORT_WIDTH ?? '1440');
+const VIEWPORT_HEIGHT = Number(process.env.BRAVE_ROLE_AUDIT_VIEWPORT_HEIGHT ?? '960');
+const VIEWPORT_MOBILE = process.env.BRAVE_ROLE_AUDIT_VIEWPORT_MOBILE === '1';
+const VIEWPORT_SCALE = Number(
+    process.env.BRAVE_ROLE_AUDIT_VIEWPORT_SCALE ?? (VIEWPORT_MOBILE ? '3' : '1'),
+);
+const VIEWPORT_IS_LANDSCAPE = VIEWPORT_WIDTH >= VIEWPORT_HEIGHT;
 
 function normalizeBaseUrl(rawUrl, fallbackUrl) {
     const normalized = (rawUrl ?? fallbackUrl).trim().replace(/\/+$/, '');
@@ -732,6 +739,20 @@ async function auditScenario(baseUrl, scenario, outputDir) {
     await client.send('Runtime.enable');
     await client.send('Network.enable');
     await client.send('Log.enable');
+    await client.send('Emulation.setDeviceMetricsOverride', {
+        width: VIEWPORT_WIDTH,
+        height: VIEWPORT_HEIGHT,
+        deviceScaleFactor: VIEWPORT_SCALE,
+        mobile: VIEWPORT_MOBILE,
+        screenOrientation: {
+            type: VIEWPORT_IS_LANDSCAPE ? 'landscapePrimary' : 'portraitPrimary',
+            angle: VIEWPORT_IS_LANDSCAPE ? 90 : 0,
+        },
+    });
+    await client.send('Emulation.setTouchEmulationEnabled', {
+        enabled: VIEWPORT_MOBILE,
+        maxTouchPoints: VIEWPORT_MOBILE ? 5 : 1,
+    });
     await client.send('Page.addScriptToEvaluateOnNewDocument', {
         source: `
             (() => {

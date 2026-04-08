@@ -30,4 +30,11 @@ export class ObservabilityController {
         );
         response.send(await this.observabilityService.getMetrics());
     }
+
+    @Get('summary')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    getSummary() {
+        return this.observabilityService.getFrontendHealthSnapshot();
+    }
 }
