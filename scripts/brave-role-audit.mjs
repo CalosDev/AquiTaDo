@@ -697,6 +697,8 @@ async function auditScenario(baseUrl, scenario, outputDir) {
     const consoleMessages = [];
     const pageErrors = [];
     const networkFailures = [];
+    const httpFailures = [];
+    const requestUrls = new Map();
 
     client.on('Runtime.consoleAPICalled', (params) => {
         const args = (params.args ?? []).map((entry) => entry.value ?? entry.description ?? '');
@@ -732,6 +734,25 @@ async function auditScenario(baseUrl, scenario, outputDir) {
             type: params.type,
             errorText: params.errorText,
             canceled: params.canceled,
+        });
+    });
+    client.on('Network.requestWillBeSent', (params) => {
+        if (params.requestId && params.request?.url) {
+            requestUrls.set(params.requestId, params.request.url);
+        }
+    });
+    client.on('Network.responseReceived', (params) => {
+        const status = Number(params.response?.status ?? 0);
+        if (status < 400) {
+            return;
+        }
+
+        const url = params.response?.url || requestUrls.get(params.requestId) || '';
+        httpFailures.push({
+            url,
+            status,
+            type: params.type,
+            mimeType: params.response?.mimeType ?? '',
         });
     });
 
@@ -846,6 +867,7 @@ async function auditScenario(baseUrl, scenario, outputDir) {
         externalNoise,
         pageErrors,
         networkFailures,
+        httpFailures,
         screenshotPath,
     };
 }
@@ -1017,6 +1039,7 @@ async function run() {
                 externalNoise: report.externalNoise.length,
                 pageErrors: report.pageErrors.length,
                 networkFailures: report.networkFailures.length,
+                httpFailures: report.httpFailures.length,
             }));
         }
 
@@ -1028,6 +1051,7 @@ async function run() {
             || report.metrics.overflowX
             || report.pageErrors.length > 0
             || report.networkFailures.length > 0
+            || report.httpFailures.length > 0
             || report.consoleMessages.some((message) => message.type === 'error'),
         );
 
