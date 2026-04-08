@@ -411,9 +411,9 @@ export function EditBusiness() {
                     <div className="h-4 w-28 rounded-full bg-white/20 animate-pulse"></div>
                     <div className="mt-3 h-10 w-64 max-w-full rounded-2xl bg-white/20 animate-pulse"></div>
                     <div className="mt-3 h-5 w-full max-w-2xl rounded-xl bg-white/15 animate-pulse"></div>
-                    <div className="mt-5 flex flex-wrap gap-3">
-                        <div className="h-11 w-36 rounded-full bg-white/15 animate-pulse"></div>
-                        <div className="h-11 w-40 rounded-full bg-white/15 animate-pulse"></div>
+                    <div className="role-hero-actions" aria-hidden="true">
+                        <div className="role-hero-action-skeleton animate-pulse">Volver al panel</div>
+                        <div className="role-hero-action-skeleton animate-pulse">Ver perfil publico</div>
                     </div>
                 </section>
                 <div className="section-shell p-6 lg:p-8">
@@ -466,9 +466,9 @@ export function EditBusiness() {
                     Actualiza la información pública de tu negocio y mantén su perfil siempre al día.
                 </p>
 
-                <div className="mt-5 flex flex-wrap gap-3">
-                    <Link to="/dashboard" className="btn-secondary">Volver al panel</Link>
-                    <Link to={`/businesses/${business.slug || business.id}`} className="btn-primary">
+                <div className="role-hero-actions">
+                    <Link to="/dashboard" className="btn-secondary role-hero-action">Volver al panel</Link>
+                    <Link to={`/businesses/${business.slug || business.id}`} className="btn-primary role-hero-action">
                         Ver perfil público
                     </Link>
                 </div>

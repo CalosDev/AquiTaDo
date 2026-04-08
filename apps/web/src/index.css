@@ -481,6 +481,19 @@
       linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%);
   }
 
+  .role-hero-actions {
+    @apply mt-5 flex min-h-12 flex-wrap items-start gap-3;
+  }
+
+  .role-hero-action {
+    @apply inline-flex min-w-[11rem] justify-center;
+  }
+
+  .role-hero-action-skeleton {
+    @apply inline-flex h-11 min-w-[11rem] items-center justify-center rounded-2xl border border-white/15 bg-white/15 text-transparent;
+    box-shadow: none;
+  }
+
   .role-kpi-grid {
     @apply grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4;
   }
