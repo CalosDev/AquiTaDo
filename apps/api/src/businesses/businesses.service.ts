@@ -670,41 +670,6 @@ export class BusinessesService {
 
         try {
             await this.prisma.$transaction(async (tx) => {
-                await tx.businessImage.deleteMany({
-                    where: { businessId: id },
-                });
-
-                await tx.promotion.updateMany({
-                    where: {
-                        businessId: id,
-                        deletedAt: null,
-                    },
-                    data: {
-                        deletedAt: now,
-                        isActive: false,
-                    },
-                });
-
-                await tx.booking.updateMany({
-                    where: {
-                        businessId: id,
-                        deletedAt: null,
-                    },
-                    data: {
-                        deletedAt: now,
-                    },
-                });
-
-                await tx.conversation.updateMany({
-                    where: {
-                        businessId: id,
-                        deletedAt: null,
-                    },
-                    data: {
-                        deletedAt: now,
-                    },
-                });
-
                 await tx.business.update({
                     where: { id },
                     data: {
@@ -715,26 +680,88 @@ export class BusinessesService {
                 });
 
                 await this.syncBusinessLocation(tx, id, undefined, undefined);
-
-                await tx.auditLog.create({
-                    data: {
-                        organizationId: business.organizationId,
-                        actorUserId: userId,
-                        action: 'business.deleted',
-                        targetType: 'business',
-                        targetId: id,
-                        metadata: {
-                            reason: normalizedReason,
-                            actorRole: userRole,
-                            deletedAt: now.toISOString(),
-                        } as Prisma.InputJsonValue,
-                    },
-                });
             });
-            this.publishBusinessChangedEvent(id, business.slug, 'deleted');
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
+        }
+
+        const cleanupTasks: Array<Promise<unknown>> = [
+            this.prisma.businessImage.deleteMany({
+                where: { businessId: id },
+            }).catch((error) => {
+                this.logger.warn(
+                    `Could not delete business image rows for "${id}" (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }),
+            this.prisma.promotion.updateMany({
+                where: {
+                    businessId: id,
+                    deletedAt: null,
+                },
+                data: {
+                    deletedAt: now,
+                    isActive: false,
+                },
+            }).catch((error) => {
+                this.logger.warn(
+                    `Could not soft-delete promotions for "${id}" (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }),
+            this.prisma.booking.updateMany({
+                where: {
+                    businessId: id,
+                    deletedAt: null,
+                },
+                data: {
+                    deletedAt: now,
+                },
+            }).catch((error) => {
+                this.logger.warn(
+                    `Could not soft-delete bookings for "${id}" (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }),
+            this.prisma.conversation.updateMany({
+                where: {
+                    businessId: id,
+                    deletedAt: null,
+                },
+                data: {
+                    deletedAt: now,
+                },
+            }).catch((error) => {
+                this.logger.warn(
+                    `Could not soft-delete conversations for "${id}" (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }),
+            this.prisma.auditLog.create({
+                data: {
+                    organizationId: business.organizationId,
+                    actorUserId: userId,
+                    action: 'business.deleted',
+                    targetType: 'business',
+                    targetId: id,
+                    metadata: {
+                        reason: normalizedReason,
+                        actorRole: userRole,
+                        deletedAt: now.toISOString(),
+                    } as Prisma.InputJsonValue,
+                },
+            }).catch((error) => {
+                this.logger.warn(
+                    `Could not persist delete audit log for "${id}" (${error instanceof Error ? error.message : String(error)})`,
+                );
+            }),
+        ];
+
+        await Promise.all(cleanupTasks);
+
+        try {
+            this.publishBusinessChangedEvent(id, business.slug, 'deleted');
+        } catch (error) {
+            this.logger.warn(
+                `Could not publish business deleted event for "${id}" (${error instanceof Error ? error.message : String(error)})`,
+            );
         }
 
         try {
