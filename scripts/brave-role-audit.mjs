@@ -67,6 +67,25 @@ function assert(condition, message) {
     }
 }
 
+async function ensureUrlReachable(baseUrl, label, pathName) {
+    try {
+        const response = await fetch(`${baseUrl}${pathName}`, {
+            headers: {
+                accept: label === 'API' ? 'application/json' : 'text/html',
+            },
+        });
+        if (response.ok) {
+            return;
+        }
+        throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+            `${label} at ${baseUrl} is not reachable (${message}). Start the target app first or point ${label === 'Frontend' ? 'BRAVE_AUDIT_APP_URL' : 'BRAVE_AUDIT_API_URL'} to a live environment.`,
+        );
+    }
+}
+
 function assertActorRole(actor, expectedRole, label) {
     assert(
         actor.role === expectedRole,
@@ -907,6 +926,8 @@ async function run() {
     const runId = randomUUID().slice(0, 8);
 
     console.log(`Running Brave role audit against ${appBaseUrl} (api=${apiBaseUrl}, run=${runId})`);
+    await ensureUrlReachable(apiBaseUrl, 'API', '/api/health');
+    await ensureUrlReachable(appBaseUrl, 'Frontend', '/login');
     const customer = await resolveUserActor(apiBaseUrl, runId);
     const owner = await resolveOwnerActor(apiBaseUrl, runId);
     const admin = await resolveAdminActor(apiBaseUrl);

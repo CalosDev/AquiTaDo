@@ -158,7 +158,16 @@ async function checkObservability(apiBaseUrl, adminToken) {
 }
 
 async function checkWebHealth(webBaseUrl) {
-    const health = await request(`${webBaseUrl}/health`, 'text/plain');
+    let health;
+    try {
+        health = await request(`${webBaseUrl}/health`, 'text/plain');
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+            `Web app at ${webBaseUrl} is not reachable (${message}). Start @aquita/web on that URL or set FULL_SMOKE_SKIP_WEB=1.`,
+        );
+    }
+
     if (health.response.ok && health.text.trim().toLowerCase() === 'ok') {
         return;
     }
@@ -166,7 +175,15 @@ async function checkWebHealth(webBaseUrl) {
     // SPA hosts (for example Vercel rewrites) can serve index.html for /health.
     const webRoutes = ['/', '/businesses', '/login'];
     for (const route of webRoutes) {
-        const response = await request(`${webBaseUrl}${route}`, 'text/html');
+        let response;
+        try {
+            response = await request(`${webBaseUrl}${route}`, 'text/html');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(
+                `Web route ${route} is not reachable on ${webBaseUrl} (${message}). Start @aquita/web on that URL or set FULL_SMOKE_SKIP_WEB=1.`,
+            );
+        }
         assert(response.response.ok, `${route} failed with HTTP ${response.response.status}`);
         const contentType = response.response.headers.get('content-type') ?? '';
         assert(
