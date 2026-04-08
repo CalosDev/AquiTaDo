@@ -381,58 +381,34 @@ export class BusinessesService {
 
                 await this.assertOrganizationCanCreateBusiness(tx, effectiveOrganizationId);
 
-                const insertedBusinesses = await tx.$queryRaw<Array<{ id: string; slug: string }>>`
-                    INSERT INTO "businesses" (
-                        "id",
-                        "name",
-                        "slug",
-                        "description",
-                        "phone",
-                        "whatsapp",
-                        "website",
-                        "email",
-                        "instagramUrl",
-                        "facebookUrl",
-                        "tiktokUrl",
-                        "priceRange",
-                        "address",
-                        "latitude",
-                        "longitude",
-                        "ownerId",
-                        "organizationId",
-                        "provinceId",
-                        "cityId",
-                        "sectorId"
-                    )
-                    VALUES (
-                        ${businessId},
-                        ${dto.name},
-                        ${slug},
-                        ${dto.description},
-                        ${contactChannels.phone ?? null},
-                        ${contactChannels.whatsapp ?? null},
-                        ${website},
-                        ${email},
-                        ${instagramUrl},
-                        ${facebookUrl},
-                        ${tiktokUrl},
-                        ${dto.priceRange ?? null},
-                        ${dto.address},
-                        ${coordinates.latitude ?? null},
-                        ${coordinates.longitude ?? null},
-                        ${userId},
-                        ${effectiveOrganizationId},
-                        ${dto.provinceId},
-                        ${dto.cityId ?? null},
-                        ${dto.sectorId ?? null}
-                    )
-                    RETURNING "id", "slug"
-                `;
-
-                const business = insertedBusinesses[0];
-                if (!business) {
-                    throw new BadRequestException('No se pudo crear el negocio');
-                }
+                const business = await tx.business.create({
+                    data: {
+                        id: businessId,
+                        name: dto.name,
+                        slug,
+                        description: dto.description,
+                        phone: contactChannels.phone ?? null,
+                        whatsapp: contactChannels.whatsapp ?? null,
+                        website,
+                        email,
+                        instagramUrl,
+                        facebookUrl,
+                        tiktokUrl,
+                        priceRange: dto.priceRange ?? null,
+                        address: dto.address,
+                        latitude: coordinates.latitude ?? null,
+                        longitude: coordinates.longitude ?? null,
+                        ownerId: userId,
+                        organizationId: effectiveOrganizationId,
+                        provinceId: dto.provinceId,
+                        cityId: dto.cityId ?? null,
+                        sectorId: dto.sectorId ?? null,
+                    },
+                    select: {
+                        id: true,
+                        slug: true,
+                    },
+                });
 
                 if (categoryIds?.length) {
                     await tx.businessCategory.createMany({
