@@ -678,13 +678,13 @@ export class BusinessesService {
                         verificationStatus: 'SUSPENDED',
                     },
                 });
-
-                await this.syncBusinessLocation(tx, id, undefined, undefined);
             });
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
         }
+
+        await this.syncBusinessLocation(this.prisma, id, undefined, undefined);
 
         const cleanupTasks: Array<Promise<unknown>> = [
             this.prisma.businessImage.deleteMany({
