@@ -379,57 +379,86 @@ export class BusinessesService {
 
                 await this.assertOrganizationCanCreateBusiness(tx, effectiveOrganizationId);
 
-                const business = await tx.business.create({
-                    data: {
-                        name: dto.name,
-                        slug,
-                        description: dto.description,
-                        phone: contactChannels.phone,
-                        whatsapp: contactChannels.whatsapp,
-                        website,
-                        email,
-                        instagramUrl,
-                        facebookUrl,
-                        tiktokUrl,
-                        priceRange: dto.priceRange,
-                        address: dto.address,
-                        provinceId: dto.provinceId,
-                        cityId: dto.cityId,
-                        sectorId: dto.sectorId,
-                        latitude: coordinates.latitude,
-                        longitude: coordinates.longitude,
-                        ownerId: userId,
-                        organizationId: effectiveOrganizationId,
-                        categories: categoryIds
-                            ? {
-                                create: categoryIds.map((categoryId) => ({
-                                    categoryId,
-                                })),
-                            }
-                            : undefined,
-                        features: featureIds
-                            ? {
-                                create: featureIds.map((featureId) => ({
-                                    featureId,
-                                })),
-                            }
-                            : undefined,
-                        hours: hours
-                            ? {
-                                create: hours.map((entry) => ({
-                                    dayOfWeek: entry.dayOfWeek,
-                                    opensAt: entry.opensAt,
-                                    closesAt: entry.closesAt,
-                                    closed: entry.closed,
-                                })),
-                            }
-                            : undefined,
-                    },
-                    select: {
-                        id: true,
-                        slug: true,
-                    },
-                });
+                const insertedBusinesses = await tx.$queryRaw<Array<{ id: string; slug: string }>>`
+                    INSERT INTO "businesses" (
+                        "name",
+                        "slug",
+                        "description",
+                        "phone",
+                        "whatsapp",
+                        "website",
+                        "email",
+                        "instagramUrl",
+                        "facebookUrl",
+                        "tiktokUrl",
+                        "priceRange",
+                        "address",
+                        "latitude",
+                        "longitude",
+                        "ownerId",
+                        "organizationId",
+                        "provinceId",
+                        "cityId",
+                        "sectorId"
+                    )
+                    VALUES (
+                        ${dto.name},
+                        ${slug},
+                        ${dto.description},
+                        ${contactChannels.phone ?? null},
+                        ${contactChannels.whatsapp ?? null},
+                        ${website},
+                        ${email},
+                        ${instagramUrl},
+                        ${facebookUrl},
+                        ${tiktokUrl},
+                        ${dto.priceRange ?? null},
+                        ${dto.address},
+                        ${coordinates.latitude ?? null},
+                        ${coordinates.longitude ?? null},
+                        ${userId},
+                        ${effectiveOrganizationId},
+                        ${dto.provinceId},
+                        ${dto.cityId ?? null},
+                        ${dto.sectorId ?? null}
+                    )
+                    RETURNING "id", "slug"
+                `;
+
+                const business = insertedBusinesses[0];
+                if (!business) {
+                    throw new BadRequestException('No se pudo crear el negocio');
+                }
+
+                if (categoryIds?.length) {
+                    await tx.businessCategory.createMany({
+                        data: categoryIds.map((categoryId) => ({
+                            businessId: business.id,
+                            categoryId,
+                        })),
+                    });
+                }
+
+                if (featureIds?.length) {
+                    await tx.businessFeature.createMany({
+                        data: featureIds.map((featureId) => ({
+                            businessId: business.id,
+                            featureId,
+                        })),
+                    });
+                }
+
+                if (hours?.length) {
+                    await tx.businessHour.createMany({
+                        data: hours.map((entry) => ({
+                            businessId: business.id,
+                            dayOfWeek: entry.dayOfWeek,
+                            opensAt: entry.opensAt,
+                            closesAt: entry.closesAt,
+                            closed: entry.closed,
+                        })),
+                    });
+                }
 
                 // Only promote regular users; never downgrade admin users.
                 await tx.user.updateMany({
