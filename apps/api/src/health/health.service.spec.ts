@@ -254,4 +254,113 @@ describe('HealthService', () => {
         expect(result.status).toBe('degraded');
         expect(result.checks?.ai?.status).toBe('degraded');
     });
+
+    it('treats optional dependency downtime as degraded instead of down', async () => {
+        const queryRaw = vi.fn().mockResolvedValue([
+            {
+                ping: 1,
+                businesses: 'businesses',
+                categories: 'categories',
+                active_connections: 8,
+                max_connections: 100,
+            },
+        ]);
+        const passwordResetToken = {
+            count: vi.fn()
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0),
+        };
+        const prisma = {
+            $queryRaw: queryRaw,
+            passwordResetToken,
+        } as unknown as PrismaService;
+        const getDependencyHealthSnapshot = vi.fn().mockReturnValue([
+            {
+                dependency: 'ai',
+                operation: 'chat_completion',
+                samples: 3,
+                p50Ms: 1800,
+                p95Ms: 2100,
+                errorRatePct: 100,
+                lastSeenAt: new Date().toISOString(),
+                latencyThresholdMs: 2500,
+                healthy: false,
+            },
+        ]);
+
+        const service = createService(prisma, {
+            observability: {
+                getDependencyHealthSnapshot,
+            },
+        });
+
+        const result = await service.getOperationalDashboard();
+
+        expect(result.status).toBe('degraded');
+        expect(result.checks?.ai).toMatchObject({
+            status: 'down',
+            critical: false,
+        });
+    });
+
+    it('marks configured critical dependencies as down when they fail', async () => {
+        const queryRaw = vi.fn().mockResolvedValue([
+            {
+                ping: 1,
+                businesses: 'businesses',
+                categories: 'categories',
+                active_connections: 8,
+                max_connections: 100,
+            },
+        ]);
+        const passwordResetToken = {
+            count: vi.fn()
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0)
+                .mockResolvedValueOnce(0),
+        };
+        const prisma = {
+            $queryRaw: queryRaw,
+            passwordResetToken,
+        } as unknown as PrismaService;
+        const getDependencyHealthSnapshot = vi.fn().mockReturnValue([
+            {
+                dependency: 'ai',
+                operation: 'chat_completion',
+                samples: 3,
+                p50Ms: 1800,
+                p95Ms: 2100,
+                errorRatePct: 100,
+                lastSeenAt: new Date().toISOString(),
+                latencyThresholdMs: 2500,
+                healthy: false,
+            },
+        ]);
+        const configGet = vi.fn((key: string) => {
+            if (key === 'HEALTH_AI_CRITICAL') {
+                return 'true';
+            }
+            return undefined;
+        });
+
+        const service = createService(prisma, {
+            observability: {
+                getDependencyHealthSnapshot,
+            },
+            config: {
+                get: configGet,
+            },
+        });
+
+        const result = await service.getOperationalDashboard();
+
+        expect(result.status).toBe('down');
+        expect(result.checks?.ai).toMatchObject({
+            status: 'down',
+            critical: true,
+        });
+    });
 });

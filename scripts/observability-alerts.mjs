@@ -159,6 +159,8 @@ function evaluateHealth(health, readiness, dashboard, issues) {
             continue;
         }
 
+        const dependencyCritical = dependencyState.critical === true;
+
         const emailNotConfigured = dependency === 'email'
             && dependencyState.status === 'down'
             && dependencyState.reason === 'not_configured';
@@ -174,7 +176,12 @@ function evaluateHealth(health, readiness, dashboard, issues) {
         }
 
         if (dependencyState.status === 'down') {
-            addIssue(issues, 'critical', `Dependencia ${dependency} reporta down`, dependencyState);
+            addIssue(
+                issues,
+                dependencyCritical ? 'critical' : 'warn',
+                `Dependencia ${dependency} reporta down`,
+                dependencyState,
+            );
         } else if (dependencyState.status === 'degraded') {
             addIssue(issues, 'warn', `Dependencia ${dependency} reporta degraded`, dependencyState);
         }

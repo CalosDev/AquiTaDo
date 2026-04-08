@@ -145,7 +145,9 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertPositiveInteger(config, 'RATE_LIMIT_AI_IP_LIMIT');
     assertPositiveInteger(config, 'RATE_LIMIT_AI_API_KEY_LIMIT');
     assertPositiveInteger(config, 'HEALTH_AI_P95_MAX_MS');
+    assertPositiveInteger(config, 'HEALTH_EMAIL_P95_MAX_MS');
     assertPositiveInteger(config, 'HEALTH_WHATSAPP_P95_MAX_MS');
+    assertPositiveInteger(config, 'HEALTH_DEPENDENCY_CRITICAL_MIN_SAMPLES');
     assertPositiveInteger(config, 'AI_EMBEDDING_DIMENSIONS');
     assertPositiveInteger(config, 'EXTERNAL_DATA_CACHE_TTL_SECONDS');
     assertPositiveInteger(config, 'EXTERNAL_DATA_TIMEOUT_MS');
@@ -175,6 +177,9 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertBooleanLike(config, 'WHATSAPP_ENABLED');
     assertBooleanLike(config, 'VERIPHONE_STRICT_MODE');
     assertBooleanLike(config, 'NOMINATIM_ENABLED');
+    assertBooleanLike(config, 'HEALTH_AI_CRITICAL');
+    assertBooleanLike(config, 'HEALTH_EMAIL_CRITICAL');
+    assertBooleanLike(config, 'HEALTH_WHATSAPP_CRITICAL');
     assertNonEmptyString(config, 'NOMINATIM_USER_AGENT');
     assertPositiveInteger(config, 'NOMINATIM_MIN_INTERVAL_MS');
 

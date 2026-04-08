@@ -111,6 +111,9 @@ export class HealthService {
         const aiLatencyThresholdMs = this.resolveNumber('HEALTH_AI_P95_MAX_MS', 2_500);
         const emailLatencyThresholdMs = this.resolveNumber('HEALTH_EMAIL_P95_MAX_MS', 4_000);
         const whatsappLatencyThresholdMs = this.resolveNumber('HEALTH_WHATSAPP_P95_MAX_MS', 3_000);
+        const aiCritical = this.resolveBooleanLike('HEALTH_AI_CRITICAL', false);
+        const emailCritical = this.resolveBooleanLike('HEALTH_EMAIL_CRITICAL', false);
+        const whatsappCritical = this.resolveBooleanLike('HEALTH_WHATSAPP_CRITICAL', false);
         const dbWarnThreshold = this.resolveNumber('HEALTH_DB_POOL_WARN_RATIO', 0.75);
         const dbCriticalThreshold = this.resolveNumber('HEALTH_DB_POOL_CRITICAL_RATIO', 0.9);
         const dependencyCriticalMinSamples = this.resolveNumber('HEALTH_DEPENDENCY_CRITICAL_MIN_SAMPLES', 3);
@@ -191,12 +194,23 @@ export class HealthService {
         const emailDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'email');
         const whatsappDependencies = dependencySnapshots.filter((entry) => entry.dependency === 'whatsapp');
 
-        const aiHealth = this.summarizeDependencyGroup(aiDependencies, aiLatencyThresholdMs, dependencyCriticalMinSamples);
+        const aiHealth = this.summarizeDependencyGroup(
+            aiDependencies,
+            aiLatencyThresholdMs,
+            dependencyCriticalMinSamples,
+            aiCritical,
+        );
         const emailHealth = emailProviderConfigured
-            ? this.summarizeDependencyGroup(emailDependencies, emailLatencyThresholdMs, dependencyCriticalMinSamples)
+            ? this.summarizeDependencyGroup(
+                emailDependencies,
+                emailLatencyThresholdMs,
+                dependencyCriticalMinSamples,
+                emailCritical,
+            )
             : {
                 status: 'down' as const,
                 reason: 'not_configured',
+                critical: emailCritical,
                 thresholdMs: emailLatencyThresholdMs,
                 operations: [],
             };
@@ -204,13 +218,21 @@ export class HealthService {
             whatsappDependencies,
             whatsappLatencyThresholdMs,
             dependencyCriticalMinSamples,
+            whatsappCritical,
         );
 
-        const overallStatus = !schemaReady || dbPoolStatus === 'down' || aiHealth.status === 'down' || whatsappHealth.status === 'down'
+        const overallStatus = !schemaReady
+            || dbPoolStatus === 'down'
+            || (aiHealth.critical && aiHealth.status === 'down')
+            || (emailHealth.critical && emailHealth.status === 'down')
+            || (whatsappHealth.critical && whatsappHealth.status === 'down')
             ? 'down'
             : dbPoolStatus === 'degraded'
                 || aiHealth.status === 'degraded'
+                || aiHealth.status === 'down'
+                || emailHealth.status === 'down'
                 || whatsappHealth.status === 'degraded'
+                || whatsappHealth.status === 'down'
                 || emailHealth.status !== 'up'
                 ? 'degraded'
                 : 'up';
@@ -261,11 +283,13 @@ export class HealthService {
         }>,
         thresholdMs: number,
         minimumCriticalSamples: number,
+        critical: boolean,
     ) {
         if (items.length === 0) {
             return {
                 status: 'degraded',
                 reason: 'no_samples',
+                critical,
                 thresholdMs,
                 operations: [],
             };
@@ -278,6 +302,7 @@ export class HealthService {
 
         return {
             status: hasDown ? 'down' : hasDegraded ? 'degraded' : 'up',
+            critical,
             thresholdMs,
             operations: items.map((item) => ({
                 operation: item.operation,
@@ -299,6 +324,22 @@ export class HealthService {
 
         const parsed = Number(raw);
         return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+    }
+
+    private resolveBooleanLike(key: string, fallback: boolean): boolean {
+        const raw = this.configService.get<string>(key);
+        if (!raw) {
+            return fallback;
+        }
+
+        const normalized = raw.trim().toLowerCase();
+        if (normalized === '1' || normalized === 'true') {
+            return true;
+        }
+        if (normalized === '0' || normalized === 'false') {
+            return false;
+        }
+        return fallback;
     }
 
     private isTransactionalEmailConfigured(): boolean {

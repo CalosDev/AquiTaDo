@@ -158,7 +158,14 @@ Servicios:
 - `CIRCUIT_BREAKER_COOLDOWN_MS=60000`
 - `JSON_API_RESPONSE_ENABLED=false`
 - `HEALTH_AI_P95_MAX_MS=2500`
+- `HEALTH_EMAIL_P95_MAX_MS=4000`
+- `HEALTH_WHATSAPP_P95_MAX_MS=3000`
 - `HEALTH_DB_POOL_WARN_RATIO=0.75`
+- `HEALTH_DB_POOL_CRITICAL_RATIO=0.9`
+- `HEALTH_DEPENDENCY_CRITICAL_MIN_SAMPLES=3`
+- `HEALTH_AI_CRITICAL=false`
+- `HEALTH_EMAIL_CRITICAL=false`
+- `HEALTH_WHATSAPP_CRITICAL=false`
 
 `apps/web/.env`:
 
@@ -420,3 +427,8 @@ Variables soportadas por `pnpm alerts:prod`:
 - `SMOKE_PROD_ALERT_POOR_VITALS_WARN`: umbral de advertencia para web vitals no saludables acumulados. Default `5`.
 - `SMOKE_PROD_ALERT_FAIL_ON_WARN=1`: hace fallar el script tambien cuando solo hay `warn`, no solo `critical`.
 - `SMOKE_PROD_REQUIRE_EMAIL=1`: trata email transaccional sin configurar como un error critico en vez de advertencia.
+
+Notas operativas para `GET /api/health/dashboard`:
+
+- `HEALTH_AI_CRITICAL`, `HEALTH_EMAIL_CRITICAL` y `HEALTH_WHATSAPP_CRITICAL` controlan si una dependencia externa puede bajar el estado global a `down`.
+- Por defecto esas dependencias quedan como senales operativas visibles, pero no tiran el servicio completo a `down` a menos que se marque explicitamente.
