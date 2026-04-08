@@ -410,7 +410,10 @@ export function EditBusiness() {
                 <section className="role-hero role-hero-owner" aria-busy="true">
                     <div className="h-4 w-28 rounded-full bg-white/20 animate-pulse"></div>
                     <div className="mt-3 h-10 w-64 max-w-full rounded-2xl bg-white/20 animate-pulse"></div>
-                    <div className="mt-3 h-5 w-full max-w-2xl rounded-xl bg-white/15 animate-pulse"></div>
+                    <div className="mt-3 max-w-2xl space-y-2">
+                        <div className="h-5 w-full rounded-xl bg-white/15 animate-pulse"></div>
+                        <div className="h-5 w-3/4 rounded-xl bg-white/10 animate-pulse"></div>
+                    </div>
                     <div className="role-hero-actions" aria-hidden="true">
                         <div className="role-hero-action-skeleton animate-pulse">Volver al panel</div>
                         <div className="role-hero-action-skeleton animate-pulse">Ver perfil publico</div>
@@ -462,7 +465,7 @@ export function EditBusiness() {
             <section className="role-hero role-hero-owner">
                 <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Editar negocio</h1>
-                <p className="text-blue-100 mt-2 max-w-2xl">
+                <p className="text-blue-100 mt-2 max-w-2xl min-h-[3.5rem]">
                     Actualiza la información pública de tu negocio y mantén su perfil siempre al día.
                 </p>
 
