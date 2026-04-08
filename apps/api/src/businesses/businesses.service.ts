@@ -677,6 +677,9 @@ export class BusinessesService {
                         verified: false,
                         verificationStatus: 'SUSPENDED',
                     },
+                    select: {
+                        id: true,
+                    },
                 });
             });
         } catch (error) {
