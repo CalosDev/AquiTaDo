@@ -1768,7 +1768,7 @@ export function AdminDashboard() {
                                     <div>
                                         <h3 className="font-display font-semibold text-gray-900">Salud frontend</h3>
                                         <p className="mt-1 text-sm text-gray-600">
-                                            Errores cliente, web vitals y rutas calientes reportadas por usuarios reales.
+                                            Errores cliente, web vitals y rutas calientes de las últimas 24 horas.
                                         </p>
                                     </div>
                                     <div className="text-xs text-gray-500">

@@ -158,12 +158,16 @@
   }
 
   .auth-hero-panel {
-    @apply relative overflow-hidden rounded-[32px] border border-primary-300/20 p-8 text-white md:p-10;
+    @apply relative flex flex-col gap-8 overflow-hidden rounded-[32px] border border-primary-300/20 p-8 text-white md:p-10;
     background:
       radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 34%),
       radial-gradient(circle at 84% 14%, rgba(206, 17, 38, 0.28) 0%, rgba(206, 17, 38, 0) 30%),
       linear-gradient(135deg, #04142f 0%, #0b2d63 52%, #154fa3 100%);
     box-shadow: 0 24px 46px -28px rgba(2, 6, 23, 0.65);
+  }
+
+  .auth-hero-top {
+    @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
   }
 
   .auth-hero-panel::after {
@@ -178,7 +182,11 @@
   }
 
   .auth-hero-badge {
-    @apply mb-8 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-100/85 backdrop-blur-sm;
+    @apply inline-flex max-w-max items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-100/85 backdrop-blur-sm;
+  }
+
+  .auth-brand-lockup {
+    @apply inline-flex items-center gap-3 text-white self-start sm:self-auto;
   }
 
   .auth-feature-list {
@@ -200,6 +208,11 @@
 
   .auth-card-header {
     @apply mb-8 flex flex-col items-center gap-4;
+  }
+
+  .defer-render-section {
+    content-visibility: auto;
+    contain-intrinsic-size: 720px;
   }
 
   .card {

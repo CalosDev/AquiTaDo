@@ -32,6 +32,7 @@ const FRONTEND_OBSERVABILITY_URL = `${API_BASE_URL}/observability/frontend`;
 const canUseWindow = typeof window !== 'undefined';
 const reportedRouteViews = new Set<string>();
 const reportedVitals = new Set<string>();
+const SYNTHETIC_QUERY_PARAMS = ['synthetic_audit', 'synthetic_monitoring', 'synthetic'];
 
 function sanitizeSignalText(value: string | undefined, fallback: string): string {
     const normalized = (value ?? '').trim();
@@ -50,6 +51,30 @@ function isExternalNoise(message: string): boolean {
         || normalized.includes('dialogcontent')
         || normalized.includes('dialogtitle')
     );
+}
+
+export function shouldSkipFrontendObservability(): boolean {
+    if (!canUseWindow) {
+        return false;
+    }
+
+    try {
+        const searchParams = new URLSearchParams(window.location.search);
+        if (SYNTHETIC_QUERY_PARAMS.some((key) => {
+            const value = searchParams.get(key);
+            return value === '1' || value === 'true';
+        })) {
+            return true;
+        }
+
+        if (window.localStorage.getItem('aquitaSyntheticSession') === '1') {
+            return true;
+        }
+    } catch {
+        // Ignore storage/query parsing issues.
+    }
+
+    return navigator.webdriver === true;
 }
 
 export function toRoleLabel(rawRole: string | undefined): FrontendRole {
@@ -96,7 +121,7 @@ export function normalizeFrontendRoute(pathname: string): string {
 }
 
 function sendFrontendSignal(payload: FrontendSignalPayload) {
-    if (!canUseWindow) {
+    if (!canUseWindow || shouldSkipFrontendObservability()) {
         return;
     }
 
@@ -158,6 +183,10 @@ function getWebVitalRating(metricName: WebVitalName, value: number): WebVitalRat
 }
 
 export function reportRouteView(pathname: string, role: string | undefined) {
+    if (shouldSkipFrontendObservability()) {
+        return;
+    }
+
     const normalizedRoute = normalizeFrontendRoute(pathname);
     const dedupeKey = `${normalizedRoute}:${toRoleLabel(role)}`;
     if (reportedRouteViews.has(dedupeKey)) {
@@ -204,7 +233,7 @@ function reportWebVital(pathname: string, role: string | undefined, metricName: 
 export function createFrontendObservabilityObservers(
     getContext: () => FrontendObservabilityContext,
 ) {
-    if (!canUseWindow || typeof PerformanceObserver === 'undefined') {
+    if (!canUseWindow || typeof PerformanceObserver === 'undefined' || shouldSkipFrontendObservability()) {
         return () => undefined;
     }
 

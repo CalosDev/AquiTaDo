@@ -6,6 +6,7 @@ import {
     createFrontendObservabilityObservers,
     normalizeFrontendRoute,
     reportRouteView,
+    shouldSkipFrontendObservability,
     toRoleLabel,
 } from '../lib/frontendObservability';
 
@@ -25,11 +26,17 @@ export function FrontendObservabilityBridge() {
     }, [location.pathname, user?.role]);
 
     useEffect(() => {
+        if (shouldSkipFrontendObservability()) {
+            return undefined;
+        }
         const cleanup = createFrontendObservabilityObservers(() => latestContext.current);
         return cleanup;
     }, []);
 
     useEffect(() => {
+        if (shouldSkipFrontendObservability()) {
+            return;
+        }
         reportRouteView(location.pathname, user?.role);
     }, [location.key, location.pathname, user?.role]);
 

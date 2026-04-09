@@ -248,4 +248,36 @@ describe('ObservabilityController (e2e)', () => {
         expect(response.text).toContain('/businesses/:slug');
         expect(response.text).toContain('/dashboard/businesses/:id/edit');
     });
+
+    it('allows admins to reset frontend observability aggregates', async () => {
+        await request(app.getHttpServer())
+            .post('/api/observability/frontend')
+            .send({
+                kind: FrontendSignalKind.ROUTE_VIEW,
+                route: '/businesses',
+                role: 'USER',
+            })
+            .expect(202);
+
+        const admin = await createUser('ADMIN');
+        const token = signToken(admin.id, admin.role);
+
+        await request(app.getHttpServer())
+            .post('/api/observability/summary/reset')
+            .set('Authorization', `Bearer ${token}`)
+            .expect(201)
+            .expect(({ body }) => {
+                expect(body).toEqual({ cleared: true });
+            });
+
+        const response = await request(app.getHttpServer())
+            .get('/api/observability/summary')
+            .set('Authorization', `Bearer ${token}`)
+            .expect(200);
+
+        expect(response.body.totalRouteViews).toBe(0);
+        expect(response.body.totalClientErrors).toBe(0);
+        expect(response.body.totalPoorVitals).toBe(0);
+        expect(response.body.alerts).toEqual([]);
+    });
 });

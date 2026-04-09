@@ -47,6 +47,12 @@ function normalizeBaseUrl(rawUrl, fallbackUrl) {
     return normalized;
 }
 
+function withSyntheticAudit(url) {
+    const nextUrl = new URL(url);
+    nextUrl.searchParams.set('synthetic_audit', '1');
+    return nextUrl.toString();
+}
+
 function isLocalApiBaseUrl(apiBaseUrl) {
     try {
         const hostname = new URL(apiBaseUrl).hostname;
@@ -1007,7 +1013,7 @@ async function run() {
             {
                 label: 'customer-profile',
                 role: 'USER',
-                url: `${appBaseUrl}/profile`,
+                url: withSyntheticAudit(`${appBaseUrl}/profile`),
                 session: {
                     accessToken: customer.accessToken,
                     user: customer.user,
@@ -1017,7 +1023,7 @@ async function run() {
             {
                 label: 'customer-dashboard',
                 role: 'USER',
-                url: `${appBaseUrl}/app/customer`,
+                url: withSyntheticAudit(`${appBaseUrl}/app/customer`),
                 session: {
                     accessToken: customer.accessToken,
                     user: customer.user,
@@ -1029,7 +1035,7 @@ async function run() {
             {
                 label: 'owner-profile',
                 role: 'BUSINESS_OWNER',
-                url: `${appBaseUrl}/profile`,
+                url: withSyntheticAudit(`${appBaseUrl}/profile`),
                 session: {
                     accessToken: owner.accessToken,
                     user: owner.user,
@@ -1039,7 +1045,7 @@ async function run() {
             {
                 label: 'owner-dashboard',
                 role: 'BUSINESS_OWNER',
-                url: `${appBaseUrl}/dashboard`,
+                url: withSyntheticAudit(`${appBaseUrl}/dashboard`),
                 session: {
                     accessToken: owner.accessToken,
                     user: owner.user,
@@ -1049,7 +1055,7 @@ async function run() {
             {
                 label: 'owner-register-business',
                 role: 'BUSINESS_OWNER',
-                url: `${appBaseUrl}/register-business`,
+                url: withSyntheticAudit(`${appBaseUrl}/register-business`),
                 session: {
                     accessToken: owner.accessToken,
                     user: owner.user,
@@ -1059,7 +1065,7 @@ async function run() {
             ...(businessId ? [{
                 label: 'owner-edit-business',
                 role: 'BUSINESS_OWNER',
-                url: `${appBaseUrl}/dashboard/businesses/${businessId}/edit`,
+                url: withSyntheticAudit(`${appBaseUrl}/dashboard/businesses/${businessId}/edit`),
                 session: {
                     accessToken: owner.accessToken,
                     user: owner.user,
@@ -1074,7 +1080,7 @@ async function run() {
             {
                 label: 'admin-profile',
                 role: 'ADMIN',
-                url: `${appBaseUrl}/profile`,
+                url: withSyntheticAudit(`${appBaseUrl}/profile`),
                 session: {
                     accessToken: admin.accessToken,
                     user: admin.user,
@@ -1084,7 +1090,7 @@ async function run() {
             {
                 label: 'admin-dashboard',
                 role: 'ADMIN',
-                url: `${appBaseUrl}/admin`,
+                url: withSyntheticAudit(`${appBaseUrl}/admin`),
                 session: {
                     accessToken: admin.accessToken,
                     user: admin.user,
@@ -1094,7 +1100,7 @@ async function run() {
             {
                 label: 'admin-security',
                 role: 'ADMIN',
-                url: `${appBaseUrl}/security`,
+                url: withSyntheticAudit(`${appBaseUrl}/security`),
                 session: {
                     accessToken: admin.accessToken,
                     user: admin.user,

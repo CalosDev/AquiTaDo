@@ -11,6 +11,7 @@ import { FrontendSignalKind, TrackFrontendSignalDto } from './dto/frontend-obser
 
 let defaultMetricsCollected = false;
 const FRONTEND_OBSERVABILITY_TTL_SECONDS = 60 * 60 * 24 * 7;
+const FRONTEND_HEALTH_WINDOW_MS = 1000 * 60 * 60 * 24;
 const FRONTEND_ROUTE_VIEW_REDIS_KEY = 'observability:frontend:route-views:v1';
 const FRONTEND_CLIENT_ERROR_REDIS_KEY = 'observability:frontend:client-errors:v1';
 const FRONTEND_WEB_VITAL_REDIS_KEY = 'observability:frontend:web-vitals:v1';
@@ -432,6 +433,20 @@ export class ObservabilityService {
         };
     }
 
+    async resetFrontendHealthSnapshot(): Promise<{ cleared: boolean }> {
+        this.frontendRouteViewSamples.clear();
+        this.frontendClientErrorSamples.clear();
+        this.frontendWebVitalSamples.clear();
+
+        await Promise.all([
+            this.redisService.deleteByPrefix(FRONTEND_ROUTE_VIEW_REDIS_KEY),
+            this.redisService.deleteByPrefix(FRONTEND_CLIENT_ERROR_REDIS_KEY),
+            this.redisService.deleteByPrefix(FRONTEND_WEB_VITAL_REDIS_KEY),
+        ]);
+
+        return { cleared: true };
+    }
+
     getDependencyHealthSnapshot(
         thresholdsMs?: Record<string, number>,
     ): Array<{
@@ -687,10 +702,10 @@ export class ObservabilityService {
         }>>(FRONTEND_ROUTE_VIEW_REDIS_KEY);
 
         if (cached && Object.keys(cached).length > 0) {
-            return Object.values(cached);
+            return this.filterRecentFrontendEntries(Object.values(cached));
         }
 
-        return [...this.frontendRouteViewSamples.values()];
+        return this.filterRecentFrontendEntries([...this.frontendRouteViewSamples.values()]);
     }
 
     private async getFrontendClientErrorEntries(): Promise<Array<{
@@ -709,10 +724,10 @@ export class ObservabilityService {
         }>>(FRONTEND_CLIENT_ERROR_REDIS_KEY);
 
         if (cached && Object.keys(cached).length > 0) {
-            return Object.values(cached);
+            return this.filterRecentFrontendEntries(Object.values(cached));
         }
 
-        return [...this.frontendClientErrorSamples.values()];
+        return this.filterRecentFrontendEntries([...this.frontendClientErrorSamples.values()]);
     }
 
     private async getFrontendWebVitalEntries(): Promise<Array<{
@@ -737,10 +752,10 @@ export class ObservabilityService {
         }>>(FRONTEND_WEB_VITAL_REDIS_KEY);
 
         if (cached && Object.keys(cached).length > 0) {
-            return Object.values(cached);
+            return this.filterRecentFrontendEntries(Object.values(cached));
         }
 
-        return [...this.frontendWebVitalSamples.values()];
+        return this.filterRecentFrontendEntries([...this.frontendWebVitalSamples.values()]);
     }
 
     private async persistRedisAggregateUpdate<T>(
@@ -770,5 +785,10 @@ export class ObservabilityService {
             Math.max(0, Math.floor((sorted.length - 1) * percentile)),
         );
         return Number((sorted[index] ?? 0).toFixed(2));
+    }
+
+    private filterRecentFrontendEntries<T extends { lastSeenAt: number }>(entries: T[]): T[] {
+        const cutoff = Date.now() - FRONTEND_HEALTH_WINDOW_MS;
+        return entries.filter((entry) => entry.lastSeenAt >= cutoff);
     }
 }

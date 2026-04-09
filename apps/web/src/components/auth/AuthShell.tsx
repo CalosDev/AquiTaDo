@@ -24,25 +24,27 @@ export function AuthShell({
         <div className="auth-stage">
             <div className="auth-layout">
                 <section className="auth-hero-panel">
-                    <div className="auth-hero-badge">
-                        Hecho para discovery local en RD
-                    </div>
+                    <div className="auth-hero-top">
+                        <div className="auth-hero-badge">
+                            Hecho para discovery local en RD
+                        </div>
 
-                    <Link to="/" className="inline-flex items-center gap-3 text-white">
-                        <div className="relative h-12 w-12 overflow-hidden rounded-2xl border border-white/30 bg-white/90 shadow-lg shadow-black/10">
-                            <div className="absolute inset-y-0 left-0 w-1/2 bg-primary-700"></div>
-                            <div className="absolute inset-y-0 right-0 w-1/2 bg-accent-600"></div>
-                            <span className="absolute inset-0 flex items-center justify-center font-display text-lg font-bold text-white">A</span>
-                        </div>
-                        <div>
-                            <p className="font-display text-3xl font-bold">
-                                Aqui<span className="text-accent-300">Ta</span>.do
-                            </p>
-                            <p className="text-xs uppercase tracking-[0.24em] text-blue-100/80">
-                                Negocios locales en RD
-                            </p>
-                        </div>
-                    </Link>
+                        <Link to="/" className="auth-brand-lockup">
+                            <div className="relative h-12 w-12 overflow-hidden rounded-2xl border border-white/30 bg-white/90 shadow-lg shadow-black/10">
+                                <div className="absolute inset-y-0 left-0 w-1/2 bg-primary-700"></div>
+                                <div className="absolute inset-y-0 right-0 w-1/2 bg-accent-600"></div>
+                                <span className="absolute inset-0 flex items-center justify-center font-display text-lg font-bold text-white">A</span>
+                            </div>
+                            <div>
+                                <p className="font-display text-3xl font-bold">
+                                    Aqui<span className="text-accent-300">Ta</span>.do
+                                </p>
+                                <p className="text-xs uppercase tracking-[0.24em] text-blue-100/80">
+                                    Negocios locales en RD
+                                </p>
+                            </div>
+                        </Link>
+                    </div>
 
                     <div className="space-y-4">
                         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-100/80">

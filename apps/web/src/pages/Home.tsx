@@ -538,7 +538,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
+            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
                 <div className="section-shell p-5 md:p-7">
                     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>
@@ -573,7 +573,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
+            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
                 <div className="grid gap-8 lg:grid-cols-2">
                     <div className="section-shell p-6">
                         <div className="flex items-end justify-between gap-4">
@@ -659,7 +659,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
+            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
                 <div className="section-shell p-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                         <div>
@@ -740,7 +740,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
+            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h2 className="section-title !text-3xl">Negocios recientes</h2>
@@ -817,7 +817,7 @@ export function Home() {
                 )}
             </section>
 
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
+            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
                 <div className="section-shell p-6 md:p-8">
                     <h2 className="section-title !text-3xl">Por que AquiTa.do es diferente</h2>
                     <p className="section-subtitle mt-2">
@@ -834,7 +834,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="gradient-hero mt-14">
+            <section className="defer-render-section gradient-hero mt-14">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
                     <p className="chip !bg-white/10 !text-white !border-white/30 mx-auto w-fit">Impulsa tu presencia local</p>
                     <h2 className="mt-4 font-display text-3xl md:text-5xl font-extrabold text-white">

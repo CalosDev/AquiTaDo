@@ -37,4 +37,11 @@ export class ObservabilityController {
     getSummary() {
         return this.observabilityService.getFrontendHealthSnapshot();
     }
+
+    @Post('summary/reset')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    resetSummary() {
+        return this.observabilityService.resetFrontendHealthSnapshot();
+    }
 }
