@@ -3,6 +3,7 @@ import { ImgHTMLAttributes, useEffect, useState } from 'react';
 type OptimizedImageProps = ImgHTMLAttributes<HTMLImageElement> & {
     src: string;
     fallbackSrc?: string;
+    priority?: boolean;
 };
 
 const UPLOAD_IMAGE_REGEX = /^(.*\/uploads\/businesses\/.+)\.(jpe?g|png|webp)(\?.*)?$/i;
@@ -53,7 +54,17 @@ function resolveAssetUrl(src: string): string {
     return normalized;
 }
 
-export function OptimizedImage({ src, alt, fallbackSrc, onError, ...rest }: OptimizedImageProps) {
+export function OptimizedImage({
+    src,
+    alt,
+    fallbackSrc,
+    onError,
+    priority = false,
+    loading,
+    decoding,
+    fetchPriority,
+    ...rest
+}: OptimizedImageProps) {
     const [hasLoadError, setHasLoadError] = useState(false);
 
     useEffect(() => {
@@ -62,6 +73,9 @@ export function OptimizedImage({ src, alt, fallbackSrc, onError, ...rest }: Opti
 
     const resolvedSrc = resolveAssetUrl(src);
     const resolvedFallbackSrc = resolveAssetUrl((fallbackSrc || DEFAULT_FALLBACK_SRC).trim());
+    const effectiveLoading = loading ?? (priority ? 'eager' : 'lazy');
+    const effectiveDecoding = decoding ?? 'async';
+    const effectiveFetchPriority = fetchPriority ?? (priority ? 'high' : undefined);
 
     const handleError: ImgHTMLAttributes<HTMLImageElement>['onError'] = (event) => {
         setHasLoadError(true);
@@ -69,12 +83,32 @@ export function OptimizedImage({ src, alt, fallbackSrc, onError, ...rest }: Opti
     };
 
     if (hasLoadError || !resolvedSrc) {
-        return <img src={resolvedFallbackSrc} alt={alt} onError={onError} {...rest} />;
+        return (
+            <img
+                src={resolvedFallbackSrc}
+                alt={alt}
+                onError={onError}
+                loading={effectiveLoading}
+                decoding={effectiveDecoding}
+                fetchPriority={effectiveFetchPriority}
+                {...rest}
+            />
+        );
     }
 
     const match = resolvedSrc.match(UPLOAD_IMAGE_REGEX);
     if (!match) {
-        return <img src={resolvedSrc} alt={alt} onError={handleError} {...rest} />;
+        return (
+            <img
+                src={resolvedSrc}
+                alt={alt}
+                onError={handleError}
+                loading={effectiveLoading}
+                decoding={effectiveDecoding}
+                fetchPriority={effectiveFetchPriority}
+                {...rest}
+            />
+        );
     }
 
     const basePath = match[1];
@@ -83,7 +117,15 @@ export function OptimizedImage({ src, alt, fallbackSrc, onError, ...rest }: Opti
         <picture>
             <source srcSet={`${basePath}.avif${queryString}`} type="image/avif" />
             <source srcSet={`${basePath}.webp${queryString}`} type="image/webp" />
-            <img src={resolvedSrc} alt={alt} onError={handleError} {...rest} />
+            <img
+                src={resolvedSrc}
+                alt={alt}
+                onError={handleError}
+                loading={effectiveLoading}
+                decoding={effectiveDecoding}
+                fetchPriority={effectiveFetchPriority}
+                {...rest}
+            />
         </picture>
     );
 }

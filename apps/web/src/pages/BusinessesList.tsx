@@ -184,6 +184,8 @@ export function BusinessesList() {
         const end = Math.min(total, start + businesses.length - 1);
         return `Mostrando ${start}-${end} de ${total} resultados`;
     }, [businesses.length, currentPage, loading, total]);
+    const shouldShowInitialLoading = loading && businesses.length === 0 && !loadError;
+    const isRefreshingResults = loading && businesses.length > 0 && !loadError;
     const activeCategory = useMemo(
         () => categories.find((category) => category.slug === categorySlug || category.id === currentCategory) || null,
         [categories, categorySlug, currentCategory],
@@ -926,7 +928,7 @@ export function BusinessesList() {
                 />
 
                 <div className="min-w-0">
-                    {loading ? (
+                    {shouldShowInitialLoading ? (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 {Array.from({ length: 3 }).map((_, index) => (
@@ -965,7 +967,7 @@ export function BusinessesList() {
                                 <div className="h-9 w-24 rounded-xl bg-slate-100 animate-pulse"></div>
                             </div>
                         </div>
-                    ) : loadError ? (
+                    ) : loadError && businesses.length === 0 ? (
                         <div className="rounded-[1.75rem] border border-accent-100 bg-white p-6 shadow-[0_28px_80px_-42px_rgba(15,23,42,0.28)] sm:p-8">
                             <div className="max-w-2xl">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-500">
@@ -1002,6 +1004,20 @@ export function BusinessesList() {
                         </div>
                     ) : sortedBusinesses.length > 0 ? (
                         <>
+                            {isRefreshingResults ? (
+                                <div className="mb-4 rounded-2xl border border-primary-100 bg-primary-50/80 px-4 py-3 text-sm text-primary-700 shadow-sm">
+                                    Actualizando resultados sin perder el contexto actual...
+                                </div>
+                            ) : null}
+
+                            {loadError ? (
+                                <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
+                                    {loadErrorType === 'timeout'
+                                        ? 'La actualizacion tardó más de lo normal. Te dejamos los últimos resultados visibles mientras reintentas.'
+                                        : loadError}
+                                </div>
+                            ) : null}
+
                             {showSponsoredAds && sponsoredPlacements.length > 0 && (
                                 <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                     {sponsoredPlacements.map((placement) => (
@@ -1100,7 +1116,7 @@ export function BusinessesList() {
                                                     setSelectedBusinessId(biz.id);
                                                 }
                                             }}
-                                            className={`group listing-card ${
+                                            className={`group listing-card defer-render-card ${
                                                 isSelectedOnMap
                                                     ? 'border-primary-300 ring-2 ring-primary-100'
                                                     : ''
@@ -1112,8 +1128,8 @@ export function BusinessesList() {
                                                         src={biz.images[0].url}
                                                         alt={biz.name}
                                                         className="h-full w-full object-cover"
-                                                        loading="lazy"
-                                                        decoding="async"
+                                                        priority={currentPage === 1 && currentView === 'list' && sortedBusinesses[0]?.id === biz.id}
+                                                        sizes="(min-width: 1280px) 26rem, (min-width: 1024px) 30vw, (min-width: 640px) 50vw, 100vw"
                                                     />
                                                 ) : (
                                                     <div className="flex h-full items-center justify-center text-4xl font-display font-bold text-slate-300">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { analyticsApi, bookingsApi, businessApi, checkinsApi, favoritesApi, messagingApi, promotionsApi, reputationApi, reviewApi, whatsappApi } from '../api/endpoints';
@@ -13,9 +13,6 @@ import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { featureFlags } from '../config/features';
 import { MobileContactBar } from './business-details/MobileContactBar';
-import { NearbyBusinessesSection } from './business-details/NearbyBusinessesSection';
-import { PromotionsSection } from './business-details/PromotionsSection';
-import { ReviewsSection } from './business-details/ReviewsSection';
 import { SidebarPanel } from './business-details/SidebarPanel';
 import { businessSupportsBooking, formatDaysAgo, getCurrentLocation, getDisplayInitial, renderStarsSafe } from './business-details/helpers';
 import type {
@@ -28,6 +25,61 @@ import type {
     ReputationProfile,
     ReviewEntry,
 } from './business-details/types';
+
+const PromotionsSectionLazy = lazy(async () => {
+    const module = await import('./business-details/PromotionsSection');
+    return { default: module.PromotionsSection };
+});
+
+const NearbyBusinessesSectionLazy = lazy(async () => {
+    const module = await import('./business-details/NearbyBusinessesSection');
+    return { default: module.NearbyBusinessesSection };
+});
+
+const ReviewsSectionLazy = lazy(async () => {
+    const module = await import('./business-details/ReviewsSection');
+    return { default: module.ReviewsSection };
+});
+
+function scheduleDeferredTask(task: () => void): () => void {
+    if (typeof window === 'undefined') {
+        task();
+        return () => undefined;
+    }
+
+    const idleWindow = window as Window & {
+        requestIdleCallback?: (
+            callback: IdleRequestCallback,
+            options?: IdleRequestOptions,
+        ) => number;
+        cancelIdleCallback?: (handle: number) => void;
+    };
+    const idleCallback = idleWindow.requestIdleCallback;
+    if (typeof idleCallback === 'function') {
+        const callbackId = idleCallback(() => {
+            task();
+        }, { timeout: 600 });
+        return () => idleWindow.cancelIdleCallback?.(callbackId);
+    }
+
+    const timeoutId = window.setTimeout(task, 180);
+    return () => window.clearTimeout(timeoutId);
+}
+
+function DetailSectionFallback({ label }: { label: string }) {
+    return (
+        <div className="panel-premium p-6">
+            <div className="h-4 w-28 rounded-full bg-slate-100 animate-pulse" />
+            <div className="mt-3 h-7 w-52 rounded-full bg-slate-100 animate-pulse" />
+            <div className="mt-5 space-y-3">
+                <div className="h-20 rounded-[1.25rem] bg-slate-100 animate-pulse" />
+                <div className="h-20 rounded-[1.25rem] bg-slate-100 animate-pulse" />
+            </div>
+            <span className="sr-only">{label}</span>
+        </div>
+    );
+}
+
 export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
     const { isAuthenticated, user } = useAuth();
@@ -308,68 +360,45 @@ export function BusinessDetails() {
             setReviews([]);
             setPublicPromotions([]);
             setNearbyBusinesses([]);
+            setReviewsLoading(false);
+            setPromotionsLoading(false);
+            setNearbyLoading(false);
             return;
         }
 
         let active = true;
-        setReviewsLoading(true);
-        setPromotionsLoading(true);
-        setNearbyLoading(Boolean(
-            typeof business.latitude === 'number' && typeof business.longitude === 'number',
-        ));
+        const cancelDeferredTask = scheduleDeferredTask(() => {
+            if (!active) {
+                return;
+            }
 
-        void reviewApi.getByBusiness(business.id)
-            .then((response) => {
-                if (!active) {
-                    return;
-                }
-                setReviews((response.data || []) as ReviewEntry[]);
-            })
-            .catch(() => {
-                if (active) {
-                    setReviews([]);
-                }
-            })
-            .finally(() => {
-                if (active) {
-                    setReviewsLoading(false);
-                }
-            });
+            setReviewsLoading(true);
+            setPromotionsLoading(true);
+            setNearbyLoading(Boolean(
+                typeof business.latitude === 'number' && typeof business.longitude === 'number',
+            ));
 
-        void promotionsApi.getPublic({
-            businessId: business.id,
-            limit: 6,
-        })
-            .then((response) => {
-                if (!active) {
-                    return;
-                }
+            void reviewApi.getByBusiness(business.id)
+                .then((response) => {
+                    if (!active) {
+                        return;
+                    }
+                    setReviews((response.data || []) as ReviewEntry[]);
+                })
+                .catch(() => {
+                    if (active) {
+                        setReviews([]);
+                    }
+                })
+                .finally(() => {
+                    if (active) {
+                        setReviewsLoading(false);
+                    }
+                });
 
-                const payload = response.data;
-                const rows = Array.isArray(payload)
-                    ? payload
-                    : ((payload?.data || []) as PublicPromotion[]);
-                setPublicPromotions(rows as PublicPromotion[]);
-            })
-            .catch(() => {
-                if (active) {
-                    setPublicPromotions([]);
-                }
-            })
-            .finally(() => {
-                if (active) {
-                    setPromotionsLoading(false);
-                }
-            });
-
-        if (
-            typeof business.latitude === 'number'
-            && typeof business.longitude === 'number'
-        ) {
-            void businessApi.getNearby({
-                lat: business.latitude,
-                lng: business.longitude,
-                radius: 5,
+            void promotionsApi.getPublic({
+                businessId: business.id,
+                limit: 6,
             })
                 .then((response) => {
                     if (!active) {
@@ -377,42 +406,75 @@ export function BusinessDetails() {
                     }
 
                     const payload = response.data;
-                    const rows = (Array.isArray(payload)
+                    const rows = Array.isArray(payload)
                         ? payload
-                        : (payload?.data || [])) as Array<Record<string, unknown>>;
-
-                    const normalized = rows
-                        .map((row) => ({
-                            id: String(row.id || ''),
-                            name: String(row.name || ''),
-                            slug: String(row.slug || ''),
-                            address: typeof row.address === 'string' ? row.address : undefined,
-                            distance: typeof row.distance === 'number' || typeof row.distance === 'string'
-                                ? row.distance
-                                : null,
-                        }))
-                        .filter((item) => item.id && item.id !== business.id)
-                        .slice(0, 6);
-
-                    setNearbyBusinesses(normalized);
+                        : ((payload?.data || []) as PublicPromotion[]);
+                    setPublicPromotions(rows as PublicPromotion[]);
                 })
                 .catch(() => {
                     if (active) {
-                        setNearbyBusinesses([]);
+                        setPublicPromotions([]);
                     }
                 })
                 .finally(() => {
                     if (active) {
-                        setNearbyLoading(false);
+                        setPromotionsLoading(false);
                     }
                 });
-        } else {
-            setNearbyBusinesses([]);
-            setNearbyLoading(false);
-        }
+
+            if (
+                typeof business.latitude === 'number'
+                && typeof business.longitude === 'number'
+            ) {
+                void businessApi.getNearby({
+                    lat: business.latitude,
+                    lng: business.longitude,
+                    radius: 5,
+                })
+                    .then((response) => {
+                        if (!active) {
+                            return;
+                        }
+
+                        const payload = response.data;
+                        const rows = (Array.isArray(payload)
+                            ? payload
+                            : (payload?.data || [])) as Array<Record<string, unknown>>;
+
+                        const normalized = rows
+                            .map((row) => ({
+                                id: String(row.id || ''),
+                                name: String(row.name || ''),
+                                slug: String(row.slug || ''),
+                                address: typeof row.address === 'string' ? row.address : undefined,
+                                distance: typeof row.distance === 'number' || typeof row.distance === 'string'
+                                    ? row.distance
+                                    : null,
+                            }))
+                            .filter((item) => item.id && item.id !== business.id)
+                            .slice(0, 6);
+
+                        setNearbyBusinesses(normalized);
+                    })
+                    .catch(() => {
+                        if (active) {
+                            setNearbyBusinesses([]);
+                        }
+                    })
+                    .finally(() => {
+                        if (active) {
+                            setNearbyLoading(false);
+                        }
+                    });
+            } else {
+                setNearbyBusinesses([]);
+                setNearbyLoading(false);
+            }
+        });
 
         return () => {
             active = false;
+            cancelDeferredTask();
         };
     }, [business?.id, business?.latitude, business?.longitude]);
 
@@ -996,6 +1058,8 @@ export function BusinessDetails() {
                                     src={coverImage.url}
                                     alt={business.name}
                                     className="w-full h-full object-cover"
+                                    priority
+                                    sizes="(min-width: 1280px) 52vw, (min-width: 1024px) 60vw, 100vw"
                                 />
                             ) : (
                                 <div className="flex h-full items-center justify-center text-8xl font-display font-bold text-white/20">
@@ -1071,8 +1135,7 @@ export function BusinessDetails() {
                                             src={img.url}
                                             alt=""
                                             className="w-full h-full object-cover"
-                                            loading="lazy"
-                                            decoding="async"
+                                            sizes="(min-width: 1024px) 4rem, 20vw"
                                         />
                                     </button>
                                 ))}
@@ -1376,26 +1439,32 @@ export function BusinessDetails() {
                         </div>
                     )}
 
-                    <PromotionsSection loading={promotionsLoading} promotions={publicPromotions} />
+                    <Suspense fallback={<DetailSectionFallback label="Cargando promociones" />}>
+                        <PromotionsSectionLazy loading={promotionsLoading} promotions={publicPromotions} />
+                    </Suspense>
 
-                    <NearbyBusinessesSection businesses={nearbyBusinesses} loading={nearbyLoading} />
+                    <Suspense fallback={<DetailSectionFallback label="Cargando negocios cercanos" />}>
+                        <NearbyBusinessesSectionLazy businesses={nearbyBusinesses} loading={nearbyLoading} />
+                    </Suspense>
 
-                    <ReviewsSection
-                        averageRating={averageRating}
-                        averageRatingNumber={averageRatingNumber}
-                        isAuthenticated={isAuthenticated}
-                        isCustomerRole={isCustomerRole}
-                        onReviewFormChange={setReviewForm}
-                        onSubmit={handleReviewSubmit}
-                        reviewCount={reviewCount}
-                        reviewErrorMessage={reviewErrorMessage}
-                        reviewForm={reviewForm}
-                        reviews={visibleReviews}
-                        reviewsLoading={reviewsLoading}
-                        reviewStarsLabel={reviewStarsLabel}
-                        reviewSuccessMessage={reviewSuccessMessage}
-                        submittingReview={submittingReview}
-                    />
+                    <Suspense fallback={<DetailSectionFallback label="Cargando resenas" />}>
+                        <ReviewsSectionLazy
+                            averageRating={averageRating}
+                            averageRatingNumber={averageRatingNumber}
+                            isAuthenticated={isAuthenticated}
+                            isCustomerRole={isCustomerRole}
+                            onReviewFormChange={setReviewForm}
+                            onSubmit={handleReviewSubmit}
+                            reviewCount={reviewCount}
+                            reviewErrorMessage={reviewErrorMessage}
+                            reviewForm={reviewForm}
+                            reviews={visibleReviews}
+                            reviewsLoading={reviewsLoading}
+                            reviewStarsLabel={reviewStarsLabel}
+                            reviewSuccessMessage={reviewSuccessMessage}
+                            submittingReview={submittingReview}
+                        />
+                    </Suspense>
 
                 </div>
 

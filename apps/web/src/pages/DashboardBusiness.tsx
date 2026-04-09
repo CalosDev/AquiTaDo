@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useRef } from 'react';
 import { analyticsApi, businessApi, verificationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
@@ -112,6 +113,12 @@ export function DashboardBusiness() {
     const [verificationStatus, setVerificationStatus] = useState<BusinessVerificationStatus | null>(null);
     const [documents, setDocuments] = useState<VerificationDocument[]>([]);
     const [verificationLoadedBusinessId, setVerificationLoadedBusinessId] = useState('');
+    const verificationCacheRef = useRef(
+        new Map<string, {
+            status: BusinessVerificationStatus | null;
+            documents: VerificationDocument[];
+        }>(),
+    );
     const [documentType, setDocumentType] = useState<VerificationDocument['documentType']>('ID_CARD');
     const [verificationNotes, setVerificationNotes] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -122,7 +129,9 @@ export function DashboardBusiness() {
     );
     const hasOrganizations = organizations.length > 0;
     const needsFirstBusinessSetup = !organizationLoading && !activeOrganizationId && !hasOrganizations;
-    const showVerificationSkeleton = Boolean(selectedBusinessId) && (verificationLoading || verificationLoadedBusinessId !== selectedBusinessId);
+    const showVerificationSkeleton = Boolean(selectedBusinessId)
+        && verificationLoading
+        && verificationLoadedBusinessId !== selectedBusinessId;
 
     const totals = metrics?.totals ?? {};
     const completeProfiles = useMemo(
@@ -140,6 +149,12 @@ export function DashboardBusiness() {
             ]);
 
             const nextBusinesses = asArray<BusinessItem>(businessesRes.data);
+            const nextBusinessIds = new Set(nextBusinesses.map((business) => business.id));
+            Array.from(verificationCacheRef.current.keys()).forEach((businessId) => {
+                if (!nextBusinessIds.has(businessId)) {
+                    verificationCacheRef.current.delete(businessId);
+                }
+            });
             setBusinesses(nextBusinesses);
             setMetrics((metricsRes.data || null) as DashboardMetrics | null);
 
@@ -166,7 +181,7 @@ export function DashboardBusiness() {
         }
     }, []);
 
-    const loadVerificationData = useCallback(async (businessId: string) => {
+    const loadVerificationData = useCallback(async (businessId: string, options?: { force?: boolean }) => {
         if (!businessId) {
             setVerificationStatus(null);
             setDocuments([]);
@@ -175,10 +190,21 @@ export function DashboardBusiness() {
             return;
         }
 
+        const cached = verificationCacheRef.current.get(businessId);
+        if (cached && !options?.force) {
+            setVerificationStatus(cached.status);
+            setDocuments(cached.documents);
+            setVerificationLoadedBusinessId(businessId);
+            setVerificationLoading(false);
+            return;
+        }
+
         setVerificationLoading(true);
-        setVerificationLoadedBusinessId('');
-        setVerificationStatus(null);
-        setDocuments([]);
+        if (!cached) {
+            setVerificationLoadedBusinessId('');
+            setVerificationStatus(null);
+            setDocuments([]);
+        }
 
         try {
             const [statusRes, documentsRes] = await Promise.all([
@@ -188,18 +214,26 @@ export function DashboardBusiness() {
 
             const statusPayload = (statusRes.data || null) as BusinessVerificationStatus | null;
             const allDocuments = asArray<VerificationDocument>(documentsRes.data);
+            const filteredDocuments = allDocuments.filter((document) => {
+                if (!document.business?.id) {
+                    return true;
+                }
+                return document.business.id === businessId;
+            });
+
+            verificationCacheRef.current.set(businessId, {
+                status: statusPayload,
+                documents: filteredDocuments,
+            });
             setVerificationStatus(statusPayload);
-            setDocuments(
-                allDocuments.filter((document) => {
-                    if (!document.business?.id) {
-                        return true;
-                    }
-                    return document.business.id === businessId;
-                }),
-            );
+            setDocuments(filteredDocuments);
             setVerificationLoadedBusinessId(businessId);
         } catch (error) {
             setVerificationLoadedBusinessId(businessId);
+            if (!cached) {
+                setVerificationStatus(null);
+                setDocuments([]);
+            }
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la verificación documental'));
         } finally {
             setVerificationLoading(false);
@@ -261,8 +295,9 @@ export function DashboardBusiness() {
                 fileUrl,
             });
 
+            verificationCacheRef.current.delete(selectedBusinessId);
             setSelectedFile(null);
-            await loadVerificationData(selectedBusinessId);
+            await loadVerificationData(selectedBusinessId, { force: true });
             setSuccessMessage('Documento enviado para revision');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo subir el documento'));
@@ -284,7 +319,8 @@ export function DashboardBusiness() {
             await verificationApi.submitBusiness(selectedBusinessId, {
                 notes: verificationNotes.trim() || undefined,
             });
-            await loadVerificationData(selectedBusinessId);
+            verificationCacheRef.current.delete(selectedBusinessId);
+            await loadVerificationData(selectedBusinessId, { force: true });
             setSuccessMessage('Solicitud de verificación enviada');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de verificación'));

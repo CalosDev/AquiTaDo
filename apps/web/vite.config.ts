@@ -55,6 +55,44 @@ export default defineConfig({
                         return 'page-owner';
                     }
 
+                    if (
+                        id.includes('/src/pages/Home')
+                        || id.includes('\\src\\pages\\Home')
+                    ) {
+                        return 'page-home';
+                    }
+
+                    if (
+                        id.includes('/src/pages/BusinessesList')
+                        || id.includes('\\src\\pages\\BusinessesList')
+                    ) {
+                        return 'page-discovery';
+                    }
+
+                    if (
+                        id.includes('/src/pages/BusinessDetails')
+                        || id.includes('\\src\\pages\\BusinessDetails')
+                        || id.includes('/src/pages/business-details/')
+                        || id.includes('\\src\\pages\\business-details\\')
+                    ) {
+                        return 'page-business-detail';
+                    }
+
+                    if (
+                        id.includes('/src/pages/Login')
+                        || id.includes('\\src\\pages\\Login')
+                        || id.includes('/src/pages/Register')
+                        || id.includes('\\src\\pages\\Register')
+                        || id.includes('/src/pages/ForgotPassword')
+                        || id.includes('\\src\\pages\\ForgotPassword')
+                        || id.includes('/src/pages/ResetPassword')
+                        || id.includes('\\src\\pages\\ResetPassword')
+                        || id.includes('/src/components/auth/')
+                        || id.includes('\\src\\components\\auth\\')
+                    ) {
+                        return 'page-auth';
+                    }
+
                     return undefined;
                 },
             },

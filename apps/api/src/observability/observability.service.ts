@@ -15,6 +15,10 @@ const FRONTEND_HEALTH_WINDOW_MS = 1000 * 60 * 60 * 24;
 const FRONTEND_ROUTE_VIEW_REDIS_KEY = 'observability:frontend:route-views:v1';
 const FRONTEND_CLIENT_ERROR_REDIS_KEY = 'observability:frontend:client-errors:v1';
 const FRONTEND_WEB_VITAL_REDIS_KEY = 'observability:frontend:web-vitals:v1';
+const FRONTEND_CLIENT_ERROR_WARN_COUNT = 2;
+const FRONTEND_CLIENT_ERROR_CRITICAL_COUNT = 5;
+const FRONTEND_WEB_VITAL_WARN_COUNT = 2;
+const FRONTEND_WEB_VITAL_CRITICAL_COUNT = 3;
 
 type FrontendRouteViewSnapshot = {
     route: string;
@@ -331,9 +335,12 @@ export class ObservabilityService {
         poorVitals: FrontendWebVitalSnapshot[];
         alerts: FrontendAlertSnapshot[];
     }> {
-        const routeViewEntries = await this.getFrontendRouteViewEntries();
-        const clientErrorEntries = await this.getFrontendClientErrorEntries();
-        const webVitalEntries = await this.getFrontendWebVitalEntries();
+        const [routeViewEntries, clientErrorEntries, webVitalEntries] =
+            await Promise.all([
+                this.getFrontendRouteViewEntries(),
+                this.getFrontendClientErrorEntries(),
+                this.getFrontendWebVitalEntries(),
+            ]);
 
         const busiestRoutes = routeViewEntries
             .sort((left, right) => {
@@ -386,9 +393,16 @@ export class ObservabilityService {
                 lastSeenAt: entry.lastSeenAt ? new Date(entry.lastSeenAt).toISOString() : null,
             }));
 
+        const actionableClientErrors = clientErrors.filter(
+            (entry) => entry.count >= FRONTEND_CLIENT_ERROR_WARN_COUNT,
+        );
+        const actionablePoorVitals = poorVitals.filter(
+            (entry) => entry.count >= FRONTEND_WEB_VITAL_WARN_COUNT,
+        );
+
         const alerts: FrontendAlertSnapshot[] = [
-            ...clientErrors.map((entry) => ({
-                level: entry.count >= 3 ? 'critical' as const : 'warn' as const,
+            ...actionableClientErrors.map((entry) => ({
+                level: entry.count >= FRONTEND_CLIENT_ERROR_CRITICAL_COUNT ? 'critical' as const : 'warn' as const,
                 kind: 'client-error' as const,
                 route: entry.route,
                 role: entry.role,
@@ -396,8 +410,11 @@ export class ObservabilityService {
                 count: entry.count,
                 message: `${entry.count} error(es) cliente en ${entry.route}`,
             })),
-            ...poorVitals.map((entry) => ({
-                level: entry.rating === 'poor' && entry.count >= 3 ? 'critical' as const : 'warn' as const,
+            ...actionablePoorVitals.map((entry) => ({
+                level:
+                    entry.rating === 'poor' && entry.count >= FRONTEND_WEB_VITAL_CRITICAL_COUNT
+                        ? 'critical' as const
+                        : 'warn' as const,
                 kind: 'web-vital' as const,
                 route: entry.route,
                 role: entry.role,
@@ -420,15 +437,12 @@ export class ObservabilityService {
             generatedAt: new Date().toISOString(),
             totalRouteViews: routeViewEntries.reduce((sum, entry) => sum + entry.count, 0),
             totalClientErrors: clientErrorEntries.reduce((sum, entry) => sum + entry.count, 0),
-            totalPoorVitals: webVitalEntries.reduce(
-                (sum, entry) => sum + (entry.rating !== 'good' ? entry.count : 0),
-                0,
-            ),
+            totalPoorVitals: actionablePoorVitals.reduce((sum, entry) => sum + entry.count, 0),
             warnAlerts: alerts.filter((entry) => entry.level === 'warn').length,
             criticalAlerts: alerts.filter((entry) => entry.level === 'critical').length,
             busiestRoutes,
             clientErrors,
-            poorVitals,
+            poorVitals: actionablePoorVitals,
             alerts,
         };
     }

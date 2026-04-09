@@ -788,8 +788,7 @@ export function Home() {
                                             src={business.images[0].url}
                                             alt={business.name}
                                             className="h-full w-full object-cover"
-                                            loading="lazy"
-                                            decoding="async"
+                                            sizes="(min-width: 1280px) 24rem, (min-width: 768px) 50vw, 100vw"
                                         />
                                     ) : (
                                         <div className="h-full w-full flex items-center justify-center text-sm font-semibold text-primary-700">

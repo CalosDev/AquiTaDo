@@ -208,6 +208,7 @@ docker compose down
 - `pnpm test:e2e:api`: ejecuta E2E del backend (`apps/api`) y requiere PostgreSQL accesible + migraciones aplicadas.
 - `pnpm db:status`: valida si el esquema local ya esta alineado con todas las migraciones de Prisma.
 - `pnpm perf:prod`: benchmark de latencia (Web + API) con reporte en consola y JSON opcional.
+- `pnpm ops:prod`: corrida compacta de humo, alertas y benchmark sobre produccion.
 - `pnpm keepwarm:prod`: ejecuta pings livianos para evitar cold starts prolongados en produccion.
 
 Mitigacion de cold start en produccion:

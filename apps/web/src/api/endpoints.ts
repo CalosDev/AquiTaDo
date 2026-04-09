@@ -1,7 +1,11 @@
 import type { AxiosResponse } from 'axios';
-import api from './client';
+import api, { getAccessToken } from './client';
 
 const REFERENCE_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_DISCOVERY_TTL_MS = 90 * 1000;
+const PUBLIC_NEARBY_TTL_MS = 60 * 1000;
+const PUBLIC_DETAIL_TTL_MS = 120 * 1000;
+const ADMIN_INSIGHTS_TTL_MS = 15 * 1000;
 
 type CachedRequest<T = AxiosResponse> = {
     promise: Promise<T>;
@@ -13,17 +17,23 @@ let featuresCache: CachedRequest | null = null;
 let provincesCache: CachedRequest | null = null;
 const citiesCacheByProvince = new Map<string, CachedRequest>();
 const sectorsCacheByCity = new Map<string, CachedRequest>();
+const discoveryCacheByKey = new Map<string, CachedRequest>();
+const nearbyCacheByKey = new Map<string, CachedRequest>();
+const publicDetailCacheByKey = new Map<string, CachedRequest>();
+const observabilitySummaryCacheByKey = new Map<string, CachedRequest>();
+const healthDashboardCacheByKey = new Map<string, CachedRequest>();
 
 function resolveCachedRequest<T>(
     cacheEntry: CachedRequest<T> | null,
     fetcher: () => Promise<T>,
+    ttlMs: number = REFERENCE_TTL_MS,
 ): CachedRequest<T> {
     if (cacheEntry && cacheEntry.expiresAt > Date.now()) {
         return cacheEntry;
     }
 
     const nextEntry: CachedRequest<T> = {
-        expiresAt: Date.now() + REFERENCE_TTL_MS,
+        expiresAt: Date.now() + ttlMs,
         promise: fetcher(),
     };
     nextEntry.promise = nextEntry.promise.catch((error) => {
@@ -32,6 +42,63 @@ function resolveCachedRequest<T>(
     });
 
     return nextEntry;
+}
+
+function sortRecordEntries(
+    value: Record<string, string | number | boolean> | undefined,
+): Array<[string, string | number | boolean]> {
+    return Object.entries(value ?? {})
+        .filter(([, entryValue]) => entryValue !== '' && entryValue !== undefined && entryValue !== null)
+        .sort(([left], [right]) => left.localeCompare(right));
+}
+
+function buildCacheKey(
+    prefix: string,
+    value?: Record<string, string | number | boolean> | string,
+): string {
+    if (typeof value === 'string') {
+        return `${prefix}:${value}`;
+    }
+
+    const searchParams = new URLSearchParams();
+    for (const [entryKey, entryValue] of sortRecordEntries(value)) {
+        searchParams.set(entryKey, String(entryValue));
+    }
+
+    return `${prefix}:${searchParams.toString() || 'default'}`;
+}
+
+function resolveMappedCachedRequest<T>(
+    cache: Map<string, CachedRequest<T>>,
+    cacheKey: string,
+    ttlMs: number,
+    fetcher: () => Promise<T>,
+): Promise<T> {
+    const nextEntry = resolveCachedRequest(cache.get(cacheKey) ?? null, fetcher, ttlMs);
+    cache.set(cacheKey, nextEntry);
+
+    if (cache.size > 40) {
+        const oldestKey = cache.keys().next().value;
+        if (oldestKey) {
+            cache.delete(oldestKey);
+        }
+    }
+
+    return nextEntry.promise;
+}
+
+function clearMappedCache(cache: Map<string, CachedRequest>): void {
+    cache.clear();
+}
+
+function shouldUsePublicDetailCache(): boolean {
+    return !getAccessToken();
+}
+
+function resetBusinessDiscoveryCaches(): void {
+    clearMappedCache(discoveryCacheByKey);
+    clearMappedCache(nearbyCacheByKey);
+    clearMappedCache(publicDetailCacheByKey);
 }
 
 // ---- Auth ----
@@ -67,15 +134,38 @@ export const usersApi = {
 // ---- Businesses ----
 export const businessApi = {
     getAll: (params?: Record<string, string | number | boolean>) =>
-        api.get('/businesses', { params }),
+        resolveMappedCachedRequest(
+            discoveryCacheByKey,
+            buildCacheKey('public-businesses', params),
+            PUBLIC_DISCOVERY_TTL_MS,
+            () => api.get('/businesses', { params }),
+        ),
     getMine: () => api.get('/businesses/my'),
     getAllAdmin: (params?: Record<string, string | number | boolean>) =>
         api.get('/businesses/admin/all', { params }),
     getCatalogQuality: (params?: { limit?: number }) =>
         api.get('/businesses/admin/catalog-quality', { params }),
-    getByIdentifier: (identifier: string) => api.get(`/businesses/${identifier}`),
+    getByIdentifier: (identifier: string) => (
+        shouldUsePublicDetailCache()
+            ? resolveMappedCachedRequest(
+                publicDetailCacheByKey,
+                buildCacheKey('public-business-detail-identifier', identifier),
+                PUBLIC_DETAIL_TTL_MS,
+                () => api.get(`/businesses/${identifier}`),
+            )
+            : api.get(`/businesses/${identifier}`)
+    ),
     getById: (id: string) => api.get(`/businesses/${id}`),
-    getBySlug: (slug: string) => api.get(`/businesses/${slug}`),
+    getBySlug: (slug: string) => (
+        shouldUsePublicDetailCache()
+            ? resolveMappedCachedRequest(
+                publicDetailCacheByKey,
+                buildCacheKey('public-business-detail-slug', slug),
+                PUBLIC_DETAIL_TTL_MS,
+                () => api.get(`/businesses/${slug}`),
+            )
+            : api.get(`/businesses/${slug}`)
+    ),
     createPublicLead: (
         businessId: string,
         data: {
@@ -86,12 +176,29 @@ export const businessApi = {
             preferredChannel?: 'WHATSAPP' | 'PHONE' | 'EMAIL';
         },
     ) => api.post(`/businesses/${businessId}/public-lead`, data),
-    create: (data: Record<string, unknown>) => api.post('/businesses', data),
-    update: (id: string, data: Record<string, unknown>) => api.put(`/businesses/${id}`, data),
-    delete: (id: string, data: { reason: string }) => api.delete(`/businesses/${id}`, { data }),
+    create: (data: Record<string, unknown>) => api.post('/businesses', data).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
+    update: (id: string, data: Record<string, unknown>) => api.put(`/businesses/${id}`, data).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
+    delete: (id: string, data: { reason: string }) => api.delete(`/businesses/${id}`, { data }).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
     getNearby: (params: { lat: number; lng: number; radius?: number; categoryId?: string; sectorId?: string }) =>
-        api.get('/businesses/nearby', { params }),
-    verify: (id: string) => api.put(`/businesses/${id}/verify`),
+        resolveMappedCachedRequest(
+            nearbyCacheByKey,
+            buildCacheKey('public-businesses-nearby', params),
+            PUBLIC_NEARBY_TTL_MS,
+            () => api.get('/businesses/nearby', { params }),
+        ),
+    verify: (id: string) => api.put(`/businesses/${id}/verify`).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
 };
 
 // ---- Categories ----
@@ -586,12 +693,24 @@ export const verificationApi = {
 // ---- Observability ----
 export const observabilityApi = {
     getMetrics: () => api.get<string>('/observability/metrics', { responseType: 'text' }),
-    getSummary: () => api.get('/observability/summary'),
+    getSummary: () =>
+        resolveMappedCachedRequest(
+            observabilitySummaryCacheByKey,
+            buildCacheKey('admin-observability-summary'),
+            ADMIN_INSIGHTS_TTL_MS,
+            () => api.get('/observability/summary'),
+        ),
 };
 
 // ---- Health ----
 export const healthApi = {
     getLiveness: () => api.get('/health'),
     getReadiness: () => api.get('/health/ready'),
-    getDashboard: () => api.get('/health/dashboard'),
+    getDashboard: () =>
+        resolveMappedCachedRequest(
+            healthDashboardCacheByKey,
+            buildCacheKey('admin-health-dashboard'),
+            ADMIN_INSIGHTS_TTL_MS,
+            () => api.get('/health/dashboard'),
+        ),
 };

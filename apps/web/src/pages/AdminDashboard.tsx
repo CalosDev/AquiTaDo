@@ -288,6 +288,8 @@ export function AdminDashboard() {
     const [frontendHealthSummary, setFrontendHealthSummary] = useState<FrontendHealthSummary>(EMPTY_FRONTEND_HEALTH_SUMMARY);
     const [operationalHealth, setOperationalHealth] = useState<OperationalDashboardSnapshot | null>(null);
     const [operationalHealthLoading, setOperationalHealthLoading] = useState(false);
+    const [rawMetricsLoading, setRawMetricsLoading] = useState(false);
+    const [rawMetricsLoaded, setRawMetricsLoaded] = useState(false);
 
     const [newCategoryForm, setNewCategoryForm] = useState<CategoryForm>(EMPTY_CATEGORY_FORM);
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -458,15 +460,7 @@ export function AdminDashboard() {
         setObservabilityLoading(true);
         setErrorMessage('');
         try {
-            const [metricsResponse, summaryResponse] = await Promise.all([
-                observabilityApi.getMetrics(),
-                observabilityApi.getSummary(),
-            ]);
-            const payload = typeof metricsResponse.data === 'string'
-                ? metricsResponse.data
-                : String(metricsResponse.data ?? '');
-            setObservabilityRaw(payload);
-            setObservabilitySummary(parseObservabilitySummary(payload));
+            const summaryResponse = await observabilityApi.getSummary();
             setFrontendHealthSummary(
                 (summaryResponse.data || EMPTY_FRONTEND_HEALTH_SUMMARY) as FrontendHealthSummary,
             );
@@ -475,6 +469,23 @@ export function AdminDashboard() {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar observabilidad'));
         } finally {
             setObservabilityLoading(false);
+        }
+    }, []);
+
+    const loadRawMetrics = useCallback(async () => {
+        setRawMetricsLoading(true);
+        try {
+            const metricsResponse = await observabilityApi.getMetrics();
+            const payload = typeof metricsResponse.data === 'string'
+                ? metricsResponse.data
+                : String(metricsResponse.data ?? '');
+            setObservabilityRaw(payload);
+            setObservabilitySummary(parseObservabilitySummary(payload));
+            setRawMetricsLoaded(true);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar las metricas raw'));
+        } finally {
+            setRawMetricsLoading(false);
         }
     }, []);
 
@@ -1706,42 +1717,76 @@ export function AdminDashboard() {
 
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                                    <h3 className="font-display font-semibold text-gray-900">Resumen operativo</h3>
-                                    <button
-                                        type="button"
-                                        className="btn-secondary text-xs"
-                                        onClick={() => {
-                                            void loadObservabilityData();
-                                            void loadOperationalHealth();
-                                        }}
-                                        disabled={observabilityLoading}
-                                    >
-                                        {observabilityLoading ? 'Actualizando...' : 'Actualizar'}
-                                    </button>
+                                    <div>
+                                        <h3 className="font-display font-semibold text-gray-900">Resumen operativo</h3>
+                                        <p className="mt-1 text-sm text-gray-600">
+                                            El resumen Prometheus se carga bajo demanda para mantener ligero el panel.
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            onClick={() => {
+                                                void loadObservabilityData();
+                                                void loadOperationalHealth();
+                                            }}
+                                            disabled={observabilityLoading}
+                                        >
+                                            {observabilityLoading ? 'Actualizando...' : 'Actualizar salud'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            onClick={() => void loadRawMetrics()}
+                                            disabled={rawMetricsLoading}
+                                        >
+                                            {rawMetricsLoading
+                                                ? 'Cargando raw...'
+                                                : rawMetricsLoaded
+                                                    ? 'Actualizar raw'
+                                                    : 'Cargar raw metrics'}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <p className="text-xs text-gray-500">Requests totales</p>
-                                        <p className="text-xl font-semibold text-gray-900">{observabilitySummary.totalRequests}</p>
+                                        <p className="text-xl font-semibold text-gray-900">
+                                            {rawMetricsLoaded ? observabilitySummary.totalRequests : '--'}
+                                        </p>
                                     </div>
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <p className="text-xs text-gray-500">Errores 5xx</p>
-                                        <p className="text-xl font-semibold text-red-700">{observabilitySummary.errors5xx}</p>
+                                        <p className="text-xl font-semibold text-red-700">
+                                            {rawMetricsLoaded ? observabilitySummary.errors5xx : '--'}
+                                        </p>
                                     </div>
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <p className="text-xs text-gray-500">Latencia promedio</p>
-                                        <p className="text-xl font-semibold text-primary-700">{observabilitySummary.averageLatencyMs} ms</p>
+                                        <p className="text-xl font-semibold text-primary-700">
+                                            {rawMetricsLoaded ? `${observabilitySummary.averageLatencyMs} ms` : '--'}
+                                        </p>
                                     </div>
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <p className="text-xs text-gray-500">Rate limit hits</p>
-                                        <p className="text-xl font-semibold text-amber-700">{observabilitySummary.rateLimitHits}</p>
+                                        <p className="text-xl font-semibold text-amber-700">
+                                            {rawMetricsLoaded ? observabilitySummary.rateLimitHits : '--'}
+                                        </p>
                                     </div>
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                         <p className="text-xs text-gray-500">Fallas externas</p>
-                                        <p className="text-xl font-semibold text-purple-700">{observabilitySummary.externalFailures}</p>
+                                        <p className="text-xl font-semibold text-purple-700">
+                                            {rawMetricsLoaded ? observabilitySummary.externalFailures : '--'}
+                                        </p>
                                     </div>
                                 </div>
+                                {!rawMetricsLoaded ? (
+                                    <p className="mt-3 text-xs text-gray-500">
+                                        Las metricas raw solo se consultan cuando las necesitas para evitar una carga pesada en cada visita al panel.
+                                    </p>
+                                ) : null}
                             </div>
 
                             <div className="card p-5">
@@ -1872,10 +1917,33 @@ export function AdminDashboard() {
                             </div>
 
                             <div className="card p-5">
-                                <h3 className="font-display font-semibold text-gray-900 mb-3">Raw metrics (Prometheus)</h3>
-                                <pre className="max-h-[420px] overflow-auto rounded-xl border border-gray-100 bg-slate-950 p-4 text-[11px] leading-5 text-slate-100">
-                                    {observabilityRaw || 'Sin datos de métricas'}
-                                </pre>
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <div>
+                                        <h3 className="font-display font-semibold text-gray-900">Raw metrics (Prometheus)</h3>
+                                        <p className="mt-1 text-sm text-gray-600">
+                                            Usa esta vista solo cuando necesites diagnostico fino o exportar el texto completo de Prometheus.
+                                        </p>
+                                    </div>
+                                    {!rawMetricsLoaded ? (
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-xs"
+                                            onClick={() => void loadRawMetrics()}
+                                            disabled={rawMetricsLoading}
+                                        >
+                                            {rawMetricsLoading ? 'Cargando raw...' : 'Cargar raw metrics'}
+                                        </button>
+                                    ) : null}
+                                </div>
+                                {rawMetricsLoaded ? (
+                                    <pre className="max-h-[420px] overflow-auto rounded-xl border border-gray-100 bg-slate-950 p-4 text-[11px] leading-5 text-slate-100">
+                                        {observabilityRaw || 'Sin datos de metricas'}
+                                    </pre>
+                                ) : (
+                                    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                                        Las metricas raw aun no se han cargado en esta sesion.
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

@@ -26,6 +26,7 @@
     "smoke:brave:roles": "node scripts/brave-role-audit.mjs",
     "smoke:brave:roles:mobile": "node scripts/brave-role-audit-mobile.mjs",
     "perf:prod": "node scripts/perf-benchmark.mjs",
+    "ops:prod": "pnpm smoke:prod && pnpm alerts:prod && pnpm perf:prod",
     "keepwarm:prod": "node scripts/keep-warm-prod.mjs",
     "db:migrate": "pnpm --filter @aquita/api prisma:migrate",
     "db:migrate:deploy": "pnpm --filter @aquita/api prisma:migrate:deploy",
