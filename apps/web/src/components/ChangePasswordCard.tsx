@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { BusyButtonLabel } from './BusyButtonLabel';
 import { useAuth } from '../context/useAuth';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 
@@ -143,7 +144,11 @@ export function ChangePasswordCard({
                 </div>
 
                 <button type="submit" className="btn-primary text-sm" disabled={saving}>
-                    {saving ? 'Actualizando...' : 'Actualizar contraseña y cerrar sesión'}
+                    <BusyButtonLabel
+                        busy={saving}
+                        busyText="Actualizando..."
+                        idleText="Actualizar contraseña y cerrar sesión"
+                    />
                 </button>
             </form>
         </div>

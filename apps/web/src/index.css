@@ -149,6 +149,11 @@
     @apply bg-accent-600 hover:bg-accent-700 text-white font-semibold py-2.5 px-6 rounded-2xl transition-all duration-200 shadow-lg shadow-accent-600/25 hover:shadow-xl hover:shadow-accent-700/30;
   }
 
+  .btn-danger-inline {
+    @apply inline-flex items-center justify-center rounded-2xl bg-red-600 px-4 py-2.5 font-semibold text-white transition-all duration-200 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50;
+    box-shadow: 0 14px 28px -22px rgba(220, 38, 38, 0.72);
+  }
+
   .auth-stage {
     @apply flex flex-1 items-center justify-center px-4 py-6 sm:px-6 sm:py-10;
   }
@@ -256,6 +261,34 @@
     box-shadow:
       0 20px 36px -24px rgba(15, 23, 42, 0.28),
       0 10px 18px -16px rgba(0, 45, 98, 0.22);
+  }
+
+  .page-loader-wrap {
+    @apply flex min-h-[240px] items-center justify-center;
+  }
+
+  .page-loader-shell {
+    @apply flex w-full max-w-2xl flex-col items-center rounded-[28px] border border-primary-100/80 bg-white/92 px-6 py-10 text-center shadow-sm backdrop-blur-sm sm:px-8;
+    box-shadow:
+      0 24px 42px -34px rgba(15, 23, 42, 0.42),
+      0 14px 28px -28px rgba(0, 45, 98, 0.18);
+  }
+
+  .page-loader-spinner {
+    @apply h-11 w-11 animate-spin rounded-full border-[3px] border-primary-200 border-r-primary-700;
+  }
+
+  .inline-danger-confirm {
+    @apply w-full rounded-2xl border border-red-200 bg-red-50/85 p-4 shadow-sm backdrop-blur-sm;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .inline-danger-confirm-icon {
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700;
+  }
+
+  .inline-danger-confirm-actions {
+    @apply flex flex-wrap justify-end gap-2;
   }
 
   .glass {

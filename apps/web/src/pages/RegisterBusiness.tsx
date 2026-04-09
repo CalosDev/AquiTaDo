@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { BusinessHoursEditor } from '../components/BusinessHoursEditor';
+import { BusyButtonLabel } from '../components/BusyButtonLabel';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
 import { evaluateBusinessSubmissionGuidance } from '../lib/businessSubmissionGuidance';
@@ -1120,7 +1121,7 @@ export function RegisterBusiness() {
                                     disabled={loading}
                                     className="btn-primary min-w-[220px]"
                                 >
-                                    {loading ? 'Registrando...' : currentStepActionLabel}
+                                    <BusyButtonLabel busy={loading} busyText="Registrando..." idleText={currentStepActionLabel} />
                                 </button>
                             </div>
                         </div>

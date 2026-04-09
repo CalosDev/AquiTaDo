@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { BusyButtonLabel } from '../components/BusyButtonLabel';
 import { BusinessHoursEditor } from '../components/BusinessHoursEditor';
 import { OptimizedImage } from '../components/OptimizedImage';
 import {
@@ -982,7 +983,11 @@ export function EditBusiness() {
                                             onClick={() => void handleDeleteImage(image.id)}
                                             disabled={deletingImageId === image.id || saving}
                                         >
-                                            {deletingImageId === image.id ? 'Eliminando...' : 'Eliminar'}
+                                            <BusyButtonLabel
+                                                busy={deletingImageId === image.id}
+                                                busyText="Eliminando..."
+                                                idleText="Eliminar"
+                                            />
                                         </button>
                                     </div>
                                 </div>
@@ -1021,7 +1026,7 @@ export function EditBusiness() {
 
                 <div className="flex flex-wrap items-center gap-3">
                     <button type="submit" className="btn-primary" disabled={saving}>
-                        {saving ? 'Guardando cambios...' : 'Guardar cambios'}
+                        <BusyButtonLabel busy={saving} busyText="Guardando cambios..." idleText="Guardar cambios" />
                     </button>
                     <Link to="/dashboard" className="btn-secondary">
                         Cancelar

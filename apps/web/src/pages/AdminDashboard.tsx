@@ -28,6 +28,8 @@ import {
 import { GrowthInsightsPanel } from './admin-dashboard/GrowthInsightsPanel';
 import { VerificationQueueSection } from './admin-dashboard/VerificationQueueSection';
 import type { GrowthInsightsSnapshot, ModerationQueueItem } from './admin-dashboard/types';
+import { InlineDangerConfirm } from '../components/InlineDangerConfirm';
+import { PageBlockingLoader } from '../components/PageBlockingLoader';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 
@@ -645,11 +647,6 @@ export function AdminDashboard() {
     };
 
     const requestCategoryDelete = (categoryId: string) => {
-        if (confirmDeleteCategoryId === categoryId) {
-            void deleteCategory(categoryId);
-            return;
-        }
-
         setConfirmDeleteCategoryId(categoryId);
     };
 
@@ -846,9 +843,11 @@ export function AdminDashboard() {
             </div>
 
             {loading ? (
-                <div className="flex justify-center py-20">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
-                </div>
+                <PageBlockingLoader
+                    label="Cargando operacion de plataforma"
+                    hint="Traemos negocios, moderacion, catalogo y observabilidad para que el panel entre ya consolidado."
+                    className="py-12"
+                />
             ) : (
                 <>
                     {activeTab === 'businesses' && (
@@ -992,10 +991,25 @@ export function AdminDashboard() {
                                                             </button>
                                                         )}
                                                         {confirmDeleteBusinessId === business.id ? (
-                                                            <div className="flex w-[320px] flex-col items-end gap-2 rounded-xl border border-red-200 bg-red-50/70 p-3">
-                                                                <p className="text-[11px] text-right text-red-700">
-                                                                    Accion irreversible. Escribe un motivo (min. 15 caracteres) y confirma con <strong>{DELETE_CONFIRMATION_TEXT}</strong>.
-                                                                </p>
+                                                            <InlineDangerConfirm
+                                                                className="w-[340px]"
+                                                                title="Eliminar negocio del catalogo"
+                                                                description={`Esta accion es irreversible para ${business.name}. Agrega un motivo util (min. 15 caracteres) y confirma con ${DELETE_CONFIRMATION_TEXT}.`}
+                                                                confirmLabel="Eliminar ahora"
+                                                                busyLabel="Eliminando..."
+                                                                busy={processingId === business.id}
+                                                                confirmDisabled={
+                                                                    deleteBusinessReason.trim().length < 15
+                                                                    || deleteBusinessConfirmationText.trim().toUpperCase() !== DELETE_CONFIRMATION_TEXT
+                                                                }
+                                                                onConfirm={() =>
+                                                                    void handleDeleteBusiness(
+                                                                        business.id,
+                                                                        deleteBusinessReason,
+                                                                    )
+                                                                }
+                                                                onCancel={cancelBusinessDelete}
+                                                            >
                                                                 <textarea
                                                                     value={deleteBusinessReason}
                                                                     onChange={(event) => setDeleteBusinessReason(event.target.value)}
@@ -1009,34 +1023,7 @@ export function AdminDashboard() {
                                                                     className="input-field w-full text-xs"
                                                                     placeholder={`Escribe ${DELETE_CONFIRMATION_TEXT}`}
                                                                 />
-                                                                <div className="flex justify-end gap-2">
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            void handleDeleteBusiness(
-                                                                                business.id,
-                                                                                deleteBusinessReason,
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            processingId === business.id
-                                                                            || deleteBusinessReason.trim().length < 15
-                                                                            || deleteBusinessConfirmationText.trim().toUpperCase() !== DELETE_CONFIRMATION_TEXT
-                                                                        }
-                                                                        className="text-xs bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
-                                                                    >
-                                                                        {processingId === business.id
-                                                                            ? 'Procesando...'
-                                                                            : 'Eliminar ahora'}
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={cancelBusinessDelete}
-                                                                        disabled={processingId === business.id}
-                                                                        className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50"
-                                                                    >
-                                                                        Cancelar
-                                                                    </button>
-                                                                </div>
-                                                            </div>
+                                                            </InlineDangerConfirm>
                                                         ) : (
                                                             <button
                                                                 onClick={() =>
@@ -1248,26 +1235,16 @@ export function AdminDashboard() {
                                                             Editar
                                                         </button>
                                                         {confirmDeleteCategoryId === category.id ? (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    className="text-xs bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
-                                                                    onClick={() => void deleteCategory(category.id)}
-                                                                    disabled={processingId === category.id}
-                                                                >
-                                                                    {processingId === category.id
-                                                                        ? 'Procesando...'
-                                                                        : 'Confirmar'}
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn-secondary text-xs"
-                                                                    onClick={() => setConfirmDeleteCategoryId(null)}
-                                                                    disabled={processingId === category.id}
-                                                                >
-                                                                    Cancelar
-                                                                </button>
-                                                            </>
+                                                            <InlineDangerConfirm
+                                                                className="w-[320px]"
+                                                                title="Eliminar categoria"
+                                                                description={`La categoria ${category.name} dejara de estar disponible para futuros negocios. Solo continua si ya no forma parte del catalogo activo.`}
+                                                                confirmLabel="Confirmar eliminacion"
+                                                                busyLabel="Eliminando..."
+                                                                busy={processingId === category.id}
+                                                                onConfirm={() => void deleteCategory(category.id)}
+                                                                onCancel={() => setConfirmDeleteCategoryId(null)}
+                                                            />
                                                         ) : (
                                                             <button
                                                                 type="button"

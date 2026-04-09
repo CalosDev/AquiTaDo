@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
+import { BusyButtonLabel } from '../components/BusyButtonLabel';
 import { ChangePasswordCard } from '../components/ChangePasswordCard';
+import { PageBlockingLoader } from '../components/PageBlockingLoader';
 import { useAuth } from '../context/useAuth';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 import { formatDateTimeDo } from '../lib/market';
@@ -171,9 +173,11 @@ export function AdminSecurity() {
             {successMessage && <div className="alert-success">{successMessage}</div>}
 
             {loading ? (
-                <div className="flex justify-center py-16">
-                    <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary-600"></div>
-                </div>
+                <PageBlockingLoader
+                    label="Preparando controles de seguridad"
+                    hint="Cargamos el estado actual de 2FA y las acciones sensibles para evitar cambios en falso."
+                    className="py-10"
+                />
             ) : (
                 <div className="space-y-6">
                     <ChangePasswordCard
@@ -230,7 +234,7 @@ export function AdminSecurity() {
                                     onClick={() => void handleSetup()}
                                     disabled={saving}
                                 >
-                                    {saving ? 'Procesando...' : 'Generar QR y secreto'}
+                                    <BusyButtonLabel busy={saving} busyText="Procesando..." idleText="Generar QR y secreto" />
                                 </button>
                             ) : (
                                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -274,7 +278,7 @@ export function AdminSecurity() {
                                             disabled={saving || code.trim().length !== 6}
                                             onClick={() => void handleEnable()}
                                         >
-                                            Activar 2FA
+                                            <BusyButtonLabel busy={saving} busyText="Activando..." idleText="Activar 2FA" />
                                         </button>
                                     </div>
                                 </div>
@@ -306,7 +310,7 @@ export function AdminSecurity() {
                                 disabled={saving || code.trim().length !== 6}
                                 onClick={() => void handleDisable()}
                             >
-                                Deshabilitar 2FA
+                                <BusyButtonLabel busy={saving} busyText="Deshabilitando..." idleText="Deshabilitar 2FA" />
                             </button>
                         </div>
                     )}
