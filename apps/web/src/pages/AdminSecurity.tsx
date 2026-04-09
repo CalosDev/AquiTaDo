@@ -4,6 +4,7 @@ import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { ChangePasswordCard } from '../components/ChangePasswordCard';
 import { useAuth } from '../context/useAuth';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 import { formatDateTimeDo } from '../lib/market';
 
 interface TwoFactorStatus {
@@ -28,6 +29,9 @@ export function AdminSecurity() {
     const [status, setStatus] = useState<TwoFactorStatus | null>(null);
     const [setup, setSetup] = useState<TwoFactorSetup | null>(null);
     const [code, setCode] = useState('');
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
+    useTimedMessage(successMessage, setSuccessMessage, 5000);
 
     const qrUrl = useMemo(() => {
         if (!setup?.otpauthUrl) {

@@ -4,6 +4,7 @@ import { analyticsApi, businessApi, verificationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useOrganization } from '../context/useOrganization';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 import { formatDateTimeDo } from '../lib/market';
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
@@ -100,6 +101,9 @@ export function DashboardBusiness() {
     const [verificationLoading, setVerificationLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
+    useTimedMessage(successMessage, setSuccessMessage, 4500);
 
     const [businesses, setBusinesses] = useState<BusinessItem[]>([]);
     const [selectedBusinessId, setSelectedBusinessId] = useState('');

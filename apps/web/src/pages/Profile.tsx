@@ -6,6 +6,7 @@ import { ChangePasswordCard } from '../components/ChangePasswordCard';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
 import type { UserRole } from '../auth/roles';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateTimeDo } from '../lib/market';
 
 type ProfileType = 'USER' | 'BUSINESS_OWNER' | 'ADMIN';
@@ -454,6 +455,9 @@ export function Profile() {
         () => (payload?.profileType === 'ADMIN' && payload.adminProfile ? getAdminMetricCards(payload.adminProfile) : []),
         [payload],
     );
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
+    useTimedMessage(successMessage, setSuccessMessage, 4500);
 
     const loadProfile = useCallback(async () => {
         setLoading(true);

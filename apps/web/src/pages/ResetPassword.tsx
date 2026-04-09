@@ -5,6 +5,7 @@ import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
 import { AuthShell } from '../components/auth/AuthShell';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 
 const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[A-Za-z])(?=.*\d).+$/;
 
@@ -16,6 +17,8 @@ export function ResetPassword() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();

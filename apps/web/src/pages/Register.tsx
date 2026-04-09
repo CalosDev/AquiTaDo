@@ -5,6 +5,7 @@ import { AuthShell } from '../components/auth/AuthShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 
 const PHONE_REGEX = /^[0-9+()\-\s]{7,20}$/;
 
@@ -23,6 +24,8 @@ export function Register() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || '';
+
+    useTimedMessage(error, setError, 6500);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();

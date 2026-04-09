@@ -5,6 +5,7 @@ import { favoritesApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 import { formatDateTimeDo } from '../lib/market';
 
 interface FavoriteBusinessItem {
@@ -68,6 +69,9 @@ export function CustomerDashboard() {
     const [favoritesActionLoading, setFavoritesActionLoading] = useState<string | null>(null);
     const [favoritesInfoMessage, setFavoritesInfoMessage] = useState('');
     const [favoritesErrorMessage, setFavoritesErrorMessage] = useState('');
+
+    useTimedMessage(favoritesInfoMessage, setFavoritesInfoMessage, 4500);
+    useTimedMessage(favoritesErrorMessage, setFavoritesErrorMessage, 6500);
 
     const dashboardQuery = useQuery({
         queryKey: ['customer-dashboard-lite'],

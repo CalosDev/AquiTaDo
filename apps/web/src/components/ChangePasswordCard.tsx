@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { useAuth } from '../context/useAuth';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 
 const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[A-Za-z])(?=.*\d).+$/;
 
@@ -24,6 +25,8 @@ export function ChangePasswordCard({
     const [confirmPassword, setConfirmPassword] = useState('');
     const [saving, setSaving] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();

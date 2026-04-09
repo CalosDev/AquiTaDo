@@ -29,6 +29,7 @@ import { GrowthInsightsPanel } from './admin-dashboard/GrowthInsightsPanel';
 import { VerificationQueueSection } from './admin-dashboard/VerificationQueueSection';
 import type { GrowthInsightsSnapshot, ModerationQueueItem } from './admin-dashboard/types';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 
 interface Business {
     id: string;
@@ -264,6 +265,9 @@ export function AdminDashboard() {
     const [confirmDeleteCategoryId, setConfirmDeleteCategoryId] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
+    useTimedMessage(successMessage, setSuccessMessage, 4500);
     const [verificationLoading, setVerificationLoading] = useState(false);
     const [pendingVerifications, setPendingVerifications] = useState<PendingVerificationBusiness[]>([]);
     const [marketReports, setMarketReports] = useState<MarketReport[]>([]);

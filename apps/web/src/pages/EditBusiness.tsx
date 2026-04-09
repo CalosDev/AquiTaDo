@@ -21,6 +21,7 @@ import {
     type Sector,
 } from './edit-business/types';
 import { formatPublicCategoryIcon, formatPublicCategoryPath } from '../lib/categoryLabel';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 
 export function EditBusiness() {
     const { businessId } = useParams<{ businessId: string }>();
@@ -39,6 +40,9 @@ export function EditBusiness() {
     const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
+    useTimedMessage(successMessage, setSuccessMessage, 4500);
 
     const selectedCategorySet = useMemo(
         () => new Set(formData.categoryIds),

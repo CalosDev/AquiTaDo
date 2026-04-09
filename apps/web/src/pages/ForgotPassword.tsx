@@ -5,12 +5,16 @@ import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
 import { AuthShell } from '../components/auth/AuthShell';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 
 export function ForgotPassword() {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
+    useTimedMessage(successMessage, setSuccessMessage, 5000);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();

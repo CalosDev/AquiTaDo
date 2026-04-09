@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { AuthShell } from '../components/auth/AuthShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
+import { useTimedMessage } from '../hooks/useTimedMessage';
 
 export function Login() {
     const { login, loginWithGoogle } = useAuth();
@@ -22,6 +23,22 @@ export function Login() {
         && typeof (location.state as { notice?: unknown }).notice === 'string'
             ? (location.state as { notice: string }).notice
             : '';
+    const [noticeMessage, setNoticeMessage] = useState(notice);
+
+    useEffect(() => {
+        if (!notice) {
+            return;
+        }
+
+        setNoticeMessage(notice);
+        navigate(`${location.pathname}${location.search}${location.hash}`, {
+            replace: true,
+            state: null,
+        });
+    }, [location.hash, location.pathname, location.search, navigate, notice]);
+
+    useTimedMessage(error, setError, 6500);
+    useTimedMessage(noticeMessage, setNoticeMessage, 5000);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -108,7 +125,7 @@ export function Login() {
         >
             <PageFeedbackStack
                 items={[
-                    { id: 'login-notice', tone: 'success', text: notice },
+                    { id: 'login-notice', tone: 'success', text: noticeMessage },
                     { id: 'login-error', tone: 'danger', text: error },
                 ]}
             />
