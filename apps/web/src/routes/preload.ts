@@ -53,12 +53,12 @@ export function preloadRouteChunk(pathname: string): void {
     const normalizedPath = normalizePath(pathname);
 
     if (normalizedPath === '/') {
-        preloadMany(['home', 'businessesList']);
+        preloadByKey('home');
         return;
     }
 
     if (normalizedPath.startsWith('/businesses/')) {
-        preloadMany(['businessDetails', 'businessesList']);
+        preloadByKey('businessDetails');
         return;
     }
 
@@ -66,7 +66,7 @@ export function preloadRouteChunk(pathname: string): void {
         normalizedPath === '/businesses'
         || normalizedPath.startsWith('/negocios/')
     ) {
-        preloadMany(['businessesList', 'businessDetails']);
+        preloadByKey('businessesList');
         return;
     }
 
@@ -91,7 +91,7 @@ export function preloadRouteChunk(pathname: string): void {
     }
 
     if (normalizedPath === '/app') {
-        preloadMany(['appHome', 'customerDashboard', 'dashboardBusiness', 'adminDashboard']);
+        preloadByKey('appHome');
         return;
     }
 
@@ -101,12 +101,12 @@ export function preloadRouteChunk(pathname: string): void {
     }
 
     if (normalizedPath === '/dashboard') {
-        preloadMany(['dashboardBusiness', 'editBusiness']);
+        preloadByKey('dashboardBusiness');
         return;
     }
 
     if (normalizedPath.startsWith('/dashboard/businesses/')) {
-        preloadMany(['editBusiness', 'dashboardBusiness']);
+        preloadByKey('editBusiness');
         return;
     }
 
@@ -150,34 +150,25 @@ export function preloadLikelyRoutesForSession(options: {
     role?: UserRole;
     mode?: 'normal' | 'minimal';
 }): void {
-    const mode = options.mode ?? 'normal';
-
     if (!options.isAuthenticated) {
-        preloadMany(mode === 'minimal'
-            ? ['home', 'businessesList']
-            : ['home', 'businessesList', 'about']);
+        preloadMany(['home', 'businessesList']);
         return;
     }
 
-    preloadMany(mode === 'minimal' ? ['appHome'] : ['appHome', 'profile']);
-
     if (options.role === 'USER') {
-        preloadMany(mode === 'minimal'
-            ? ['customerDashboard']
-            : ['customerDashboard', 'profile']);
+        preloadMany(['customerDashboard', 'profile']);
         return;
     }
 
     if (options.role === 'BUSINESS_OWNER') {
-        preloadMany(mode === 'minimal'
-            ? ['dashboardBusiness']
-            : ['dashboardBusiness', 'registerBusiness', 'editBusiness']);
+        preloadByKey('dashboardBusiness');
         return;
     }
 
     if (options.role === 'ADMIN') {
-        preloadMany(mode === 'minimal'
-            ? ['adminDashboard']
-            : ['adminDashboard', 'adminSecurity']);
+        preloadByKey('adminDashboard');
+        return;
     }
+
+    preloadByKey('appHome');
 }

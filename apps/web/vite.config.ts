@@ -10,6 +10,30 @@ export default defineConfig({
         },
     },
     build: {
+        modulePreload: {
+            resolveDependencies(_filename, deps, context) {
+                if (context.hostType !== 'html') {
+                    return deps;
+                }
+
+                const allowedHtmlPreloads = [
+                    'assets/vendor-react-',
+                    'assets/vendor-data-',
+                    'assets/vendor-router-',
+                    'assets/shared-app-shell-',
+                    'assets/shared-core-',
+                    'assets/shared-feedback-',
+                    'assets/shared-organization-',
+                    'assets/page-home-',
+                    'assets/page-discovery-',
+                    'assets/page-auth-',
+                ];
+
+                return deps.filter((dependency) =>
+                    allowedHtmlPreloads.some((prefix) => dependency.startsWith(prefix)),
+                );
+            },
+        },
         rollupOptions: {
             output: {
                 manualChunks(id) {
@@ -33,6 +57,76 @@ export default defineConfig({
                         ) {
                             return 'vendor-react';
                         }
+                    }
+
+                    if (
+                        id.includes('/src/context/AuthContext')
+                        || id.includes('\\src\\context\\AuthContext')
+                        || id.includes('/src/context/useAuth')
+                        || id.includes('\\src\\context\\useAuth')
+                        || id.includes('/src/auth/')
+                        || id.includes('\\src\\auth\\')
+                        || id.includes('/src/seo/')
+                        || id.includes('\\src\\seo\\')
+                        || id.includes('/src/lib/queryClient')
+                        || id.includes('\\src\\lib\\queryClient')
+                        || id.includes('/src/lib/businessProfile')
+                        || id.includes('\\src\\lib\\businessProfile')
+                        || id.includes('/src/lib/categoryLabel')
+                        || id.includes('\\src\\lib\\categoryLabel')
+                        || id.includes('/src/lib/clientContext')
+                        || id.includes('\\src\\lib\\clientContext')
+                        || id.includes('/src/lib/trust')
+                        || id.includes('\\src\\lib\\trust')
+                        || id.includes('/src/lib/growthTracking')
+                        || id.includes('\\src\\lib\\growthTracking')
+                        || id.includes('/src/lib/abTesting')
+                        || id.includes('\\src\\lib\\abTesting')
+                        || id.includes('/src/config/features')
+                        || id.includes('\\src\\config\\features')
+                        || id.includes('/src/api/error')
+                        || id.includes('\\src\\api\\error')
+                    ) {
+                        return 'shared-core';
+                    }
+
+                    if (
+                        id.includes('/src/context/OrganizationContext')
+                        || id.includes('\\src\\context\\OrganizationContext')
+                        || id.includes('/src/context/useOrganization')
+                        || id.includes('\\src\\context\\useOrganization')
+                    ) {
+                        return 'shared-organization';
+                    }
+
+                    if (
+                        id.includes('/src/layouts/')
+                        || id.includes('\\src\\layouts\\')
+                        || id.includes('/src/components/Navbar')
+                        || id.includes('\\src\\components\\Navbar')
+                        || id.includes('/src/components/Footer')
+                        || id.includes('\\src\\components\\Footer')
+                        || id.includes('/src/components/ProtectedRoute')
+                        || id.includes('\\src\\components\\ProtectedRoute')
+                        || id.includes('/src/components/FrontendObservabilityBridge')
+                        || id.includes('\\src\\components\\FrontendObservabilityBridge')
+                    ) {
+                        return 'shared-app-shell';
+                    }
+
+                    if (
+                        id.includes('/src/components/BusyButtonLabel')
+                        || id.includes('\\src\\components\\BusyButtonLabel')
+                        || id.includes('/src/components/PageBlockingLoader')
+                        || id.includes('\\src\\components\\PageBlockingLoader')
+                        || id.includes('/src/components/PageFeedbackStack')
+                        || id.includes('\\src\\components\\PageFeedbackStack')
+                        || id.includes('/src/components/InlineDangerConfirm')
+                        || id.includes('\\src\\components\\InlineDangerConfirm')
+                        || id.includes('/src/hooks/useTimedMessage')
+                        || id.includes('\\src\\hooks\\useTimedMessage')
+                    ) {
+                        return 'shared-feedback';
                     }
 
                     if (

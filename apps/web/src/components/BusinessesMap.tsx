@@ -1,3 +1,4 @@
+import 'leaflet/dist/leaflet.css';
 import { LatLngBounds } from 'leaflet';
 import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
