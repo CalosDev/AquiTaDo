@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../api/error';
 import { analyticsApi, bookingsApi, businessApi, checkinsApi, favoritesApi, messagingApi, promotionsApi, reputationApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { useNearViewport } from '../hooks/useNearViewport';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { trackGrowthEvent as trackGrowthSignal } from '../lib/growthTracking';
@@ -41,37 +42,26 @@ const ReviewsSectionLazy = lazy(async () => {
     return { default: module.ReviewsSection };
 });
 
-function scheduleDeferredTask(task: () => void): () => void {
-    if (typeof window === 'undefined') {
-        task();
-        return () => undefined;
-    }
-
-    const idleWindow = window as Window & {
-        requestIdleCallback?: (
-            callback: IdleRequestCallback,
-            options?: IdleRequestOptions,
-        ) => number;
-        cancelIdleCallback?: (handle: number) => void;
-    };
-    const idleCallback = idleWindow.requestIdleCallback;
-    if (typeof idleCallback === 'function') {
-        const callbackId = idleCallback(() => {
-            task();
-        }, { timeout: 600 });
-        return () => idleWindow.cancelIdleCallback?.(callbackId);
-    }
-
-    const timeoutId = window.setTimeout(task, 180);
-    return () => window.clearTimeout(timeoutId);
-}
-
 function DetailSectionFallback({ label }: { label: string }) {
     return (
         <div className="panel-premium p-6">
             <div className="h-4 w-28 rounded-full bg-slate-100 animate-pulse" />
             <div className="mt-3 h-7 w-52 rounded-full bg-slate-100 animate-pulse" />
             <div className="mt-5 space-y-3">
+                <div className="h-20 rounded-[1.25rem] bg-slate-100 animate-pulse" />
+                <div className="h-20 rounded-[1.25rem] bg-slate-100 animate-pulse" />
+            </div>
+            <span className="sr-only">{label}</span>
+        </div>
+    );
+}
+
+function DeferredSectionPlaceholder({ label }: { label: string }) {
+    return (
+        <div className="panel-premium p-6">
+            <div className="h-4 w-24 rounded-full bg-slate-100 animate-pulse" />
+            <div className="mt-3 h-6 w-56 rounded-full bg-slate-100 animate-pulse" />
+            <div className="mt-5 grid gap-3">
                 <div className="h-20 rounded-[1.25rem] bg-slate-100 animate-pulse" />
                 <div className="h-20 rounded-[1.25rem] bg-slate-100 animate-pulse" />
             </div>
@@ -144,6 +134,9 @@ export function BusinessDetails() {
     const [promotionsLoading, setPromotionsLoading] = useState(false);
     const [nearbyBusinesses, setNearbyBusinesses] = useState<NearbyBusiness[]>([]);
     const [nearbyLoading, setNearbyLoading] = useState(false);
+    const [promotionsSectionRef, promotionsSectionVisible] = useNearViewport<HTMLDivElement>('420px 0px', 0.01, business?.id);
+    const [nearbySectionRef, nearbySectionVisible] = useNearViewport<HTMLDivElement>('420px 0px', 0.01, business?.id);
+    const [reviewsSectionRef, reviewsSectionVisible] = useNearViewport<HTMLDivElement>('420px 0px', 0.01, business?.id);
 
     const loadBusiness = useCallback(async () => {
         if (!slug) {
@@ -357,126 +350,155 @@ export function BusinessDetails() {
 
     useEffect(() => {
         if (!business?.id) {
-            setReviews([]);
             setPublicPromotions([]);
-            setNearbyBusinesses([]);
-            setReviewsLoading(false);
             setPromotionsLoading(false);
+            return;
+        }
+
+        if (!promotionsSectionVisible) {
+            setPublicPromotions([]);
+            setPromotionsLoading(false);
+            return;
+        }
+
+        let active = true;
+        setPromotionsLoading(true);
+
+        void promotionsApi.getPublic({
+            businessId: business.id,
+            limit: 6,
+        })
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+
+                const payload = response.data;
+                const rows = Array.isArray(payload)
+                    ? payload
+                    : ((payload?.data || []) as PublicPromotion[]);
+                setPublicPromotions(rows as PublicPromotion[]);
+            })
+            .catch(() => {
+                if (active) {
+                    setPublicPromotions([]);
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setPromotionsLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [business?.id, promotionsSectionVisible]);
+
+    useEffect(() => {
+        if (!business?.id) {
+            setNearbyBusinesses([]);
+            setNearbyLoading(false);
+            return;
+        }
+
+        if (
+            !nearbySectionVisible
+            || typeof business.latitude !== 'number'
+            || typeof business.longitude !== 'number'
+        ) {
+            setNearbyBusinesses([]);
             setNearbyLoading(false);
             return;
         }
 
         let active = true;
-        const cancelDeferredTask = scheduleDeferredTask(() => {
-            if (!active) {
-                return;
-            }
+        setNearbyLoading(true);
 
-            setReviewsLoading(true);
-            setPromotionsLoading(true);
-            setNearbyLoading(Boolean(
-                typeof business.latitude === 'number' && typeof business.longitude === 'number',
-            ));
+        void businessApi.getNearby({
+            lat: business.latitude,
+            lng: business.longitude,
+            radius: 5,
+        })
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
 
-            void reviewApi.getByBusiness(business.id)
-                .then((response) => {
-                    if (!active) {
-                        return;
-                    }
-                    setReviews((response.data || []) as ReviewEntry[]);
-                })
-                .catch(() => {
-                    if (active) {
-                        setReviews([]);
-                    }
-                })
-                .finally(() => {
-                    if (active) {
-                        setReviewsLoading(false);
-                    }
-                });
+                const payload = response.data;
+                const rows = (Array.isArray(payload)
+                    ? payload
+                    : (payload?.data || [])) as Array<Record<string, unknown>>;
 
-            void promotionsApi.getPublic({
-                businessId: business.id,
-                limit: 6,
+                const normalized = rows
+                    .map((row) => ({
+                        id: String(row.id || ''),
+                        name: String(row.name || ''),
+                        slug: String(row.slug || ''),
+                        address: typeof row.address === 'string' ? row.address : undefined,
+                        distance: typeof row.distance === 'number' || typeof row.distance === 'string'
+                            ? row.distance
+                            : null,
+                    }))
+                    .filter((item) => item.id && item.id !== business.id)
+                    .slice(0, 6);
+
+                setNearbyBusinesses(normalized);
             })
-                .then((response) => {
-                    if (!active) {
-                        return;
-                    }
-
-                    const payload = response.data;
-                    const rows = Array.isArray(payload)
-                        ? payload
-                        : ((payload?.data || []) as PublicPromotion[]);
-                    setPublicPromotions(rows as PublicPromotion[]);
-                })
-                .catch(() => {
-                    if (active) {
-                        setPublicPromotions([]);
-                    }
-                })
-                .finally(() => {
-                    if (active) {
-                        setPromotionsLoading(false);
-                    }
-                });
-
-            if (
-                typeof business.latitude === 'number'
-                && typeof business.longitude === 'number'
-            ) {
-                void businessApi.getNearby({
-                    lat: business.latitude,
-                    lng: business.longitude,
-                    radius: 5,
-                })
-                    .then((response) => {
-                        if (!active) {
-                            return;
-                        }
-
-                        const payload = response.data;
-                        const rows = (Array.isArray(payload)
-                            ? payload
-                            : (payload?.data || [])) as Array<Record<string, unknown>>;
-
-                        const normalized = rows
-                            .map((row) => ({
-                                id: String(row.id || ''),
-                                name: String(row.name || ''),
-                                slug: String(row.slug || ''),
-                                address: typeof row.address === 'string' ? row.address : undefined,
-                                distance: typeof row.distance === 'number' || typeof row.distance === 'string'
-                                    ? row.distance
-                                    : null,
-                            }))
-                            .filter((item) => item.id && item.id !== business.id)
-                            .slice(0, 6);
-
-                        setNearbyBusinesses(normalized);
-                    })
-                    .catch(() => {
-                        if (active) {
-                            setNearbyBusinesses([]);
-                        }
-                    })
-                    .finally(() => {
-                        if (active) {
-                            setNearbyLoading(false);
-                        }
-                    });
-            } else {
-                setNearbyBusinesses([]);
-                setNearbyLoading(false);
-            }
-        });
+            .catch(() => {
+                if (active) {
+                    setNearbyBusinesses([]);
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setNearbyLoading(false);
+                }
+            });
 
         return () => {
             active = false;
-            cancelDeferredTask();
         };
-    }, [business?.id, business?.latitude, business?.longitude]);
+    }, [business?.id, business?.latitude, business?.longitude, nearbySectionVisible]);
+
+    useEffect(() => {
+        if (!business?.id) {
+            setReviews([]);
+            setReviewsLoading(false);
+            return;
+        }
+
+        if (!reviewsSectionVisible) {
+            setReviews([]);
+            setReviewsLoading(false);
+            return;
+        }
+
+        let active = true;
+        setReviewsLoading(true);
+
+        void reviewApi.getByBusiness(business.id)
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+                setReviews((response.data || []) as ReviewEntry[]);
+            })
+            .catch(() => {
+                if (active) {
+                    setReviews([]);
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setReviewsLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [business?.id, reviewsSectionVisible]);
 
     useEffect(() => {
         if (!shareFeedback) {
@@ -1439,37 +1461,49 @@ export function BusinessDetails() {
                         </div>
                     )}
 
-                    <div className="defer-render-section">
-                        <Suspense fallback={<DetailSectionFallback label="Cargando promociones" />}>
-                            <PromotionsSectionLazy loading={promotionsLoading} promotions={publicPromotions} />
-                        </Suspense>
+                    <div ref={promotionsSectionRef} className="defer-render-section">
+                        {promotionsSectionVisible ? (
+                            <Suspense fallback={<DetailSectionFallback label="Cargando promociones" />}>
+                                <PromotionsSectionLazy loading={promotionsLoading} promotions={publicPromotions} />
+                            </Suspense>
+                        ) : (
+                            <DeferredSectionPlaceholder label="Promociones disponibles" />
+                        )}
                     </div>
 
-                    <div className="defer-render-section">
-                        <Suspense fallback={<DetailSectionFallback label="Cargando negocios cercanos" />}>
-                            <NearbyBusinessesSectionLazy businesses={nearbyBusinesses} loading={nearbyLoading} />
-                        </Suspense>
+                    <div ref={nearbySectionRef} className="defer-render-section">
+                        {nearbySectionVisible ? (
+                            <Suspense fallback={<DetailSectionFallback label="Cargando negocios cercanos" />}>
+                                <NearbyBusinessesSectionLazy businesses={nearbyBusinesses} loading={nearbyLoading} />
+                            </Suspense>
+                        ) : (
+                            <DeferredSectionPlaceholder label="Negocios cercanos" />
+                        )}
                     </div>
 
-                    <div className="defer-render-section">
-                        <Suspense fallback={<DetailSectionFallback label="Cargando resenas" />}>
-                            <ReviewsSectionLazy
-                                averageRating={averageRating}
-                                averageRatingNumber={averageRatingNumber}
-                                isAuthenticated={isAuthenticated}
-                                isCustomerRole={isCustomerRole}
-                                onReviewFormChange={setReviewForm}
-                                onSubmit={handleReviewSubmit}
-                                reviewCount={reviewCount}
-                                reviewErrorMessage={reviewErrorMessage}
-                                reviewForm={reviewForm}
-                                reviews={visibleReviews}
-                                reviewsLoading={reviewsLoading}
-                                reviewStarsLabel={reviewStarsLabel}
-                                reviewSuccessMessage={reviewSuccessMessage}
-                                submittingReview={submittingReview}
-                            />
-                        </Suspense>
+                    <div ref={reviewsSectionRef} className="defer-render-section">
+                        {reviewsSectionVisible ? (
+                            <Suspense fallback={<DetailSectionFallback label="Cargando resenas" />}>
+                                <ReviewsSectionLazy
+                                    averageRating={averageRating}
+                                    averageRatingNumber={averageRatingNumber}
+                                    isAuthenticated={isAuthenticated}
+                                    isCustomerRole={isCustomerRole}
+                                    onReviewFormChange={setReviewForm}
+                                    onSubmit={handleReviewSubmit}
+                                    reviewCount={reviewCount}
+                                    reviewErrorMessage={reviewErrorMessage}
+                                    reviewForm={reviewForm}
+                                    reviews={visibleReviews}
+                                    reviewsLoading={reviewsLoading}
+                                    reviewStarsLabel={reviewStarsLabel}
+                                    reviewSuccessMessage={reviewSuccessMessage}
+                                    submittingReview={submittingReview}
+                                />
+                            </Suspense>
+                        ) : (
+                            <DeferredSectionPlaceholder label="Resenas del negocio" />
+                        )}
                     </div>
 
                 </div>

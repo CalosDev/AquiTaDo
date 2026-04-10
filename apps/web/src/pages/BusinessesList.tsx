@@ -63,6 +63,32 @@ const BusinessesMapLazy = lazy(async () => {
     return { default: module.BusinessesMap };
 });
 
+function scheduleIdleTask(task: () => void): () => void {
+    if (typeof window === 'undefined') {
+        task();
+        return () => undefined;
+    }
+
+    const idleWindow = window as Window & {
+        requestIdleCallback?: (
+            callback: IdleRequestCallback,
+            options?: IdleRequestOptions,
+        ) => number;
+        cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+        const callbackId = idleWindow.requestIdleCallback(() => {
+            task();
+        }, { timeout: 650 });
+
+        return () => idleWindow.cancelIdleCallback?.(callbackId);
+    }
+
+    const timeoutId = window.setTimeout(task, 220);
+    return () => window.clearTimeout(timeoutId);
+}
+
 function buildPagination(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
     if (totalPages <= 7) {
         return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -106,6 +132,7 @@ export function BusinessesList() {
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [sponsoredPlacements, setSponsoredPlacements] = useState<SponsoredPlacement[]>([]);
+    const [sponsoredPlacementsLoading, setSponsoredPlacementsLoading] = useState(false);
     const [favoriteBusinessIds, setFavoriteBusinessIds] = useState<Set<string>>(new Set());
     const [favoriteProcessingId, setFavoriteProcessingId] = useState<string | null>(null);
     const [filtersLoading, setFiltersLoading] = useState(true);
@@ -403,6 +430,8 @@ export function BusinessesList() {
         setLoading(true);
         setLoadError('');
         setLoadErrorType(null);
+        setSponsoredPlacements([]);
+        setSponsoredPlacementsLoading(false);
         try {
             const params: Record<string, string | number | boolean> = { page: currentPage, limit: PAGE_SIZE };
             if (currentSearch) params.search = currentSearch;
@@ -422,35 +451,71 @@ export function BusinessesList() {
             if (currentOpenNow) params.openNow = true;
             if (currentVerified) params.verified = true;
 
-            const sponsoredPlacementsPromise = showSponsoredAds
-                ? adsApi.getPlacements({
-                    provinceId: currentProvince || undefined,
-                    categoryId: currentCategory || undefined,
-                    limit: 3,
-                })
-                    .then((response) => ((response.data || []) as SponsoredPlacement[]))
-                    .catch(() => [] as SponsoredPlacement[])
-                : Promise.resolve([] as SponsoredPlacement[]);
-            const [businessesRes, nextSponsoredPlacements] = await Promise.all([
-                businessApi.getAll(params),
-                sponsoredPlacementsPromise,
-            ]);
+            const businessesRes = await businessApi.getAll(params);
 
             setBusinesses(businessesRes.data.data || []);
             setTotal(businessesRes.data.total || 0);
             setTotalPages(businessesRes.data.totalPages || 0);
-            setSponsoredPlacements(nextSponsoredPlacements);
         } catch (error) {
             setLoadErrorType(isApiTimeoutError(error) ? 'timeout' : 'generic');
             setLoadError(getApiErrorMessage(error, 'No se pudieron cargar los negocios'));
+            setSponsoredPlacements([]);
         } finally {
             setLoading(false);
         }
-    }, [categorySlug, currentCategory, currentCity, currentFeature, currentOpenNow, currentPage, currentProvince, currentSearch, currentSector, currentVerified, provinceSlug, showSponsoredAds]);
+    }, [categorySlug, currentCategory, currentCity, currentFeature, currentOpenNow, currentPage, currentProvince, currentSearch, currentSector, currentVerified, provinceSlug]);
 
     useEffect(() => {
         void loadBusinesses();
     }, [loadBusinesses]);
+
+    useEffect(() => {
+        if (!showSponsoredAds) {
+            setSponsoredPlacements([]);
+            setSponsoredPlacementsLoading(false);
+            return;
+        }
+
+        if (loading || loadError || businesses.length === 0) {
+            if (!loading && businesses.length === 0) {
+                setSponsoredPlacements([]);
+                setSponsoredPlacementsLoading(false);
+            }
+            return;
+        }
+
+        let active = true;
+        setSponsoredPlacementsLoading(true);
+        const cancelIdleTask = scheduleIdleTask(() => {
+            void adsApi.getPlacements({
+                provinceId: currentProvince || undefined,
+                categoryId: currentCategory || undefined,
+                limit: 3,
+            })
+                .then((response) => {
+                    if (!active) {
+                        return;
+                    }
+                    setSponsoredPlacements((response.data || []) as SponsoredPlacement[]);
+                })
+                .catch(() => {
+                    if (!active) {
+                        return;
+                    }
+                    setSponsoredPlacements([]);
+                })
+                .finally(() => {
+                    if (active) {
+                        setSponsoredPlacementsLoading(false);
+                    }
+                });
+        });
+
+        return () => {
+            active = false;
+            cancelIdleTask();
+        };
+    }, [businesses.length, currentCategory, currentProvince, loadError, loading, showSponsoredAds]);
 
     useEffect(() => {
         if (!isAuthenticated || !isCustomerRole) {
@@ -1026,7 +1091,7 @@ export function BusinessesList() {
                                 </div>
                             ) : null}
 
-                            {showSponsoredAds && sponsoredPlacements.length > 0 && (
+                            {showSponsoredAds && sponsoredPlacements.length > 0 ? (
                                 <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                     {sponsoredPlacements.map((placement) => (
                                         <Link
@@ -1052,7 +1117,22 @@ export function BusinessesList() {
                                         </Link>
                                     ))}
                                 </div>
-                            )}
+                            ) : null}
+
+                            {showSponsoredAds && sponsoredPlacementsLoading && sponsoredPlacements.length === 0 ? (
+                                <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    {Array.from({ length: 3 }).map((_, index) => (
+                                        <div
+                                            key={`sponsored-skeleton-${index}`}
+                                            className="rounded-2xl border border-slate-200 bg-white p-4"
+                                        >
+                                            <div className="h-3 w-24 rounded-full bg-slate-100 animate-pulse" />
+                                            <div className="mt-3 h-5 w-2/3 rounded-full bg-slate-100 animate-pulse" />
+                                            <div className="mt-2 h-4 w-3/4 rounded-full bg-slate-100 animate-pulse" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : null}
 
                             {currentView === 'map' ? (
                                 <div className="discovery-callout mb-4 p-3">
