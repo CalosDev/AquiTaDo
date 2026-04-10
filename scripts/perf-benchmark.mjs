@@ -11,6 +11,7 @@ const API_BASE_URL = normalizeBaseUrl(
 const RUNS = parsePositiveInt(process.env.PERF_RUNS, 7);
 const TIMEOUT_MS = parsePositiveInt(process.env.PERF_TIMEOUT_MS, 30_000);
 const OUTPUT_JSON = process.env.PERF_OUTPUT_JSON?.trim() || '';
+const TRANSIENT_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 
 const TARGETS = [
     { name: 'WEB /', url: `${WEB_BASE_URL}/`, accept: 'text/html' },
@@ -71,6 +72,14 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isSuccessfulStatus(status) {
+    return status >= 200 && status < 400;
+}
+
+function isTransientStatus(status) {
+    return status === 0 || TRANSIENT_STATUS_CODES.has(status);
+}
+
 async function hit(url, accept = 'application/json') {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -112,7 +121,15 @@ function statusSummary(samples) {
 }
 
 async function benchmarkTarget(target) {
-    const warmup = await hit(target.url, target.accept);
+    let warmup = await hit(target.url, target.accept);
+    for (let attempt = 1; attempt <= 3 && isTransientStatus(warmup.status); attempt += 1) {
+        await sleep(1_250 * attempt);
+        warmup = await hit(target.url, target.accept);
+        if (isSuccessfulStatus(warmup.status)) {
+            break;
+        }
+    }
+
     const samples = [];
 
     for (let index = 0; index < RUNS; index += 1) {
@@ -120,7 +137,7 @@ async function benchmarkTarget(target) {
         await sleep(120);
     }
 
-    const successful = samples.filter((sample) => sample.status >= 200 && sample.status < 400);
+    const successful = samples.filter((sample) => isSuccessfulStatus(sample.status));
     const elapsed = successful.map((sample) => sample.elapsedMs).sort((a, b) => a - b);
 
     return {
@@ -167,6 +184,11 @@ function printMarkdownReport(rows) {
 
 async function main() {
     console.log(`Running performance benchmark (runs=${RUNS}, timeout=${TIMEOUT_MS}ms)`);
+    await benchmarkTarget({
+        name: 'API warmup /api/health/ready',
+        url: `${API_BASE_URL}/api/health/ready`,
+    });
+
     const rows = [];
     for (const target of TARGETS) {
         rows.push(await benchmarkTarget(target));

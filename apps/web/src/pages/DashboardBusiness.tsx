@@ -1,12 +1,14 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useRef } from 'react';
 import { analyticsApi, businessApi, verificationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useOrganization } from '../context/useOrganization';
 import { useTimedMessage } from '../hooks/useTimedMessage';
-import { formatDateTimeDo } from '../lib/market';
+
+const VerificationWorkspace = lazy(async () => ({
+    default: (await import('./dashboard-business/VerificationWorkspace')).VerificationWorkspace,
+}));
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
 
@@ -93,6 +95,37 @@ function getStatusClass(status: VerificationStatus | 'APPROVED' | 'REJECTED' | '
         default:
             return 'bg-gray-100 text-gray-700';
     }
+}
+
+function LazyOwnerSectionFallback({ label }: { label: string }) {
+    return (
+        <article className="section-shell p-6 lg:col-span-2 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-2">
+                    <div className="h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
+                    <div className="h-7 w-56 rounded-full bg-slate-100 animate-pulse" />
+                </div>
+                <div className="h-8 w-28 rounded-full bg-slate-100 animate-pulse" />
+            </div>
+            <div className="h-4 w-64 rounded-full bg-slate-100 animate-pulse" />
+            <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 min-h-[10.75rem]">
+                <div className="h-5 w-36 animate-pulse rounded-lg bg-slate-100" />
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="h-11 animate-pulse rounded-xl bg-white" />
+                    <div className="h-11 animate-pulse rounded-xl bg-white" />
+                </div>
+                <div className="h-10 w-36 animate-pulse rounded-xl bg-primary-100/60" />
+            </div>
+            <div className="rounded-xl border border-gray-100 p-4 min-h-[8.5rem]">
+                <div className="h-5 w-40 animate-pulse rounded-lg bg-slate-100" />
+                <div className="mt-4 space-y-2">
+                    <div className="h-16 animate-pulse rounded-xl bg-slate-50" />
+                    <div className="h-16 animate-pulse rounded-xl bg-slate-50" />
+                </div>
+            </div>
+            <span className="sr-only">{label}</span>
+        </article>
+    );
 }
 
 export function DashboardBusiness() {
@@ -453,7 +486,7 @@ export function DashboardBusiness() {
                 </article>
             </section>
 
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <section className="defer-render-section grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <article className="section-shell p-6">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <div>
@@ -513,157 +546,26 @@ export function DashboardBusiness() {
                     )}
                 </article>
 
-                <article className="section-shell p-6 lg:col-span-2 space-y-5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Compliance</p>
-                            <h2 className="font-display text-xl font-bold text-slate-900">Verificacion documental</h2>
-                        </div>
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getStatusClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
-                            {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
-                        </span>
-                    </div>
-
-                    {selectedBusiness ? (
-                        <p className="text-sm text-slate-600">
-                            Negocio seleccionado: <strong>{selectedBusiness.name}</strong>
-                        </p>
-                    ) : (
-                        <p className="text-sm text-slate-500">Selecciona un negocio para gestionar su verificación.</p>
-                    )}
-
-                    <div className="min-h-[6.5rem] space-y-2">
-                        {showVerificationSkeleton ? (
-                            <>
-                                <div className="h-4 w-48 animate-pulse rounded-lg bg-slate-100" />
-                                <div className="h-4 w-56 animate-pulse rounded-lg bg-slate-100" />
-                                <div className="h-11 w-full animate-pulse rounded-xl bg-amber-50" />
-                            </>
-                        ) : (
-                            <>
-                                {verificationStatus?.verificationSubmittedAt && (
-                                    <p className="text-xs text-slate-500">
-                                        Enviado: {formatDateTimeDo(verificationStatus.verificationSubmittedAt)}.
-                                    </p>
-                                )}
-                                {verificationStatus?.verificationReviewedAt && (
-                                    <p className="text-xs text-slate-500">
-                                        Revisado: {formatDateTimeDo(verificationStatus.verificationReviewedAt)}.
-                                    </p>
-                                )}
-                                {verificationStatus?.verificationNotes && (
-                                    <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                                        Nota: {verificationStatus.verificationNotes}
-                                    </p>
-                                )}
-                            </>
-                        )}
-                    </div>
-
-                    {showVerificationSkeleton ? (
-                        <>
-                            <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 min-h-[10.75rem]">
-                                <div className="h-5 w-36 animate-pulse rounded-lg bg-slate-100" />
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    <div className="h-11 animate-pulse rounded-xl bg-white" />
-                                    <div className="h-11 animate-pulse rounded-xl bg-white" />
-                                </div>
-                                <div className="h-10 w-36 animate-pulse rounded-xl bg-primary-100/60" />
-                            </div>
-
-                            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-3 min-h-[9.75rem]">
-                                <div className="h-5 w-48 animate-pulse rounded-lg bg-slate-100" />
-                                <div className="h-24 animate-pulse rounded-xl bg-white" />
-                                <div className="h-10 w-44 animate-pulse rounded-xl bg-slate-200/80" />
-                            </div>
-
-                            <div className="rounded-xl border border-gray-100 p-4 min-h-[8.5rem]">
-                                <div className="h-5 w-40 animate-pulse rounded-lg bg-slate-100" />
-                                <div className="mt-4 space-y-2">
-                                    <div className="h-16 animate-pulse rounded-xl bg-slate-50" />
-                                    <div className="h-16 animate-pulse rounded-xl bg-slate-50" />
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <form onSubmit={handleUploadDocument} className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 min-h-[10.75rem]">
-                                <h3 className="font-semibold text-slate-900">Subir documento</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <select
-                                        className="input-field"
-                                        value={documentType}
-                                        onChange={(event) => setDocumentType(event.target.value as VerificationDocument['documentType'])}
-                                        disabled={!selectedBusinessId || saving}
-                                    >
-                                        <option value="ID_CARD">Cedula</option>
-                                        <option value="TAX_CERTIFICATE">RNC</option>
-                                        <option value="BUSINESS_LICENSE">Licencia comercial</option>
-                                        <option value="ADDRESS_PROOF">Comprobante de direccion</option>
-                                        <option value="SELFIE">Selfie</option>
-                                        <option value="OTHER">Otro</option>
-                                    </select>
-                                    <input
-                                        type="file"
-                                        className="input-field"
-                                        accept=".pdf,.jpg,.jpeg,.png,.webp"
-                                        onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
-                                        disabled={!selectedBusinessId || saving}
-                                    />
-                                </div>
-                                <button type="submit" className="btn-primary text-sm" disabled={!selectedBusinessId || !selectedFile || saving}>
-                                    {saving ? 'Subiendo...' : 'Subir documento'}
-                                </button>
-                            </form>
-
-                            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-3 min-h-[9.75rem]">
-                                <h3 className="font-semibold text-slate-900">Enviar solicitud de revisión</h3>
-                                <textarea
-                                    className="input-field text-sm"
-                                    rows={3}
-                                    placeholder="Notas para el equipo de verificación (opcional)"
-                                    value={verificationNotes}
-                                    onChange={(event) => setVerificationNotes(event.target.value)}
-                                    disabled={!selectedBusinessId || saving}
-                                />
-                                <button
-                                    type="button"
-                                    className="btn-secondary text-sm"
-                                    onClick={() => void handleSubmitBusinessVerification()}
-                                    disabled={!selectedBusinessId || saving}
-                                >
-                                    {saving ? 'Enviando...' : 'Solicitar verificación'}
-                                </button>
-                            </div>
-
-                            <div className="rounded-xl border border-gray-100 p-4 min-h-[8.5rem]">
-                                <h3 className="font-semibold text-gray-900 mb-3">Historial de documentos</h3>
-                                {documents.length === 0 ? (
-                                    <p className="text-sm text-gray-500">Todavia no has subido documentos.</p>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {documents.map((document) => (
-                                            <div key={document.id} className="rounded-lg border border-gray-100 px-3 py-2">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <p className="text-sm font-medium text-gray-900">{document.documentType}</p>
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusClass(document.status)}`}>
-                                                        {getStatusLabel(document.status)}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    Subido: {formatDateTimeDo(document.submittedAt)}
-                                                </p>
-                                                {document.rejectionReason && (
-                                                    <p className="text-xs text-red-700 mt-1">Motivo: {document.rejectionReason}</p>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-                </article>
+                <Suspense fallback={<LazyOwnerSectionFallback label="Cargando verificacion documental" />}>
+                    <VerificationWorkspace
+                        selectedBusiness={selectedBusiness}
+                        selectedBusinessId={selectedBusinessId}
+                        showVerificationSkeleton={showVerificationSkeleton}
+                        verificationStatus={verificationStatus}
+                        documents={documents}
+                        documentType={documentType}
+                        hasSelectedFile={Boolean(selectedFile)}
+                        verificationNotes={verificationNotes}
+                        saving={saving}
+                        onDocumentTypeChange={(value) => setDocumentType(value as VerificationDocument['documentType'])}
+                        onFileChange={setSelectedFile}
+                        onVerificationNotesChange={setVerificationNotes}
+                        onUploadDocument={handleUploadDocument}
+                        onSubmitBusinessVerification={() => void handleSubmitBusinessVerification()}
+                        getStatusClass={getStatusClass}
+                        getStatusLabel={getStatusLabel}
+                    />
+                </Suspense>
             </section>
         </div>
     );

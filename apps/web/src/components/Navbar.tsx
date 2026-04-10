@@ -103,10 +103,24 @@ export function Navbar() {
             return;
         }
 
+        const connection = window.navigator as Navigator & {
+            connection?: {
+                effectiveType?: string;
+                saveData?: boolean;
+            };
+        };
+        const effectiveType = connection.connection?.effectiveType || '';
+        const saveData = connection.connection?.saveData === true;
+        if (saveData || effectiveType === 'slow-2g' || effectiveType === '2g') {
+            return;
+        }
+
+        const prefetchMode = effectiveType === '3g' ? 'minimal' : 'normal';
         const schedulePrefetch = () => {
             preloadLikelyRoutesForSession({
                 isAuthenticated,
                 role: user?.role,
+                mode: prefetchMode,
             });
         };
 
@@ -120,7 +134,7 @@ export function Navbar() {
         if (typeof withIdleCallback.requestIdleCallback === 'function') {
             const idleId = withIdleCallback.requestIdleCallback(() => {
                 schedulePrefetch();
-            }, { timeout: 1500 });
+            }, { timeout: prefetchMode === 'minimal' ? 2200 : 1500 });
             return () => {
                 if (typeof withIdleCallback.cancelIdleCallback === 'function') {
                     withIdleCallback.cancelIdleCallback(idleId);
@@ -128,7 +142,7 @@ export function Navbar() {
             };
         }
 
-        const timeoutId = window.setTimeout(schedulePrefetch, 600);
+        const timeoutId = window.setTimeout(schedulePrefetch, prefetchMode === 'minimal' ? 1400 : 600);
         return () => window.clearTimeout(timeoutId);
     }, [isAuthenticated, user?.role]);
 
@@ -144,7 +158,7 @@ export function Navbar() {
                         <span className="chip !px-2.5 !py-0.5 !text-[10px] !shadow-none">Hecho en RD</span>
                         <span>Discovery local de negocios en RD</span>
                     </div>
-                    <span className="text-primary-700">Santo Domingo, República Dominicana</span>
+                    <span className="text-primary-700">Santo Domingo, Republica Dominicana</span>
                 </div>
             </div>
 

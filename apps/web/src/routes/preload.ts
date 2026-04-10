@@ -148,38 +148,36 @@ export function preloadRouteChunk(pathname: string): void {
 export function preloadLikelyRoutesForSession(options: {
     isAuthenticated: boolean;
     role?: UserRole;
+    mode?: 'normal' | 'minimal';
 }): void {
+    const mode = options.mode ?? 'normal';
+
     if (!options.isAuthenticated) {
-        preloadMany([
-            'home',
-            'businessesList',
-            'businessDetails',
-            'login',
-            'register',
-            'forgotPassword',
-            'resetPassword',
-            'about',
-        ]);
+        preloadMany(mode === 'minimal'
+            ? ['home', 'businessesList']
+            : ['home', 'businessesList', 'about']);
         return;
     }
 
-    preloadMany(['appHome', 'profile']);
+    preloadMany(mode === 'minimal' ? ['appHome'] : ['appHome', 'profile']);
 
     if (options.role === 'USER') {
-        preloadByKey('customerDashboard');
+        preloadMany(mode === 'minimal'
+            ? ['customerDashboard']
+            : ['customerDashboard', 'profile']);
         return;
     }
 
     if (options.role === 'BUSINESS_OWNER') {
-        preloadMany([
-            'dashboardBusiness',
-            'registerBusiness',
-            'editBusiness',
-        ]);
+        preloadMany(mode === 'minimal'
+            ? ['dashboardBusiness']
+            : ['dashboardBusiness', 'registerBusiness', 'editBusiness']);
         return;
     }
 
     if (options.role === 'ADMIN') {
-        preloadMany(['adminDashboard', 'adminSecurity']);
+        preloadMany(mode === 'minimal'
+            ? ['adminDashboard']
+            : ['adminDashboard', 'adminSecurity']);
     }
 }

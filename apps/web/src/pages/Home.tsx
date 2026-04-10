@@ -793,7 +793,7 @@ export function Home() {
                     </div>
                 ) : (
                     <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                        {recentBusinesses.map((business) => (
+                        {recentBusinesses.map((business, index) => (
                             <Link
                                 key={business.id}
                                 to={`/businesses/${business.slug || business.id}`}
@@ -808,6 +808,7 @@ export function Home() {
                                             src={business.images[0].url}
                                             alt={business.name}
                                             className="h-full w-full object-cover"
+                                            priority={index === 0}
                                             sizes="(min-width: 1280px) 24rem, (min-width: 768px) 50vw, 100vw"
                                         />
                                     ) : (

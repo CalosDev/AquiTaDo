@@ -10,6 +10,7 @@ const DEFAULT_PROD_SMOKE_USER_EMAIL = 'smoke.user.aquitado@example.com';
 const DEFAULT_PROD_SMOKE_OWNER_EMAIL = 'smoke.owner.aquitado@example.com';
 const DEFAULT_PROD_SMOKE_ADMIN_EMAIL = 'admin@aquita.do';
 const DEFAULT_PROD_SMOKE_ADMIN_PASSWORD = 'admin12345';
+const TRANSIENT_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 const FRONTEND_BUNDLE_PATTERNS = [
     {
         pattern: /\[DEPRECATED\]\s*Default export is deprecated\. Instead use `import \{ create \} from 'zustand'`/i,
@@ -132,9 +133,50 @@ async function request(baseUrl, path, options = {}) {
             text,
             json,
         };
+    } catch (error) {
+        return {
+            status: 0,
+            headers: new Headers(),
+            text: '',
+            json: null,
+            error: error instanceof Error ? error.message : String(error),
+        };
     } finally {
         clearTimeout(timeout);
     }
+}
+
+function shouldRetryTransientResponse(response, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+    if (method !== 'GET') {
+        return false;
+    }
+
+    if (response.status === 0) {
+        return true;
+    }
+
+    return TRANSIENT_STATUS_CODES.has(response.status);
+}
+
+async function requestWithRetry(baseUrl, path, options = {}, retryOptions = {}) {
+    const {
+        attempts = 4,
+        delayMs = 1_800,
+    } = retryOptions;
+
+    let lastResponse = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        const response = await request(baseUrl, path, options);
+        lastResponse = response;
+        if (!shouldRetryTransientResponse(response, options) || attempt === attempts) {
+            return response;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+    }
+
+    return lastResponse;
 }
 
 function isExpectedCheckInError(response) {
@@ -192,30 +234,30 @@ async function runBundleSignalSmoke(webBaseUrl, homeHtml) {
 async function runApiSmoke(apiBaseUrl, skipCheckIns) {
     console.log(`Running API checks against ${apiBaseUrl}`);
 
-    const health = await request(apiBaseUrl, '/api/health');
+    const health = await requestWithRetry(apiBaseUrl, '/api/health');
     expectStatus(health, [200], 'GET /api/health');
     assert(health.json?.status === 'ok', '/api/health returned invalid status');
 
-    const ready = await request(apiBaseUrl, '/api/health/ready');
+    const ready = await requestWithRetry(apiBaseUrl, '/api/health/ready');
     expectStatus(ready, [200], 'GET /api/health/ready');
     assert(ready.json?.checks?.database === 'up', 'Readiness database check is not up');
     assert(ready.json?.checks?.schema === 'up', 'Readiness schema check is not up');
 
-    const plans = await request(apiBaseUrl, '/api/plans');
+    const plans = await requestWithRetry(apiBaseUrl, '/api/plans');
     expectStatus(plans, [200], 'GET /api/plans');
     assert(Array.isArray(plans.json) && plans.json.length > 0, 'No plans found');
 
-    const categories = await request(apiBaseUrl, '/api/categories');
+    const categories = await requestWithRetry(apiBaseUrl, '/api/categories');
     expectStatus(categories, [200], 'GET /api/categories');
     assert(Array.isArray(categories.json) && categories.json.length > 0, 'No categories found');
 
-    const provinces = await request(apiBaseUrl, '/api/provinces');
+    const provinces = await requestWithRetry(apiBaseUrl, '/api/provinces');
     expectStatus(provinces, [200], 'GET /api/provinces');
     assert(Array.isArray(provinces.json) && provinces.json.length > 0, 'No provinces found');
     const firstProvinceId = provinces.json?.[0]?.id;
     assert(typeof firstProvinceId === 'string', 'No province id available for smoke checks');
 
-    const businesses = await request(apiBaseUrl, '/api/businesses?limit=3');
+    const businesses = await requestWithRetry(apiBaseUrl, '/api/businesses?limit=3');
     expectStatus(businesses, [200], 'GET /api/businesses');
     assert(Array.isArray(businesses.json?.data), '/api/businesses.data must be an array');
     const firstBusinessId = businesses.json?.data?.[0]?.id;
@@ -227,7 +269,7 @@ async function runApiSmoke(apiBaseUrl, skipCheckIns) {
     if (skipCheckIns) {
         console.log('Skipping check-in stats validation: SMOKE_PROD_SKIP_CHECKINS=1');
     } else {
-        const checkInStats = await request(apiBaseUrl, `/api/checkins/business/${firstBusinessId}/stats`);
+        const checkInStats = await requestWithRetry(apiBaseUrl, `/api/checkins/business/${firstBusinessId}/stats`);
         if (checkInStats.status === 500) {
             throw new Error(
                 'GET /api/checkins/business/:id/stats returned HTTP 500. ' +
