@@ -157,3 +157,49 @@ export interface GrowthInsightsSnapshot {
         }>;
     };
 }
+
+export interface OperationalDashboardSnapshot {
+    status: 'up' | 'degraded' | 'down' | 'disabled';
+    timestamp: string;
+    uptimeSeconds: number;
+    responseTimeMs?: number;
+    checks?: {
+        database?: {
+            status?: 'up' | 'degraded' | 'down' | 'disabled';
+            schema?: 'up' | 'down';
+            pool?: {
+                status?: 'up' | 'degraded' | 'down' | 'disabled';
+                activeConnections?: number;
+                maxConnections?: number;
+                saturationPct?: number;
+            };
+        };
+        email?: {
+            status?: 'up' | 'degraded' | 'down' | 'disabled';
+            thresholdMs?: number;
+            reason?: string;
+            operations?: Array<{
+                operation: string;
+                p95Ms: number;
+                errorRatePct: number;
+            }>;
+        };
+        whatsapp?: {
+            status?: 'up' | 'degraded' | 'down' | 'disabled';
+            thresholdMs?: number;
+            operations?: Array<{
+                operation: string;
+                p95Ms: number;
+                errorRatePct: number;
+            }>;
+        };
+    };
+    passwordReset?: {
+        providerConfigured?: boolean;
+        requestsLast24h?: number;
+        completionsLast24h?: number;
+        completionRatePct?: number;
+        activeTokens?: number;
+        expiredPendingTokens?: number;
+    };
+}

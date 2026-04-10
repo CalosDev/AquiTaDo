@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '../api/error';
 import {
     analyticsApi,
@@ -25,13 +25,18 @@ import {
     type FrontendHealthSummary,
     type ObservabilitySummary,
 } from './admin-dashboard/helpers';
-import { GrowthInsightsPanel } from './admin-dashboard/GrowthInsightsPanel';
-import { VerificationQueueSection } from './admin-dashboard/VerificationQueueSection';
-import type { GrowthInsightsSnapshot, ModerationQueueItem } from './admin-dashboard/types';
+import type { GrowthInsightsSnapshot, ModerationQueueItem, OperationalDashboardSnapshot } from './admin-dashboard/types';
 import { InlineDangerConfirm } from '../components/InlineDangerConfirm';
 import { PageBlockingLoader } from '../components/PageBlockingLoader';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useTimedMessage } from '../hooks/useTimedMessage';
+
+const GrowthInsightsPanel = lazy(async () => ({
+    default: (await import('./admin-dashboard/GrowthInsightsPanel')).GrowthInsightsPanel,
+}));
+const VerificationQueueSection = lazy(async () => ({
+    default: (await import('./admin-dashboard/VerificationQueueSection')).VerificationQueueSection,
+}));
 
 interface Business {
     id: string;
@@ -135,52 +140,6 @@ interface FlaggedReview {
     };
 }
 
-interface OperationalDashboardSnapshot {
-    status: 'up' | 'degraded' | 'down' | 'disabled';
-    timestamp: string;
-    uptimeSeconds: number;
-    responseTimeMs?: number;
-    checks?: {
-        database?: {
-            status?: 'up' | 'degraded' | 'down' | 'disabled';
-            schema?: 'up' | 'down';
-            pool?: {
-                status?: 'up' | 'degraded' | 'down' | 'disabled';
-                activeConnections?: number;
-                maxConnections?: number;
-                saturationPct?: number;
-            };
-        };
-        email?: {
-            status?: 'up' | 'degraded' | 'down' | 'disabled';
-            thresholdMs?: number;
-            reason?: string;
-            operations?: Array<{
-                operation: string;
-                p95Ms: number;
-                errorRatePct: number;
-            }>;
-        };
-        whatsapp?: {
-            status?: 'up' | 'degraded' | 'down' | 'disabled';
-            thresholdMs?: number;
-            operations?: Array<{
-                operation: string;
-                p95Ms: number;
-                errorRatePct: number;
-            }>;
-        };
-    };
-    passwordReset?: {
-        providerConfigured?: boolean;
-        requestsLast24h?: number;
-        completionsLast24h?: number;
-        completionRatePct?: number;
-        activeTokens?: number;
-        expiredPendingTokens?: number;
-    };
-}
-
 interface MarketInsightsSnapshot {
     totals: {
         trackedBusinesses: number;
@@ -251,6 +210,21 @@ const EMPTY_CATEGORY_FORM: CategoryForm = {
     parentId: '',
 };
 const DELETE_CONFIRMATION_TEXT = 'ELIMINAR';
+
+function LazyAdminPanelFallback({ label }: { label: string }) {
+    return (
+        <div className="card p-5">
+            <div className="h-5 w-44 rounded-lg bg-slate-100 animate-pulse" />
+            <p className="mt-3 text-sm text-gray-500">{label}</p>
+            <div className="mt-4 space-y-3">
+                <div className="h-16 rounded-2xl bg-slate-50 animate-pulse" />
+                <div className="h-16 rounded-2xl bg-slate-50 animate-pulse" />
+                <div className="h-16 rounded-2xl bg-slate-50 animate-pulse" />
+            </div>
+        </div>
+    );
+}
+
 export function AdminDashboard() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -1385,12 +1359,14 @@ export function AdminDashboard() {
 
                     {activeTab === 'verification' && (
                         <div className="space-y-4">
-                            <VerificationQueueSection
-                                items={moderationQueue}
-                                processingId={processingId}
-                                onResolvePreventiveModeration={handleResolvePreventiveModeration}
-                                onReviewDocument={handleReviewDocument}
-                            />
+                            <Suspense fallback={<LazyAdminPanelFallback label="Cargando cola de verificacion y moderacion..." />}>
+                                <VerificationQueueSection
+                                    items={moderationQueue}
+                                    processingId={processingId}
+                                    onResolvePreventiveModeration={handleResolvePreventiveModeration}
+                                    onReviewDocument={handleReviewDocument}
+                                />
+                            </Suspense>
 
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -1516,14 +1492,16 @@ export function AdminDashboard() {
                                 </div>
                             </div>
 
-                            <GrowthInsightsPanel
-                                growthInsights={growthInsights}
-                                marketTrackedBusinesses={marketInsights?.totals.trackedBusinesses ?? 0}
-                                marketConversionRate={marketInsights?.totals.conversionRate ?? 0}
-                                loading={insightsLoading}
-                                refreshing={verificationLoading || insightsLoading}
-                                onRefresh={() => void loadVerificationData()}
-                            />
+                            <Suspense fallback={<LazyAdminPanelFallback label="Cargando tendencias y growth insights..." />}>
+                                <GrowthInsightsPanel
+                                    growthInsights={growthInsights}
+                                    marketTrackedBusinesses={marketInsights?.totals.trackedBusinesses ?? 0}
+                                    marketConversionRate={marketInsights?.totals.conversionRate ?? 0}
+                                    loading={insightsLoading}
+                                    refreshing={verificationLoading || insightsLoading}
+                                    onRefresh={() => void loadVerificationData()}
+                                />
+                            </Suspense>
 
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
