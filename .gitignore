@@ -17,3 +17,4 @@ coverage/
 apps/api/uploads/
 apps/api/src/generated/prisma/
 .run/
+.docs/
