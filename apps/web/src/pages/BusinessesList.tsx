@@ -279,6 +279,14 @@ export function BusinessesList() {
         });
         return lookup;
     }, [businesses]);
+    const prefetchBusinessDestination = useCallback((business: { id?: string | null; slug?: string | null }) => {
+        const businessPath = `/businesses/${business.slug || business.id}`;
+        preloadRouteChunk(businessPath);
+        businessApi.prefetchPublicDetail({
+            id: business.id,
+            slug: business.slug,
+        });
+    }, []);
 
     useEffect(() => {
         setSearchInput(currentSearch);
@@ -1033,6 +1041,8 @@ export function BusinessesList() {
                                                 }
                                                 trackBusinessClick(placement.business.id, 'sponsored-placement');
                                             }}
+                                            onMouseEnter={() => prefetchBusinessDestination(placement.business)}
+                                            onFocus={() => prefetchBusinessDestination(placement.business)}
                                             className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700 transition hover:border-amber-300"
                                         >
                                             <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">Patrocinado #{placement.placementRank}</p>
@@ -1058,6 +1068,8 @@ export function BusinessesList() {
                                             <Link
                                                 to={`/businesses/${selectedBusiness.slug || selectedBusiness.id}`}
                                                 onClick={() => trackBusinessClick(selectedBusiness.id, 'listing-map-selected')}
+                                                onMouseEnter={() => prefetchBusinessDestination(selectedBusiness)}
+                                                onFocus={() => prefetchBusinessDestination(selectedBusiness)}
                                                 className="text-xs font-semibold text-primary-700 transition hover:text-primary-800"
                                             >
                                                 Ver {selectedBusiness.name}
@@ -1105,13 +1117,13 @@ export function BusinessesList() {
                                                 trackBusinessClick(biz.id, 'businesses-list');
                                             }}
                                             onMouseEnter={() => {
-                                                preloadRouteChunk(businessPath);
+                                                prefetchBusinessDestination(biz);
                                                 if (currentView === 'map' && isMappable) {
                                                     setSelectedBusinessId(biz.id);
                                                 }
                                             }}
                                             onFocus={() => {
-                                                preloadRouteChunk(businessPath);
+                                                prefetchBusinessDestination(biz);
                                                 if (currentView === 'map' && isMappable) {
                                                     setSelectedBusinessId(biz.id);
                                                 }

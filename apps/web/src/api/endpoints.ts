@@ -140,6 +140,13 @@ export const businessApi = {
             PUBLIC_DISCOVERY_TTL_MS,
             () => api.get('/businesses', { params }),
         ),
+    prefetchDiscoveryLanding: () => {
+        void Promise.allSettled([
+            businessApi.getAll({ page: 1, limit: 12 }),
+            categoryApi.getAll(),
+            locationApi.getProvinces(),
+        ]);
+    },
     getMine: () => api.get('/businesses/my'),
     getAllAdmin: (params?: Record<string, string | number | boolean>) =>
         api.get('/businesses/admin/all', { params }),
@@ -166,6 +173,24 @@ export const businessApi = {
             )
             : api.get(`/businesses/${slug}`)
     ),
+    prefetchPublicDetail: (params: { slug?: string | null; id?: string | null }) => {
+        const slug = params.slug?.trim();
+        const id = params.id?.trim();
+
+        if (slug) {
+            void businessApi.getBySlug(slug).catch(() => {
+                if (id) {
+                    return businessApi.getByIdentifier(id);
+                }
+                return undefined;
+            });
+            return;
+        }
+
+        if (id) {
+            void businessApi.getByIdentifier(id).catch(() => undefined);
+        }
+    },
     createPublicLead: (
         businessId: string,
         data: {

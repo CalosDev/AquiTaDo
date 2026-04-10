@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { businessApi } from '../../api/endpoints';
+import { preloadRouteChunk } from '../../routes/preload';
 import { getDisplayInitial } from './helpers';
 import type { NearbyBusiness } from './types';
 
@@ -34,6 +36,22 @@ export function NearbyBusinessesSection({ businesses, loading }: NearbyBusinesse
                                 <Link
                                     key={nearbyBusiness.id}
                                     to={`/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`}
+                                    onMouseEnter={() => {
+                                        const businessPath = `/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`;
+                                        preloadRouteChunk(businessPath);
+                                        businessApi.prefetchPublicDetail({
+                                            id: nearbyBusiness.id,
+                                            slug: nearbyBusiness.slug,
+                                        });
+                                    }}
+                                    onFocus={() => {
+                                        const businessPath = `/businesses/${nearbyBusiness.slug || nearbyBusiness.id}`;
+                                        preloadRouteChunk(businessPath);
+                                        businessApi.prefetchPublicDetail({
+                                            id: nearbyBusiness.id,
+                                            slug: nearbyBusiness.slug,
+                                        });
+                                    }}
                                     className="group flex items-center gap-4 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-4 transition-colors hover:border-primary-200 hover:bg-primary-50/40"
                                 >
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-sm font-semibold text-primary-700">

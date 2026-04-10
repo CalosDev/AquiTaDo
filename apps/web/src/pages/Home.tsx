@@ -8,6 +8,7 @@ import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext
 import { formatNumberDo } from '../lib/market';
 import { formatPublicCategoryName } from '../lib/categoryLabel';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { preloadRouteChunk } from '../routes/preload';
 
 interface Category {
     id: string;
@@ -218,6 +219,14 @@ export function Home() {
         : canRegisterBusiness
             ? 'Registrar mi negocio'
             : 'Explorar negocios';
+    const prefetchBusinessDetail = useCallback((business: { id?: string | null; slug?: string | null }) => {
+        const businessPath = `/businesses/${business.slug || business.id}`;
+        preloadRouteChunk(businessPath);
+        businessApi.prefetchPublicDetail({
+            id: business.id,
+            slug: business.slug,
+        });
+    }, []);
 
     const topCategories = useMemo(
         () => [...categories].sort((a, b) => (b._count?.businesses ?? 0) - (a._count?.businesses ?? 0)),
@@ -712,6 +721,8 @@ export function Home() {
                                     key={item.id}
                                     to={`/businesses/${item.slug || item.id}`}
                                     onClick={() => handleBusinessClick(item.id)}
+                                    onMouseEnter={() => prefetchBusinessDetail(item)}
+                                    onFocus={() => prefetchBusinessDetail(item)}
                                     className="panel-premium p-4"
                                 >
                                     <div className="flex items-start justify-between gap-3">
@@ -746,7 +757,14 @@ export function Home() {
                         <h2 className="section-title !text-3xl">Negocios recientes</h2>
                         <p className="section-subtitle">Perfiles nuevos listos para recibir clientes.</p>
                     </div>
-                    <Link to="/businesses" className="btn-secondary text-sm w-fit">Ver todo el directorio</Link>
+                    <Link
+                        to="/businesses"
+                        className="btn-secondary text-sm w-fit"
+                        onMouseEnter={() => businessApi.prefetchDiscoveryLanding()}
+                        onFocus={() => businessApi.prefetchDiscoveryLanding()}
+                    >
+                        Ver todo el directorio
+                    </Link>
                 </div>
 
                 {loading ? (
@@ -780,6 +798,8 @@ export function Home() {
                                 key={business.id}
                                 to={`/businesses/${business.slug || business.id}`}
                                 onClick={() => handleBusinessClick(business.id)}
+                                onMouseEnter={() => prefetchBusinessDetail(business)}
+                                onFocus={() => prefetchBusinessDetail(business)}
                                 className="listing-card group overflow-hidden p-0"
                             >
                                 <div className="listing-card-media h-48 bg-gradient-to-br from-primary-50 to-accent-50">

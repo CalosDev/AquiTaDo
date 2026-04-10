@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { businessApi } from '../api/endpoints';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { resolveRoleHomeLabel, resolveRoleHomePath } from '../auth/roles';
 import { useAuth } from '../context/useAuth';
@@ -185,8 +186,14 @@ export function Navbar() {
                                     to="/businesses"
                                     className={desktopNavClass(businessesActive)}
                                     aria-current={businessesActive ? 'page' : undefined}
-                                    onMouseEnter={() => preloadRouteChunk('/businesses')}
-                                    onFocus={() => preloadRouteChunk('/businesses')}
+                                    onMouseEnter={() => {
+                                        preloadRouteChunk('/businesses');
+                                        businessApi.prefetchDiscoveryLanding();
+                                    }}
+                                    onFocus={() => {
+                                        preloadRouteChunk('/businesses');
+                                        businessApi.prefetchDiscoveryLanding();
+                                    }}
                                 >
                                     Negocios
                                 </Link>
