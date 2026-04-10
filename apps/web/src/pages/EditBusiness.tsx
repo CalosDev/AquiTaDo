@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { BusyButtonLabel } from '../components/BusyButtonLabel';
-import { BusinessHoursEditor } from '../components/BusinessHoursEditor';
 import { OptimizedImage } from '../components/OptimizedImage';
 import {
     BUSINESS_PRICE_RANGE_OPTIONS,
@@ -23,6 +22,23 @@ import {
 } from './edit-business/types';
 import { formatPublicCategoryIcon, formatPublicCategoryPath } from '../lib/categoryLabel';
 import { useTimedMessage } from '../hooks/useTimedMessage';
+
+const BusinessHoursEditor = lazy(async () => ({
+    default: (await import('../components/BusinessHoursEditor')).BusinessHoursEditor,
+}));
+
+function EditStepSectionFallback({ rows = 4 }: { rows?: number }) {
+    return (
+        <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
+            <div className="h-4 w-36 rounded-full bg-gray-200 animate-pulse"></div>
+            <div className="mt-3 space-y-3">
+                {Array.from({ length: rows }).map((_, index) => (
+                    <div key={index} className="h-12 rounded-xl bg-white animate-pulse"></div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export function EditBusiness() {
     const { businessId } = useParams<{ businessId: string }>();
@@ -883,10 +899,12 @@ export function EditBusiness() {
                             Completitud: {business.profileCompletenessScore ?? 0}%
                         </span>
                     </div>
-                    <BusinessHoursEditor
-                        hours={formData.hours}
-                        onChange={(hours) => setFormData((previous) => ({ ...previous, hours }))}
-                    />
+                    <Suspense fallback={<EditStepSectionFallback rows={7} />}>
+                        <BusinessHoursEditor
+                            hours={formData.hours}
+                            onChange={(hours) => setFormData((previous) => ({ ...previous, hours }))}
+                        />
+                    </Suspense>
                     <p className="mt-3 text-xs text-gray-500">
                         Precio actual: {businessPriceRangeLabel(formData.priceRange) || 'Sin definir'}.
                     </p>
