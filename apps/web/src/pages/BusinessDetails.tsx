@@ -1390,7 +1390,7 @@ export function BusinessDetails() {
 
                     {/* Map */}
                     {openStreetMapEmbedUrl && (
-                        <div className="panel-premium overflow-hidden">
+                        <div className="panel-premium defer-render-section overflow-hidden">
                             <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-end sm:justify-between">
                                 <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Ubicacion</p>
@@ -1439,32 +1439,38 @@ export function BusinessDetails() {
                         </div>
                     )}
 
-                    <Suspense fallback={<DetailSectionFallback label="Cargando promociones" />}>
-                        <PromotionsSectionLazy loading={promotionsLoading} promotions={publicPromotions} />
-                    </Suspense>
+                    <div className="defer-render-section">
+                        <Suspense fallback={<DetailSectionFallback label="Cargando promociones" />}>
+                            <PromotionsSectionLazy loading={promotionsLoading} promotions={publicPromotions} />
+                        </Suspense>
+                    </div>
 
-                    <Suspense fallback={<DetailSectionFallback label="Cargando negocios cercanos" />}>
-                        <NearbyBusinessesSectionLazy businesses={nearbyBusinesses} loading={nearbyLoading} />
-                    </Suspense>
+                    <div className="defer-render-section">
+                        <Suspense fallback={<DetailSectionFallback label="Cargando negocios cercanos" />}>
+                            <NearbyBusinessesSectionLazy businesses={nearbyBusinesses} loading={nearbyLoading} />
+                        </Suspense>
+                    </div>
 
-                    <Suspense fallback={<DetailSectionFallback label="Cargando resenas" />}>
-                        <ReviewsSectionLazy
-                            averageRating={averageRating}
-                            averageRatingNumber={averageRatingNumber}
-                            isAuthenticated={isAuthenticated}
-                            isCustomerRole={isCustomerRole}
-                            onReviewFormChange={setReviewForm}
-                            onSubmit={handleReviewSubmit}
-                            reviewCount={reviewCount}
-                            reviewErrorMessage={reviewErrorMessage}
-                            reviewForm={reviewForm}
-                            reviews={visibleReviews}
-                            reviewsLoading={reviewsLoading}
-                            reviewStarsLabel={reviewStarsLabel}
-                            reviewSuccessMessage={reviewSuccessMessage}
-                            submittingReview={submittingReview}
-                        />
-                    </Suspense>
+                    <div className="defer-render-section">
+                        <Suspense fallback={<DetailSectionFallback label="Cargando resenas" />}>
+                            <ReviewsSectionLazy
+                                averageRating={averageRating}
+                                averageRatingNumber={averageRatingNumber}
+                                isAuthenticated={isAuthenticated}
+                                isCustomerRole={isCustomerRole}
+                                onReviewFormChange={setReviewForm}
+                                onSubmit={handleReviewSubmit}
+                                reviewCount={reviewCount}
+                                reviewErrorMessage={reviewErrorMessage}
+                                reviewForm={reviewForm}
+                                reviews={visibleReviews}
+                                reviewsLoading={reviewsLoading}
+                                reviewStarsLabel={reviewStarsLabel}
+                                reviewSuccessMessage={reviewSuccessMessage}
+                                submittingReview={submittingReview}
+                            />
+                        </Suspense>
+                    </div>
 
                 </div>
 

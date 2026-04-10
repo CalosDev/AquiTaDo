@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
-import { BusinessHoursEditor } from '../components/BusinessHoursEditor';
 import { BusyButtonLabel } from '../components/BusyButtonLabel';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
@@ -14,7 +13,6 @@ import {
     createDefaultBusinessHours,
     type BusinessHourEntry,
 } from '../lib/businessProfile';
-import { PublicationGuidancePanel } from './register-business/PublicationGuidancePanel';
 import { formatPublicCategoryIcon, formatPublicCategoryPath } from '../lib/categoryLabel';
 import {
     getRegisterStepActionLabel,
@@ -55,6 +53,27 @@ interface Sector {
 }
 
 const BOOKING_FEATURE_CANONICAL = 'reservaciones';
+
+const BusinessHoursEditor = lazy(async () => ({
+    default: (await import('../components/BusinessHoursEditor')).BusinessHoursEditor,
+}));
+
+const PublicationGuidancePanel = lazy(async () => ({
+    default: (await import('./register-business/PublicationGuidancePanel')).PublicationGuidancePanel,
+}));
+
+function RegisterStepSectionFallback({ rows = 4 }: { rows?: number }) {
+    return (
+        <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
+            <div className="h-4 w-36 rounded-full bg-gray-200 animate-pulse"></div>
+            <div className="mt-3 space-y-3">
+                {Array.from({ length: rows }).map((_, index) => (
+                    <div key={index} className="h-12 rounded-xl bg-white animate-pulse"></div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export function RegisterBusiness() {
     const navigate = useNavigate();
@@ -885,10 +904,12 @@ export function RegisterBusiness() {
                     <p className="mb-3 text-xs text-gray-500">
                         Define horarios reales. Esta información alimenta filtros como "abierto ahora".
                     </p>
-                    <BusinessHoursEditor
-                        hours={formData.hours}
-                        onChange={(hours) => setFormData((previous) => ({ ...previous, hours }))}
-                    />
+                    <Suspense fallback={<RegisterStepSectionFallback rows={7} />}>
+                        <BusinessHoursEditor
+                            hours={formData.hours}
+                            onChange={(hours) => setFormData((previous) => ({ ...previous, hours }))}
+                        />
+                    </Suspense>
                 </div>
 
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
@@ -1095,12 +1116,14 @@ export function RegisterBusiness() {
                             {renderStepBody()}
                         </div>
 
-                        <PublicationGuidancePanel
-                            submissionGuidance={submissionGuidance}
-                            currentStepTips={currentStepTips}
-                            completedVisibilityChecks={completedVisibilityChecks}
-                            remainingPublishNeeds={remainingPublishNeeds}
-                        />
+                        <Suspense fallback={<RegisterStepSectionFallback rows={5} />}>
+                            <PublicationGuidancePanel
+                                submissionGuidance={submissionGuidance}
+                                currentStepTips={currentStepTips}
+                                completedVisibilityChecks={completedVisibilityChecks}
+                                remainingPublishNeeds={remainingPublishNeeds}
+                            />
+                        </Suspense>
 
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                             <button

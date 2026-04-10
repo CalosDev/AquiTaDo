@@ -38,21 +38,36 @@ export default defineConfig({
                     if (
                         id.includes('/src/pages/AdminDashboard')
                         || id.includes('\\src\\pages\\AdminDashboard')
-                        || id.includes('/src/pages/AdminSecurity')
+                    ) {
+                        return 'page-admin-dashboard';
+                    }
+
+                    if (
+                        id.includes('/src/pages/AdminSecurity')
                         || id.includes('\\src\\pages\\AdminSecurity')
                     ) {
-                        return 'page-admin';
+                        return 'page-admin-security';
                     }
 
                     if (
                         id.includes('/src/pages/RegisterBusiness')
                         || id.includes('\\src\\pages\\RegisterBusiness')
-                        || id.includes('/src/pages/EditBusiness')
+                    ) {
+                        return 'page-owner-register';
+                    }
+
+                    if (
+                        id.includes('/src/pages/EditBusiness')
                         || id.includes('\\src\\pages\\EditBusiness')
-                        || id.includes('/src/pages/DashboardBusiness')
+                    ) {
+                        return 'page-owner-edit';
+                    }
+
+                    if (
+                        id.includes('/src/pages/DashboardBusiness')
                         || id.includes('\\src\\pages\\DashboardBusiness')
                     ) {
-                        return 'page-owner';
+                        return 'page-owner-dashboard';
                     }
 
                     if (
