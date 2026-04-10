@@ -8,6 +8,7 @@ import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext
 import { formatNumberDo } from '../lib/market';
 import { formatPublicCategoryName } from '../lib/categoryLabel';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { useNearViewport } from '../hooks/useNearViewport';
 import { preloadRouteChunk } from '../routes/preload';
 
 interface Category {
@@ -206,6 +207,7 @@ export function Home() {
     const [rankingsLoading, setRankingsLoading] = useState(false);
     const [rankingsError, setRankingsError] = useState('');
     const [rankings, setRankings] = useState<ReputationRankingItem[]>([]);
+    const [rankingsSectionRef, rankingsSectionVisible] = useNearViewport<HTMLElement>('520px 0px', 0.01, rankingProvinceId);
 
     const roleCapabilities = getRoleCapabilities(user?.role);
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
@@ -321,6 +323,11 @@ export function Home() {
     }, [loadData]);
 
     useEffect(() => {
+        if (!rankingsSectionVisible) {
+            setRankingsLoading(false);
+            return;
+        }
+
         let active = true;
         setRankingsLoading(true);
         setRankingsError('');
@@ -351,7 +358,7 @@ export function Home() {
         return () => {
             active = false;
         };
-    }, [rankingProvinceId]);
+    }, [rankingProvinceId, rankingsSectionVisible]);
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
@@ -668,7 +675,7 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
+            <section ref={rankingsSectionRef} className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
                 <div className="section-shell p-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                         <div>
@@ -698,7 +705,16 @@ export function Home() {
                         </div>
                     ) : null}
 
-                    {rankingsLoading ? (
+                    {!rankingsSectionVisible ? (
+                        <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            {Array.from({ length: 4 }).map((_, index) => (
+                                <div key={`ranking-placeholder-${index}`} className="panel-premium p-4">
+                                    <div className="h-4 w-32 rounded bg-gray-100 animate-pulse"></div>
+                                    <div className="mt-2 h-3 w-56 rounded bg-gray-100 animate-pulse"></div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : rankingsLoading ? (
                         <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
                             {Array.from({ length: 4 }).map((_, index) => (
                                 <div key={index} className="panel-premium p-4">

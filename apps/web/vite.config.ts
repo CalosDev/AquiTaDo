@@ -24,9 +24,6 @@ export default defineConfig({
                     'assets/shared-core-',
                     'assets/shared-feedback-',
                     'assets/shared-organization-',
-                    'assets/page-home-',
-                    'assets/page-discovery-',
-                    'assets/page-auth-',
                 ];
 
                 return deps.filter((dependency) =>

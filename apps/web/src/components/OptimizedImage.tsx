@@ -75,7 +75,7 @@ export function OptimizedImage({
     const resolvedFallbackSrc = resolveAssetUrl((fallbackSrc || DEFAULT_FALLBACK_SRC).trim());
     const effectiveLoading = loading ?? (priority ? 'eager' : 'lazy');
     const effectiveDecoding = decoding ?? 'async';
-    const effectiveFetchPriority = fetchPriority ?? (priority ? 'high' : undefined);
+    const effectiveFetchPriority = fetchPriority ?? (priority ? 'high' : 'low');
 
     const handleError: ImgHTMLAttributes<HTMLImageElement>['onError'] = (event) => {
         setHasLoadError(true);
