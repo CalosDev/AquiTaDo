@@ -61,6 +61,10 @@ type PublicBusinessCandidate = {
     tiktokUrl: string | null;
     priceRange: string | null;
     verified: boolean;
+    publicStatus: string;
+    claimStatus: string;
+    source: string;
+    isClaimable: boolean;
     reputationScore: Prisma.Decimal;
     verificationStatus: string;
     createdAt: Date;
@@ -168,6 +172,10 @@ export class SearchService {
         tiktokUrl: true,
         priceRange: true,
         verified: true,
+        publicStatus: true,
+        claimStatus: true,
+        source: true,
+        isClaimable: true,
         reputationScore: true,
         verificationStatus: true,
         createdAt: true,
@@ -416,6 +424,10 @@ export class SearchService {
             description: candidate.description,
             address: candidate.address,
             verified: candidate.verified,
+            publicStatus: candidate.publicStatus,
+            claimStatus: candidate.claimStatus,
+            source: candidate.source,
+            isClaimable: candidate.isClaimable,
             reputationScore: candidate.reputationScore,
             verificationStatus: candidate.verificationStatus,
             province: candidate.province,
@@ -536,8 +548,16 @@ export class SearchService {
 
     private async buildPublicWhere(query: NormalizedPublicDiscoveryQuery): Promise<Prisma.BusinessWhereInput> {
         const where: Prisma.BusinessWhereInput = {
-            verified: true,
             deletedAt: null,
+            publicStatus: 'PUBLISHED',
+            OR: [
+                { verified: true },
+                {
+                    claimStatus: {
+                        in: ['UNCLAIMED', 'PENDING_CLAIM'],
+                    },
+                },
+            ],
         };
 
         if (query.search) {

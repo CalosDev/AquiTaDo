@@ -42,6 +42,64 @@ const ReviewsSectionLazy = lazy(async () => {
     return { default: module.ReviewsSection };
 });
 
+const CLAIM_STATUS_META = {
+    CLAIMED: {
+        label: 'Reclamado',
+        heroClass: 'bg-primary-700 text-white',
+        badgeClass: 'bg-primary-100 text-primary-700 border border-primary-200',
+        cardClass: 'border-primary-200 bg-primary-50/60',
+        eyebrowClass: 'text-primary-700',
+        description: 'El negocio ya activo su ownership dentro de AquiTa.do y puede usar herramientas tenant.',
+    },
+    PENDING_CLAIM: {
+        label: 'Reclamacion en revision',
+        heroClass: 'bg-amber-100 text-amber-900 ring-1 ring-amber-200',
+        badgeClass: 'bg-amber-100 text-amber-800 border border-amber-200',
+        cardClass: 'border-amber-200 bg-amber-50',
+        eyebrowClass: 'text-amber-700',
+        description: 'Ya existe una solicitud de reclamacion. El equipo admin esta validando la evidencia.',
+    },
+    UNCLAIMED: {
+        label: 'No reclamado',
+        heroClass: 'bg-white/15 text-white ring-1 ring-white/20',
+        badgeClass: 'bg-slate-100 text-slate-700 border border-slate-200',
+        cardClass: 'border-slate-200 bg-slate-50',
+        eyebrowClass: 'text-slate-600',
+        description: 'Esta ficha pertenece al catalogo publico. Las herramientas SaaS se habilitan cuando el dueno reclama el perfil.',
+    },
+} as const;
+
+const CLAIM_EVIDENCE_OPTIONS = [
+    { value: 'PHONE', label: 'Telefono del negocio' },
+    { value: 'EMAIL', label: 'Email del negocio' },
+    { value: 'WEBSITE', label: 'Sitio web oficial' },
+    { value: 'INSTAGRAM', label: 'Instagram del negocio' },
+    { value: 'DOCUMENT', label: 'Documento o constancia' },
+    { value: 'NOTE', label: 'Nota explicativa' },
+    { value: 'OTHER', label: 'Otra evidencia' },
+] as const;
+
+function getClaimEvidencePlaceholder(
+    evidenceType: typeof CLAIM_EVIDENCE_OPTIONS[number]['value'],
+): string {
+    if (evidenceType === 'PHONE') {
+        return 'Ej. 8095550101';
+    }
+    if (evidenceType === 'EMAIL') {
+        return 'Ej. hola@negocio.com';
+    }
+    if (evidenceType === 'WEBSITE') {
+        return 'Ej. https://negocio.com';
+    }
+    if (evidenceType === 'INSTAGRAM') {
+        return 'Ej. https://instagram.com/negocio';
+    }
+    if (evidenceType === 'DOCUMENT') {
+        return 'Ej. RNC, licencia o nombre del archivo';
+    }
+    return 'Describe la evidencia que demuestra tu relacion con el negocio';
+}
+
 function DetailSectionFallback({ label }: { label: string }) {
     return (
         <div className="panel-premium p-6">
@@ -93,7 +151,17 @@ export function BusinessDetails() {
         partySize: '2',
         notes: '',
     });
+    const [claimForm, setClaimForm] = useState<{
+        evidenceType: typeof CLAIM_EVIDENCE_OPTIONS[number]['value'];
+        evidenceValue: string;
+        notes: string;
+    }>({
+        evidenceType: 'PHONE',
+        evidenceValue: '',
+        notes: '',
+    });
     const [submittingBooking, setSubmittingBooking] = useState(false);
+    const [submittingClaim, setSubmittingClaim] = useState(false);
     const [publicLeadForm, setPublicLeadForm] = useState({
         contactName: '',
         contactPhone: '',
@@ -108,6 +176,8 @@ export function BusinessDetails() {
     const [messageSuccessMessage, setMessageSuccessMessage] = useState('');
     const [bookingErrorMessage, setBookingErrorMessage] = useState('');
     const [bookingSuccessMessage, setBookingSuccessMessage] = useState('');
+    const [claimErrorMessage, setClaimErrorMessage] = useState('');
+    const [claimSuccessMessage, setClaimSuccessMessage] = useState('');
     const [publicLeadErrorMessage, setPublicLeadErrorMessage] = useState('');
     const [publicLeadSuccessMessage, setPublicLeadSuccessMessage] = useState('');
     const [contactVariant, setContactVariant] = useState('control');
@@ -544,6 +614,10 @@ export function BusinessDetails() {
             setMessageErrorMessage('Solo usuarios clientes pueden enviar mensajes directos');
             return;
         }
+        if (!isClaimedBusiness) {
+            setMessageErrorMessage('La mensajeria se habilita cuando el dueno reclama este perfil');
+            return;
+        }
         if (!business?.id || !messageForm.content.trim()) {
             setMessageErrorMessage('Escribe un mensaje para el negocio');
             return;
@@ -632,7 +706,12 @@ export function BusinessDetails() {
     const whatsappDirectUrl = business?.whatsapp
         ? `https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`
         : null;
-    const canBookThisBusiness = showBookings && businessSupportsBooking(business?.features);
+    const claimStatus = business?.claimStatus ?? 'CLAIMED';
+    const claimMeta = CLAIM_STATUS_META[claimStatus];
+    const isClaimedBusiness = claimStatus === 'CLAIMED';
+    const showClaimCallout = claimStatus !== 'CLAIMED';
+    const canUseOperationalContactFlows = canUseCustomerContactFlows && isClaimedBusiness;
+    const canBookThisBusiness = showBookings && isClaimedBusiness && businessSupportsBooking(business?.features);
 
     const trackContactGrowthEvent = (
         eventType: 'CONTACT_CLICK' | 'WHATSAPP_CLICK' | 'BOOKING_INTENT',
@@ -780,6 +859,11 @@ export function BusinessDetails() {
             return;
         }
 
+        if (!isClaimedBusiness) {
+            setPublicLeadErrorMessage('Este perfil aun no activo sus canales tenant dentro de AquiTa.do');
+            return;
+        }
+
         if (!publicLeadForm.contactName.trim() || !publicLeadForm.contactPhone.trim() || !publicLeadForm.message.trim()) {
             setPublicLeadErrorMessage('Nombre, teléfono y mensaje son obligatorios');
             return;
@@ -903,6 +987,11 @@ export function BusinessDetails() {
             return;
         }
 
+        if (!isClaimedBusiness) {
+            setBookingErrorMessage('Las reservas se habilitan cuando el dueno reclama este perfil');
+            return;
+        }
+
         const scheduledFor = bookingForm.scheduledFor.trim();
         const partySize = Number.parseInt(bookingForm.partySize, 10);
         if (!scheduledFor) {
@@ -944,6 +1033,58 @@ export function BusinessDetails() {
             setBookingErrorMessage(getApiErrorMessage(error, 'No se pudo crear la reserva'));
         } finally {
             setSubmittingBooking(false);
+        }
+    };
+
+    const handleClaimSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!business?.id) {
+            return;
+        }
+
+        if (!isAuthenticated) {
+            setClaimErrorMessage('Inicia sesion para solicitar la reclamacion del negocio');
+            return;
+        }
+
+        if (!business.isClaimable || claimStatus === 'CLAIMED') {
+            setClaimErrorMessage('Este negocio ya no esta disponible para reclamacion');
+            return;
+        }
+
+        if (claimStatus === 'PENDING_CLAIM') {
+            setClaimErrorMessage('Ya existe una solicitud pendiente para este negocio');
+            return;
+        }
+
+        const trimmedEvidenceValue = claimForm.evidenceValue.trim();
+        const trimmedNotes = claimForm.notes.trim();
+        if (!trimmedEvidenceValue && !trimmedNotes) {
+            setClaimErrorMessage('Comparte al menos una evidencia o una nota para revisar tu solicitud');
+            return;
+        }
+
+        setSubmittingClaim(true);
+        setClaimErrorMessage('');
+        setClaimSuccessMessage('');
+
+        try {
+            await businessApi.createClaimRequest(business.id, {
+                evidenceType: claimForm.evidenceType,
+                evidenceValue: trimmedEvidenceValue || undefined,
+                notes: trimmedNotes || undefined,
+            });
+            setClaimForm({
+                evidenceType: 'PHONE',
+                evidenceValue: '',
+                notes: '',
+            });
+            await loadBusiness();
+            setClaimSuccessMessage('Solicitud enviada. El equipo admin la revisara antes de activar el perfil.');
+        } catch (error) {
+            setClaimErrorMessage(getApiErrorMessage(error, 'No se pudo enviar la solicitud de reclamacion'));
+        } finally {
+            setSubmittingClaim(false);
         }
     };
 
@@ -1098,6 +1239,9 @@ export function BusinessDetails() {
                                                     Verificado
                                                 </span>
                                             )}
+                                            <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${claimMeta.heroClass}`}>
+                                                {claimMeta.label}
+                                            </span>
                                             {business.openNow !== null && business.openNow !== undefined && (
                                                 <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
                                                     business.openNow
@@ -1229,6 +1373,9 @@ export function BusinessDetails() {
                                             OK Verificado
                                         </span>
                                     )}
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${claimMeta.badgeClass}`}>
+                                        {claimMeta.label}
+                                    </span>
                                     {business.openNow !== null && business.openNow !== undefined && (
                                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
                                             business.openNow
@@ -1280,6 +1427,117 @@ export function BusinessDetails() {
                                 </p>
                             )}
                         </div>
+
+                        {showClaimCallout ? (
+                            <div className={`mt-5 rounded-2xl border px-5 py-5 ${claimMeta.cardClass}`}>
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="max-w-2xl">
+                                        <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${claimMeta.eyebrowClass}`}>
+                                            Claim / ownership
+                                        </p>
+                                        <h3 className="mt-2 font-display text-2xl font-semibold text-slate-900">
+                                            Eres el dueno? Reclama este perfil
+                                        </h3>
+                                        <p className="mt-2 text-sm leading-7 text-slate-700">
+                                            {claimMeta.description}
+                                        </p>
+                                    </div>
+                                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${claimMeta.badgeClass}`}>
+                                        {claimMeta.label}
+                                    </span>
+                                </div>
+
+                                {claimStatus === 'PENDING_CLAIM' ? (
+                                    <div className="mt-4 rounded-xl border border-amber-200 bg-white/80 px-4 py-3 text-sm text-slate-700">
+                                        Ya existe una solicitud pendiente. Cuando el equipo admin termine la revision, el perfil podra activar su organizacion tenant y sus herramientas operativas.
+                                    </div>
+                                ) : null}
+
+                                {claimSuccessMessage ? (
+                                    <div className="mt-4 rounded-xl border border-primary-200 bg-white/80 px-4 py-3 text-sm text-primary-700">
+                                        {claimSuccessMessage}
+                                    </div>
+                                ) : null}
+                                {claimErrorMessage ? (
+                                    <div className="mt-4 rounded-xl border border-red-200 bg-white/80 px-4 py-3 text-sm text-red-700">
+                                        {claimErrorMessage}
+                                    </div>
+                                ) : null}
+
+                                {!isAuthenticated ? (
+                                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                                        <Link to="/login" className="btn-primary text-sm">
+                                            Inicia sesion para reclamar
+                                        </Link>
+                                        <p className="text-sm text-slate-600">
+                                            Si ya tienes cuenta, comparte una evidencia y enviaremos la solicitud a revision.
+                                        </p>
+                                    </div>
+                                ) : business.isClaimable && claimStatus === 'UNCLAIMED' ? (
+                                    <form onSubmit={handleClaimSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
+                                        <div>
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                                Tipo de evidencia
+                                            </label>
+                                            <select
+                                                className="input-field text-sm"
+                                                value={claimForm.evidenceType}
+                                                onChange={(event) => setClaimForm((previous) => ({
+                                                    ...previous,
+                                                    evidenceType: event.target.value as typeof CLAIM_EVIDENCE_OPTIONS[number]['value'],
+                                                }))}
+                                            >
+                                                {CLAIM_EVIDENCE_OPTIONS.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                                Dato de verificacion
+                                            </label>
+                                            <input
+                                                className="input-field text-sm"
+                                                value={claimForm.evidenceValue}
+                                                onChange={(event) => setClaimForm((previous) => ({
+                                                    ...previous,
+                                                    evidenceValue: event.target.value,
+                                                }))}
+                                                placeholder={getClaimEvidencePlaceholder(claimForm.evidenceType)}
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                                Contexto adicional
+                                            </label>
+                                            <textarea
+                                                className="input-field min-h-[110px] text-sm"
+                                                value={claimForm.notes}
+                                                onChange={(event) => setClaimForm((previous) => ({
+                                                    ...previous,
+                                                    notes: event.target.value,
+                                                }))}
+                                                placeholder="Cuéntanos por que puedes administrar este negocio, que organizacion usarias o como comprobarlo."
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+                                            <button
+                                                type="submit"
+                                                className="btn-primary text-sm"
+                                                disabled={submittingClaim}
+                                            >
+                                                {submittingClaim ? 'Enviando solicitud...' : 'Solicitar reclamacion'}
+                                            </button>
+                                            <p className="text-sm text-slate-600">
+                                                La solicitud queda auditada y solo un admin puede aprobarla o rechazarla.
+                                            </p>
+                                        </div>
+                                    </form>
+                                ) : null}
+                            </div>
+                        ) : null}
 
                         {isAuthenticated && isCustomerRole && (
                             <div className="mt-5 rounded-xl border border-primary-100 p-4 bg-primary-50/30 space-y-3">
@@ -1515,11 +1773,12 @@ export function BusinessDetails() {
                     bookingSuccessMessage={bookingSuccessMessage}
                     business={business}
                     canBookThisBusiness={canBookThisBusiness}
-                    canUseCustomerContactFlows={canUseCustomerContactFlows}
+                    canUseCustomerContactFlows={canUseOperationalContactFlows}
                     contactVariant={contactVariant}
                     hasBusinessHours={hasBusinessHours}
                     hasOperatorRole={hasOperatorRole}
                     hoursByDay={hoursByDay}
+                    isClaimedBusiness={isClaimedBusiness}
                     isAdminRole={isAdminRole}
                     isAuthenticated={isAuthenticated}
                     isCustomerRole={isCustomerRole}
@@ -1557,7 +1816,7 @@ export function BusinessDetails() {
 
             <MobileContactBar
                 phone={business.phone}
-                show={canUseCustomerContactFlows}
+                show={canUseOperationalContactFlows}
                 whatsapp={business.whatsapp}
                 onOpenWhatsApp={openWhatsApp}
                 onPhoneClick={handlePhoneClick}

@@ -5,6 +5,7 @@ import {
     businessApi,
     categoryApi,
     healthApi,
+    locationApi,
     observabilityApi,
     reviewApi,
     verificationApi,
@@ -42,6 +43,9 @@ interface Business {
     name: string;
     slug: string;
     verified: boolean;
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+    publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+    source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
     verificationStatus: BusinessVerificationState;
     createdAt: string;
     profileCompletenessScore?: number;
@@ -64,10 +68,17 @@ interface Category {
     _count?: { businesses: number };
 }
 
+interface Province {
+    id: string;
+    name: string;
+}
+
 interface CatalogQualitySnapshot {
     totalBusinesses: number;
     incompleteCount: number;
     duplicateClusterCount: number;
+    unclaimedBusinesses?: number;
+    pendingClaims?: number;
     incompleteBusinesses: Array<{
         id: string;
         slug: string;
@@ -88,6 +99,40 @@ interface CatalogQualitySnapshot {
             province?: { name: string } | null;
         }>;
     }>;
+}
+
+interface ClaimRequestItem {
+    id: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
+    evidenceType: 'PHONE' | 'EMAIL' | 'WEBSITE' | 'INSTAGRAM' | 'DOCUMENT' | 'NOTE' | 'OTHER';
+    evidenceValue?: string | null;
+    notes?: string | null;
+    createdAt: string;
+    reviewedAt?: string | null;
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+        publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+        source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    };
+    requesterUser?: {
+        id: string;
+        name: string;
+        email: string;
+        role: string;
+    } | null;
+    requesterOrganization?: {
+        id: string;
+        name: string;
+        slug: string;
+    } | null;
+    reviewedByAdmin?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
 }
 
 interface PendingVerificationBusiness {
@@ -202,11 +247,34 @@ type CategoryForm = {
     parentId: string;
 };
 
+type CatalogBusinessForm = {
+    name: string;
+    description: string;
+    address: string;
+    provinceId: string;
+    phone: string;
+    whatsapp: string;
+    website: string;
+    email: string;
+    categoryIds: string[];
+};
+
 const EMPTY_CATEGORY_FORM: CategoryForm = {
     name: '',
     slug: '',
     icon: '',
     parentId: '',
+};
+const EMPTY_CATALOG_FORM: CatalogBusinessForm = {
+    name: '',
+    description: '',
+    address: '',
+    provinceId: '',
+    phone: '',
+    whatsapp: '',
+    website: '',
+    email: '',
+    categoryIds: [],
 };
 const DELETE_CONFIRMATION_TEXT = 'ELIMINAR';
 
@@ -227,8 +295,15 @@ function LazyAdminPanelFallback({ label }: { label: string }) {
 export function AdminDashboard() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [provinces, setProvinces] = useState<Province[]>([]);
     const [catalogQuality, setCatalogQuality] = useState<CatalogQualitySnapshot | null>(null);
     const [catalogQualityLoading, setCatalogQualityLoading] = useState(false);
+    const [claimRequests, setClaimRequests] = useState<ClaimRequestItem[]>([]);
+    const [claimRequestSummary, setClaimRequestSummary] = useState<Record<string, number>>({});
+    const [claimRequestStatusFilter, setClaimRequestStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'>('PENDING');
+    const [claimReviewNotes, setClaimReviewNotes] = useState<Record<string, string>>({});
+    const [creatingCatalogBusiness, setCreatingCatalogBusiness] = useState(false);
+    const [catalogBusinessForm, setCatalogBusinessForm] = useState<CatalogBusinessForm>(EMPTY_CATALOG_FORM);
     const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'catalog' | 'verification' | 'observability'>('businesses');
     const [businessSearch, setBusinessSearch] = useState('');
     const [businessStatusFilter, setBusinessStatusFilter] = useState<'ALL' | 'VERIFIED' | 'PENDING' | 'SUSPENDED' | 'REJECTED'>('ALL');
@@ -297,6 +372,40 @@ export function AdminDashboard() {
         return summary;
     }, [businesses]);
 
+    const catalogClaimSummary = useMemo(() => ({
+        unclaimed: businesses.filter((business) => business.claimStatus === 'UNCLAIMED').length,
+        pending: businesses.filter((business) => business.claimStatus === 'PENDING_CLAIM').length,
+        claimed: businesses.filter((business) => business.claimStatus === 'CLAIMED').length,
+    }), [businesses]);
+
+    const userSuggestionBusinesses = useMemo(
+        () => businesses.filter((business) => business.source === 'USER_SUGGESTION'),
+        [businesses],
+    );
+
+    const catalogConflictQueue = useMemo(() => {
+        const duplicateConflicts = (catalogQuality?.duplicateCandidates ?? []).map((cluster) => ({
+            key: `duplicate:${cluster.key}`,
+            kind: 'DUPLICATE_CLUSTER' as const,
+            title: 'Posible conflicto por duplicado',
+            detail: `${cluster.businesses.length} fichas comparten senales similares`,
+            hint: cluster.reasons.join(' | '),
+        }));
+        const pendingClaimConflicts = claimRequests
+            .filter((claimRequest) => claimRequest.status === 'PENDING')
+            .map((claimRequest) => ({
+                key: `claim:${claimRequest.id}`,
+                kind: 'PENDING_CLAIM' as const,
+                title: `Claim pendiente para ${claimRequest.business.name}`,
+                detail: claimRequest.requesterOrganization?.name
+                    ? `Solicitante: ${claimRequest.requesterUser?.name || 'Usuario'} - ${claimRequest.requesterOrganization.name}`
+                    : `Solicitante: ${claimRequest.requesterUser?.name || 'Usuario'}`,
+                hint: claimRequest.evidenceValue || claimRequest.notes || claimRequest.evidenceType,
+            }));
+
+        return [...pendingClaimConflicts, ...duplicateConflicts].slice(0, 8);
+    }, [catalogQuality, claimRequests]);
+
     const filteredBusinesses = useMemo(() => {
         const normalizedSearch = businessSearch.trim().toLowerCase();
 
@@ -337,12 +446,14 @@ export function AdminDashboard() {
         setErrorMessage('');
 
         try {
-            const [businessesResponse, categoriesResponse] = await Promise.all([
+            const [businessesResponse, categoriesResponse, provincesResponse] = await Promise.all([
                 businessApi.getAllAdmin({ limit: 100 }),
                 categoryApi.getAll(),
+                locationApi.getProvinces(),
             ]);
             setBusinesses(businessesResponse.data.data || []);
             setCategories(categoriesResponse.data);
+            setProvinces(provincesResponse.data || []);
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el panel admin'));
         } finally {
@@ -477,11 +588,27 @@ export function AdminDashboard() {
         }
     }, []);
 
+    const loadClaimRequests = useCallback(async () => {
+        try {
+            const response = await businessApi.getClaimRequestsAdmin({
+                status: claimRequestStatusFilter,
+                limit: 20,
+            });
+            setClaimRequests((response.data?.data || []) as ClaimRequestItem[]);
+            setClaimRequestSummary((response.data?.summary || {}) as Record<string, number>);
+        } catch (error) {
+            setClaimRequests([]);
+            setClaimRequestSummary({});
+            setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar las reclamaciones'));
+        }
+    }, [claimRequestStatusFilter]);
+
     useEffect(() => {
         if (activeTab === 'catalog') {
             void loadCatalogQuality();
+            void loadClaimRequests();
         }
-    }, [activeTab, loadCatalogQuality]);
+    }, [activeTab, loadCatalogQuality, loadClaimRequests]);
 
     const loadOperationalHealth = useCallback(async () => {
         setOperationalHealthLoading(true);
@@ -502,6 +629,65 @@ export function AdminDashboard() {
             void loadOperationalHealth();
         }
     }, [activeTab, loadObservabilityData, loadOperationalHealth]);
+
+    const handleReviewClaimRequest = async (
+        claimRequestId: string,
+        status: 'APPROVED' | 'REJECTED',
+    ) => {
+        setProcessingId(claimRequestId);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await businessApi.reviewClaimRequestAdmin(claimRequestId, {
+                status,
+                notes: claimReviewNotes[claimRequestId]?.trim() || undefined,
+            });
+            await Promise.all([loadClaimRequests(), loadCatalogQuality(), loadData()]);
+            setClaimReviewNotes((current) => {
+                const next = { ...current };
+                delete next[claimRequestId];
+                return next;
+            });
+            setSuccessMessage(
+                status === 'APPROVED'
+                    ? 'Reclamacion aprobada y negocio asignado al solicitante'
+                    : 'Reclamacion rechazada y negocio devuelto a estado no reclamado',
+            );
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo revisar la reclamacion'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleCreateCatalogBusiness = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setCreatingCatalogBusiness(true);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await businessApi.createAdminCatalog({
+                name: catalogBusinessForm.name.trim(),
+                description: catalogBusinessForm.description.trim(),
+                address: catalogBusinessForm.address.trim(),
+                provinceId: catalogBusinessForm.provinceId,
+                categoryIds: catalogBusinessForm.categoryIds,
+                phone: catalogBusinessForm.phone.trim() || undefined,
+                whatsapp: catalogBusinessForm.whatsapp.trim() || undefined,
+                website: catalogBusinessForm.website.trim() || undefined,
+                email: catalogBusinessForm.email.trim() || undefined,
+            });
+            setCatalogBusinessForm(EMPTY_CATALOG_FORM);
+            await Promise.all([loadData(), loadCatalogQuality()]);
+            setSuccessMessage('Negocio de catalogo creado correctamente');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo crear el negocio de catalogo'));
+        } finally {
+            setCreatingCatalogBusiness(false);
+        }
+    };
 
     const handleDeleteBusiness = async (businessId: string, reason: string) => {
         setProcessingId(businessId);
@@ -1259,17 +1445,31 @@ export function AdminDashboard() {
                                             Prioriza perfiles incompletos y posibles duplicados antes de seguir creciendo el catálogo.
                                         </p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="btn-secondary text-sm"
-                                        onClick={() => void loadCatalogQuality()}
-                                        disabled={catalogQualityLoading}
-                                    >
-                                        {catalogQualityLoading ? 'Actualizando...' : 'Actualizar calidad'}
-                                    </button>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-sm"
+                                            onClick={() => void loadClaimRequests()}
+                                            disabled={catalogQualityLoading}
+                                        >
+                                            Reclamaciones
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary text-sm"
+                                            onClick={() => {
+                                                void loadCatalogQuality();
+                                                void loadClaimRequests();
+                                                void loadData();
+                                            }}
+                                            disabled={catalogQualityLoading}
+                                        >
+                                            {catalogQualityLoading ? 'Actualizando...' : 'Actualizar catalogo'}
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
                                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                                         <p className="text-xs text-gray-500">Negocios auditados</p>
                                         <p className="mt-1 text-2xl font-semibold text-gray-900">{catalogQuality?.totalBusinesses ?? 0}</p>
@@ -1281,6 +1481,234 @@ export function AdminDashboard() {
                                     <div className="rounded-xl border border-red-100 bg-red-50 p-4">
                                         <p className="text-xs text-red-700">Clusters duplicados</p>
                                         <p className="mt-1 text-2xl font-semibold text-red-900">{catalogQuality?.duplicateClusterCount ?? 0}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                        <p className="text-xs text-slate-600">No reclamados</p>
+                                        <p className="mt-1 text-2xl font-semibold text-slate-900">
+                                            {catalogQuality?.unclaimedBusinesses ?? catalogClaimSummary.unclaimed}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-primary-100 bg-primary-50 p-4">
+                                        <p className="text-xs text-primary-700">Claims pendientes</p>
+                                        <p className="mt-1 text-2xl font-semibold text-primary-900">
+                                            {claimRequestSummary.PENDING ?? catalogQuality?.pendingClaims ?? catalogClaimSummary.pending}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                <div className="card p-5">
+                                    <h3 className="font-display font-semibold mb-3">Crear negocio de catalogo</h3>
+                                    <form onSubmit={handleCreateCatalogBusiness} className="space-y-3">
+                                        <input
+                                            type="text"
+                                            className="input-field text-sm"
+                                            placeholder="Nombre del negocio"
+                                            value={catalogBusinessForm.name}
+                                            onChange={(event) => setCatalogBusinessForm((current) => ({ ...current, name: event.target.value }))}
+                                        />
+                                        <textarea
+                                            className="input-field min-h-[110px] text-sm"
+                                            placeholder="Descripcion publica"
+                                            value={catalogBusinessForm.description}
+                                            onChange={(event) => setCatalogBusinessForm((current) => ({ ...current, description: event.target.value }))}
+                                        />
+                                        <input
+                                            type="text"
+                                            className="input-field text-sm"
+                                            placeholder="Direccion"
+                                            value={catalogBusinessForm.address}
+                                            onChange={(event) => setCatalogBusinessForm((current) => ({ ...current, address: event.target.value }))}
+                                        />
+                                        <select
+                                            className="input-field text-sm"
+                                            value={catalogBusinessForm.provinceId}
+                                            onChange={(event) => setCatalogBusinessForm((current) => ({ ...current, provinceId: event.target.value }))}
+                                        >
+                                            <option value="">Selecciona provincia</option>
+                                            {provinces.map((province) => (
+                                                <option key={province.id} value={province.id}>
+                                                    {province.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                            <input
+                                                type="text"
+                                                className="input-field text-sm"
+                                                placeholder="Telefono"
+                                                value={catalogBusinessForm.phone}
+                                                onChange={(event) => setCatalogBusinessForm((current) => ({ ...current, phone: event.target.value }))}
+                                            />
+                                            <input
+                                                type="text"
+                                                className="input-field text-sm"
+                                                placeholder="WhatsApp"
+                                                value={catalogBusinessForm.whatsapp}
+                                                onChange={(event) => setCatalogBusinessForm((current) => ({ ...current, whatsapp: event.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                            <input
+                                                type="url"
+                                                className="input-field text-sm"
+                                                placeholder="Sitio web"
+                                                value={catalogBusinessForm.website}
+                                                onChange={(event) => setCatalogBusinessForm((current) => ({ ...current, website: event.target.value }))}
+                                            />
+                                            <input
+                                                type="email"
+                                                className="input-field text-sm"
+                                                placeholder="Email"
+                                                value={catalogBusinessForm.email}
+                                                onChange={(event) => setCatalogBusinessForm((current) => ({ ...current, email: event.target.value }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                                Categorias
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {categories.map((category) => {
+                                                    const selected = catalogBusinessForm.categoryIds.includes(category.id);
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            key={category.id}
+                                                            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                                                                selected
+                                                                    ? 'bg-primary-600 text-white'
+                                                                    : 'border border-gray-200 bg-white text-slate-700 hover:border-primary-300'
+                                                            }`}
+                                                            onClick={() => setCatalogBusinessForm((current) => ({
+                                                                ...current,
+                                                                categoryIds: selected
+                                                                    ? current.categoryIds.filter((categoryId) => categoryId !== category.id)
+                                                                    : [...current.categoryIds, category.id],
+                                                            }))}
+                                                        >
+                                                            {category.name}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <button
+                                                type="submit"
+                                                className="btn-primary text-sm"
+                                                disabled={creatingCatalogBusiness}
+                                            >
+                                                {creatingCatalogBusiness ? 'Creando...' : 'Crear ficha de catalogo'}
+                                            </button>
+                                            <p className="text-sm text-slate-600">
+                                                Se crea como negocio no reclamado y listo para el flujo formal de claim.
+                                            </p>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <div className="card p-5">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <h3 className="font-display font-semibold text-gray-900">Reclamaciones del catalogo</h3>
+                                            <p className="mt-1 text-sm text-gray-600">
+                                                Aprueba o rechaza ownership antes de activar herramientas tenant.
+                                            </p>
+                                        </div>
+                                        <select
+                                            className="input-field text-sm"
+                                            value={claimRequestStatusFilter}
+                                            onChange={(event) => setClaimRequestStatusFilter(event.target.value as 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED')}
+                                        >
+                                            <option value="PENDING">Pendientes</option>
+                                            <option value="APPROVED">Aprobadas</option>
+                                            <option value="REJECTED">Rechazadas</option>
+                                            <option value="CANCELED">Canceladas</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {(['PENDING', 'APPROVED', 'REJECTED', 'CANCELED'] as const).map((status) => (
+                                            <span key={status} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                {status}: {claimRequestSummary[status] ?? 0}
+                                            </span>
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-4 space-y-3">
+                                        {claimRequests.length > 0 ? claimRequests.map((claimRequest) => (
+                                            <div key={claimRequest.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div>
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <p className="font-medium text-gray-900">{claimRequest.business.name}</p>
+                                                            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 border border-slate-200">
+                                                                {claimRequest.evidenceType}
+                                                            </span>
+                                                            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 border border-slate-200">
+                                                                {claimRequest.status}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-sm text-slate-600">
+                                                            Solicitante: {claimRequest.requesterUser?.name || 'Usuario no disponible'}
+                                                            {claimRequest.requesterOrganization?.name ? ` - ${claimRequest.requesterOrganization.name}` : ''}
+                                                        </p>
+                                                        {claimRequest.evidenceValue ? (
+                                                            <p className="mt-1 text-sm text-slate-700">Evidencia: {claimRequest.evidenceValue}</p>
+                                                        ) : null}
+                                                        {claimRequest.notes ? (
+                                                            <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{claimRequest.notes}</p>
+                                                        ) : null}
+                                                    </div>
+                                                    <a
+                                                        href={`/businesses/${claimRequest.business.slug}`}
+                                                        className="btn-secondary text-sm"
+                                                    >
+                                                        Ver ficha
+                                                    </a>
+                                                </div>
+
+                                                {claimRequest.status === 'PENDING' ? (
+                                                    <div className="mt-3 space-y-3">
+                                                        <textarea
+                                                            className="input-field h-24 w-full resize-none text-sm"
+                                                            placeholder="Notas administrativas para la decision"
+                                                            value={claimReviewNotes[claimRequest.id] || ''}
+                                                            onChange={(event) => setClaimReviewNotes((current) => ({
+                                                                ...current,
+                                                                [claimRequest.id]: event.target.value,
+                                                            }))}
+                                                        />
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <button
+                                                                type="button"
+                                                                className="btn-primary text-sm"
+                                                                disabled={processingId === claimRequest.id}
+                                                                onClick={() => void handleReviewClaimRequest(claimRequest.id, 'APPROVED')}
+                                                            >
+                                                                Aprobar claim
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-secondary text-sm"
+                                                                disabled={processingId === claimRequest.id}
+                                                                onClick={() => void handleReviewClaimRequest(claimRequest.id, 'REJECTED')}
+                                                            >
+                                                                Rechazar claim
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="mt-3 text-xs text-slate-500">
+                                                        Revisada {claimRequest.reviewedAt ? new Date(claimRequest.reviewedAt).toLocaleString('es-DO') : 'sin fecha'} por {claimRequest.reviewedByAdmin?.name || 'sistema'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )) : (
+                                            <p className="text-sm text-gray-500">No hay reclamaciones para este filtro.</p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1349,6 +1777,80 @@ export function AdminDashboard() {
                                             ))
                                         ) : (
                                             <p className="text-sm text-gray-500">No hay duplicados detectados en la muestra actual.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="card p-5">
+                                <h3 className="font-display font-semibold mb-3">Negocios no reclamados detectados</h3>
+                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                    {businesses.filter((business) => business.claimStatus === 'UNCLAIMED').slice(0, 9).map((business) => (
+                                        <div key={business.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-medium text-gray-900">{business.name}</p>
+                                                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                                    {business.source || 'SIN SOURCE'}
+                                                </span>
+                                            </div>
+                                            <p className="mt-2 text-sm text-slate-600">
+                                                {business.province?.name || 'Provincia pendiente'}
+                                            </p>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Estado publico: {business.publicStatus || 'PUBLISHED'}
+                                            </p>
+                                        </div>
+                                    ))}
+                                    {businesses.filter((business) => business.claimStatus === 'UNCLAIMED').length === 0 ? (
+                                        <p className="text-sm text-gray-500">No hay negocios no reclamados en la muestra cargada.</p>
+                                    ) : null}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                <div className="card p-5">
+                                    <h3 className="font-display font-semibold mb-3">Sugerencias de usuarios</h3>
+                                    <div className="space-y-3">
+                                        {userSuggestionBusinesses.length > 0 ? userSuggestionBusinesses.slice(0, 8).map((business) => (
+                                            <div key={business.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">{business.name}</p>
+                                                        <p className="mt-1 text-sm text-slate-600">
+                                                            {business.province?.name || 'Provincia pendiente'}
+                                                        </p>
+                                                    </div>
+                                                    <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-semibold text-primary-700">
+                                                        USER_SUGGESTION
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <p className="text-sm text-gray-500">No hay sugerencias de usuarios en la muestra cargada.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="card p-5">
+                                    <h3 className="font-display font-semibold mb-3">Resolucion de conflictos</h3>
+                                    <div className="space-y-3">
+                                        {catalogConflictQueue.length > 0 ? catalogConflictQueue.map((item) => (
+                                            <div key={item.key} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="font-medium text-gray-900">{item.title}</p>
+                                                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                                        item.kind === 'PENDING_CLAIM'
+                                                            ? 'border border-amber-200 bg-amber-50 text-amber-800'
+                                                            : 'border border-red-200 bg-red-50 text-red-800'
+                                                    }`}>
+                                                        {item.kind === 'PENDING_CLAIM' ? 'Claim pendiente' : 'Duplicado probable'}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-2 text-sm text-slate-700">{item.detail}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{item.hint}</p>
+                                            </div>
+                                        )) : (
+                                            <p className="text-sm text-gray-500">No hay conflictos priorizados con la data actualmente cargada.</p>
                                         )}
                                     </div>
                                 </div>

@@ -33,6 +33,7 @@ interface SidebarPanelProps {
     hasBusinessHours: boolean;
     hasOperatorRole: boolean;
     hoursByDay: HoursByDayEntry[];
+    isClaimedBusiness: boolean;
     isAdminRole: boolean;
     isAuthenticated: boolean;
     isCustomerRole: boolean;
@@ -81,6 +82,7 @@ export function SidebarPanel({
     hasBusinessHours,
     hasOperatorRole,
     hoursByDay,
+    isClaimedBusiness,
     isAdminRole,
     isAuthenticated,
     isCustomerRole,
@@ -248,6 +250,17 @@ export function SidebarPanel({
                             </div>
                         ) : null}
 
+                        {!isClaimedBusiness ? (
+                            <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+                                    Perfil de catalogo
+                                </p>
+                                <p className="mt-1 text-sm leading-relaxed text-slate-700">
+                                    Esta ficha es publica, pero las herramientas de reservas, mensajeria y leads solo se habilitan cuando el dueno reclama el negocio.
+                                </p>
+                            </div>
+                        ) : null}
+
                         {business.whatsapp && canUseCustomerContactFlows ? (
                             <button
                                 type="button"
@@ -327,13 +340,13 @@ export function SidebarPanel({
                                     </div>
                                 ) : null}
 
-                                {showBookings && isAuthenticated && isCustomerRole && !canBookThisBusiness ? (
+                                {showBookings && isClaimedBusiness && isAuthenticated && isCustomerRole && !canBookThisBusiness ? (
                                     <div className="mb-6 rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm text-slate-700">
                                         Este negocio no gestiona reservas en linea. Usa los canales de contacto disponibles para coordinar.
                                     </div>
                                 ) : null}
 
-                                {showMessaging ? (
+                                {showMessaging && isClaimedBusiness ? (
                                     <>
                                         <h3 className="mb-3 font-display font-semibold text-gray-900">Mensaje directo</h3>
 

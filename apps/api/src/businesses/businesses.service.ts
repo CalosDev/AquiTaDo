@@ -18,6 +18,11 @@ import {
     BusinessQueryDto,
     NearbyQueryDto,
     CreatePublicLeadDto,
+    ClaimSearchQueryDto,
+    CreateBusinessClaimRequestDto,
+    ReviewBusinessClaimRequestDto,
+    BusinessClaimRequestQueryDto,
+    CreateAdminCatalogBusinessDto,
 } from './dto/business.dto';
 import slugify from 'slugify';
 import { getOrganizationPlanLimits } from '../organizations/organization-plan-limits';
@@ -51,6 +56,8 @@ export class BusinessesService {
     private readonly logger = new Logger(BusinessesService.name);
     private static readonly DETAIL_ID_CACHE_PREFIX = 'public:businesses:detail:id';
     private static readonly DETAIL_SLUG_CACHE_PREFIX = 'public:businesses:detail:slug';
+    private static readonly CATALOG_SYSTEM_USER_EMAIL = 'catalog@internal.aquita.do';
+    private static readonly CATALOG_SYSTEM_ORG_SLUG = 'aquita-catalog-system';
 
     constructor(
         @Inject(PrismaService)
@@ -77,13 +84,13 @@ export class BusinessesService {
         const business = await this.prisma.business.findFirst({
             where: {
                 id: businessId,
-                verified: true,
                 deletedAt: null,
             },
             select: {
                 id: true,
                 name: true,
                 slug: true,
+                claimStatus: true,
                 ownerId: true,
                 organizationId: true,
                 whatsapp: true,
@@ -97,6 +104,10 @@ export class BusinessesService {
 
         if (!business) {
             throw new NotFoundException('Negocio no encontrado');
+        }
+
+        if (business.claimStatus !== 'CLAIMED') {
+            throw new BadRequestException('Este negocio todavia no ha sido reclamado y no puede recibir consultas operativas');
         }
 
         const contactName = dto.contactName.trim();
@@ -331,6 +342,463 @@ export class BusinessesService {
 
         return decorateBusinessProfile(business as Record<string, any>);
     }
+
+    async claimSearch(query: ClaimSearchQueryDto) {
+        const matches = await this.searchClaimCandidates(query.q, {
+            provinceId: query.provinceId,
+            cityId: query.cityId,
+            limit: query.limit,
+        });
+
+        return {
+            data: matches,
+            total: matches.length,
+            query: query.q.trim(),
+        };
+    }
+
+    async listClaimRequests(query: BusinessClaimRequestQueryDto) {
+        const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
+        const status = query.status ?? 'PENDING';
+        const items = await this.prisma.businessClaimRequest.findMany({
+            where: {
+                status,
+            },
+            select: {
+                id: true,
+                status: true,
+                evidenceType: true,
+                evidenceValue: true,
+                notes: true,
+                createdAt: true,
+                updatedAt: true,
+                reviewedAt: true,
+                business: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        claimStatus: true,
+                        publicStatus: true,
+                        source: true,
+                    },
+                },
+                requesterUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+                requesterOrganization: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
+                reviewedByAdmin: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'asc' },
+            take: limit,
+        });
+
+        const summary = await this.prisma.businessClaimRequest.groupBy({
+            by: ['status'],
+            _count: {
+                _all: true,
+            },
+        });
+
+        return {
+            data: items,
+            summary: summary.reduce<Record<string, number>>((accumulator, item) => {
+                accumulator[item.status] = item._count._all;
+                return accumulator;
+            }, {}),
+        };
+    }
+
+    async createClaimRequest(
+        businessId: string,
+        dto: CreateBusinessClaimRequestDto,
+        requesterUserId: string,
+        requesterOrganizationId?: string,
+    ) {
+        const normalizedEvidenceValue = normalizeOptionalText(dto.evidenceValue) ?? null;
+        const normalizedNotes = normalizeOptionalText(dto.notes) ?? null;
+
+        try {
+            const claimRequest = await this.prisma.$transaction(async (tx) => {
+                const business = await tx.business.findUnique({
+                    where: { id: businessId },
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        claimStatus: true,
+                        isClaimable: true,
+                        deletedAt: true,
+                    },
+                });
+
+                if (!business || business.deletedAt) {
+                    throw new NotFoundException('Negocio no encontrado');
+                }
+
+                if (!business.isClaimable) {
+                    throw new BadRequestException('Este negocio no esta disponible para reclamacion');
+                }
+
+                if (business.claimStatus === 'CLAIMED') {
+                    throw new BadRequestException('Este negocio ya fue reclamado');
+                }
+
+                const existingPendingRequest = await tx.businessClaimRequest.findFirst({
+                    where: {
+                        businessId,
+                        status: 'PENDING',
+                    },
+                    select: { id: true },
+                });
+
+                if (existingPendingRequest) {
+                    throw new ConflictException('Ya existe una solicitud de reclamacion pendiente para este negocio');
+                }
+
+                const createdRequest = await tx.businessClaimRequest.create({
+                    data: {
+                        businessId,
+                        requesterUserId,
+                        requesterOrganizationId: requesterOrganizationId ?? null,
+                        evidenceType: dto.evidenceType,
+                        evidenceValue: normalizedEvidenceValue,
+                        notes: normalizedNotes,
+                    },
+                    select: {
+                        id: true,
+                        status: true,
+                        createdAt: true,
+                        business: {
+                            select: {
+                                id: true,
+                                name: true,
+                                slug: true,
+                            },
+                        },
+                    },
+                });
+
+                await tx.business.update({
+                    where: { id: businessId },
+                    data: {
+                        claimStatus: 'PENDING_CLAIM',
+                    },
+                    select: { id: true },
+                });
+
+                return createdRequest;
+            });
+
+            return {
+                ...claimRequest,
+                message: 'Solicitud de reclamacion enviada para revision administrativa',
+            };
+        } catch (error) {
+            this.handlePrismaError(error);
+            throw error;
+        }
+    }
+
+    async reviewClaimRequest(
+        claimRequestId: string,
+        dto: ReviewBusinessClaimRequestDto,
+        adminUserId: string,
+    ) {
+        const reviewNotes = normalizeOptionalText(dto.notes) ?? null;
+        const reviewedAt = new Date();
+
+        try {
+            const reviewedClaim = await this.prisma.$transaction(async (tx) => {
+                const claimRequest = await tx.businessClaimRequest.findUnique({
+                    where: { id: claimRequestId },
+                    select: {
+                        id: true,
+                        businessId: true,
+                        requesterUserId: true,
+                        requesterOrganizationId: true,
+                        status: true,
+                        notes: true,
+                        business: {
+                            select: {
+                                id: true,
+                                slug: true,
+                                claimStatus: true,
+                            },
+                        },
+                    },
+                });
+
+                if (!claimRequest) {
+                    throw new NotFoundException('Solicitud de reclamacion no encontrada');
+                }
+
+                if (claimRequest.status !== 'PENDING') {
+                    throw new BadRequestException('Esta solicitud ya fue revisada');
+                }
+
+                if (dto.status === 'APPROVED') {
+                    const effectiveOrganizationId = claimRequest.requesterOrganizationId
+                        ?? await this.ensureOwnerOrganization(tx, claimRequest.requesterUserId);
+
+                    await tx.user.updateMany({
+                        where: {
+                            id: claimRequest.requesterUserId,
+                            role: 'USER',
+                        },
+                        data: {
+                            role: 'BUSINESS_OWNER',
+                        },
+                    });
+
+                    await tx.business.update({
+                        where: { id: claimRequest.businessId },
+                        data: {
+                            ownerId: claimRequest.requesterUserId,
+                            organizationId: effectiveOrganizationId,
+                            claimStatus: 'CLAIMED',
+                            claimedAt: reviewedAt,
+                            claimedByUserId: claimRequest.requesterUserId,
+                        },
+                        select: {
+                            id: true,
+                        },
+                    });
+
+                    await tx.businessClaimRequest.update({
+                        where: { id: claimRequestId },
+                        data: {
+                            status: 'APPROVED',
+                            notes: reviewNotes ?? claimRequest.notes,
+                            reviewedByAdminId: adminUserId,
+                            reviewedAt,
+                        },
+                        select: { id: true },
+                    });
+
+                    await tx.businessClaimRequest.updateMany({
+                        where: {
+                            businessId: claimRequest.businessId,
+                            status: 'PENDING',
+                            id: {
+                                not: claimRequestId,
+                            },
+                        },
+                        data: {
+                            status: 'CANCELED',
+                            reviewedByAdminId: adminUserId,
+                            reviewedAt,
+                        },
+                    });
+
+                    return {
+                        id: claimRequest.id,
+                        status: 'APPROVED' as const,
+                        businessId: claimRequest.businessId,
+                        businessSlug: claimRequest.business.slug,
+                    };
+                }
+
+                await tx.businessClaimRequest.update({
+                    where: { id: claimRequestId },
+                    data: {
+                        status: 'REJECTED',
+                        notes: reviewNotes ?? claimRequest.notes,
+                        reviewedByAdminId: adminUserId,
+                        reviewedAt,
+                    },
+                    select: { id: true },
+                });
+
+                await tx.business.update({
+                    where: { id: claimRequest.businessId },
+                    data: {
+                        claimStatus: 'UNCLAIMED',
+                    },
+                    select: { id: true },
+                });
+
+                return {
+                    id: claimRequest.id,
+                    status: 'REJECTED' as const,
+                    businessId: claimRequest.businessId,
+                    businessSlug: claimRequest.business.slug,
+                };
+            });
+
+            this.publishBusinessChangedEvent(
+                reviewedClaim.businessId,
+                reviewedClaim.businessSlug,
+                'updated',
+            );
+
+            return reviewedClaim;
+        } catch (error) {
+            this.handlePrismaError(error);
+            throw error;
+        }
+    }
+
+    async createAdminCatalogBusiness(dto: CreateAdminCatalogBusinessDto, adminUserId: string) {
+        assertCoordinatePair(dto.latitude, dto.longitude);
+        const baseSlug = slugify(dto.name, { lower: true, strict: true });
+        if (!baseSlug) {
+            throw new BadRequestException('El nombre del negocio no es valido para generar un slug');
+        }
+
+        const slug = await this.generateUniqueSlug(baseSlug);
+        const categoryIds = dto.categoryIds ? [...new Set(dto.categoryIds)] : undefined;
+        const featureIds = dto.featureIds ? [...new Set(dto.featureIds)] : undefined;
+        const hours = normalizeBusinessHours(dto.hours, normalizeOptionalText);
+        const contactChannels = await this.normalizeBusinessContactChannels(dto.phone, dto.whatsapp);
+        const website = normalizeOptionalText(dto.website) ?? null;
+        const email = normalizeOptionalEmail(dto.email) ?? null;
+        const instagramUrl = normalizeOptionalText(dto.instagramUrl) ?? null;
+        const facebookUrl = normalizeOptionalText(dto.facebookUrl) ?? null;
+        const tiktokUrl = normalizeOptionalText(dto.tiktokUrl) ?? null;
+        const publishedAt = dto.publicStatus === 'PUBLISHED' || !dto.publicStatus ? new Date() : null;
+        const coordinates = await this.resolveCoordinatesForBusiness({
+            address: dto.address,
+            provinceId: dto.provinceId,
+            cityId: dto.cityId,
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+        });
+
+        await this.assertNoStrongDuplicateMatch(
+            {
+                name: dto.name,
+                phone: contactChannels.phone ?? null,
+                whatsapp: contactChannels.whatsapp ?? null,
+                website,
+                provinceId: dto.provinceId,
+                cityId: dto.cityId,
+            },
+            dto.ignorePotentialDuplicates,
+        );
+
+        try {
+            const createdBusiness = await this.prisma.$transaction(async (tx) => {
+                await this.assertCityBelongsToProvince(tx, dto.provinceId, dto.cityId);
+                await this.assertSectorBelongsToCity(tx, dto.cityId, dto.sectorId);
+                const placeholderContext = await this.ensureCatalogPlaceholderContext(tx);
+
+                const business = await tx.business.create({
+                    data: {
+                        id: randomUUID(),
+                        name: dto.name,
+                        slug,
+                        description: dto.description,
+                        phone: contactChannels.phone ?? null,
+                        whatsapp: contactChannels.whatsapp ?? null,
+                        website,
+                        email,
+                        instagramUrl,
+                        facebookUrl,
+                        tiktokUrl,
+                        priceRange: dto.priceRange ?? null,
+                        address: dto.address,
+                        latitude: coordinates.latitude ?? null,
+                        longitude: coordinates.longitude ?? null,
+                        ownerId: placeholderContext.ownerId,
+                        organizationId: placeholderContext.organizationId,
+                        provinceId: dto.provinceId,
+                        cityId: dto.cityId ?? null,
+                        sectorId: dto.sectorId ?? null,
+                        publicStatus: dto.publicStatus ?? 'PUBLISHED',
+                        claimStatus: 'UNCLAIMED',
+                        source: 'ADMIN',
+                        publishedAt,
+                        claimedAt: null,
+                        claimedByUserId: null,
+                        catalogManagedByAdmin: dto.catalogManagedByAdmin ?? true,
+                        isClaimable: dto.isClaimable ?? true,
+                    },
+                    select: {
+                        id: true,
+                        slug: true,
+                    },
+                });
+
+                if (categoryIds?.length) {
+                    await tx.businessCategory.createMany({
+                        data: categoryIds.map((categoryId) => ({
+                            businessId: business.id,
+                            categoryId,
+                        })),
+                    });
+                }
+
+                if (featureIds?.length) {
+                    await tx.businessFeature.createMany({
+                        data: featureIds.map((featureId) => ({
+                            businessId: business.id,
+                            featureId,
+                        })),
+                    });
+                }
+
+                if (hours?.length) {
+                    await tx.businessHour.createMany({
+                        data: hours.map((entry) => ({
+                            businessId: business.id,
+                            dayOfWeek: entry.dayOfWeek,
+                            opensAt: entry.opensAt,
+                            closesAt: entry.closesAt,
+                            closed: entry.closed,
+                        })),
+                    });
+                }
+
+                await tx.auditLog.create({
+                    data: {
+                        organizationId: null,
+                        actorUserId: adminUserId,
+                        action: 'business.catalog.created',
+                        targetType: 'business',
+                        targetId: business.id,
+                        metadata: {
+                            source: 'admin-catalog',
+                            publicStatus: dto.publicStatus ?? 'PUBLISHED',
+                        } as Prisma.InputJsonValue,
+                    },
+                });
+
+                return business;
+            });
+
+            await this.syncBusinessLocation(this.prisma, createdBusiness.id, coordinates.latitude, coordinates.longitude);
+            this.publishBusinessChangedEvent(createdBusiness.id, createdBusiness.slug, 'created');
+
+            const hydratedBusiness = await this.findBusinessByIdWithReviews(createdBusiness.id);
+            if (!hydratedBusiness) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            return decorateBusinessProfile(hydratedBusiness as Record<string, any>);
+        } catch (error) {
+            this.handlePrismaError(error);
+            throw error;
+        }
+    }
+
     async create(
         dto: CreateBusinessDto,
         userId: string,
@@ -362,6 +830,18 @@ export class BusinessesService {
             latitude: dto.latitude,
             longitude: dto.longitude,
         });
+
+        await this.assertNoStrongDuplicateMatch(
+            {
+                name: dto.name,
+                phone: contactChannels.phone ?? null,
+                whatsapp: contactChannels.whatsapp ?? null,
+                website,
+                provinceId: dto.provinceId,
+                cityId: dto.cityId,
+            },
+            dto.ignorePotentialDuplicates,
+        );
 
         try {
             const createdBusiness = await this.prisma.$transaction(async (tx) => {
@@ -403,6 +883,14 @@ export class BusinessesService {
                         provinceId: dto.provinceId,
                         cityId: dto.cityId ?? null,
                         sectorId: dto.sectorId ?? null,
+                        publicStatus: 'PUBLISHED',
+                        claimStatus: 'CLAIMED',
+                        source: 'OWNER',
+                        publishedAt: new Date(),
+                        claimedAt: new Date(),
+                        claimedByUserId: userId,
+                        catalogManagedByAdmin: false,
+                        isClaimable: true,
                     },
                     select: {
                         id: true,
@@ -715,6 +1203,7 @@ export class BusinessesService {
                         deletedAt: now,
                         verified: false,
                         verificationStatus: 'SUSPENDED',
+                        publicStatus: 'ARCHIVED',
                     },
                     select: {
                         id: true,
@@ -961,6 +1450,8 @@ export class BusinessesService {
                 missingSector: decoratedBusinesses.filter((business) => !business.sector).length,
                 missingCoordinates: decoratedBusinesses.filter((business) =>
                     typeof business.latitude !== 'number' || typeof business.longitude !== 'number').length,
+                unclaimedBusinesses: decoratedBusinesses.filter((business) => business.claimStatus === 'UNCLAIMED').length,
+                pendingClaims: decoratedBusinesses.filter((business) => business.claimStatus === 'PENDING_CLAIM').length,
             },
             incompleteBusinesses,
             duplicateCandidates,
@@ -1066,17 +1557,19 @@ export class BusinessesService {
 
     private findPublicBusinessById(id: string) {
         return this.findBusinessDetail({
-            id,
-            verified: true,
-            deletedAt: null,
+            AND: [
+                { id },
+                this.buildPublicCatalogWhere(),
+            ],
         });
     }
 
     private findPublicBusinessBySlug(slug: string) {
         return this.findBusinessDetail({
-            slug,
-            verified: true,
-            deletedAt: null,
+            AND: [
+                { slug },
+                this.buildPublicCatalogWhere(),
+            ],
         });
     }
 
@@ -1357,6 +1850,67 @@ export class BusinessesService {
         }
     }
 
+    private async ensureCatalogPlaceholderContext(
+        tx: Prisma.TransactionClient,
+    ): Promise<{ ownerId: string; organizationId: string }> {
+        let systemUser = await tx.user.findUnique({
+            where: { email: BusinessesService.CATALOG_SYSTEM_USER_EMAIL },
+            select: { id: true },
+        });
+
+        if (!systemUser) {
+            systemUser = await tx.user.create({
+                data: {
+                    name: 'AquiTa Catalog System',
+                    email: BusinessesService.CATALOG_SYSTEM_USER_EMAIL,
+                    password: `catalog-${randomUUID()}`,
+                    role: 'ADMIN',
+                },
+                select: { id: true },
+            });
+        }
+
+        let systemOrganization = await tx.organization.findUnique({
+            where: { slug: BusinessesService.CATALOG_SYSTEM_ORG_SLUG },
+            select: { id: true },
+        });
+
+        if (!systemOrganization) {
+            systemOrganization = await tx.organization.create({
+                data: {
+                    name: 'AquiTa Catalog System',
+                    slug: BusinessesService.CATALOG_SYSTEM_ORG_SLUG,
+                    ownerUserId: systemUser.id,
+                },
+                select: { id: true },
+            });
+        }
+
+        await tx.organizationMember.upsert({
+            where: {
+                organizationId_userId: {
+                    organizationId: systemOrganization.id,
+                    userId: systemUser.id,
+                },
+            },
+            update: {
+                role: 'OWNER',
+            },
+            create: {
+                organizationId: systemOrganization.id,
+                userId: systemUser.id,
+                role: 'OWNER',
+            },
+        });
+
+        await this.ensureOrganizationSubscription(tx, systemOrganization.id);
+
+        return {
+            ownerId: systemUser.id,
+            organizationId: systemOrganization.id,
+        };
+    }
+
     private async buildWhere(
         query: BusinessQueryDto,
         includeUnverified: boolean,
@@ -1369,6 +1923,18 @@ export class BusinessesService {
             where.verified = true;
         } else if (typeof query.verified === 'boolean') {
             where.verified = query.verified;
+        }
+
+        if (query.publicStatus) {
+            where.publicStatus = query.publicStatus;
+        }
+
+        if (query.claimStatus) {
+            where.claimStatus = query.claimStatus;
+        }
+
+        if (query.source) {
+            where.source = query.source;
         }
 
         const normalizedSearch = query.search?.trim();
@@ -1427,6 +1993,341 @@ export class BusinessesService {
         }
 
         return where;
+    }
+
+    private buildPublicCatalogWhere(): Prisma.BusinessWhereInput {
+        return {
+            deletedAt: null,
+            publicStatus: 'PUBLISHED',
+            OR: [
+                { verified: true },
+                {
+                    claimStatus: {
+                        in: ['UNCLAIMED', 'PENDING_CLAIM'],
+                    },
+                },
+            ],
+        };
+    }
+
+    private async searchClaimCandidates(
+        search: string,
+        options: {
+            provinceId?: string;
+            cityId?: string;
+            limit?: number;
+        } = {},
+    ) {
+        const trimmedSearch = search.trim();
+        if (trimmedSearch.length < 2) {
+            return [];
+        }
+
+        const safeLimit = Math.min(Math.max(options.limit ?? 6, 1), 12);
+        const slugQuery = slugify(trimmedSearch, { lower: true, strict: true });
+        const normalizedDigits = trimmedSearch.replace(/\D/g, '');
+        const normalizedWebsite = this.normalizeWebsiteValue(trimmedSearch);
+        const orClauses: Prisma.BusinessWhereInput[] = [
+            {
+                name: {
+                    contains: trimmedSearch,
+                    mode: 'insensitive',
+                },
+            },
+            {
+                address: {
+                    contains: trimmedSearch,
+                    mode: 'insensitive',
+                },
+            },
+        ];
+
+        if (slugQuery) {
+            orClauses.push({
+                slug: {
+                    contains: slugQuery,
+                },
+            });
+        }
+
+        if (normalizedDigits.length >= 7) {
+            orClauses.push({ phone: normalizedDigits });
+            orClauses.push({ whatsapp: normalizedDigits });
+        }
+
+        if (normalizedWebsite) {
+            orClauses.push({
+                website: {
+                    contains: normalizedWebsite,
+                    mode: 'insensitive',
+                },
+            });
+        }
+
+        const rows = await this.prisma.business.findMany({
+            where: {
+                deletedAt: null,
+                provinceId: options.provinceId,
+                cityId: options.cityId,
+                OR: orClauses,
+            },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                address: true,
+                phone: true,
+                whatsapp: true,
+                website: true,
+                verified: true,
+                claimStatus: true,
+                publicStatus: true,
+                source: true,
+                province: {
+                    select: { id: true, name: true, slug: true },
+                },
+                city: {
+                    select: { id: true, name: true, slug: true },
+                },
+                sector: {
+                    select: { id: true, name: true, slug: true },
+                },
+                categories: {
+                    select: {
+                        category: {
+                            select: { id: true, name: true, slug: true, icon: true, parentId: true },
+                        },
+                    },
+                },
+                images: {
+                    select: { id: true, url: true, isCover: true, caption: true, type: true },
+                    orderBy: [
+                        { isCover: Prisma.SortOrder.desc },
+                        { sortOrder: Prisma.SortOrder.asc },
+                        { id: Prisma.SortOrder.asc },
+                    ],
+                    take: 1,
+                },
+            },
+            orderBy: [
+                { verified: 'desc' },
+                { createdAt: 'desc' },
+            ],
+            take: Math.min(safeLimit * 4, 40),
+        });
+
+        return rows
+            .map((row) => {
+                const scoredCandidate = this.scoreClaimSearchCandidate(row, trimmedSearch, normalizedDigits, normalizedWebsite);
+                return {
+                    ...row,
+                    matchType: scoredCandidate.matchType,
+                    matchScore: scoredCandidate.score,
+                    matchReasons: scoredCandidate.reasons,
+                    alreadyClaimed: row.claimStatus === 'CLAIMED',
+                };
+            })
+            .filter((row) => row.matchScore > 0)
+            .sort((left, right) => {
+                if (right.matchScore !== left.matchScore) {
+                    return right.matchScore - left.matchScore;
+                }
+                if (left.alreadyClaimed !== right.alreadyClaimed) {
+                    return left.alreadyClaimed ? -1 : 1;
+                }
+                return left.name.localeCompare(right.name, 'es');
+            })
+            .slice(0, safeLimit);
+    }
+
+    private scoreClaimSearchCandidate(
+        candidate: {
+            name: string;
+            address: string;
+            phone: string | null;
+            whatsapp: string | null;
+            website: string | null;
+        },
+        search: string,
+        normalizedDigits: string,
+        normalizedWebsite: string | null,
+    ): {
+        score: number;
+        matchType: 'exacta' | 'probable' | 'debil' | null;
+        reasons: string[];
+    } {
+        const normalizedSearch = this.normalizeComparisonValue(search);
+        const normalizedCandidateName = this.normalizeComparisonValue(candidate.name);
+        const normalizedCandidateAddress = this.normalizeComparisonValue(candidate.address);
+        const candidateWebsite = this.normalizeWebsiteValue(candidate.website);
+        const reasons = new Set<string>();
+        let score = 0;
+
+        if (normalizedSearch && normalizedCandidateName === normalizedSearch) {
+            score = Math.max(score, 96);
+            reasons.add('nombre_exacto');
+        } else if (
+            normalizedSearch
+            && (
+                normalizedCandidateName.includes(normalizedSearch)
+                || normalizedSearch.includes(normalizedCandidateName)
+            )
+        ) {
+            score = Math.max(score, 76);
+            reasons.add('nombre_similar');
+        }
+
+        if (normalizedDigits.length >= 7 && candidate.phone === normalizedDigits) {
+            score = Math.max(score, 95);
+            reasons.add('telefono');
+        }
+
+        if (normalizedDigits.length >= 7 && candidate.whatsapp === normalizedDigits) {
+            score = Math.max(score, 92);
+            reasons.add('whatsapp');
+        }
+
+        if (normalizedWebsite && candidateWebsite === normalizedWebsite) {
+            score = Math.max(score, 90);
+            reasons.add('website');
+        }
+
+        if (normalizedSearch && normalizedCandidateAddress.includes(normalizedSearch)) {
+            score = Math.max(score, 62);
+            reasons.add('direccion');
+        }
+
+        const matchType = score >= 90
+            ? 'exacta'
+            : score >= 70
+                ? 'probable'
+                : score > 0
+                    ? 'debil'
+                    : null;
+
+        return {
+            score,
+            matchType,
+            reasons: [...reasons],
+        };
+    }
+
+    private async assertNoStrongDuplicateMatch(
+        input: {
+            name: string;
+            phone: string | null;
+            whatsapp: string | null;
+            website: string | null;
+            provinceId: string;
+            cityId?: string;
+        },
+        ignorePotentialDuplicates?: boolean,
+    ) {
+        if (ignorePotentialDuplicates) {
+            return;
+        }
+
+        const strongCandidates = await this.findStrongDuplicateCandidates(input);
+        if (strongCandidates.length === 0) {
+            return;
+        }
+
+        throw new ConflictException(
+            'Encontramos negocios que parecen duplicados. Revisa las coincidencias y reclama el negocio existente o continua con la opcion explicita de crear de todos modos.',
+        );
+    }
+
+    private async findStrongDuplicateCandidates(input: {
+        name: string;
+        phone: string | null;
+        whatsapp: string | null;
+        website: string | null;
+        provinceId: string;
+        cityId?: string;
+    }) {
+        const normalizedName = this.normalizeComparisonValue(input.name);
+        const normalizedWebsite = this.normalizeWebsiteValue(input.website);
+        const phoneCandidates = [input.phone, input.whatsapp].filter((value): value is string => Boolean(value));
+        const orClauses: Prisma.BusinessWhereInput[] = [];
+
+        if (input.name.trim()) {
+            orClauses.push({
+                name: {
+                    contains: input.name.trim(),
+                    mode: 'insensitive',
+                },
+            });
+        }
+
+        for (const phoneValue of phoneCandidates) {
+            orClauses.push({ phone: phoneValue });
+            orClauses.push({ whatsapp: phoneValue });
+        }
+
+        if (normalizedWebsite) {
+            orClauses.push({
+                website: {
+                    contains: normalizedWebsite,
+                    mode: 'insensitive',
+                },
+            });
+        }
+
+        if (orClauses.length === 0) {
+            return [];
+        }
+
+        const candidates = await this.prisma.business.findMany({
+            where: {
+                deletedAt: null,
+                provinceId: input.provinceId,
+                cityId: input.cityId,
+                OR: orClauses,
+            },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                phone: true,
+                whatsapp: true,
+                website: true,
+                claimStatus: true,
+            },
+            take: 12,
+        });
+
+        return candidates.filter((candidate) => {
+            const sameName = normalizedName.length > 0
+                && this.normalizeComparisonValue(candidate.name) === normalizedName;
+            const samePhone = phoneCandidates.some((phoneValue) =>
+                candidate.phone === phoneValue || candidate.whatsapp === phoneValue);
+            const sameWebsite = Boolean(normalizedWebsite)
+                && this.normalizeWebsiteValue(candidate.website) === normalizedWebsite;
+
+            return sameName || samePhone || sameWebsite;
+        });
+    }
+
+    private normalizeComparisonValue(value?: string | null): string {
+        return (value ?? '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
+
+    private normalizeWebsiteValue(value?: string | null): string | null {
+        const normalized = normalizeOptionalText(value);
+        if (!normalized) {
+            return null;
+        }
+
+        return normalized
+            .replace(/^https?:\/\//i, '')
+            .replace(/^www\./i, '')
+            .replace(/\/+$/, '')
+            .toLowerCase();
     }
 
     private async resolveFeatureIds(featureQuery: string): Promise<string[]> {

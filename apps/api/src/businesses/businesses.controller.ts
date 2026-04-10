@@ -11,6 +11,11 @@ import {
     CreatePublicLeadDto,
     DeleteBusinessDto,
     CatalogQualityQueryDto,
+    ClaimSearchQueryDto,
+    CreateBusinessClaimRequestDto,
+    ReviewBusinessClaimRequestDto,
+    BusinessClaimRequestQueryDto,
+    CreateAdminCatalogBusinessDto,
 } from './dto/business.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -81,6 +86,39 @@ export class BusinessesController {
         return this.businessesService.getCatalogQuality(query.limit);
     }
 
+    @Get('claim-search')
+    async claimSearch(@Query() query: ClaimSearchQueryDto) {
+        return this.businessesService.claimSearch(query);
+    }
+
+    @Get('admin/claim-requests')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async listClaimRequests(@Query() query: BusinessClaimRequestQueryDto) {
+        return this.businessesService.listClaimRequests(query);
+    }
+
+    @Post('admin/catalog')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async createAdminCatalogBusiness(
+        @Body() dto: CreateAdminCatalogBusinessDto,
+        @CurrentUser('id') adminUserId: string,
+    ) {
+        return this.businessesService.createAdminCatalogBusiness(dto, adminUserId);
+    }
+
+    @Post('admin/claim-requests/:id/review')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async reviewClaimRequest(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: ReviewBusinessClaimRequestDto,
+        @CurrentUser('id') adminUserId: string,
+    ) {
+        return this.businessesService.reviewClaimRequest(id, dto, adminUserId);
+    }
+
     @Get(':identifier')
     @PublicCache({ maxAgeSeconds: 120, staleWhileRevalidateSeconds: 900 })
     @UseGuards(OptionalJwtAuthGuard, OptionalOrgContextGuard)
@@ -105,6 +143,17 @@ export class BusinessesController {
         @Body() dto: CreatePublicLeadDto,
     ) {
         return this.businessesService.createPublicLead(id, dto);
+    }
+
+    @Post(':id/claim-requests')
+    @UseGuards(JwtAuthGuard, OptionalOrgContextGuard)
+    async createClaimRequest(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: CreateBusinessClaimRequestDto,
+        @CurrentUser('id') requesterUserId: string,
+        @CurrentOrganization('organizationId') requesterOrganizationId?: string,
+    ) {
+        return this.businessesService.createClaimRequest(id, dto, requesterUserId, requesterOrganizationId);
     }
 
     @Post()

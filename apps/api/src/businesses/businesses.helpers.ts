@@ -199,8 +199,8 @@ export function resolvePagination(
 }
 
 export function canAccessUnverified(
-    ownerId: string,
-    businessOrganizationId: string,
+    ownerId?: string | null,
+    businessOrganizationId?: string | null,
     userId?: string,
     userRole?: string,
     currentOrganizationId?: string,
@@ -209,9 +209,13 @@ export function canAccessUnverified(
         return false;
     }
 
-    if (ownerId === userId || userRole === 'ADMIN') {
+    if ((ownerId && ownerId === userId) || userRole === 'ADMIN') {
         return true;
     }
 
-    return currentOrganizationId === businessOrganizationId;
+    return Boolean(
+        currentOrganizationId
+        && businessOrganizationId
+        && currentOrganizationId === businessOrganizationId,
+    );
 }

@@ -37,11 +37,12 @@ export class MessagingService {
                 id: true,
                 organizationId: true,
                 verified: true,
+                claimStatus: true,
                 name: true,
             },
         });
 
-        if (!business || !business.verified) {
+        if (!business || !business.verified || business.claimStatus !== 'CLAIMED') {
             throw new BadRequestException('Negocio no disponible para mensajería');
         }
 

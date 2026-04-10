@@ -16,6 +16,7 @@ import {
     Min,
     Max,
     ValidateNested,
+    IsInt,
 } from 'class-validator';
 
 const URL_OPTIONS = {
@@ -24,6 +25,11 @@ const URL_OPTIONS = {
 };
 
 const BUSINESS_PRICE_RANGES = ['BUDGET', 'MODERATE', 'PREMIUM', 'LUXURY'] as const;
+const BUSINESS_PUBLIC_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED', 'SUSPENDED'] as const;
+const BUSINESS_CLAIM_STATUSES = ['UNCLAIMED', 'PENDING_CLAIM', 'CLAIMED'] as const;
+const BUSINESS_SOURCES = ['ADMIN', 'OWNER', 'IMPORT', 'USER_SUGGESTION', 'SYSTEM'] as const;
+const BUSINESS_CLAIM_REQUEST_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELED'] as const;
+const BUSINESS_CLAIM_EVIDENCE_TYPES = ['PHONE', 'EMAIL', 'WEBSITE', 'INSTAGRAM', 'DOCUMENT', 'NOTE', 'OTHER'] as const;
 
 export class BusinessHourInputDto {
     @IsNumber()
@@ -143,6 +149,11 @@ export class CreateBusinessDto {
     @ValidateNested({ each: true })
     @Type(() => BusinessHourInputDto)
     hours?: BusinessHourInputDto[];
+
+    @IsOptional()
+    @Type(() => Boolean)
+    @IsBoolean()
+    ignorePotentialDuplicates?: boolean;
 }
 
 export class UpdateBusinessDto {
@@ -310,6 +321,18 @@ export class BusinessQueryDto {
     verified?: boolean;
 
     @IsOptional()
+    @IsIn(BUSINESS_PUBLIC_STATUSES)
+    publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+
+    @IsOptional()
+    @IsIn(BUSINESS_CLAIM_STATUSES)
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+
+    @IsOptional()
+    @IsIn(BUSINESS_SOURCES)
+    source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+
+    @IsOptional()
     @IsNumber()
     @Min(1)
     page?: number;
@@ -401,4 +424,81 @@ export class CatalogQualityQueryDto {
     @Min(1)
     @Max(100)
     limit?: number;
+}
+
+export class ClaimSearchQueryDto {
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(2)
+    @MaxLength(200)
+    q!: string;
+
+    @IsOptional()
+    @IsUUID()
+    provinceId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    cityId?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(12)
+    limit?: number;
+}
+
+export class CreateBusinessClaimRequestDto {
+    @IsIn(BUSINESS_CLAIM_EVIDENCE_TYPES)
+    evidenceType!: 'PHONE' | 'EMAIL' | 'WEBSITE' | 'INSTAGRAM' | 'DOCUMENT' | 'NOTE' | 'OTHER';
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(255)
+    evidenceValue?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(2000)
+    notes?: string;
+}
+
+export class ReviewBusinessClaimRequestDto {
+    @IsIn(['APPROVED', 'REJECTED'])
+    status!: 'APPROVED' | 'REJECTED';
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    notes?: string;
+}
+
+export class BusinessClaimRequestQueryDto {
+    @IsOptional()
+    @IsIn(BUSINESS_CLAIM_REQUEST_STATUSES)
+    status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number;
+}
+
+export class CreateAdminCatalogBusinessDto extends CreateBusinessDto {
+    @IsOptional()
+    @IsIn(BUSINESS_PUBLIC_STATUSES)
+    publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+
+    @IsOptional()
+    @Type(() => Boolean)
+    @IsBoolean()
+    catalogManagedByAdmin?: boolean;
+
+    @IsOptional()
+    @Type(() => Boolean)
+    @IsBoolean()
+    isClaimable?: boolean;
 }

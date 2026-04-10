@@ -107,6 +107,7 @@ export class BookingsService {
                 id: true,
                 organizationId: true,
                 verified: true,
+                claimStatus: true,
                 features: {
                     select: {
                         feature: {
@@ -119,7 +120,7 @@ export class BookingsService {
             },
         });
 
-        if (!business || !business.verified) {
+        if (!business || !business.verified || business.claimStatus !== 'CLAIMED') {
             throw new NotFoundException('Negocio no disponible para reservas');
         }
 

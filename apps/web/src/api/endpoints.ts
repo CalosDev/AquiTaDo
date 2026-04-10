@@ -152,6 +152,21 @@ export const businessApi = {
         api.get('/businesses/admin/all', { params }),
     getCatalogQuality: (params?: { limit?: number }) =>
         api.get('/businesses/admin/catalog-quality', { params }),
+    claimSearch: (params: { q: string; provinceId?: string; cityId?: string; limit?: number }) =>
+        api.get('/businesses/claim-search', { params }),
+    getClaimRequestsAdmin: (params?: { status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'; limit?: number }) =>
+        api.get('/businesses/admin/claim-requests', { params }),
+    reviewClaimRequestAdmin: (
+        claimRequestId: string,
+        data: { status: 'APPROVED' | 'REJECTED'; notes?: string },
+    ) => api.post(`/businesses/admin/claim-requests/${claimRequestId}/review`, data).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
+    createAdminCatalog: (data: Record<string, unknown>) => api.post('/businesses/admin/catalog', data).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
     getByIdentifier: (identifier: string) => (
         shouldUsePublicDetailCache()
             ? resolveMappedCachedRequest(
@@ -201,6 +216,17 @@ export const businessApi = {
             preferredChannel?: 'WHATSAPP' | 'PHONE' | 'EMAIL';
         },
     ) => api.post(`/businesses/${businessId}/public-lead`, data),
+    createClaimRequest: (
+        businessId: string,
+        data: {
+            evidenceType: 'PHONE' | 'EMAIL' | 'WEBSITE' | 'INSTAGRAM' | 'DOCUMENT' | 'NOTE' | 'OTHER';
+            evidenceValue?: string;
+            notes?: string;
+        },
+    ) => api.post(`/businesses/${businessId}/claim-requests`, data).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
     create: (data: Record<string, unknown>) => api.post('/businesses', data).then((response) => {
         resetBusinessDiscoveryCaches();
         return response;

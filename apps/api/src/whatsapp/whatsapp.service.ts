@@ -125,6 +125,7 @@ export class WhatsAppService {
                 slug: true,
                 whatsapp: true,
                 organizationId: true,
+                claimStatus: true,
                 provinceId: true,
                 cityId: true,
                 categories: {
@@ -138,6 +139,10 @@ export class WhatsAppService {
 
         if (!business) {
             throw new NotFoundException('Negocio no encontrado');
+        }
+
+        if (business.claimStatus !== 'CLAIMED') {
+            throw new BadRequestException('Este negocio todavia no tiene un canal reclamado en AquiTa.do');
         }
 
         if (!business.whatsapp) {
@@ -298,6 +303,7 @@ export class WhatsAppService {
             id: string;
             name: string;
             organizationId: string;
+            claimStatus: string;
             autoResponderEnabled: boolean;
             latitude: number | null;
             longitude: number | null;
@@ -310,11 +316,16 @@ export class WhatsAppService {
                     id: true,
                     name: true,
                     organizationId: true,
+                    claimStatus: true,
                     autoResponderEnabled: true,
                     latitude: true,
                     longitude: true,
                 },
             });
+
+            if (scopedBusiness?.claimStatus !== 'CLAIMED') {
+                scopedBusiness = null;
+            }
         }
 
         const previousConversation = await this.prisma.whatsAppConversation.findFirst({

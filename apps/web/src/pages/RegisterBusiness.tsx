@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { BusyButtonLabel } from '../components/BusyButtonLabel';
@@ -52,6 +52,21 @@ interface Sector {
     name: string;
 }
 
+interface ClaimSearchCandidate {
+    id: string;
+    name: string;
+    slug: string;
+    address: string;
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+    publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+    matchType?: 'exacta' | 'probable' | 'debil' | null;
+    matchScore?: number;
+    matchReasons?: string[];
+    alreadyClaimed?: boolean;
+    city?: { name: string } | null;
+    province?: { name: string } | null;
+}
+
 const BOOKING_FEATURE_CANONICAL = 'reservaciones';
 
 const BusinessHoursEditor = lazy(async () => ({
@@ -92,6 +107,10 @@ export function RegisterBusiness() {
     const [error, setError] = useState('');
     const [currentStep, setCurrentStep] = useState<RegisterStep>(1);
     const trackedOnboardingStepsRef = useRef<Set<RegisterStep>>(new Set());
+    const duplicatePanelRef = useRef<HTMLDivElement | null>(null);
+    const [duplicateCandidates, setDuplicateCandidates] = useState<ClaimSearchCandidate[]>([]);
+    const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false);
+    const [duplicateSearchTerms, setDuplicateSearchTerms] = useState<string[]>([]);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -239,6 +258,18 @@ export function RegisterBusiness() {
         void loadSectors(formData.cityId);
     }, [formData.cityId]);
 
+    useEffect(() => {
+        setDuplicateCandidates([]);
+        setDuplicateSearchTerms([]);
+    }, [
+        formData.name,
+        formData.phone,
+        formData.whatsapp,
+        formData.website,
+        formData.provinceId,
+        formData.cityId,
+    ]);
+
     const loadFormData = async () => {
         setLoadingData(true);
         try {
@@ -272,6 +303,59 @@ export function RegisterBusiness() {
             setSectors(res.data || []);
         } catch (err: unknown) {
             setError(getApiErrorMessage(err, 'No se pudieron cargar los sectores'));
+        }
+    };
+
+    const buildDuplicateSearchTerms = (): string[] => {
+        const rawTerms = [
+            formData.name.trim(),
+            formData.phone.trim(),
+            formData.whatsapp.trim(),
+            formData.website.trim(),
+        ].filter((value) => value.length >= 2);
+
+        return Array.from(new Set(rawTerms));
+    };
+
+    const findPotentialDuplicates = async (): Promise<ClaimSearchCandidate[]> => {
+        const searchTerms = buildDuplicateSearchTerms();
+        if (searchTerms.length === 0) {
+            setDuplicateCandidates([]);
+            setDuplicateSearchTerms([]);
+            return [];
+        }
+
+        setDuplicateCheckLoading(true);
+        try {
+            const responses = await Promise.all(
+                searchTerms.map((term) => businessApi.claimSearch({
+                    q: term,
+                    provinceId: formData.provinceId || undefined,
+                    cityId: formData.cityId || undefined,
+                    limit: 6,
+                })),
+            );
+
+            const candidatesById = new Map<string, ClaimSearchCandidate>();
+            responses.forEach((response) => {
+                const rows = ((response.data?.data || []) as ClaimSearchCandidate[]);
+                rows.forEach((candidate) => {
+                    const existing = candidatesById.get(candidate.id);
+                    if (!existing || Number(candidate.matchScore ?? 0) > Number(existing.matchScore ?? 0)) {
+                        candidatesById.set(candidate.id, candidate);
+                    }
+                });
+            });
+
+            const matches = Array.from(candidatesById.values())
+                .sort((left, right) => Number(right.matchScore ?? 0) - Number(left.matchScore ?? 0))
+                .slice(0, 6);
+
+            setDuplicateCandidates(matches);
+            setDuplicateSearchTerms(searchTerms);
+            return matches;
+        } finally {
+            setDuplicateCheckLoading(false);
         }
     };
 
@@ -397,7 +481,7 @@ export function RegisterBusiness() {
         event.target.value = '';
     };
 
-    const submitBusiness = async () => {
+    const submitBusiness = async (ignorePotentialDuplicates = false) => {
         setLoading(true);
         setError('');
 
@@ -446,6 +530,10 @@ export function RegisterBusiness() {
                     return;
                 }
                 payload.longitude = parsedLongitude;
+            }
+
+            if (ignorePotentialDuplicates) {
+                payload.ignorePotentialDuplicates = true;
             }
 
             const response = await businessApi.create(payload);
@@ -510,6 +598,20 @@ export function RegisterBusiness() {
             setError(
                 `La ficha todavia muestra senales que probablemente activaran revision preventiva: ${submissionGuidance.preventiveSignals.map((signal) => signal.reason).join('; ')}. Corrigela antes de publicar.`,
             );
+            return;
+        }
+
+        try {
+            const matches = await findPotentialDuplicates();
+            if (matches.length > 0) {
+                setError('Encontramos negocios parecidos en el catalogo. Revisa si uno ya existe antes de crear otro.');
+                window.setTimeout(() => {
+                    duplicatePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+                return;
+            }
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, 'No se pudo ejecutar el prechequeo de duplicados'));
             return;
         }
 
@@ -1124,6 +1226,120 @@ export function RegisterBusiness() {
                                 remainingPublishNeeds={remainingPublishNeeds}
                             />
                         </Suspense>
+
+                        {(duplicateCheckLoading || duplicateCandidates.length > 0) && (
+                            <div ref={duplicatePanelRef} className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+                                            Prechequeo de duplicados
+                                        </p>
+                                        <h3 className="mt-1 font-display text-2xl font-semibold text-slate-900">
+                                            Revisa si tu negocio ya existe en el catalogo
+                                        </h3>
+                                        <p className="mt-2 text-sm text-slate-700">
+                                            Antes de crear una nueva ficha, AquiTa.do busca coincidencias para que puedas reclamar un perfil existente y evitar duplicados.
+                                        </p>
+                                        {duplicateSearchTerms.length > 0 ? (
+                                            <p className="mt-2 text-xs text-slate-600">
+                                                Terminos revisados: {duplicateSearchTerms.join(' | ')}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary text-sm"
+                                        onClick={() => void findPotentialDuplicates()}
+                                        disabled={duplicateCheckLoading || loading}
+                                    >
+                                        {duplicateCheckLoading ? 'Buscando...' : 'Volver a revisar'}
+                                    </button>
+                                </div>
+
+                                {duplicateCandidates.length > 0 ? (
+                                    <div className="mt-4 grid gap-3">
+                                        {duplicateCandidates.map((candidate) => {
+                                            const claimLabel = candidate.claimStatus === 'CLAIMED'
+                                                ? 'Reclamado'
+                                                : candidate.claimStatus === 'PENDING_CLAIM'
+                                                    ? 'Pendiente de reclamacion'
+                                                    : 'No reclamado';
+                                            const claimClass = candidate.claimStatus === 'CLAIMED'
+                                                ? 'bg-primary-100 text-primary-700 border border-primary-200'
+                                                : candidate.claimStatus === 'PENDING_CLAIM'
+                                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                                    : 'bg-white text-slate-700 border border-slate-200';
+
+                                            return (
+                                                <div key={candidate.id} className="rounded-2xl border border-amber-100 bg-white p-4">
+                                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                                        <div>
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <p className="font-semibold text-slate-900">{candidate.name}</p>
+                                                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${claimClass}`}>
+                                                                    {claimLabel}
+                                                                </span>
+                                                                {candidate.matchType ? (
+                                                                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                                                                        Match {candidate.matchType}
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
+                                                            <p className="mt-2 text-sm text-slate-600">
+                                                                {[candidate.address, candidate.city?.name, candidate.province?.name].filter(Boolean).join(' - ')}
+                                                            </p>
+                                                            {candidate.matchReasons && candidate.matchReasons.length > 0 ? (
+                                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                                    {candidate.matchReasons.map((reason) => (
+                                                                        <span key={`${candidate.id}-${reason}`} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700">
+                                                                            {reason}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Link
+                                                                to={`/businesses/${candidate.slug || candidate.id}`}
+                                                                className="btn-secondary text-sm"
+                                                            >
+                                                                Ver perfil
+                                                            </Link>
+                                                            {candidate.claimStatus !== 'CLAIMED' ? (
+                                                                <Link
+                                                                    to={`/businesses/${candidate.slug || candidate.id}`}
+                                                                    className="btn-primary text-sm"
+                                                                >
+                                                                    Abrir y reclamar
+                                                                </Link>
+                                                            ) : null}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : duplicateCheckLoading ? (
+                                    <p className="mt-4 text-sm text-slate-600">Buscando coincidencias en el catalogo...</p>
+                                ) : null}
+
+                                {duplicateCandidates.length > 0 ? (
+                                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                                        <button
+                                            type="button"
+                                            className="btn-primary text-sm"
+                                            onClick={() => void submitBusiness(true)}
+                                            disabled={loading}
+                                        >
+                                            {loading ? 'Creando...' : 'No es el mismo, continuar creando'}
+                                        </button>
+                                        <p className="text-sm text-slate-600">
+                                            Si uno de los perfiles coincide con tu negocio, abre su ficha y usa la opcion para reclamarlo.
+                                        </p>
+                                    </div>
+                                ) : null}
+                            </div>
+                        )}
 
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                             <button

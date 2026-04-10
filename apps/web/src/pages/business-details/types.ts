@@ -41,6 +41,10 @@ export interface Business {
     latitude?: number;
     longitude?: number;
     verified: boolean;
+    publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+    source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    isClaimable?: boolean;
     openNow?: boolean | null;
     todayHoursLabel?: string | null;
     profileCompletenessScore?: number;

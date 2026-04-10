@@ -127,6 +127,44 @@ enum BusinessVerificationStatus {
   SUSPENDED
 }
 
+enum BusinessPublicStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  SUSPENDED
+}
+
+enum BusinessClaimStatus {
+  UNCLAIMED
+  PENDING_CLAIM
+  CLAIMED
+}
+
+enum BusinessSource {
+  ADMIN
+  OWNER
+  IMPORT
+  USER_SUGGESTION
+  SYSTEM
+}
+
+enum BusinessClaimRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum BusinessClaimEvidenceType {
+  PHONE
+  EMAIL
+  WEBSITE
+  INSTAGRAM
+  DOCUMENT
+  NOTE
+  OTHER
+}
+
 enum BusinessPriceRange {
   BUDGET
   MODERATE
@@ -291,6 +329,9 @@ model User {
   checkIns                 CheckIn[]
   salesLeadsAsCustomer     SalesLead[]                    @relation("SalesLeadCustomer")
   salesLeadsCreated        SalesLead[]                    @relation("SalesLeadCreator")
+  claimedBusinesses        Business[]                     @relation("BusinessClaimedBy")
+  businessClaimRequests    BusinessClaimRequest[]         @relation("BusinessClaimRequester")
+  businessClaimReviews     BusinessClaimRequest[]         @relation("BusinessClaimReviewer")
 
   @@index([email])
   @@index([loyaltyPoints])
@@ -319,6 +360,15 @@ model Business {
   verified                Boolean                    @default(false)
   verifiedAt              DateTime?
   verificationStatus      BusinessVerificationStatus @default(UNVERIFIED)
+  publicStatus            BusinessPublicStatus       @default(DRAFT)
+  claimStatus             BusinessClaimStatus        @default(CLAIMED)
+  source                  BusinessSource             @default(OWNER)
+  publishedAt             DateTime?
+  claimedAt               DateTime?
+  claimedByUserId         String?
+  claimedByUser           User?                      @relation("BusinessClaimedBy", fields: [claimedByUserId], references: [id])
+  catalogManagedByAdmin   Boolean                    @default(false)
+  isClaimable             Boolean                    @default(true)
   verificationSubmittedAt DateTime?
   verificationReviewedAt  DateTime?
   verificationNotes       String?                    @db.VarChar(500)
@@ -360,6 +410,7 @@ model Business {
   listedByUsers         UserBusinessListItem[]
   checkIns              CheckIn[]
   salesLeads            SalesLead[]
+  claimRequests         BusinessClaimRequest[]
 
   @@index([slug])
   @@index([ownerId])
@@ -373,6 +424,10 @@ model Business {
   @@index([provinceId, verified, createdAt])
   @@index([cityId, sectorId])
   @@index([verificationStatus, createdAt])
+  @@index([publicStatus, createdAt])
+  @@index([claimStatus, createdAt])
+  @@index([source, createdAt])
+  @@index([claimedByUserId])
   @@index([provinceId, reputationScore])
   @@index([reputationTier, reputationScore])
   @@map("businesses")
@@ -414,10 +469,36 @@ model Organization {
   growthEvents          GrowthEvent[]
   checkIns              CheckIn[]
   salesLeads            SalesLead[]
+  claimRequests         BusinessClaimRequest[]
 
   @@index([ownerUserId])
   @@index([plan, subscriptionStatus])
   @@map("organizations")
+}
+
+model BusinessClaimRequest {
+  id                      String                     @id @default(uuid())
+  businessId              String
+  business                Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  requesterUserId         String
+  requesterUser           User                       @relation("BusinessClaimRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  requesterOrganizationId String?
+  requesterOrganization   Organization?              @relation(fields: [requesterOrganizationId], references: [id], onDelete: SetNull)
+  status                  BusinessClaimRequestStatus @default(PENDING)
+  evidenceType            BusinessClaimEvidenceType
+  evidenceValue           String?                    @db.VarChar(255)
+  notes                   String?                    @db.Text
+  reviewedByAdminId       String?
+  reviewedByAdmin         User?                      @relation("BusinessClaimReviewer", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  reviewedAt              DateTime?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  @@index([businessId, status, createdAt])
+  @@index([requesterUserId, status, createdAt])
+  @@index([requesterOrganizationId, status, createdAt])
+  @@index([reviewedByAdminId, reviewedAt])
+  @@map("business_claim_requests")
 }
 
 model OrganizationMember {
