@@ -1,4 +1,5 @@
 import { Prisma } from '../generated/prisma/client';
+import { activeBusinessOwnershipSelect } from './business-ownership.helpers';
 
 export const businessImageOrderBy: Prisma.BusinessImageOrderByWithRelationInput[] = [
     { isCover: Prisma.SortOrder.desc },
@@ -14,6 +15,7 @@ export const fullBusinessInclude = {
     owner: {
         select: { id: true, name: true },
     },
+    ownerships: activeBusinessOwnershipSelect,
     organization: {
         select: { id: true, name: true, slug: true },
     },
@@ -110,6 +112,7 @@ export const businessDetailBaseSelect = {
     owner: {
         select: { id: true, name: true },
     },
+    ownerships: activeBusinessOwnershipSelect,
     organization: {
         select: { id: true, name: true, slug: true },
     },

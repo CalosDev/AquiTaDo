@@ -11,6 +11,10 @@ import {
     CreateReviewDto,
     ModerateReviewDto,
 } from './dto/review.dto';
+import {
+    activeBusinessOwnershipSelect,
+    resolveActiveBusinessOrganizationId,
+} from '../businesses/business-ownership.helpers';
 
 @Injectable()
 export class ReviewsService {
@@ -146,6 +150,7 @@ export class ReviewsService {
                         id: true,
                         name: true,
                         organizationId: true,
+                        ownerships: activeBusinessOwnershipSelect,
                     },
                 },
             },
@@ -172,6 +177,7 @@ export class ReviewsService {
                 business: {
                     select: {
                         organizationId: true,
+                        ownerships: activeBusinessOwnershipSelect,
                     },
                 },
             },
@@ -180,6 +186,8 @@ export class ReviewsService {
         if (!currentReview) {
             throw new NotFoundException('Resena no encontrada');
         }
+
+        const effectiveOrganizationId = resolveActiveBusinessOrganizationId(currentReview.business);
 
         const normalizedReason = dto.reason?.trim();
         const moderationReason = normalizedReason
@@ -219,7 +227,7 @@ export class ReviewsService {
             this.reputationService.recalculateBusinessReputation(currentReview.businessId),
             this.prisma.auditLog.create({
                 data: {
-                    organizationId: currentReview.business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     actorUserId: adminUserId,
                     action: 'REVIEW_MODERATION_UPDATED',
                     targetType: 'REVIEW',

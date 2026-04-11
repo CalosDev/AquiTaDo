@@ -83,7 +83,6 @@ export class PolicyService {
             where: { id: resourceId },
             select: {
                 id: true,
-                organizationId: true,
                 ownerId: true,
                 ownerships: {
                     where: {
@@ -102,8 +101,7 @@ export class PolicyService {
             throw new NotFoundException('Business not found');
         }
 
-        const belongsToActiveOrganization = business.ownerships.length > 0
-            || business.organizationId === organizationContext.organizationId;
+        const belongsToActiveOrganization = business.ownerships.length > 0;
 
         if (!belongsToActiveOrganization) {
             throw new ForbiddenException('Resource does not belong to active organization');

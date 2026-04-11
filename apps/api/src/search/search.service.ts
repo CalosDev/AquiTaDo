@@ -133,7 +133,7 @@ type NearbyBusinessRow = {
     slug: string;
     address: string;
     verified: boolean;
-    organizationId: string;
+    organizationId: string | null;
     provinceId: string;
     cityId: string | null;
     sectorId: string | null;
@@ -319,7 +319,15 @@ export class SearchService {
                 : Prisma.empty;
 
             const organizationClause = normalizedQuery.organizationId
-                ? Prisma.sql`AND b."organizationId" = ${normalizedQuery.organizationId}`
+                ? Prisma.sql`
+                    AND EXISTS (
+                        SELECT 1
+                        FROM business_ownerships bo
+                        WHERE bo."businessId" = b.id
+                          AND bo."organizationId" = ${normalizedQuery.organizationId}
+                          AND bo."isActive" = true
+                    )
+                `
                 : Prisma.empty;
 
             const rows = await this.prisma.$queryRaw<NearbyBusinessRow[]>(Prisma.sql`
@@ -335,7 +343,10 @@ export class SearchService {
                     ST_Distance(b.location::geography, ${origin}) AS "distanceMeters"
                 FROM businesses b
                 WHERE b."deletedAt" IS NULL
-                  AND b.verified = true
+                  AND b."publicStatus" = 'PUBLISHED'
+                  AND b."isPublished" = true
+                  AND b."isSearchable" = true
+                  AND b."isDiscoverable" = true
                   AND b.location IS NOT NULL
                   AND ST_DWithin(
                         b.location::geography,
@@ -550,14 +561,9 @@ export class SearchService {
         const where: Prisma.BusinessWhereInput = {
             deletedAt: null,
             publicStatus: 'PUBLISHED',
-            OR: [
-                { verified: true },
-                {
-                    claimStatus: {
-                        in: ['UNCLAIMED', 'PENDING_CLAIM'],
-                    },
-                },
-            ],
+            isPublished: true,
+            isSearchable: true,
+            isDiscoverable: true,
         };
 
         if (query.search) {

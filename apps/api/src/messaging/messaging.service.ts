@@ -12,6 +12,7 @@ import {
     Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { activeBusinessOwnershipSelect, resolveActiveBusinessOrganizationId } from '../businesses/business-ownership.helpers';
 import {
     ConvertConversationToBookingDto,
     CreateConversationDto,
@@ -39,15 +40,7 @@ export class MessagingService {
                 verified: true,
                 claimStatus: true,
                 name: true,
-                ownerships: {
-                    where: {
-                        isActive: true,
-                    },
-                    select: {
-                        organizationId: true,
-                    },
-                    take: 1,
-                },
+                ownerships: activeBusinessOwnershipSelect,
             },
         });
 
@@ -55,7 +48,7 @@ export class MessagingService {
             throw new BadRequestException('Negocio no disponible para mensajería');
         }
 
-        const effectiveOrganizationId = business.organizationId ?? business.ownerships[0]?.organizationId ?? null;
+        const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
         if (!effectiveOrganizationId) {
             throw new BadRequestException('Este negocio aun no tiene una organizacion activa para mensajeria');
         }

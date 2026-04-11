@@ -17,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ReputationService } from '../reputation/reputation.service';
 import { NotificationsQueueService } from '../notifications/notifications.queue.service';
+import { activeBusinessOwnershipSelect, resolveActiveBusinessOrganizationId } from '../businesses/business-ownership.helpers';
 import {
     CreateBookingDto,
     ListBookingsQueryDto,
@@ -112,15 +113,7 @@ export class BookingsService {
                 organizationId: true,
                 verified: true,
                 claimStatus: true,
-                ownerships: {
-                    where: {
-                        isActive: true,
-                    },
-                    select: {
-                        organizationId: true,
-                    },
-                    take: 1,
-                },
+                ownerships: activeBusinessOwnershipSelect,
                 features: {
                     select: {
                         feature: {
@@ -137,7 +130,7 @@ export class BookingsService {
             throw new NotFoundException('Negocio no disponible para reservas');
         }
 
-        const effectiveOrganizationId = business.organizationId ?? business.ownerships[0]?.organizationId ?? null;
+        const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
         if (!effectiveOrganizationId) {
             throw new BadRequestException('Este negocio aun no tiene una organizacion activa para reservas');
         }

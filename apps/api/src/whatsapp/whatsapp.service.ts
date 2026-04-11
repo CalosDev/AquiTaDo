@@ -10,6 +10,7 @@ import { createHash } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { GrowthEventType, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { activeBusinessOwnershipSelect, resolveActiveBusinessOrganizationId } from '../businesses/business-ownership.helpers';
 import {
     CreateClickToChatDto,
     ListWhatsAppConversationsDto,
@@ -128,15 +129,7 @@ export class WhatsAppService {
                 claimStatus: true,
                 provinceId: true,
                 cityId: true,
-                ownerships: {
-                    where: {
-                        isActive: true,
-                    },
-                    select: {
-                        organizationId: true,
-                    },
-                    take: 1,
-                },
+                ownerships: activeBusinessOwnershipSelect,
                 categories: {
                     select: {
                         categoryId: true,
@@ -169,7 +162,7 @@ export class WhatsAppService {
         const variantKey = dto.variantKey?.trim() || null;
 
         const conversion = await this.prisma.$transaction(async (tx) => {
-            const effectiveOrganizationId = business.organizationId ?? business.ownerships[0]?.organizationId ?? null;
+            const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
             if (!effectiveOrganizationId) {
                 throw new BadRequestException('Este negocio aun no tiene una organizacion activa para WhatsApp');
             }
@@ -337,15 +330,7 @@ export class WhatsAppService {
                     autoResponderEnabled: true,
                     latitude: true,
                     longitude: true,
-                    ownerships: {
-                        where: {
-                            isActive: true,
-                        },
-                        select: {
-                            organizationId: true,
-                        },
-                        take: 1,
-                    },
+                    ownerships: activeBusinessOwnershipSelect,
                 },
             });
 
@@ -366,9 +351,7 @@ export class WhatsAppService {
             },
         });
 
-        const scopedOrganizationId = scopedBusiness?.organizationId
-            ?? scopedBusiness?.ownerships[0]?.organizationId
-            ?? null;
+        const scopedOrganizationId = resolveActiveBusinessOrganizationId(scopedBusiness);
         const organizationId = scopedOrganizationId ?? previousConversation?.organizationId ?? null;
         const businessContextId = scopedBusiness?.id ?? previousConversation?.businessId ?? null;
 

@@ -19,6 +19,11 @@ import { ReputationService } from '../reputation/reputation.service';
 import { NotificationsQueueService } from '../notifications/notifications.queue.service';
 import { UploadsService } from '../uploads/uploads.service';
 import {
+    activeBusinessOwnershipSelect,
+    businessBelongsToOrganization,
+    resolveActiveBusinessOrganizationId,
+} from '../businesses/business-ownership.helpers';
+import {
     buildPreventiveModerationErrorMessage,
     buildPreventiveModerationNote,
     buildPreventiveSuggestedActions,
@@ -91,21 +96,23 @@ export class VerificationService {
                 select: {
                     id: true,
                     organizationId: true,
+                    ownerships: activeBusinessOwnershipSelect,
                     verificationStatus: true,
                 },
             });
 
-            if (!business || (actorGlobalRole !== 'ADMIN' && business.organizationId !== organizationId)) {
+            if (!business || (actorGlobalRole !== 'ADMIN' && !businessBelongsToOrganization(business, organizationId))) {
                 throw new NotFoundException('Negocio no encontrado en la organización activa');
             }
 
-            if (!business.organizationId) {
+            const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
+            if (!effectiveOrganizationId) {
                 throw new BadRequestException('Este negocio aun no tiene una organizacion activa para verificacion');
             }
 
             const document = await tx.businessVerificationDocument.create({
                 data: {
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     businessId: business.id,
                     documentType: dto.documentType,
                     fileUrl: dto.fileUrl.trim(),
@@ -134,7 +141,7 @@ export class VerificationService {
                         tx,
                         GrowthEventType.PREMODERATION_FLAGGED,
                         business.id,
-                        business.organizationId,
+                        effectiveOrganizationId,
                         null,
                         {
                             trigger: 'document_submit',
@@ -216,15 +223,17 @@ export class VerificationService {
                 select: {
                     id: true,
                     organizationId: true,
+                    ownerships: activeBusinessOwnershipSelect,
                     verificationStatus: true,
                 },
             });
 
-            if (!business || (actorGlobalRole !== 'ADMIN' && business.organizationId !== organizationId)) {
+            if (!business || (actorGlobalRole !== 'ADMIN' && !businessBelongsToOrganization(business, organizationId))) {
                 throw new NotFoundException('Negocio no encontrado en la organización activa');
             }
 
-            if (!business.organizationId) {
+            const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
+            if (!effectiveOrganizationId) {
                 throw new BadRequestException('Este negocio aun no tiene una organizacion activa para verificacion');
             }
 
@@ -257,7 +266,7 @@ export class VerificationService {
                     tx,
                     GrowthEventType.PREMODERATION_FLAGGED,
                     business.id,
-                    business.organizationId,
+                    effectiveOrganizationId,
                     null,
                     {
                         trigger: 'business_submit',
@@ -550,6 +559,7 @@ export class VerificationService {
                     id: true,
                     name: true,
                     organizationId: true,
+                    ownerships: activeBusinessOwnershipSelect,
                     whatsapp: true,
                     verificationStatus: true,
                     verificationNotes: true,
@@ -570,7 +580,8 @@ export class VerificationService {
                 throw new NotFoundException('Negocio no encontrado');
             }
 
-            if (!business.organizationId) {
+            const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
+            if (!effectiveOrganizationId) {
                 throw new BadRequestException('Este negocio aun no tiene una organizacion activa para verificacion');
             }
 
@@ -616,7 +627,7 @@ export class VerificationService {
                     tx,
                     GrowthEventType.PREMODERATION_RELEASED,
                     business.id,
-                    business.organizationId,
+                    effectiveOrganizationId,
                     reviewerUserId,
                     {
                         decision: dto.decision,
@@ -629,7 +640,7 @@ export class VerificationService {
                 return {
                     updatedBusiness,
                     notificationPayload: {
-                        organizationId: business.organizationId,
+                        organizationId: effectiveOrganizationId,
                         businessId: business.id,
                         ownerPhone: business.owner?.phone ?? business.whatsapp ?? null,
                         businessName: business.name,
@@ -675,7 +686,7 @@ export class VerificationService {
                 tx,
                 GrowthEventType.PREMODERATION_CONFIRMED,
                 business.id,
-                business.organizationId,
+                effectiveOrganizationId,
                 reviewerUserId,
                 {
                     decision: dto.decision,
@@ -688,7 +699,7 @@ export class VerificationService {
             return {
                 updatedBusiness,
                 notificationPayload: {
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     businessId: business.id,
                     ownerPhone: business.owner?.phone ?? business.whatsapp ?? null,
                     businessName: business.name,
@@ -725,6 +736,7 @@ export class VerificationService {
                     id: true,
                     name: true,
                     organizationId: true,
+                    ownerships: activeBusinessOwnershipSelect,
                     whatsapp: true,
                     verificationStatus: true,
                     owner: {
@@ -739,7 +751,8 @@ export class VerificationService {
                 throw new NotFoundException('Negocio no encontrado');
             }
 
-            if (!business.organizationId) {
+            const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
+            if (!effectiveOrganizationId) {
                 throw new BadRequestException('Este negocio aun no tiene una organizacion activa para verificacion');
             }
 
@@ -803,7 +816,7 @@ export class VerificationService {
                 updatedBusiness,
                 shouldRecalculateReputation: shouldVerify,
                 notificationPayload: {
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     businessId: business.id,
                     ownerPhone: business.owner?.phone ?? business.whatsapp ?? null,
                     businessName: business.name,
@@ -894,6 +907,7 @@ export class VerificationService {
                 name: true,
                 slug: true,
                 organizationId: true,
+                ownerships: activeBusinessOwnershipSelect,
                 verified: true,
                 verifiedAt: true,
                 verificationStatus: true,
@@ -923,7 +937,7 @@ export class VerificationService {
             },
         });
 
-        if (!business || (actorGlobalRole !== 'ADMIN' && business.organizationId !== organizationId)) {
+        if (!business || (actorGlobalRole !== 'ADMIN' && !businessBelongsToOrganization(business, organizationId))) {
             throw new NotFoundException('Negocio no encontrado en la organización activa');
         }
 

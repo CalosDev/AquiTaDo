@@ -527,8 +527,8 @@ export class CreateBusinessClaimRequestDto {
 }
 
 export class ReviewBusinessClaimRequestDto {
-    @IsIn(['APPROVED', 'REJECTED'])
-    status!: 'APPROVED' | 'REJECTED';
+    @IsIn(['UNDER_REVIEW', 'APPROVED', 'REJECTED'])
+    status!: 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 
     @IsOptional()
     @IsString()

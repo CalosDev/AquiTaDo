@@ -13,6 +13,7 @@ import {
     Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { activeBusinessOwnershipSelect, businessBelongsToOrganization } from '../businesses/business-ownership.helpers';
 import {
     AdPlacementQueryDto,
     CreateAdCampaignDto,
@@ -97,11 +98,12 @@ export class AdsService {
                 select: {
                     id: true,
                     organizationId: true,
+                    ownerships: activeBusinessOwnershipSelect,
                     verified: true,
                 },
             });
 
-            if (!business || business.organizationId !== organizationId) {
+            if (!business || !businessBelongsToOrganization(business, organizationId)) {
                 throw new NotFoundException('Negocio no encontrado en la organización activa');
             }
 

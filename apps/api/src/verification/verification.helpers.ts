@@ -2,6 +2,10 @@ import { NotFoundException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+    activeBusinessOwnershipSelect,
+    resolveActiveBusinessOrganizationId,
+} from '../businesses/business-ownership.helpers';
+import {
     evaluatePreventiveModerationSnapshot,
     type PreventiveModerationResult,
 } from './preventive-moderation';
@@ -37,6 +41,7 @@ export async function evaluatePreventiveModerationForBusiness(
             id: true,
             ownerId: true,
             organizationId: true,
+            ownerships: activeBusinessOwnershipSelect,
             provinceId: true,
             name: true,
             description: true,
@@ -53,6 +58,8 @@ export async function evaluatePreventiveModerationForBusiness(
     if (!business) {
         throw new NotFoundException('Negocio no encontrado');
     }
+
+    const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
 
     const [
         ownerBusinessBurst,
@@ -75,7 +82,16 @@ export async function evaluatePreventiveModerationForBusiness(
             where: {
                 id: { not: business.id },
                 deletedAt: null,
-                organizationId: { not: business.organizationId },
+                ...(effectiveOrganizationId
+                    ? {
+                        ownerships: {
+                            none: {
+                                organizationId: effectiveOrganizationId,
+                                isActive: true,
+                            },
+                        },
+                    }
+                    : {}),
                 provinceId: business.provinceId,
                 name: {
                     equals: business.name,
@@ -87,10 +103,10 @@ export async function evaluatePreventiveModerationForBusiness(
                 },
             },
         }),
-        countDuplicateBusinessField(prismaClient, business.id, business.organizationId, 'phone', business.phone),
-        countDuplicateBusinessField(prismaClient, business.id, business.organizationId, 'whatsapp', business.whatsapp),
-        countDuplicateBusinessField(prismaClient, business.id, business.organizationId, 'email', business.email),
-        countDuplicateBusinessField(prismaClient, business.id, business.organizationId, 'website', business.website),
+        countDuplicateBusinessField(prismaClient, business.id, effectiveOrganizationId, 'phone', business.phone),
+        countDuplicateBusinessField(prismaClient, business.id, effectiveOrganizationId, 'whatsapp', business.whatsapp),
+        countDuplicateBusinessField(prismaClient, business.id, effectiveOrganizationId, 'email', business.email),
+        countDuplicateBusinessField(prismaClient, business.id, effectiveOrganizationId, 'website', business.website),
     ]);
 
     return evaluatePreventiveModerationSnapshot({
@@ -192,7 +208,16 @@ async function countDuplicateBusinessField(
         where: {
             id: { not: businessId },
             deletedAt: null,
-            ...(organizationId ? { organizationId: { not: organizationId } } : {}),
+            ...(organizationId
+                ? {
+                    ownerships: {
+                        none: {
+                            organizationId,
+                            isActive: true,
+                        },
+                    },
+                }
+                : {}),
             [field]: {
                 equals: value,
                 mode: 'insensitive',

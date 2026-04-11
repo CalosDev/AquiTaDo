@@ -14,6 +14,7 @@ import {
     Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { activeBusinessOwnershipSelect, businessBelongsToOrganization } from '../businesses/business-ownership.helpers';
 import {
     CreatePromotionDto,
     ListMyPromotionsQueryDto,
@@ -512,11 +513,12 @@ export class PromotionsService {
             select: {
                 id: true,
                 organizationId: true,
+                ownerships: activeBusinessOwnershipSelect,
                 deletedAt: true,
             },
         });
 
-        if (!business || business.deletedAt || business.organizationId !== organizationId) {
+        if (!business || business.deletedAt || !businessBelongsToOrganization(business, organizationId)) {
             throw new BadRequestException('El negocio no pertenece a la organización activa');
         }
     }

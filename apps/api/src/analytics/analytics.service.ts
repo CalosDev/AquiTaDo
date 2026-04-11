@@ -8,6 +8,11 @@ import { createHash } from 'crypto';
 import { GrowthEventType, MarketReportType, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+    activeBusinessOwnershipSelect,
+    businessBelongsToOrganization,
+    resolveActiveBusinessOrganizationId,
+} from '../businesses/business-ownership.helpers';
+import {
     buildDailySeries,
     MS_PER_DAY,
     normalizeAnalyticsDays,
@@ -50,6 +55,7 @@ export class AnalyticsService {
                     select: {
                         id: true,
                         organizationId: true,
+                        ownerships: activeBusinessOwnershipSelect,
                     },
                 });
 
@@ -63,11 +69,12 @@ export class AnalyticsService {
                     } as const;
                 }
 
+                const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
                 let uniqueVisitors = 0;
-                if (dto.eventType === AnalyticsEventType.VIEW && business.organizationId) {
+                if (dto.eventType === AnalyticsEventType.VIEW && effectiveOrganizationId) {
                     uniqueVisitors = await this.registerUniqueVisitor(
                         tx,
-                        business.organizationId,
+                        effectiveOrganizationId,
                         dto.businessId,
                         analyticsDate,
                         dto.visitorId,
@@ -152,6 +159,7 @@ export class AnalyticsService {
                     select: {
                         id: true,
                         organizationId: true,
+                        ownerships: activeBusinessOwnershipSelect,
                     },
                 });
 
@@ -159,7 +167,7 @@ export class AnalyticsService {
                     throw new NotFoundException('Negocio no encontrado');
                 }
 
-                organizationId = business.organizationId;
+                organizationId = resolveActiveBusinessOrganizationId(business);
             }
 
             const growthEvent = await this.prisma.growthEvent.create({
@@ -1009,10 +1017,11 @@ export class AnalyticsService {
                 name: true,
                 slug: true,
                 organizationId: true,
+                ownerships: activeBusinessOwnershipSelect,
             },
         });
 
-        if (!business || business.organizationId !== organizationId) {
+        if (!business || !businessBelongsToOrganization(business, organizationId)) {
             throw new NotFoundException('Negocio no encontrado en la organización activa');
         }
 

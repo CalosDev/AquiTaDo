@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import type { BusinessQueryDto, BusinessHourInputDto } from './dto/business.dto';
+import { resolveActiveBusinessOrganizationId } from './business-ownership.helpers';
 import {
     buildTodayBusinessHoursLabel,
     calculateBusinessProfileCompletenessScore,
@@ -483,6 +484,7 @@ export function resolvePagination(
 export function canAccessUnverified(
     ownerId?: string | null,
     businessOrganizationId?: string | null,
+    ownerships?: Array<{ organizationId: string }> | null,
     userId?: string,
     userRole?: string,
     currentOrganizationId?: string,
@@ -497,7 +499,9 @@ export function canAccessUnverified(
 
     return Boolean(
         currentOrganizationId
-        && businessOrganizationId
-        && currentOrganizationId === businessOrganizationId,
+        && currentOrganizationId === resolveActiveBusinessOrganizationId({
+            organizationId: businessOrganizationId,
+            ownerships,
+        }),
     );
 }

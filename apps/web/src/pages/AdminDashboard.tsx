@@ -173,12 +173,17 @@ interface CatalogQualitySnapshot {
 
 interface ClaimRequestItem {
     id: string;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
+    status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED';
     evidenceType: 'PHONE' | 'EMAIL' | 'WEBSITE' | 'INSTAGRAM' | 'DOCUMENT' | 'NOTE' | 'OTHER';
     evidenceValue?: string | null;
     notes?: string | null;
+    adminNotes?: string | null;
     createdAt: string;
     reviewedAt?: string | null;
+    approvedAt?: string | null;
+    rejectedAt?: string | null;
+    expiredAt?: string | null;
+    canceledAt?: string | null;
     business: {
         id: string;
         name: string;
@@ -203,6 +208,51 @@ interface ClaimRequestItem {
         name: string;
         email: string;
     } | null;
+}
+
+interface OwnershipHistoryItem {
+    id: string;
+    role: 'PRIMARY_OWNER' | 'MANAGER';
+    isActive: boolean;
+    grantedAt: string;
+    revokedAt?: string | null;
+    revokeReason?: string | null;
+    organization: {
+        id: string;
+        name: string;
+        slug: string;
+    };
+    grantedByUser?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
+    revokedByUser?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
+    claimRequest?: {
+        id: string;
+        status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED';
+        requesterUser?: {
+            id: string;
+            name: string;
+            email: string;
+        } | null;
+    } | null;
+}
+
+interface OwnershipHistorySnapshot {
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+        ownerId?: string | null;
+        organizationId?: string | null;
+    };
+    data: OwnershipHistoryItem[];
 }
 
 interface BusinessSuggestionItem {
@@ -443,8 +493,13 @@ export function AdminDashboard() {
     const [catalogQualityLoading, setCatalogQualityLoading] = useState(false);
     const [claimRequests, setClaimRequests] = useState<ClaimRequestItem[]>([]);
     const [claimRequestSummary, setClaimRequestSummary] = useState<Record<string, number>>({});
-    const [claimRequestStatusFilter, setClaimRequestStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'>('PENDING');
+    const [claimRequestStatusFilter, setClaimRequestStatusFilter] = useState<'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED'>('PENDING');
     const [claimReviewNotes, setClaimReviewNotes] = useState<Record<string, string>>({});
+    const [selectedOwnershipBusinessId, setSelectedOwnershipBusinessId] = useState('');
+    const [ownershipHistory, setOwnershipHistory] = useState<OwnershipHistorySnapshot | null>(null);
+    const [ownershipHistoryLoading, setOwnershipHistoryLoading] = useState(false);
+    const [ownershipRevokeReasons, setOwnershipRevokeReasons] = useState<Record<string, string>>({});
+    const [confirmOwnershipRevokeId, setConfirmOwnershipRevokeId] = useState<string | null>(null);
     const [businessSuggestions, setBusinessSuggestions] = useState<BusinessSuggestionItem[]>([]);
     const [suggestionSummary, setSuggestionSummary] = useState<Record<string, number>>({});
     const [suggestionStatusFilter, setSuggestionStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
@@ -530,6 +585,8 @@ export function AdminDashboard() {
         claimed: businesses.filter((business) => business.claimStatus === 'CLAIMED').length,
     }), [businesses]);
 
+    const activeClaimRequestCount = (claimRequestSummary.PENDING ?? 0) + (claimRequestSummary.UNDER_REVIEW ?? 0);
+
     const catalogConflictQueue = useMemo(() => {
         const duplicateConflicts = (catalogQuality?.duplicateCandidates ?? []).map((cluster) => ({
             key: `duplicate:${cluster.key}`,
@@ -539,11 +596,11 @@ export function AdminDashboard() {
             hint: cluster.reasons.join(' | '),
         }));
         const pendingClaimConflicts = claimRequests
-            .filter((claimRequest) => claimRequest.status === 'PENDING')
+            .filter((claimRequest) => claimRequest.status === 'PENDING' || claimRequest.status === 'UNDER_REVIEW')
             .map((claimRequest) => ({
                 key: `claim:${claimRequest.id}`,
                 kind: 'PENDING_CLAIM' as const,
-                title: `Claim pendiente para ${claimRequest.business.name}`,
+                title: `${claimRequest.status === 'UNDER_REVIEW' ? 'Claim en revisión' : 'Claim pendiente'} para ${claimRequest.business.name}`,
                 detail: claimRequest.requesterOrganization?.name
                     ? `Solicitante: ${claimRequest.requesterUser?.name || 'Usuario'} - ${claimRequest.requesterOrganization.name}`
                     : `Solicitante: ${claimRequest.requesterUser?.name || 'Usuario'}`,
@@ -762,6 +819,24 @@ export function AdminDashboard() {
         }
     }, [claimRequestStatusFilter]);
 
+    const loadOwnershipHistory = useCallback(async (businessId: string) => {
+        if (!businessId) {
+            setOwnershipHistory(null);
+            return;
+        }
+
+        setOwnershipHistoryLoading(true);
+        try {
+            const response = await businessApi.getOwnershipHistoryAdmin(businessId, { limit: 20 });
+            setOwnershipHistory((response.data || null) as OwnershipHistorySnapshot | null);
+        } catch (error) {
+            setOwnershipHistory(null);
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el historial de ownership'));
+        } finally {
+            setOwnershipHistoryLoading(false);
+        }
+    }, []);
+
     const loadBusinessSuggestions = useCallback(async () => {
         try {
             const response = await businessSuggestionApi.getAdmin({
@@ -801,6 +876,12 @@ export function AdminDashboard() {
         }
     }, [activeTab, loadBusinessSuggestions, loadCatalogQuality, loadClaimRequests, loadDuplicateCases]);
 
+    useEffect(() => {
+        if (activeTab === 'catalog' && selectedOwnershipBusinessId) {
+            void loadOwnershipHistory(selectedOwnershipBusinessId);
+        }
+    }, [activeTab, selectedOwnershipBusinessId, loadOwnershipHistory]);
+
     const loadOperationalHealth = useCallback(async () => {
         setOperationalHealthLoading(true);
         try {
@@ -823,7 +904,7 @@ export function AdminDashboard() {
 
     const handleReviewClaimRequest = async (
         claimRequestId: string,
-        status: 'APPROVED' | 'REJECTED',
+        status: 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED',
     ) => {
         setProcessingId(claimRequestId);
         setErrorMessage('');
@@ -843,10 +924,53 @@ export function AdminDashboard() {
             setSuccessMessage(
                 status === 'APPROVED'
                     ? 'Reclamacion aprobada y negocio asignado al solicitante'
+                    : status === 'UNDER_REVIEW'
+                        ? 'Reclamacion movida a revision administrativa'
                     : 'Reclamacion rechazada y negocio devuelto a estado no reclamado',
             );
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo revisar la reclamacion'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleSelectOwnershipBusiness = (businessId: string) => {
+        setSelectedOwnershipBusinessId(businessId);
+        setConfirmOwnershipRevokeId(null);
+        if (!businessId) {
+            setOwnershipHistory(null);
+        }
+    };
+
+    const handleRevokeOwnership = async (businessId: string, ownershipId: string) => {
+        const reason = ownershipRevokeReasons[ownershipId]?.trim() || '';
+        if (reason.length < 8) {
+            setErrorMessage('Agrega un motivo claro para suspender el ownership');
+            return;
+        }
+
+        setProcessingId(ownershipId);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await businessApi.revokeOwnershipAdmin(businessId, ownershipId, { reason });
+            await Promise.all([
+                loadOwnershipHistory(businessId),
+                loadClaimRequests(),
+                loadCatalogQuality(),
+                loadData(),
+            ]);
+            setOwnershipRevokeReasons((current) => {
+                const next = { ...current };
+                delete next[ownershipId];
+                return next;
+            });
+            setConfirmOwnershipRevokeId(null);
+            setSuccessMessage('Ownership suspendido y historial actualizado');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo suspender el ownership'));
         } finally {
             setProcessingId(null);
         }
@@ -1764,7 +1888,7 @@ export function AdminDashboard() {
                                     <div className="rounded-xl border border-primary-100 bg-primary-50 p-4">
                                         <p className="text-xs text-primary-700">Claims pendientes</p>
                                         <p className="mt-1 text-2xl font-semibold text-primary-900">
-                                            {claimRequestSummary.PENDING ?? catalogQuality?.pendingClaims ?? catalogClaimSummary.pending}
+                                            {activeClaimRequestCount || catalogQuality?.pendingClaims || catalogClaimSummary.pending}
                                         </p>
                                     </div>
                                 </div>
@@ -1939,28 +2063,31 @@ export function AdminDashboard() {
                                     </form>
                                 </div>
 
-                                <div className="card p-5">
+                                <div className="space-y-4">
+                                    <div className="card p-5">
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div>
                                             <h3 className="font-display font-semibold text-gray-900">Reclamaciones del catalogo</h3>
                                             <p className="mt-1 text-sm text-gray-600">
-                                                Aprueba o rechaza ownership antes de activar herramientas tenant.
+                                                Aprueba, rechaza o mueve a revisión antes de activar herramientas tenant.
                                             </p>
                                         </div>
                                         <select
                                             className="input-field text-sm"
                                             value={claimRequestStatusFilter}
-                                            onChange={(event) => setClaimRequestStatusFilter(event.target.value as 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED')}
+                                            onChange={(event) => setClaimRequestStatusFilter(event.target.value as 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED')}
                                         >
                                             <option value="PENDING">Pendientes</option>
+                                            <option value="UNDER_REVIEW">En revisión</option>
                                             <option value="APPROVED">Aprobadas</option>
                                             <option value="REJECTED">Rechazadas</option>
+                                            <option value="EXPIRED">Expiradas</option>
                                             <option value="CANCELED">Canceladas</option>
                                         </select>
                                     </div>
 
                                     <div className="mt-3 flex flex-wrap gap-2">
-                                        {(['PENDING', 'APPROVED', 'REJECTED', 'CANCELED'] as const).map((status) => (
+                                        {(['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELED'] as const).map((status) => (
                                             <span key={status} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                                                 {status}: {claimRequestSummary[status] ?? 0}
                                             </span>
@@ -1998,10 +2125,22 @@ export function AdminDashboard() {
                                                     >
                                                         Ver ficha
                                                     </a>
+                                                    <button
+                                                        type="button"
+                                                        className="btn-secondary text-sm"
+                                                        onClick={() => void handleSelectOwnershipBusiness(claimRequest.business.id)}
+                                                    >
+                                                        Ver ownership
+                                                    </button>
                                                 </div>
 
-                                                {claimRequest.status === 'PENDING' ? (
+                                                {(claimRequest.status === 'PENDING' || claimRequest.status === 'UNDER_REVIEW') ? (
                                                     <div className="mt-3 space-y-3">
+                                                        {claimRequest.adminNotes ? (
+                                                            <p className="text-sm text-slate-600 whitespace-pre-wrap">
+                                                                Ultima nota admin: {claimRequest.adminNotes}
+                                                            </p>
+                                                        ) : null}
                                                         <textarea
                                                             className="input-field h-24 w-full resize-none text-sm"
                                                             placeholder="Notas administrativas para la decision"
@@ -2012,6 +2151,16 @@ export function AdminDashboard() {
                                                             }))}
                                                         />
                                                         <div className="flex flex-wrap gap-2">
+                                                            {claimRequest.status === 'PENDING' ? (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-secondary text-sm"
+                                                                    disabled={processingId === claimRequest.id}
+                                                                    onClick={() => void handleReviewClaimRequest(claimRequest.id, 'UNDER_REVIEW')}
+                                                                >
+                                                                    Marcar en revisión
+                                                                </button>
+                                                            ) : null}
                                                             <button
                                                                 type="button"
                                                                 className="btn-primary text-sm"
@@ -2031,13 +2180,161 @@ export function AdminDashboard() {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <p className="mt-3 text-xs text-slate-500">
-                                                        Revisada {claimRequest.reviewedAt ? new Date(claimRequest.reviewedAt).toLocaleString('es-DO') : 'sin fecha'} por {claimRequest.reviewedByAdmin?.name || 'sistema'}
-                                                    </p>
+                                                    <div className="mt-3 space-y-1">
+                                                        <p className="text-xs text-slate-500">
+                                                            Actualizada {(
+                                                                claimRequest.approvedAt
+                                                                || claimRequest.rejectedAt
+                                                                || claimRequest.expiredAt
+                                                                || claimRequest.canceledAt
+                                                                || claimRequest.reviewedAt
+                                                            ) ? new Date(
+                                                                claimRequest.approvedAt
+                                                                || claimRequest.rejectedAt
+                                                                || claimRequest.expiredAt
+                                                                || claimRequest.canceledAt
+                                                                || claimRequest.reviewedAt!,
+                                                            ).toLocaleString('es-DO') : 'sin fecha'} por {claimRequest.reviewedByAdmin?.name || 'sistema'}
+                                                        </p>
+                                                        {claimRequest.adminNotes ? (
+                                                            <p className="text-sm text-slate-600 whitespace-pre-wrap">{claimRequest.adminNotes}</p>
+                                                        ) : null}
+                                                    </div>
                                                 )}
                                             </div>
                                         )) : (
                                             <p className="text-sm text-gray-500">No hay reclamaciones para este filtro.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                    <div className="card p-5">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div>
+                                                <h3 className="font-display font-semibold text-gray-900">Historial de ownership</h3>
+                                                <p className="mt-1 text-sm text-gray-600">
+                                                    Revisa control histórico del negocio y suspende ownerships activos cuando corresponda.
+                                                </p>
+                                            </div>
+                                            <select
+                                                className="input-field text-sm"
+                                                value={selectedOwnershipBusinessId}
+                                                onChange={(event) => void handleSelectOwnershipBusiness(event.target.value)}
+                                            >
+                                                <option value="">Selecciona un negocio</option>
+                                                {businesses.map((business) => (
+                                                    <option key={business.id} value={business.id}>
+                                                        {business.name} · {business.claimStatus || 'SIN_ESTADO'}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {selectedOwnershipBusinessId ? (
+                                            ownershipHistoryLoading ? (
+                                                <p className="mt-4 text-sm text-gray-500">Cargando historial...</p>
+                                            ) : ownershipHistory ? (
+                                                <div className="mt-4 space-y-3">
+                                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <div>
+                                                                <p className="font-medium text-slate-900">{ownershipHistory.business.name}</p>
+                                                                <p className="mt-1 text-xs text-slate-500">
+                                                                    Estado claim: {ownershipHistory.business.claimStatus || 'UNCLAIMED'}
+                                                                </p>
+                                                            </div>
+                                                            <a
+                                                                href={`/businesses/${ownershipHistory.business.slug}`}
+                                                                className="btn-secondary text-sm"
+                                                            >
+                                                                Abrir ficha
+                                                            </a>
+                                                        </div>
+                                                    </div>
+
+                                                    {ownershipHistory.data.length > 0 ? ownershipHistory.data.map((ownership) => (
+                                                        <div key={ownership.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                                <div>
+                                                                    <div className="flex flex-wrap items-center gap-2">
+                                                                        <p className="font-medium text-gray-900">{ownership.organization.name}</p>
+                                                                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 border border-slate-200">
+                                                                            {ownership.role}
+                                                                        </span>
+                                                                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
+                                                                            ownership.isActive
+                                                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                                                : 'border-slate-200 bg-white text-slate-600'
+                                                                        }`}>
+                                                                            {ownership.isActive ? 'ACTIVO' : 'REVOCADO'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="mt-2 text-sm text-slate-600">
+                                                                        Otorgado {new Date(ownership.grantedAt).toLocaleString('es-DO')}
+                                                                        {ownership.grantedByUser?.name ? ` por ${ownership.grantedByUser.name}` : ''}
+                                                                    </p>
+                                                                    {ownership.claimRequest?.requesterUser?.name ? (
+                                                                        <p className="mt-1 text-sm text-slate-600">
+                                                                            Claim origen: {ownership.claimRequest.requesterUser.name} · {ownership.claimRequest.status}
+                                                                        </p>
+                                                                    ) : null}
+                                                                    {ownership.revokedAt ? (
+                                                                        <p className="mt-1 text-sm text-slate-600">
+                                                                            Revocado {new Date(ownership.revokedAt).toLocaleString('es-DO')}
+                                                                            {ownership.revokedByUser?.name ? ` por ${ownership.revokedByUser.name}` : ''}
+                                                                        </p>
+                                                                    ) : null}
+                                                                    {ownership.revokeReason ? (
+                                                                        <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{ownership.revokeReason}</p>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+
+                                                            {ownership.isActive ? (
+                                                                confirmOwnershipRevokeId === ownership.id ? (
+                                                                    <InlineDangerConfirm
+                                                                        className="mt-4"
+                                                                        title="Suspender ownership activo"
+                                                                        description="Esto revoca el control operativo del negocio para esta organización. Agrega un motivo claro antes de confirmar."
+                                                                        confirmLabel="Suspender ownership"
+                                                                        busyLabel="Suspendiendo..."
+                                                                        busy={processingId === ownership.id}
+                                                                        confirmDisabled={(ownershipRevokeReasons[ownership.id] || '').trim().length < 8}
+                                                                        onConfirm={() => void handleRevokeOwnership(ownershipHistory.business.id, ownership.id)}
+                                                                        onCancel={() => setConfirmOwnershipRevokeId(null)}
+                                                                    >
+                                                                        <textarea
+                                                                            className="input-field h-24 w-full resize-none text-sm"
+                                                                            placeholder="Motivo administrativo de la suspensión"
+                                                                            value={ownershipRevokeReasons[ownership.id] || ''}
+                                                                            onChange={(event) => setOwnershipRevokeReasons((current) => ({
+                                                                                ...current,
+                                                                                [ownership.id]: event.target.value,
+                                                                            }))}
+                                                                        />
+                                                                    </InlineDangerConfirm>
+                                                                ) : (
+                                                                    <div className="mt-4">
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn-secondary text-sm"
+                                                                            onClick={() => setConfirmOwnershipRevokeId(ownership.id)}
+                                                                        >
+                                                                            Suspender ownership
+                                                                        </button>
+                                                                    </div>
+                                                                )
+                                                            ) : null}
+                                                        </div>
+                                                    )) : (
+                                                        <p className="text-sm text-gray-500">Este negocio todavía no tiene ownerships históricos registrados.</p>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <p className="mt-4 text-sm text-gray-500">No se pudo cargar el historial del negocio seleccionado.</p>
+                                            )
+                                        ) : (
+                                            <p className="mt-4 text-sm text-gray-500">Selecciona un negocio para ver el ownership histórico y gestionar revocaciones.</p>
                                         )}
                                     </div>
                                 </div>

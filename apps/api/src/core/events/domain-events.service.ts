@@ -36,7 +36,7 @@ export type ClaimRequestReviewedEvent = {
     claimRequestId: string;
     businessId: string;
     businessSlug: string | null;
-    status: 'APPROVED' | 'REJECTED';
+    status: 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
     requesterUserId: string;
     requesterOrganizationId?: string | null;
     reviewedByAdminId: string;

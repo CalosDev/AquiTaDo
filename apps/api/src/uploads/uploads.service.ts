@@ -7,6 +7,11 @@ import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationRole } from '../generated/prisma/client';
 import { UpdateBusinessImageDto } from './dto/update-business-image.dto';
+import {
+    activeBusinessOwnershipSelect,
+    businessBelongsToOrganization,
+    resolveActiveBusinessOrganizationId,
+} from '../businesses/business-ownership.helpers';
 
 type StorageProvider = 'local' | 's3';
 type StoredAsset = {
@@ -60,6 +65,7 @@ export class UploadsService {
                 id: true,
                 ownerId: true,
                 organizationId: true,
+                ownerships: activeBusinessOwnershipSelect,
             },
         });
 
@@ -67,12 +73,13 @@ export class UploadsService {
             throw new BadRequestException('Negocio no encontrado');
         }
 
-        if (!business.organizationId) {
+        const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
+        if (!effectiveOrganizationId) {
             throw new BadRequestException('Este negocio aun no tiene una organizacion activa para gestionar imagenes');
         }
 
         if (userRole !== 'ADMIN') {
-            if (business.organizationId !== organizationId) {
+            if (!businessBelongsToOrganization(business, organizationId)) {
                 throw new NotFoundException('Negocio no encontrado');
             }
 
@@ -86,7 +93,7 @@ export class UploadsService {
         });
 
         const maxImagesPerBusiness = await this.resolveMaxImagesPerBusiness(
-            business.organizationId,
+            effectiveOrganizationId,
         );
 
         if (
@@ -182,6 +189,7 @@ export class UploadsService {
             select: {
                 id: true,
                 organizationId: true,
+                ownerships: activeBusinessOwnershipSelect,
                 deletedAt: true,
             },
         });
@@ -190,7 +198,8 @@ export class UploadsService {
             throw new NotFoundException('Negocio no encontrado');
         }
 
-        if (!business.organizationId) {
+        const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
+        if (!effectiveOrganizationId) {
             throw new BadRequestException('Este negocio aun no tiene una organizacion activa para documentos');
         }
 
@@ -199,7 +208,7 @@ export class UploadsService {
                 throw new ForbiddenException('No tienes permisos para subir documentos');
             }
 
-            if (business.organizationId !== organizationId) {
+            if (!businessBelongsToOrganization(business, organizationId)) {
                 throw new NotFoundException('Negocio no encontrado');
             }
         }
@@ -209,7 +218,7 @@ export class UploadsService {
         const storedAsset = await this.storeVerificationDocumentAsset(
             file.buffer,
             file.mimetype,
-            business.organizationId,
+            effectiveOrganizationId,
             businessId,
             extension,
         );
@@ -266,7 +275,7 @@ export class UploadsService {
             where: { id: imageId },
             include: {
                 business: {
-                    select: { ownerId: true, organizationId: true },
+                    select: { ownerId: true, organizationId: true, ownerships: activeBusinessOwnershipSelect },
                 },
             },
         });
@@ -276,7 +285,7 @@ export class UploadsService {
         }
 
         if (userRole !== 'ADMIN') {
-            if (image.business.organizationId !== organizationId) {
+            if (!businessBelongsToOrganization(image.business, organizationId)) {
                 throw new NotFoundException('Imagen no encontrada');
             }
 
@@ -306,7 +315,7 @@ export class UploadsService {
             where: { id: imageId },
             include: {
                 business: {
-                    select: { id: true, organizationId: true },
+                    select: { id: true, organizationId: true, ownerships: activeBusinessOwnershipSelect },
                 },
             },
         });
@@ -316,7 +325,7 @@ export class UploadsService {
         }
 
         if (userRole !== 'ADMIN') {
-            if (image.business.organizationId !== organizationId) {
+            if (!businessBelongsToOrganization(image.business, organizationId)) {
                 throw new NotFoundException('Imagen no encontrada');
             }
 

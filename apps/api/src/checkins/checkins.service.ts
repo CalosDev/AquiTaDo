@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCheckInDto, ListMyCheckInsQueryDto } from './dto/checkins.dto';
+import { activeBusinessOwnershipSelect, resolveActiveBusinessOrganizationId } from '../businesses/business-ownership.helpers';
 
 const CHECKIN_COOLDOWN_HOURS = 8;
 const MAX_CHECKINS_PER_DAY = 12;
@@ -90,6 +91,7 @@ export class CheckInsService {
                     latitude: true,
                     longitude: true,
                     organizationId: true,
+                    ownerships: activeBusinessOwnershipSelect,
                 },
             }),
             this.prisma.checkIn.findFirst({
@@ -128,10 +130,10 @@ export class CheckInsService {
             throw new NotFoundException('Negocio no disponible para check-in');
         }
 
-        if (!business.organizationId) {
+        const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
+        if (!effectiveOrganizationId) {
             throw new BadRequestException('Este negocio aun no tiene una organizacion activa para check-ins');
         }
-        const effectiveOrganizationId = business.organizationId;
 
         if (previousCheckInForBusiness) {
             const elapsedMs = now.getTime() - new Date(previousCheckInForBusiness.createdAt).getTime();

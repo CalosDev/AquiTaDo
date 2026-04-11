@@ -54,6 +54,11 @@ import {
     resolvePagination,
 } from './businesses.helpers';
 import {
+    activeBusinessOwnershipSelect,
+    businessBelongsToOrganization,
+    resolveActiveBusinessOrganizationId,
+} from './business-ownership.helpers';
+import {
     adminListBusinessSelect,
     businessDetailBaseSelect,
     catalogQualityBusinessSelect,
@@ -104,6 +109,7 @@ type BusinessDuplicateSignalInput = {
 };
 
 const ACTIVE_CLAIM_REQUEST_STATUSES = ['PENDING', 'UNDER_REVIEW'] as const;
+const CLAIM_REQUEST_EXPIRATION_DAYS = 30;
 
 @Injectable()
 export class BusinessesService {
@@ -145,6 +151,7 @@ export class BusinessesService {
                 claimStatus: true,
                 ownerId: true,
                 organizationId: true,
+                ownerships: activeBusinessOwnershipSelect,
                 whatsapp: true,
                 owner: {
                     select: {
@@ -162,7 +169,8 @@ export class BusinessesService {
             throw new BadRequestException('Este negocio todavia no ha sido reclamado y no puede recibir consultas operativas');
         }
 
-        if (!business.organizationId || !business.ownerId) {
+        const effectiveOrganizationId = resolveActiveBusinessOrganizationId(business);
+        if (!effectiveOrganizationId || !business.ownerId) {
             throw new BadRequestException('Este negocio todavia no tiene configuracion operativa completa');
         }
 
@@ -205,7 +213,7 @@ export class BusinessesService {
         const stage: SalesLeadStage = 'LEAD';
         const createdLead = await this.prisma.salesLead.create({
             data: {
-                organizationId: business.organizationId,
+                organizationId: effectiveOrganizationId,
                 businessId: business.id,
                 createdByUserId: business.ownerId,
                 stage,
@@ -233,7 +241,7 @@ export class BusinessesService {
                 data: {
                     eventType: GrowthEventType.CONTACT_CLICK,
                     businessId: business.id,
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     metadata: {
                         source: 'public-business-page',
                         leadId: createdLead.id,
@@ -252,7 +260,7 @@ export class BusinessesService {
 
         try {
             await this.notificationsQueueService.enqueuePublicLeadAlert({
-                organizationId: business.organizationId,
+                organizationId: effectiveOrganizationId,
                 businessId: business.id,
                 businessName: business.name,
                 businessWhatsapp: business.whatsapp,
@@ -357,7 +365,8 @@ export class BusinessesService {
 
         if (!business.verified && !canAccessUnverified(
             business.ownerId,
-            business.organizationId,
+            null,
+            business.ownerships,
             userId,
             userRole,
             currentOrganizationId,
@@ -393,7 +402,8 @@ export class BusinessesService {
 
         if (!business.verified && !canAccessUnverified(
             business.ownerId,
-            business.organizationId,
+            null,
+            business.ownerships,
             userId,
             userRole,
             currentOrganizationId,
@@ -428,7 +438,131 @@ export class BusinessesService {
         };
     }
 
+    private async expireStaleClaimRequests(
+        prismaClient: PrismaService | Prisma.TransactionClient,
+        businessId?: string,
+        referenceDate: Date = new Date(),
+    ) {
+        const expirationCutoff = new Date(
+            referenceDate.getTime() - (CLAIM_REQUEST_EXPIRATION_DAYS * 24 * 60 * 60 * 1000),
+        );
+
+        const staleClaims = await prismaClient.businessClaimRequest.findMany({
+            where: {
+                status: {
+                    in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                },
+                createdAt: {
+                    lt: expirationCutoff,
+                },
+                ...(businessId ? { businessId } : {}),
+            },
+            select: {
+                id: true,
+                businessId: true,
+                requesterOrganizationId: true,
+                business: {
+                    select: {
+                        slug: true,
+                    },
+                },
+            },
+        });
+
+        if (staleClaims.length === 0) {
+            return 0;
+        }
+
+        const staleClaimIds = staleClaims.map((claim) => claim.id);
+        const affectedBusinessIds = [...new Set(staleClaims.map((claim) => claim.businessId))];
+
+        await prismaClient.businessClaimRequest.updateMany({
+            where: {
+                id: {
+                    in: staleClaimIds,
+                },
+            },
+            data: {
+                status: 'EXPIRED',
+                reviewedAt: referenceDate,
+                expiredAt: referenceDate,
+            },
+        });
+
+        for (const staleClaim of staleClaims) {
+            await prismaClient.auditLog.create({
+                data: {
+                    organizationId: staleClaim.requesterOrganizationId ?? null,
+                    actorUserId: null,
+                    action: 'business_claim_request.expired',
+                    targetType: 'business_claim_request',
+                    targetId: staleClaim.id,
+                    metadata: {
+                        businessId: staleClaim.businessId,
+                        businessSlug: staleClaim.business.slug,
+                        expirationDays: CLAIM_REQUEST_EXPIRATION_DAYS,
+                    } as Prisma.InputJsonValue,
+                },
+            });
+        }
+
+        const [activeOwnershipRows, activeClaimSummary] = await Promise.all([
+            prismaClient.businessOwnership.findMany({
+                where: {
+                    businessId: {
+                        in: affectedBusinessIds,
+                    },
+                    isActive: true,
+                },
+                select: {
+                    businessId: true,
+                },
+                distinct: ['businessId'],
+            }),
+            prismaClient.businessClaimRequest.groupBy({
+                by: ['businessId'],
+                where: {
+                    businessId: {
+                        in: affectedBusinessIds,
+                    },
+                    status: {
+                        in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                    },
+                },
+                _count: {
+                    _all: true,
+                },
+            }),
+        ]);
+
+        const activeOwnershipBusinessIds = new Set(activeOwnershipRows.map((row) => row.businessId));
+        const activeClaimCounts = new Map(
+            activeClaimSummary.map((row) => [row.businessId, row._count._all]),
+        );
+
+        for (const affectedBusinessId of affectedBusinessIds) {
+            await prismaClient.business.update({
+                where: { id: affectedBusinessId },
+                data: {
+                    claimStatus: activeOwnershipBusinessIds.has(affectedBusinessId)
+                        ? 'CLAIMED'
+                        : (activeClaimCounts.get(affectedBusinessId) ?? 0) > 0
+                            ? 'PENDING_CLAIM'
+                            : 'UNCLAIMED',
+                    lastReviewedAt: referenceDate,
+                },
+                select: {
+                    id: true,
+                },
+            });
+        }
+
+        return staleClaims.length;
+    }
+
     async listClaimRequests(query: BusinessClaimRequestQueryDto) {
+        await this.expireStaleClaimRequests(this.prisma);
+
         const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
         const status = query.status ?? 'PENDING';
         const items = await this.prisma.businessClaimRequest.findMany({
@@ -513,6 +647,8 @@ export class BusinessesService {
 
         try {
             const claimRequest = await this.prisma.$transaction(async (tx) => {
+                await this.expireStaleClaimRequests(tx, businessId);
+
                 const business = await tx.business.findUnique({
                     where: { id: businessId },
                     select: {
@@ -658,6 +794,8 @@ export class BusinessesService {
 
         try {
             const reviewedClaim = await this.prisma.$transaction(async (tx) => {
+                await this.expireStaleClaimRequests(tx, undefined, reviewedAt);
+
                 const claimRequest = await tx.businessClaimRequest.findUnique({
                     where: { id: claimRequestId },
                     select: {
@@ -683,6 +821,66 @@ export class BusinessesService {
 
                 if (!ACTIVE_CLAIM_REQUEST_STATUSES.includes(claimRequest.status as (typeof ACTIVE_CLAIM_REQUEST_STATUSES)[number])) {
                     throw new BadRequestException('Esta solicitud ya fue revisada');
+                }
+
+                if (dto.status === 'UNDER_REVIEW') {
+                    const activeOwnership = await tx.businessOwnership.findFirst({
+                        where: {
+                            businessId: claimRequest.businessId,
+                            isActive: true,
+                        },
+                        select: {
+                            id: true,
+                        },
+                    });
+
+                    await tx.businessClaimRequest.update({
+                        where: { id: claimRequestId },
+                        data: {
+                            status: 'UNDER_REVIEW',
+                            adminNotes: reviewNotes,
+                            reviewedByAdminId: adminUserId,
+                            reviewedAt,
+                        },
+                        select: { id: true },
+                    });
+
+                    await tx.business.update({
+                        where: { id: claimRequest.businessId },
+                        data: {
+                            claimStatus: activeOwnership ? 'CLAIMED' : 'PENDING_CLAIM',
+                            updatedByUserId: adminUserId,
+                            lastReviewedAt: reviewedAt,
+                        },
+                        select: { id: true },
+                    });
+
+                    await tx.auditLog.create({
+                        data: {
+                            organizationId: claimRequest.requesterOrganizationId ?? null,
+                            actorUserId: adminUserId,
+                            action: 'business_claim_request.reviewed',
+                            targetType: 'business_claim_request',
+                            targetId: claimRequestId,
+                            metadata: {
+                                status: 'UNDER_REVIEW',
+                                businessId: claimRequest.businessId,
+                                businessSlug: claimRequest.business.slug,
+                                requesterUserId: claimRequest.requesterUserId,
+                                requesterOrganizationId: claimRequest.requesterOrganizationId,
+                            } as Prisma.InputJsonValue,
+                        },
+                    });
+
+                    return {
+                        id: claimRequest.id,
+                        status: 'UNDER_REVIEW' as const,
+                        businessId: claimRequest.businessId,
+                        businessSlug: claimRequest.business.slug,
+                        requesterUserId: claimRequest.requesterUserId,
+                        requesterOrganizationId: claimRequest.requesterOrganizationId,
+                        organizationId: claimRequest.requesterOrganizationId,
+                    };
                 }
 
                 if (dto.status === 'APPROVED') {
@@ -1832,7 +2030,7 @@ export class BusinessesService {
         const secondaryIds = secondaryBusinesses.map((business) => business.id);
 
         const invalidSecondary = secondaryBusinesses.find((business) =>
-            business.claimStatus !== 'UNCLAIMED' || business.ownerId || business.organizationId);
+            business.claimStatus !== 'UNCLAIMED');
         if (invalidSecondary) {
             throw new BadRequestException(
                 'Solo se pueden fusionar fichas de catalogo no reclamadas. Marca conflicto para casos con ownership activo.',
@@ -2685,6 +2883,7 @@ export class BusinessesService {
                         id: true,
                         ownerId: true,
                         organizationId: true,
+                        ownerships: activeBusinessOwnershipSelect,
                         provinceId: true,
                         cityId: true,
                         sectorId: true,
@@ -2697,7 +2896,7 @@ export class BusinessesService {
                     throw new NotFoundException('Negocio no encontrado');
                 }
 
-                if (business.organizationId !== organizationId) {
+                if (!businessBelongsToOrganization(business, organizationId)) {
                     throw new NotFoundException('Negocio no encontrado');
                 }
 
@@ -2823,6 +3022,7 @@ export class BusinessesService {
                 id: true,
                 slug: true,
                 organizationId: true,
+                ownerships: activeBusinessOwnershipSelect,
                 images: {
                     select: { url: true },
                 },
@@ -2838,7 +3038,7 @@ export class BusinessesService {
                 throw new ForbiddenException('Debes seleccionar una organización activa');
             }
 
-            if (business.organizationId !== organizationId) {
+            if (!businessBelongsToOrganization(business, organizationId)) {
                 throw new NotFoundException('Negocio no encontrado');
             }
 
@@ -2931,7 +3131,7 @@ export class BusinessesService {
             }),
             this.prisma.auditLog.create({
                 data: {
-                    organizationId: business.organizationId,
+                    organizationId: resolveActiveBusinessOrganizationId(business),
                     actorUserId: userId,
                     action: 'business.deleted',
                     targetType: 'business',
@@ -3089,6 +3289,8 @@ export class BusinessesService {
     }
 
     async getCatalogQuality(limit = 25) {
+        await this.expireStaleClaimRequests(this.prisma);
+
         const safeLimit = Math.min(Math.max(limit, 1), 100);
         const now = new Date();
         const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -3175,18 +3377,26 @@ export class BusinessesService {
                     },
                 },
             }),
-            this.prisma.business.count({
+            this.prisma.businessOwnership.findMany({
                 where: {
-                    deletedAt: null,
-                    claimStatus: 'CLAIMED',
-                    organizationId: { not: null },
+                    isActive: true,
+                    business: {
+                        deletedAt: null,
+                        claimStatus: 'CLAIMED',
+                    },
                 },
-            }),
-            this.prisma.business.findMany({
+                select: {
+                    businessId: true,
+                },
+                distinct: ['businessId'],
+            }).then((rows) => rows.length),
+            this.prisma.businessOwnership.findMany({
                 where: {
-                    deletedAt: null,
-                    claimStatus: 'CLAIMED',
-                    organizationId: { not: null },
+                    isActive: true,
+                    business: {
+                        deletedAt: null,
+                        claimStatus: 'CLAIMED',
+                    },
                 },
                 select: {
                     organizationId: true,
@@ -3288,23 +3498,26 @@ export class BusinessesService {
             paidOrganizationsUsingAds,
         ] = paidClaimOrganizationIds.length > 0
             ? await Promise.all([
-                this.prisma.business.findMany({
+                this.prisma.businessOwnership.findMany({
                     where: {
                         organizationId: {
                             in: paidClaimOrganizationIds,
                         },
-                        analytics: {
-                            some: {
-                                date: {
-                                    gte: last30Days,
+                        isActive: true,
+                        business: {
+                            analytics: {
+                                some: {
+                                    date: {
+                                        gte: last30Days,
+                                    },
+                                    OR: [
+                                        { views: { gt: 0 } },
+                                        { clicks: { gt: 0 } },
+                                        { conversions: { gt: 0 } },
+                                        { reservationRequests: { gt: 0 } },
+                                        { grossRevenue: { gt: 0 } },
+                                    ],
                                 },
-                                OR: [
-                                    { views: { gt: 0 } },
-                                    { clicks: { gt: 0 } },
-                                    { conversions: { gt: 0 } },
-                                    { reservationRequests: { gt: 0 } },
-                                    { grossRevenue: { gt: 0 } },
-                                ],
                             },
                         },
                     },
@@ -3375,23 +3588,26 @@ export class BusinessesService {
                 promotionOrgRows,
                 adOrgRows,
             ] = await Promise.all([
-                this.prisma.business.findMany({
+                this.prisma.businessOwnership.findMany({
                     where: {
                         organizationId: {
                             in: paidClaimOrganizationIds,
                         },
-                        analytics: {
-                            some: {
-                                date: {
-                                    gte: last30Days,
+                        isActive: true,
+                        business: {
+                            analytics: {
+                                some: {
+                                    date: {
+                                        gte: last30Days,
+                                    },
+                                    OR: [
+                                        { views: { gt: 0 } },
+                                        { clicks: { gt: 0 } },
+                                        { conversions: { gt: 0 } },
+                                        { reservationRequests: { gt: 0 } },
+                                        { grossRevenue: { gt: 0 } },
+                                    ],
                                 },
-                                OR: [
-                                    { views: { gt: 0 } },
-                                    { clicks: { gt: 0 } },
-                                    { conversions: { gt: 0 } },
-                                    { reservationRequests: { gt: 0 } },
-                                    { grossRevenue: { gt: 0 } },
-                                ],
                             },
                         },
                     },
@@ -4061,14 +4277,6 @@ export class BusinessesService {
             isPublished: true,
             isSearchable: true,
             isDiscoverable: true,
-            OR: [
-                { verified: true },
-                {
-                    claimStatus: {
-                        in: ['UNCLAIMED', 'PENDING_CLAIM'],
-                    },
-                },
-            ],
         };
     }
 

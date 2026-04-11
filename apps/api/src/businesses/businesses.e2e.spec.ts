@@ -251,7 +251,7 @@ describe('BusinessesController (e2e)', () => {
         expect(String(response.body.slug)).toContain(BUSINESS_SLUG_PREFIX);
     });
 
-    it('hides unverified business from public and allows owner access', async () => {
+    it('shows published unverified business publicly and still allows owner access', async () => {
         const owner = await createUser('BUSINESS_OWNER');
         const ownerToken = signToken(owner.id, owner.role);
         const province = await createProvince();
@@ -265,9 +265,14 @@ describe('BusinessesController (e2e)', () => {
 
         const businessId = String(created.body.id);
 
-        await request(app.getHttpServer())
+        const publicView = await request(app.getHttpServer())
             .get(`/api/businesses/${businessId}`)
-            .expect(404);
+            .expect(200);
+
+        expect(publicView.body).toMatchObject({
+            id: businessId,
+            verified: false,
+        });
 
         const ownerView = await request(app.getHttpServer())
             .get(`/api/businesses/${businessId}`)

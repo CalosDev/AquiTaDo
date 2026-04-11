@@ -174,7 +174,7 @@ export const businessApi = {
         api.get('/businesses/admin/duplicate-cases', { params }),
     reviewClaimRequestAdmin: (
         claimRequestId: string,
-        data: { status: 'APPROVED' | 'REJECTED'; notes?: string },
+        data: { status: 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'; notes?: string },
     ) => api.post(`/businesses/admin/claim-requests/${claimRequestId}/review`, data).then((response) => {
         resetBusinessDiscoveryCaches();
         return response;
