@@ -10,6 +10,7 @@ export const pageLoaders = {
     forgotPassword: () => import('../pages/ForgotPassword'),
     resetPassword: () => import('../pages/ResetPassword'),
     register: () => import('../pages/Register'),
+    suggestBusiness: () => import('../pages/SuggestBusiness'),
     registerBusiness: () => import('../pages/RegisterBusiness'),
     editBusiness: () => import('../pages/EditBusiness'),
     dashboardBusiness: () => import('../pages/DashboardBusiness'),
@@ -87,6 +88,11 @@ export function preloadRouteChunk(pathname: string): void {
 
     if (normalizedPath === '/register') {
         preloadMany(['register', 'login', 'forgotPassword']);
+        return;
+    }
+
+    if (normalizedPath === '/suggest-business') {
+        preloadByKey('suggestBusiness');
         return;
     }
 

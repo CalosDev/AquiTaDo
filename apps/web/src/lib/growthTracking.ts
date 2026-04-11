@@ -18,7 +18,10 @@ export type GrowthTrackingEventType =
     | 'PREMODERATION_RELEASED'
     | 'PREMODERATION_CONFIRMED'
     | 'BUSINESS_ONBOARDING_STEP'
-    | 'BUSINESS_ONBOARDING_COMPLETE';
+    | 'BUSINESS_ONBOARDING_COMPLETE'
+    | 'CLAIM_CTA_CLICK'
+    | 'CLAIM_REQUEST_SUBMITTED'
+    | 'USER_SUGGESTION_SUBMITTED';
 
 type GrowthTrackingPayload = {
     eventType: GrowthTrackingEventType;

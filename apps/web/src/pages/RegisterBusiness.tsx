@@ -1307,8 +1307,21 @@ export function RegisterBusiness() {
                                                             </Link>
                                                             {candidate.claimStatus !== 'CLAIMED' ? (
                                                                 <Link
-                                                                    to={`/businesses/${candidate.slug || candidate.id}`}
+                                                                    to={`/businesses/${candidate.slug || candidate.id}?claim=1`}
                                                                     className="btn-primary text-sm"
+                                                                    onClick={() => {
+                                                                        void trackGrowthSignal({
+                                                                            eventType: 'CLAIM_CTA_CLICK',
+                                                                            businessId: candidate.id,
+                                                                            provinceId: candidate.province?.id,
+                                                                            cityId: candidate.city?.id,
+                                                                            metadata: {
+                                                                                source: 'register-business-duplicate-check',
+                                                                                matchType: candidate.matchType,
+                                                                                matchScore: candidate.matchScore,
+                                                                            },
+                                                                        });
+                                                                    }}
                                                                 >
                                                                     Abrir y reclamar
                                                                 </Link>

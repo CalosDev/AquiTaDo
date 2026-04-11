@@ -128,6 +128,11 @@ export class CheckInsService {
             throw new NotFoundException('Negocio no disponible para check-in');
         }
 
+        if (!business.organizationId) {
+            throw new BadRequestException('Este negocio aun no tiene una organizacion activa para check-ins');
+        }
+        const effectiveOrganizationId = business.organizationId;
+
         if (previousCheckInForBusiness) {
             const elapsedMs = now.getTime() - new Date(previousCheckInForBusiness.createdAt).getTime();
             const cooldownMs = CHECKIN_COOLDOWN_HOURS * 60 * 60 * 1000;
@@ -184,7 +189,7 @@ export class CheckInsService {
                 data: {
                     userId,
                     businessId: business.id,
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     latitude: dto.latitude ?? null,
                     longitude: dto.longitude ?? null,
                     verifiedLocation,

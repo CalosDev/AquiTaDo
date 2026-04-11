@@ -14,6 +14,7 @@ const Login = lazy(async () => ({ default: (await pageLoaders.login()).Login }))
 const ForgotPassword = lazy(async () => ({ default: (await pageLoaders.forgotPassword()).ForgotPassword }));
 const ResetPassword = lazy(async () => ({ default: (await pageLoaders.resetPassword()).ResetPassword }));
 const Register = lazy(async () => ({ default: (await pageLoaders.register()).Register }));
+const SuggestBusiness = lazy(async () => ({ default: (await pageLoaders.suggestBusiness()).SuggestBusiness }));
 const RegisterBusiness = lazy(async () => ({ default: (await pageLoaders.registerBusiness()).RegisterBusiness }));
 const EditBusiness = lazy(async () => ({ default: (await pageLoaders.editBusiness()).EditBusiness }));
 const DashboardBusiness = lazy(async () => ({ default: (await pageLoaders.dashboardBusiness()).DashboardBusiness }));
@@ -102,6 +103,14 @@ export function AppRouter() {
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/register" element={<Register />} />
+                    <Route
+                        path="/suggest-business"
+                        element={
+                            <ProtectedRoute roles={['USER']}>
+                                <SuggestBusiness />
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
                     <Route path="/about" element={<About />} />

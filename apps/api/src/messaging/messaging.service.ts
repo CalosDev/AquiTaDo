@@ -46,6 +46,11 @@ export class MessagingService {
             throw new BadRequestException('Negocio no disponible para mensajería');
         }
 
+        if (!business.organizationId) {
+            throw new BadRequestException('Este negocio aun no tiene una organizacion activa para mensajeria');
+        }
+        const effectiveOrganizationId = business.organizationId;
+
         const content = dto.message.trim();
         if (!content) {
             throw new BadRequestException('El contenido del mensaje es obligatorio');
@@ -54,7 +59,7 @@ export class MessagingService {
         return this.prisma.$transaction(async (tx) => {
             const conversation = await tx.conversation.create({
                 data: {
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     businessId: business.id,
                     customerUserId,
                     subject: dto.subject?.trim() || `Consulta para ${business.name}`,

@@ -3,6 +3,7 @@ import { getApiErrorMessage } from '../api/error';
 import {
     analyticsApi,
     businessApi,
+    businessSuggestionApi,
     categoryApi,
     healthApi,
     locationApi,
@@ -75,10 +76,67 @@ interface Province {
 
 interface CatalogQualitySnapshot {
     totalBusinesses: number;
+    publishedBusinesses?: number;
     incompleteCount: number;
     duplicateClusterCount: number;
     unclaimedBusinesses?: number;
     pendingClaims?: number;
+    claimedBusinesses?: number;
+    weeklyCatalogGrowth?: number;
+    claimCtaClicksLast30Days?: number;
+    claimRequestsLast30Days?: number;
+    claimRequestCompletionRatePct?: number;
+    claimApprovalRatePct?: number;
+    claimReviewAvgHours?: number;
+    suggestionApprovalRatePct?: number;
+    resolvedDuplicateCases?: number;
+    duplicateResolutionAvgHours?: number;
+    claimedBusinessesWithOrganization?: number;
+    paidClaimOrganizations?: number;
+    metrics?: {
+        catalog?: {
+            totalBusinesses: number;
+            publishedBusinesses: number;
+            unclaimedBusinesses: number;
+            pendingClaims: number;
+            claimedBusinesses: number;
+            weeklyCatalogGrowth: number;
+            claimedPct: number;
+            unclaimedPct: number;
+        };
+        quality?: {
+            incompleteCount: number;
+            missingSector: number;
+            missingCoordinates: number;
+            duplicateClusterCount: number;
+            resolvedDuplicateCases: number;
+            mergedDuplicateCases: number;
+            conflictDuplicateCases: number;
+            dismissedDuplicateCases: number;
+            duplicateMergeRatePct: number;
+            duplicateResolutionAvgHours: number;
+        };
+        claim?: {
+            ctaClicksLast30Days: number;
+            requestsLast30Days: number;
+            requestCompletionRatePct: number;
+            approvalRatePct: number;
+            avgReviewHours: number;
+        };
+        suggestion?: {
+            pending: number;
+            approved: number;
+            rejected: number;
+            approvalRatePct: number;
+        };
+        saas?: {
+            claimedBusinessesWithOrganization: number;
+            claimedOrganizations: number;
+            paidClaimOrganizations: number;
+            claimedToOrganizationRatePct: number;
+            organizationToPaidRatePct: number;
+        };
+    };
     incompleteBusinesses: Array<{
         id: string;
         slug: string;
@@ -95,6 +153,9 @@ interface CatalogQualitySnapshot {
             id: string;
             slug: string;
             name: string;
+            claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+            publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+            source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
             city?: { name: string } | null;
             province?: { name: string } | null;
         }>;
@@ -129,6 +190,77 @@ interface ClaimRequestItem {
         slug: string;
     } | null;
     reviewedByAdmin?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
+}
+
+interface BusinessSuggestionItem {
+    id: string;
+    name: string;
+    description?: string | null;
+    address: string;
+    phone?: string | null;
+    whatsapp?: string | null;
+    website?: string | null;
+    email?: string | null;
+    notes?: string | null;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    createdAt: string;
+    reviewedAt?: string | null;
+    category?: {
+        id: string;
+        name: string;
+        slug: string;
+    } | null;
+    province?: {
+        id: string;
+        name: string;
+        slug: string;
+    } | null;
+    city?: {
+        id: string;
+        name: string;
+        slug: string;
+    } | null;
+    submittedByUser?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
+    reviewedByAdmin?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
+    createdBusiness?: {
+        id: string;
+        name: string;
+        slug: string;
+        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+        publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+    } | null;
+}
+
+interface DuplicateCaseItem {
+    id: string;
+    clusterKey: string;
+    status: 'MERGED' | 'DISMISSED' | 'CONFLICT';
+    businessIds: string[];
+    reasons?: string[] | null;
+    primaryBusinessId?: string | null;
+    resolutionNotes?: string | null;
+    resolutionMeta?: Record<string, unknown> | null;
+    resolvedAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    primaryBusiness?: {
+        id: string;
+        name: string;
+        slug: string;
+    } | null;
+    resolvedByAdmin?: {
         id: string;
         name: string;
         email: string;
@@ -248,6 +380,7 @@ type CategoryForm = {
 };
 
 type CatalogBusinessForm = {
+    source: 'ADMIN' | 'IMPORT' | 'SYSTEM';
     name: string;
     description: string;
     address: string;
@@ -266,6 +399,7 @@ const EMPTY_CATEGORY_FORM: CategoryForm = {
     parentId: '',
 };
 const EMPTY_CATALOG_FORM: CatalogBusinessForm = {
+    source: 'ADMIN',
     name: '',
     description: '',
     address: '',
@@ -302,6 +436,15 @@ export function AdminDashboard() {
     const [claimRequestSummary, setClaimRequestSummary] = useState<Record<string, number>>({});
     const [claimRequestStatusFilter, setClaimRequestStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'>('PENDING');
     const [claimReviewNotes, setClaimReviewNotes] = useState<Record<string, string>>({});
+    const [businessSuggestions, setBusinessSuggestions] = useState<BusinessSuggestionItem[]>([]);
+    const [suggestionSummary, setSuggestionSummary] = useState<Record<string, number>>({});
+    const [suggestionStatusFilter, setSuggestionStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+    const [suggestionReviewNotes, setSuggestionReviewNotes] = useState<Record<string, string>>({});
+    const [duplicateCases, setDuplicateCases] = useState<DuplicateCaseItem[]>([]);
+    const [duplicateCaseSummary, setDuplicateCaseSummary] = useState<Record<string, number>>({});
+    const [duplicateCaseStatusFilter, setDuplicateCaseStatusFilter] = useState<'MERGED' | 'DISMISSED' | 'CONFLICT'>('MERGED');
+    const [duplicateResolutionNotes, setDuplicateResolutionNotes] = useState<Record<string, string>>({});
+    const [duplicatePrimarySelection, setDuplicatePrimarySelection] = useState<Record<string, string>>({});
     const [creatingCatalogBusiness, setCreatingCatalogBusiness] = useState(false);
     const [catalogBusinessForm, setCatalogBusinessForm] = useState<CatalogBusinessForm>(EMPTY_CATALOG_FORM);
     const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'catalog' | 'verification' | 'observability'>('businesses');
@@ -378,11 +521,6 @@ export function AdminDashboard() {
         claimed: businesses.filter((business) => business.claimStatus === 'CLAIMED').length,
     }), [businesses]);
 
-    const userSuggestionBusinesses = useMemo(
-        () => businesses.filter((business) => business.source === 'USER_SUGGESTION'),
-        [businesses],
-    );
-
     const catalogConflictQueue = useMemo(() => {
         const duplicateConflicts = (catalogQuality?.duplicateCandidates ?? []).map((cluster) => ({
             key: `duplicate:${cluster.key}`,
@@ -402,9 +540,20 @@ export function AdminDashboard() {
                     : `Solicitante: ${claimRequest.requesterUser?.name || 'Usuario'}`,
                 hint: claimRequest.evidenceValue || claimRequest.notes || claimRequest.evidenceType,
             }));
+        const pendingSuggestionConflicts = businessSuggestions
+            .filter((suggestion) => suggestion.status === 'PENDING')
+            .map((suggestion) => ({
+                key: `suggestion:${suggestion.id}`,
+                kind: 'PENDING_SUGGESTION' as const,
+                title: `Sugerencia pendiente: ${suggestion.name}`,
+                detail: suggestion.submittedByUser?.name
+                    ? `Enviada por ${suggestion.submittedByUser.name}`
+                    : 'Sugerencia comunitaria pendiente de revision',
+                hint: suggestion.address,
+            }));
 
-        return [...pendingClaimConflicts, ...duplicateConflicts].slice(0, 8);
-    }, [catalogQuality, claimRequests]);
+        return [...pendingClaimConflicts, ...pendingSuggestionConflicts, ...duplicateConflicts].slice(0, 8);
+    }, [businessSuggestions, catalogQuality, claimRequests]);
 
     const filteredBusinesses = useMemo(() => {
         const normalizedSearch = businessSearch.trim().toLowerCase();
@@ -603,12 +752,44 @@ export function AdminDashboard() {
         }
     }, [claimRequestStatusFilter]);
 
+    const loadBusinessSuggestions = useCallback(async () => {
+        try {
+            const response = await businessSuggestionApi.getAdmin({
+                status: suggestionStatusFilter,
+                limit: 20,
+            });
+            setBusinessSuggestions((response.data?.data || []) as BusinessSuggestionItem[]);
+            setSuggestionSummary((response.data?.summary || {}) as Record<string, number>);
+        } catch (error) {
+            setBusinessSuggestions([]);
+            setSuggestionSummary({});
+            setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar las sugerencias'));
+        }
+    }, [suggestionStatusFilter]);
+
+    const loadDuplicateCases = useCallback(async () => {
+        try {
+            const response = await businessApi.getDuplicateCasesAdmin({
+                status: duplicateCaseStatusFilter,
+                limit: 20,
+            });
+            setDuplicateCases((response.data?.data || []) as DuplicateCaseItem[]);
+            setDuplicateCaseSummary((response.data?.summary || {}) as Record<string, number>);
+        } catch (error) {
+            setDuplicateCases([]);
+            setDuplicateCaseSummary({});
+            setErrorMessage(getApiErrorMessage(error, 'No se pudieron cargar las resoluciones de duplicados'));
+        }
+    }, [duplicateCaseStatusFilter]);
+
     useEffect(() => {
         if (activeTab === 'catalog') {
             void loadCatalogQuality();
             void loadClaimRequests();
+            void loadBusinessSuggestions();
+            void loadDuplicateCases();
         }
-    }, [activeTab, loadCatalogQuality, loadClaimRequests]);
+    }, [activeTab, loadBusinessSuggestions, loadCatalogQuality, loadClaimRequests, loadDuplicateCases]);
 
     const loadOperationalHealth = useCallback(async () => {
         setOperationalHealthLoading(true);
@@ -661,6 +842,87 @@ export function AdminDashboard() {
         }
     };
 
+    const handleReviewSuggestion = async (
+        suggestionId: string,
+        status: 'APPROVED' | 'REJECTED',
+    ) => {
+        setProcessingId(suggestionId);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await businessSuggestionApi.reviewAdmin(suggestionId, {
+                status,
+                notes: suggestionReviewNotes[suggestionId]?.trim() || undefined,
+                publicStatus: status === 'APPROVED' ? 'PUBLISHED' : undefined,
+            });
+            await Promise.all([loadBusinessSuggestions(), loadCatalogQuality(), loadData()]);
+            setSuggestionReviewNotes((current) => {
+                const next = { ...current };
+                delete next[suggestionId];
+                return next;
+            });
+            setSuccessMessage(
+                status === 'APPROVED'
+                    ? 'Sugerencia aprobada y ficha publicada en el catalogo'
+                    : 'Sugerencia rechazada correctamente',
+            );
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo revisar la sugerencia'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleResolveDuplicateCluster = async (
+        cluster: CatalogQualitySnapshot['duplicateCandidates'][number],
+        status: 'MERGED' | 'DISMISSED' | 'CONFLICT',
+    ) => {
+        const businessIds = cluster.businesses.map((business) => business.id);
+        const primaryBusinessId = duplicatePrimarySelection[cluster.key];
+
+        if (status === 'MERGED' && !primaryBusinessId) {
+            setErrorMessage('Selecciona una ficha primaria antes de fusionar el cluster');
+            return;
+        }
+
+        setProcessingId(`duplicate:${cluster.key}`);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await businessApi.resolveDuplicateCaseAdmin({
+                status,
+                businessIds,
+                primaryBusinessId: status === 'MERGED' ? primaryBusinessId : undefined,
+                reasons: cluster.reasons,
+                notes: duplicateResolutionNotes[cluster.key]?.trim() || undefined,
+            });
+            await Promise.all([loadCatalogQuality(), loadDuplicateCases(), loadData()]);
+            setDuplicateResolutionNotes((current) => {
+                const next = { ...current };
+                delete next[cluster.key];
+                return next;
+            });
+            setDuplicatePrimarySelection((current) => {
+                const next = { ...current };
+                delete next[cluster.key];
+                return next;
+            });
+            setSuccessMessage(
+                status === 'MERGED'
+                    ? 'Cluster fusionado y auditado correctamente'
+                    : status === 'CONFLICT'
+                        ? 'Cluster marcado como conflicto para seguimiento manual'
+                        : 'Cluster descartado como duplicado',
+            );
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo resolver el cluster duplicado'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     const handleCreateCatalogBusiness = async (event: React.FormEvent) => {
         event.preventDefault();
         setCreatingCatalogBusiness(true);
@@ -669,6 +931,7 @@ export function AdminDashboard() {
 
         try {
             await businessApi.createAdminCatalog({
+                source: catalogBusinessForm.source,
                 name: catalogBusinessForm.name.trim(),
                 description: catalogBusinessForm.description.trim(),
                 address: catalogBusinessForm.address.trim(),
@@ -1501,6 +1764,18 @@ export function AdminDashboard() {
                                 <div className="card p-5">
                                     <h3 className="font-display font-semibold mb-3">Crear negocio de catalogo</h3>
                                     <form onSubmit={handleCreateCatalogBusiness} className="space-y-3">
+                                        <select
+                                            className="input-field text-sm"
+                                            value={catalogBusinessForm.source}
+                                            onChange={(event) => setCatalogBusinessForm((current) => ({
+                                                ...current,
+                                                source: event.target.value as CatalogBusinessForm['source'],
+                                            }))}
+                                        >
+                                            <option value="ADMIN">Alta manual admin</option>
+                                            <option value="IMPORT">Importacion curada</option>
+                                            <option value="SYSTEM">Ingestion operativa</option>
+                                        </select>
                                         <input
                                             type="text"
                                             className="input-field text-sm"

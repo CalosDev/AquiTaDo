@@ -489,6 +489,10 @@ export class BusinessClaimRequestQueryDto {
 
 export class CreateAdminCatalogBusinessDto extends CreateBusinessDto {
     @IsOptional()
+    @IsIn(['ADMIN', 'IMPORT', 'SYSTEM'])
+    source?: 'ADMIN' | 'IMPORT' | 'SYSTEM';
+
+    @IsOptional()
     @IsIn(BUSINESS_PUBLIC_STATUSES)
     publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
 

@@ -1411,6 +1411,11 @@ export function BusinessesList() {
                                 >
                                     Limpiar filtros
                                 </button>
+                                {!isAuthenticated || isCustomerRole ? (
+                                    <Link to="/suggest-business" className="btn-secondary text-sm">
+                                        Sugerir este negocio
+                                    </Link>
+                                ) : null}
                                 <Link to="/" className="btn-secondary text-sm">
                                     Volver al inicio
                                 </Link>

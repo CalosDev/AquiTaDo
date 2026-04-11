@@ -161,7 +161,7 @@ export async function recordPreventiveModerationGrowthEvent(
     | 'PREMODERATION_RELEASED'
     | 'PREMODERATION_CONFIRMED',
     businessId: string,
-    organizationId: string,
+    organizationId: string | null,
     userId: string | null,
     metadata: Record<string, unknown>,
 ) {
@@ -179,7 +179,7 @@ export async function recordPreventiveModerationGrowthEvent(
 async function countDuplicateBusinessField(
     prismaClient: PrismaClientLike,
     businessId: string,
-    organizationId: string,
+    organizationId: string | null,
     field: 'phone' | 'whatsapp' | 'email' | 'website',
     rawValue?: string | null,
 ): Promise<number> {
@@ -192,7 +192,7 @@ async function countDuplicateBusinessField(
         where: {
             id: { not: businessId },
             deletedAt: null,
-            organizationId: { not: organizationId },
+            ...(organizationId ? { organizationId: { not: organizationId } } : {}),
             [field]: {
                 equals: value,
                 mode: 'insensitive',

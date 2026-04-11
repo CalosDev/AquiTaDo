@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { analyticsApi, bookingsApi, businessApi, checkinsApi, favoritesApi, messagingApi, promotionsApi, reputationApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
@@ -130,6 +130,7 @@ function DeferredSectionPlaceholder({ label }: { label: string }) {
 
 export function BusinessDetails() {
     const { slug } = useParams<{ slug: string }>();
+    const [searchParams] = useSearchParams();
     const { isAuthenticated, user } = useAuth();
     const isCustomerRole = user?.role === 'USER';
     const isBusinessOwnerRole = user?.role === 'BUSINESS_OWNER';
@@ -162,6 +163,7 @@ export function BusinessDetails() {
     });
     const [submittingBooking, setSubmittingBooking] = useState(false);
     const [submittingClaim, setSubmittingClaim] = useState(false);
+    const [claimFormVisible, setClaimFormVisible] = useState(false);
     const [publicLeadForm, setPublicLeadForm] = useState({
         contactName: '',
         contactPhone: '',
@@ -728,6 +730,33 @@ export function BusinessDetails() {
             metadata,
         });
     };
+
+    const trackClaimCtaClick = useCallback((source: string) => {
+        if (!business?.id) {
+            return;
+        }
+
+        void trackGrowthSignal({
+            eventType: 'CLAIM_CTA_CLICK',
+            businessId: business.id,
+            provinceId: business.province?.id,
+            cityId: business.city?.id,
+            metadata: {
+                source,
+                claimStatus,
+                isAuthenticated,
+            },
+        });
+    }, [business, claimStatus, isAuthenticated]);
+    const claimFormHighlighted = (
+        claimFormVisible
+        || (
+            searchParams.get('claim') === '1'
+            && showClaimCallout
+            && business?.isClaimable
+            && claimStatus === 'UNCLAIMED'
+        )
+    );
 
     const handlePhoneClick = (placement: ContactPlacement = 'sidebar_card') => {
         if (!business?.id) {
@@ -1466,7 +1495,11 @@ export function BusinessDetails() {
 
                                 {!isAuthenticated ? (
                                     <div className="mt-4 flex flex-wrap items-center gap-3">
-                                        <Link to="/login" className="btn-primary text-sm">
+                                        <Link
+                                            to="/login"
+                                            className="btn-primary text-sm"
+                                            onClick={() => trackClaimCtaClick('business-details-login-link')}
+                                        >
                                             Inicia sesion para reclamar
                                         </Link>
                                         <p className="text-sm text-slate-600">
@@ -1475,6 +1508,23 @@ export function BusinessDetails() {
                                     </div>
                                 ) : business.isClaimable && claimStatus === 'UNCLAIMED' ? (
                                     <form onSubmit={handleClaimSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
+                                        <div className="md:col-span-2 flex flex-wrap items-center gap-3 rounded-xl border border-primary-100 bg-white/80 px-4 py-3">
+                                            <button
+                                                type="button"
+                                                className="btn-primary text-sm"
+                                                onClick={() => {
+                                                    trackClaimCtaClick('business-details-claim-panel');
+                                                    setClaimFormVisible(true);
+                                                }}
+                                            >
+                                                Quiero reclamar este perfil
+                                            </button>
+                                            <p className="text-sm text-slate-600">
+                                                {claimFormHighlighted
+                                                    ? 'Perfecto. Completa la evidencia aqui abajo y enviaremos la solicitud a revision.'
+                                                    : 'Usa este CTA para iniciar el claim y luego completa la evidencia en el formulario.'}
+                                            </p>
+                                        </div>
                                         <div>
                                             <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                                                 Tipo de evidencia

@@ -24,21 +24,8 @@ import {
     UpdateBookingStatusDto,
 } from './dto/booking.dto';
 
-@Injectable()
-export class BookingsService {
-    private readonly logger = new Logger(BookingsService.name);
-    private static readonly BOOKING_FEATURE_CANONICAL = 'reservaciones';
-
-    constructor(
-        @Inject(PrismaService)
-        private readonly prisma: PrismaService,
-        @Inject(ReputationService)
-        private readonly reputationService: ReputationService,
-        @Inject(NotificationsQueueService)
-        private readonly notificationsQueueService: NotificationsQueueService,
-    ) { }
-
-    private readonly bookingInclude = {
+const bookingWithRelations = {
+    include: {
         business: {
             select: {
                 id: true,
@@ -68,7 +55,24 @@ export class BookingsService {
             orderBy: { createdAt: 'desc' as const },
             take: 1,
         },
-    };
+    },
+} as const satisfies Prisma.BookingDefaultArgs;
+
+@Injectable()
+export class BookingsService {
+    private readonly logger = new Logger(BookingsService.name);
+    private static readonly BOOKING_FEATURE_CANONICAL = 'reservaciones';
+
+    constructor(
+        @Inject(PrismaService)
+        private readonly prisma: PrismaService,
+        @Inject(ReputationService)
+        private readonly reputationService: ReputationService,
+        @Inject(NotificationsQueueService)
+        private readonly notificationsQueueService: NotificationsQueueService,
+    ) { }
+
+    private readonly bookingInclude = bookingWithRelations.include;
 
     private normalizeText(value: string): string {
         return value
@@ -124,6 +128,11 @@ export class BookingsService {
             throw new NotFoundException('Negocio no disponible para reservas');
         }
 
+        if (!business.organizationId) {
+            throw new BadRequestException('Este negocio aun no tiene una organizacion activa para reservas');
+        }
+        const effectiveOrganizationId = business.organizationId;
+
         const canAcceptBookings = business.features.some((entry) =>
             this.supportsBookingFeature(entry.feature.name),
         );
@@ -136,7 +145,7 @@ export class BookingsService {
         const booking = await this.prisma.$transaction(async (tx) => {
             const promotion = await this.resolveApplicablePromotion(
                 tx,
-                business.organizationId,
+                effectiveOrganizationId,
                 business.id,
                 dto.promotionId,
                 dto.couponCode,
@@ -144,7 +153,7 @@ export class BookingsService {
 
             const booking = await tx.booking.create({
                 data: {
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     businessId: business.id,
                     userId,
                     promotionId: promotion?.id ?? null,

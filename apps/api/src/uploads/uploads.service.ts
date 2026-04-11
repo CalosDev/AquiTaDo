@@ -67,6 +67,10 @@ export class UploadsService {
             throw new BadRequestException('Negocio no encontrado');
         }
 
+        if (!business.organizationId) {
+            throw new BadRequestException('Este negocio aun no tiene una organizacion activa para gestionar imagenes');
+        }
+
         if (userRole !== 'ADMIN') {
             if (business.organizationId !== organizationId) {
                 throw new NotFoundException('Negocio no encontrado');
@@ -184,6 +188,10 @@ export class UploadsService {
 
         if (!business || business.deletedAt) {
             throw new NotFoundException('Negocio no encontrado');
+        }
+
+        if (!business.organizationId) {
+            throw new BadRequestException('Este negocio aun no tiene una organizacion activa para documentos');
         }
 
         if (userRole !== 'ADMIN') {

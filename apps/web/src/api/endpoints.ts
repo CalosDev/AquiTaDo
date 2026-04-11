@@ -156,6 +156,8 @@ export const businessApi = {
         api.get('/businesses/claim-search', { params }),
     getClaimRequestsAdmin: (params?: { status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'; limit?: number }) =>
         api.get('/businesses/admin/claim-requests', { params }),
+    getDuplicateCasesAdmin: (params?: { status?: 'MERGED' | 'DISMISSED' | 'CONFLICT'; limit?: number }) =>
+        api.get('/businesses/admin/duplicate-cases', { params }),
     reviewClaimRequestAdmin: (
         claimRequestId: string,
         data: { status: 'APPROVED' | 'REJECTED'; notes?: string },
@@ -164,6 +166,16 @@ export const businessApi = {
         return response;
     }),
     createAdminCatalog: (data: Record<string, unknown>) => api.post('/businesses/admin/catalog', data).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
+    resolveDuplicateCaseAdmin: (data: {
+        status: 'MERGED' | 'DISMISSED' | 'CONFLICT';
+        businessIds: string[];
+        primaryBusinessId?: string;
+        reasons?: string[];
+        notes?: string;
+    }) => api.post('/businesses/admin/duplicate-cases/resolve', data).then((response) => {
         resetBusinessDiscoveryCaches();
         return response;
     }),
@@ -247,6 +259,38 @@ export const businessApi = {
             () => api.get('/businesses/nearby', { params }),
         ),
     verify: (id: string) => api.put(`/businesses/${id}/verify`).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
+};
+
+export const businessSuggestionApi = {
+    create: (data: {
+        name: string;
+        description?: string;
+        categoryId?: string;
+        address: string;
+        provinceId: string;
+        cityId?: string;
+        phone?: string;
+        whatsapp?: string;
+        website?: string;
+        email?: string;
+        notes?: string;
+    }) => api.post('/business-suggestions', data),
+    getMine: (params?: { status?: 'PENDING' | 'APPROVED' | 'REJECTED'; limit?: number }) =>
+        api.get('/business-suggestions/my', { params }),
+    getAdmin: (params?: { status?: 'PENDING' | 'APPROVED' | 'REJECTED'; limit?: number }) =>
+        api.get('/business-suggestions/admin', { params }),
+    reviewAdmin: (
+        suggestionId: string,
+        data: {
+            status: 'APPROVED' | 'REJECTED';
+            notes?: string;
+            publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+            ignorePotentialDuplicates?: boolean;
+        },
+    ) => api.post(`/business-suggestions/admin/${suggestionId}/review`, data).then((response) => {
         resetBusinessDiscoveryCaches();
         return response;
     }),
@@ -527,7 +571,10 @@ export const analyticsApi = {
             | 'PREMODERATION_RELEASED'
             | 'PREMODERATION_CONFIRMED'
             | 'BUSINESS_ONBOARDING_STEP'
-            | 'BUSINESS_ONBOARDING_COMPLETE';
+            | 'BUSINESS_ONBOARDING_COMPLETE'
+            | 'CLAIM_CTA_CLICK'
+            | 'CLAIM_REQUEST_SUBMITTED'
+            | 'USER_SUGGESTION_SUBMITTED';
         businessId?: string;
         categoryId?: string;
         provinceId?: string;

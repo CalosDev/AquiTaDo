@@ -64,7 +64,7 @@ export class AnalyticsService {
                 }
 
                 let uniqueVisitors = 0;
-                if (dto.eventType === AnalyticsEventType.VIEW) {
+                if (dto.eventType === AnalyticsEventType.VIEW && business.organizationId) {
                     uniqueVisitors = await this.registerUniqueVisitor(
                         tx,
                         business.organizationId,

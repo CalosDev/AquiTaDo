@@ -155,6 +155,18 @@ enum BusinessClaimRequestStatus {
   CANCELED
 }
 
+enum BusinessSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BusinessDuplicateCaseStatus {
+  DISMISSED
+  CONFLICT
+  MERGED
+}
+
 enum BusinessClaimEvidenceType {
   PHONE
   EMAIL
@@ -262,6 +274,9 @@ enum GrowthEventType {
   CONTACT_CLICK
   WHATSAPP_CLICK
   BOOKING_INTENT
+  CLAIM_CTA_CLICK
+  CLAIM_REQUEST_SUBMITTED
+  USER_SUGGESTION_SUBMITTED
   SHARE_CLICK
   PASSWORD_RESET_REQUEST
   PASSWORD_RESET_COMPLETE
@@ -332,6 +347,9 @@ model User {
   claimedBusinesses        Business[]                     @relation("BusinessClaimedBy")
   businessClaimRequests    BusinessClaimRequest[]         @relation("BusinessClaimRequester")
   businessClaimReviews     BusinessClaimRequest[]         @relation("BusinessClaimReviewer")
+  businessSuggestionsSubmitted BusinessSuggestion[]       @relation("BusinessSuggestionSubmitter")
+  businessSuggestionReviews BusinessSuggestion[]          @relation("BusinessSuggestionReviewer")
+  duplicateCasesResolved   BusinessDuplicateCase[]        @relation("BusinessDuplicateResolver")
 
   @@index([email])
   @@index([loyaltyPoints])
@@ -379,10 +397,10 @@ model Business {
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
-  ownerId        String
-  owner          User         @relation(fields: [ownerId], references: [id])
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  ownerId        String?
+  owner          User?        @relation(fields: [ownerId], references: [id])
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
   provinceId     String
   province       Province     @relation(fields: [provinceId], references: [id])
   cityId         String?
@@ -411,6 +429,8 @@ model Business {
   checkIns              CheckIn[]
   salesLeads            SalesLead[]
   claimRequests         BusinessClaimRequest[]
+  approvedFromSuggestions BusinessSuggestion[]            @relation("BusinessSuggestionCreatedBusiness")
+  primaryDuplicateCases BusinessDuplicateCase[]          @relation("BusinessDuplicatePrimary")
 
   @@index([slug])
   @@index([ownerId])
@@ -499,6 +519,62 @@ model BusinessClaimRequest {
   @@index([requesterOrganizationId, status, createdAt])
   @@index([reviewedByAdminId, reviewedAt])
   @@map("business_claim_requests")
+}
+
+model BusinessSuggestion {
+  id                String                   @id @default(uuid())
+  submittedByUserId String
+  submittedByUser   User                     @relation("BusinessSuggestionSubmitter", fields: [submittedByUserId], references: [id], onDelete: Cascade)
+  name              String                   @db.VarChar(200)
+  description       String?                  @db.Text
+  categoryId        String?
+  category          Category?                @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  address           String?                  @db.VarChar(500)
+  provinceId        String?
+  province          Province?                @relation(fields: [provinceId], references: [id], onDelete: SetNull)
+  cityId            String?
+  city              City?                    @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  phone             String?                  @db.VarChar(20)
+  whatsapp          String?                  @db.VarChar(20)
+  website           String?                  @db.VarChar(255)
+  email             String?                  @db.VarChar(160)
+  notes             String?                  @db.Text
+  status            BusinessSuggestionStatus @default(PENDING)
+  reviewedByAdminId String?
+  reviewedByAdmin   User?                    @relation("BusinessSuggestionReviewer", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  createdBusinessId String?
+  createdBusiness   Business?                @relation("BusinessSuggestionCreatedBusiness", fields: [createdBusinessId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([submittedByUserId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([reviewedByAdminId, reviewedAt])
+  @@index([createdBusinessId])
+  @@map("business_suggestions")
+}
+
+model BusinessDuplicateCase {
+  id                String                     @id @default(uuid())
+  clusterKey        String                     @unique @db.VarChar(255)
+  status            BusinessDuplicateCaseStatus
+  businessIds       Json
+  reasons           Json?
+  primaryBusinessId String?
+  primaryBusiness   Business?                  @relation("BusinessDuplicatePrimary", fields: [primaryBusinessId], references: [id], onDelete: SetNull)
+  resolvedByAdminId String?
+  resolvedByAdmin   User?                      @relation("BusinessDuplicateResolver", fields: [resolvedByAdminId], references: [id], onDelete: SetNull)
+  resolutionNotes   String?                    @db.Text
+  resolutionMeta    Json?
+  resolvedAt        DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@index([status, createdAt])
+  @@index([resolvedByAdminId, resolvedAt])
+  @@index([primaryBusinessId])
+  @@map("business_duplicate_cases")
 }
 
 model OrganizationMember {
@@ -684,6 +760,7 @@ model Category {
   children Category[] @relation("CategoryTree")
 
   businesses          BusinessCategory[]
+  businessSuggestions BusinessSuggestion[]
   adCampaignsTargeted AdCampaign[]       @relation("AdCampaignTargetCategory")
   growthEvents        GrowthEvent[]
 
@@ -773,6 +850,7 @@ model Province {
 
   cities              City[]
   businesses          Business[]
+  businessSuggestions BusinessSuggestion[]
   adCampaignsTargeted AdCampaign[] @relation("AdCampaignTargetProvince")
   growthEvents        GrowthEvent[]
 
@@ -789,6 +867,7 @@ model City {
   province   Province @relation(fields: [provinceId], references: [id])
 
   businesses   Business[]
+  businessSuggestions BusinessSuggestion[]
   sectors      Sector[]
   growthEvents GrowthEvent[]
 

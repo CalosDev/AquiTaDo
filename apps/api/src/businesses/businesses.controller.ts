@@ -17,6 +17,10 @@ import {
     BusinessClaimRequestQueryDto,
     CreateAdminCatalogBusinessDto,
 } from './dto/business.dto';
+import {
+    BusinessDuplicateCaseQueryDto,
+    ResolveBusinessDuplicateCaseDto,
+} from './dto/business-duplicate.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
@@ -117,6 +121,23 @@ export class BusinessesController {
         @CurrentUser('id') adminUserId: string,
     ) {
         return this.businessesService.reviewClaimRequest(id, dto, adminUserId);
+    }
+
+    @Get('admin/duplicate-cases')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async listDuplicateCases(@Query() query: BusinessDuplicateCaseQueryDto) {
+        return this.businessesService.listDuplicateCases(query);
+    }
+
+    @Post('admin/duplicate-cases/resolve')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async resolveDuplicateCase(
+        @Body() dto: ResolveBusinessDuplicateCaseDto,
+        @CurrentUser('id') adminUserId: string,
+    ) {
+        return this.businessesService.resolveDuplicateCase(dto, adminUserId);
     }
 
     @Get(':identifier')

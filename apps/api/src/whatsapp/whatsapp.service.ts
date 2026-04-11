@@ -160,6 +160,10 @@ export class WhatsAppService {
         const variantKey = dto.variantKey?.trim() || null;
 
         const conversion = await this.prisma.$transaction(async (tx) => {
+            if (!business.organizationId) {
+                throw new BadRequestException('Este negocio aun no tiene una organizacion activa para WhatsApp');
+            }
+
             const created = await tx.whatsAppClickConversion.create({
                 data: {
                     businessId: business.id,
@@ -302,7 +306,7 @@ export class WhatsAppService {
         let scopedBusiness: {
             id: string;
             name: string;
-            organizationId: string;
+            organizationId: string | null;
             claimStatus: string;
             autoResponderEnabled: boolean;
             latitude: number | null;

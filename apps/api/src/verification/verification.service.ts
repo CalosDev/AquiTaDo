@@ -99,6 +99,10 @@ export class VerificationService {
                 throw new NotFoundException('Negocio no encontrado en la organización activa');
             }
 
+            if (!business.organizationId) {
+                throw new BadRequestException('Este negocio aun no tiene una organizacion activa para verificacion');
+            }
+
             const document = await tx.businessVerificationDocument.create({
                 data: {
                     organizationId: business.organizationId,
@@ -218,6 +222,10 @@ export class VerificationService {
 
             if (!business || (actorGlobalRole !== 'ADMIN' && business.organizationId !== organizationId)) {
                 throw new NotFoundException('Negocio no encontrado en la organización activa');
+            }
+
+            if (!business.organizationId) {
+                throw new BadRequestException('Este negocio aun no tiene una organizacion activa para verificacion');
             }
 
             const docsCount = await tx.businessVerificationDocument.count({
@@ -562,6 +570,10 @@ export class VerificationService {
                 throw new NotFoundException('Negocio no encontrado');
             }
 
+            if (!business.organizationId) {
+                throw new BadRequestException('Este negocio aun no tiene una organizacion activa para verificacion');
+            }
+
             const moderation = await evaluatePreventiveModerationForBusiness(tx, businessId);
             const hasPreventiveBlock = moderation.blocked || isPreventiveModerationNote(business.verificationNotes);
 
@@ -725,6 +737,10 @@ export class VerificationService {
 
             if (!business) {
                 throw new NotFoundException('Negocio no encontrado');
+            }
+
+            if (!business.organizationId) {
+                throw new BadRequestException('Este negocio aun no tiene una organizacion activa para verificacion');
             }
 
             const now = new Date();
