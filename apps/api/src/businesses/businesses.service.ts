@@ -103,6 +103,8 @@ type BusinessDuplicateSignalInput = {
     categoryIds?: string[];
 };
 
+const ACTIVE_CLAIM_REQUEST_STATUSES = ['PENDING', 'UNDER_REVIEW'] as const;
+
 @Injectable()
 export class BusinessesService {
     private readonly logger = new Logger(BusinessesService.name);
@@ -316,8 +318,13 @@ export class BusinessesService {
     async findMine(_userId: string, _userRole: string, organizationId: string) {
         const businesses = await this.prisma.business.findMany({
             where: {
-                organizationId,
                 deletedAt: null,
+                ownerships: {
+                    some: {
+                        organizationId,
+                        isActive: true,
+                    },
+                },
             },
             select: mineListBusinessSelect,
             orderBy: { createdAt: 'desc' },
@@ -434,9 +441,14 @@ export class BusinessesService {
                 evidenceType: true,
                 evidenceValue: true,
                 notes: true,
+                adminNotes: true,
                 createdAt: true,
                 updatedAt: true,
                 reviewedAt: true,
+                approvedAt: true,
+                rejectedAt: true,
+                expiredAt: true,
+                canceledAt: true,
                 business: {
                     select: {
                         id: true,
@@ -527,10 +539,24 @@ export class BusinessesService {
                     throw new BadRequestException('Este negocio ya fue reclamado');
                 }
 
+                const activeOwnership = await tx.businessOwnership.findFirst({
+                    where: {
+                        businessId,
+                        isActive: true,
+                    },
+                    select: { id: true },
+                });
+
+                if (activeOwnership) {
+                    throw new ConflictException('Este negocio ya tiene un ownership activo');
+                }
+
                 const existingPendingRequest = await tx.businessClaimRequest.findFirst({
                     where: {
                         businessId,
-                        status: 'PENDING',
+                        status: {
+                            in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                        },
                     },
                     select: { id: true },
                 });
@@ -566,6 +592,7 @@ export class BusinessesService {
                     where: { id: businessId },
                     data: {
                         claimStatus: 'PENDING_CLAIM',
+                        updatedByUserId: requesterUserId,
                     },
                     select: { id: true },
                 });
@@ -654,13 +681,28 @@ export class BusinessesService {
                     throw new NotFoundException('Solicitud de reclamacion no encontrada');
                 }
 
-                if (claimRequest.status !== 'PENDING') {
+                if (!ACTIVE_CLAIM_REQUEST_STATUSES.includes(claimRequest.status as (typeof ACTIVE_CLAIM_REQUEST_STATUSES)[number])) {
                     throw new BadRequestException('Esta solicitud ya fue revisada');
                 }
 
                 if (dto.status === 'APPROVED') {
                     const effectiveOrganizationId = claimRequest.requesterOrganizationId
                         ?? await this.ensureOwnerOrganization(tx, claimRequest.requesterUserId);
+
+                    const activeOwnership = await tx.businessOwnership.findFirst({
+                        where: {
+                            businessId: claimRequest.businessId,
+                            isActive: true,
+                        },
+                        select: {
+                            id: true,
+                            organizationId: true,
+                        },
+                    });
+
+                    if (activeOwnership) {
+                        throw new ConflictException('El negocio ya tiene un ownership activo');
+                    }
 
                     await tx.user.updateMany({
                         where: {
@@ -680,6 +722,23 @@ export class BusinessesService {
                             claimStatus: 'CLAIMED',
                             claimedAt: reviewedAt,
                             claimedByUserId: claimRequest.requesterUserId,
+                            updatedByUserId: adminUserId,
+                            lastReviewedAt: reviewedAt,
+                        },
+                        select: {
+                            id: true,
+                        },
+                    });
+
+                    const ownership = await tx.businessOwnership.create({
+                        data: {
+                            businessId: claimRequest.businessId,
+                            organizationId: effectiveOrganizationId,
+                            grantedByUserId: adminUserId,
+                            claimRequestId,
+                            role: 'PRIMARY_OWNER',
+                            isActive: true,
+                            grantedAt: reviewedAt,
                         },
                         select: {
                             id: true,
@@ -690,9 +749,10 @@ export class BusinessesService {
                         where: { id: claimRequestId },
                         data: {
                             status: 'APPROVED',
-                            notes: reviewNotes ?? claimRequest.notes,
+                            adminNotes: reviewNotes,
                             reviewedByAdminId: adminUserId,
                             reviewedAt,
+                            approvedAt: reviewedAt,
                         },
                         select: { id: true },
                     });
@@ -700,15 +760,19 @@ export class BusinessesService {
                     await tx.businessClaimRequest.updateMany({
                         where: {
                             businessId: claimRequest.businessId,
-                            status: 'PENDING',
+                            status: {
+                                in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                            },
                             id: {
                                 not: claimRequestId,
                             },
                         },
                         data: {
                             status: 'CANCELED',
+                            adminNotes: 'Cancelada automaticamente porque otro reclamo fue aprobado.',
                             reviewedByAdminId: adminUserId,
                             reviewedAt,
+                            canceledAt: reviewedAt,
                         },
                     });
 
@@ -737,16 +801,41 @@ export class BusinessesService {
                         requesterUserId: claimRequest.requesterUserId,
                         requesterOrganizationId: effectiveOrganizationId,
                         organizationId: effectiveOrganizationId,
+                        ownershipId: ownership.id,
                     };
                 }
+
+                const [remainingActiveClaims, activeOwnership] = await Promise.all([
+                    tx.businessClaimRequest.count({
+                        where: {
+                            businessId: claimRequest.businessId,
+                            id: {
+                                not: claimRequestId,
+                            },
+                            status: {
+                                in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                            },
+                        },
+                    }),
+                    tx.businessOwnership.findFirst({
+                        where: {
+                            businessId: claimRequest.businessId,
+                            isActive: true,
+                        },
+                        select: {
+                            id: true,
+                        },
+                    }),
+                ]);
 
                 await tx.businessClaimRequest.update({
                     where: { id: claimRequestId },
                     data: {
                         status: 'REJECTED',
-                        notes: reviewNotes ?? claimRequest.notes,
+                        adminNotes: reviewNotes,
                         reviewedByAdminId: adminUserId,
                         reviewedAt,
+                        rejectedAt: reviewedAt,
                     },
                     select: { id: true },
                 });
@@ -754,7 +843,13 @@ export class BusinessesService {
                 await tx.business.update({
                     where: { id: claimRequest.businessId },
                     data: {
-                        claimStatus: 'UNCLAIMED',
+                        claimStatus: activeOwnership
+                            ? 'CLAIMED'
+                            : remainingActiveClaims > 0
+                                ? 'PENDING_CLAIM'
+                                : 'UNCLAIMED',
+                        updatedByUserId: adminUserId,
+                        lastReviewedAt: reviewedAt,
                     },
                     select: { id: true },
                 });
@@ -814,6 +909,202 @@ export class BusinessesService {
             }
 
             return reviewedClaim;
+        } catch (error) {
+            this.handlePrismaError(error);
+            throw error;
+        }
+    }
+
+    async listOwnershipHistory(businessId: string, limit = 20) {
+        const safeLimit = Math.min(Math.max(limit, 1), 100);
+        const business = await this.prisma.business.findUnique({
+            where: { id: businessId },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                claimStatus: true,
+                ownerId: true,
+                organizationId: true,
+            },
+        });
+
+        if (!business) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        const ownerships = await this.prisma.businessOwnership.findMany({
+            where: {
+                businessId,
+            },
+            orderBy: [
+                { isActive: 'desc' },
+                { grantedAt: 'desc' },
+                { createdAt: 'desc' },
+            ],
+            take: safeLimit,
+            select: {
+                id: true,
+                role: true,
+                isActive: true,
+                grantedAt: true,
+                revokedAt: true,
+                revokeReason: true,
+                organization: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
+                grantedByUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+                revokedByUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+                claimRequest: {
+                    select: {
+                        id: true,
+                        status: true,
+                        requesterUser: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        return {
+            business,
+            data: ownerships,
+        };
+    }
+
+    async revokeBusinessOwnership(
+        businessId: string,
+        ownershipId: string,
+        reason: string,
+        adminUserId: string,
+    ) {
+        const revokeReason = normalizeOptionalText(reason);
+        if (!revokeReason) {
+            throw new BadRequestException('El motivo de revocacion es obligatorio');
+        }
+
+        const revokedAt = new Date();
+
+        try {
+            const result = await this.prisma.$transaction(async (tx) => {
+                const ownership = await tx.businessOwnership.findFirst({
+                    where: {
+                        id: ownershipId,
+                        businessId,
+                    },
+                    select: {
+                        id: true,
+                        businessId: true,
+                        organizationId: true,
+                        isActive: true,
+                        business: {
+                            select: {
+                                id: true,
+                                slug: true,
+                            },
+                        },
+                    },
+                });
+
+                if (!ownership) {
+                    throw new NotFoundException('Ownership no encontrado');
+                }
+
+                if (!ownership.isActive) {
+                    throw new BadRequestException('Este ownership ya fue revocado');
+                }
+
+                await tx.businessOwnership.update({
+                    where: { id: ownershipId },
+                    data: {
+                        isActive: false,
+                        revokedAt,
+                        revokedByUserId: adminUserId,
+                        revokeReason,
+                    },
+                    select: { id: true },
+                });
+
+                const nextActiveOwnership = await tx.businessOwnership.findFirst({
+                    where: {
+                        businessId,
+                        isActive: true,
+                    },
+                    orderBy: [
+                        { grantedAt: 'desc' },
+                        { createdAt: 'desc' },
+                    ],
+                    select: {
+                        organizationId: true,
+                    },
+                });
+
+                await tx.business.update({
+                    where: { id: businessId },
+                    data: {
+                        organizationId: nextActiveOwnership?.organizationId ?? null,
+                        ownerId: nextActiveOwnership ? undefined : null,
+                        claimStatus: nextActiveOwnership ? 'CLAIMED' : 'UNCLAIMED',
+                        claimedByUserId: nextActiveOwnership ? undefined : null,
+                        claimedAt: nextActiveOwnership ? undefined : null,
+                        updatedByUserId: adminUserId,
+                        lastReviewedAt: revokedAt,
+                    },
+                    select: {
+                        id: true,
+                    },
+                });
+
+                await tx.auditLog.create({
+                    data: {
+                        organizationId: ownership.organizationId,
+                        actorUserId: adminUserId,
+                        action: 'business_ownership.revoked',
+                        targetType: 'business_ownership',
+                        targetId: ownership.id,
+                        metadata: {
+                            businessId,
+                            businessSlug: ownership.business.slug,
+                            revokeReason,
+                        } as Prisma.InputJsonValue,
+                    },
+                });
+
+                return {
+                    businessId,
+                    businessSlug: ownership.business.slug,
+                    ownershipId: ownership.id,
+                };
+            });
+
+            this.publishBusinessChangedEvent(result.businessId, result.businessSlug, 'updated');
+
+            return {
+                ...result,
+                revokedAt,
+                message: 'Ownership revocado correctamente',
+            };
         } catch (error) {
             this.handlePrismaError(error);
             throw error;
@@ -1344,7 +1635,8 @@ export class BusinessesService {
         const instagramUrl = normalizeOptionalText(input.instagramUrl) ?? null;
         const facebookUrl = normalizeOptionalText(input.facebookUrl) ?? null;
         const tiktokUrl = normalizeOptionalText(input.tiktokUrl) ?? null;
-        const publishedAt = input.publicStatus === 'PUBLISHED' || !input.publicStatus ? new Date() : null;
+        const isPublished = input.publicStatus === 'PUBLISHED' || !input.publicStatus;
+        const publishedAt = isPublished ? new Date() : null;
         const coordinates = await this.resolveCoordinatesForBusiness({
             address: input.address,
             provinceId: input.provinceId,
@@ -1406,10 +1698,16 @@ export class BusinessesService {
                         claimStatus: 'UNCLAIMED',
                         source: input.source,
                         publishedAt,
+                        firstPublishedAt: publishedAt,
                         claimedAt: null,
                         claimedByUserId: null,
                         catalogManagedByAdmin: input.catalogManagedByAdmin ?? true,
                         isClaimable: input.isClaimable ?? true,
+                        isPublished,
+                        isSearchable: isPublished,
+                        isDiscoverable: isPublished,
+                        createdByUserId: adminUserId,
+                        updatedByUserId: adminUserId,
                     },
                     select: {
                         id: true,
@@ -1542,6 +1840,7 @@ export class BusinessesService {
         }
 
         const [
+            activeOwnerships,
             activeBookings,
             activeConversations,
             activeWhatsAppConversations,
@@ -1553,6 +1852,12 @@ export class BusinessesService {
             primaryPendingClaims,
             secondaryPendingClaims,
         ] = await Promise.all([
+            tx.businessOwnership.count({
+                where: {
+                    businessId: { in: [primaryBusiness.id, ...secondaryIds] },
+                    isActive: true,
+                },
+            }),
             tx.booking.count({
                 where: {
                     businessId: { in: secondaryIds },
@@ -1600,16 +1905,26 @@ export class BusinessesService {
             tx.businessClaimRequest.count({
                 where: {
                     businessId: primaryBusiness.id,
-                    status: 'PENDING',
+                    status: {
+                        in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                    },
                 },
             }),
             tx.businessClaimRequest.count({
                 where: {
                     businessId: { in: secondaryIds },
-                    status: 'PENDING',
+                    status: {
+                        in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                    },
                 },
             }),
         ]);
+
+        if (activeOwnerships > 0) {
+            throw new BadRequestException(
+                'Este cluster tiene ownership activo. Marca conflicto y resuelve el control del negocio antes de fusionar.',
+            );
+        }
 
         if (
             activeBookings > 0
@@ -2166,6 +2481,8 @@ export class BusinessesService {
                 await this.assertCityBelongsToProvince(tx, dto.provinceId, dto.cityId);
                 await this.assertSectorBelongsToCity(tx, dto.cityId, dto.sectorId);
                 const effectiveOrganizationId = organizationId ?? await this.ensureOwnerOrganization(tx, userId);
+                const publishedAt = new Date();
+                const claimedAt = new Date();
 
                 if (organizationId) {
                     if (!organizationRole) {
@@ -2204,11 +2521,17 @@ export class BusinessesService {
                         publicStatus: 'PUBLISHED',
                         claimStatus: 'CLAIMED',
                         source: 'OWNER',
-                        publishedAt: new Date(),
-                        claimedAt: new Date(),
+                        publishedAt,
+                        firstPublishedAt: publishedAt,
+                        claimedAt,
                         claimedByUserId: userId,
                         catalogManagedByAdmin: false,
                         isClaimable: true,
+                        isPublished: true,
+                        isSearchable: true,
+                        isDiscoverable: true,
+                        createdByUserId: userId,
+                        updatedByUserId: userId,
                     },
                     select: {
                         id: true,
@@ -2216,6 +2539,18 @@ export class BusinessesService {
                         organizationId: true,
                         ownerId: true,
                     },
+                });
+
+                await tx.businessOwnership.create({
+                    data: {
+                        businessId: business.id,
+                        organizationId: effectiveOrganizationId,
+                        grantedByUserId: userId,
+                        role: 'PRIMARY_OWNER',
+                        isActive: true,
+                        grantedAt: claimedAt,
+                    },
+                    select: { id: true },
                 });
 
                 if (categoryIds?.length) {
@@ -3723,6 +4058,9 @@ export class BusinessesService {
         return {
             deletedAt: null,
             publicStatus: 'PUBLISHED',
+            isPublished: true,
+            isSearchable: true,
+            isDiscoverable: true,
             OR: [
                 { verified: true },
                 {
@@ -3754,6 +4092,10 @@ export class BusinessesService {
         const rows = await this.prisma.business.findMany({
             where: {
                 deletedAt: null,
+                publicStatus: 'PUBLISHED',
+                isPublished: true,
+                isSearchable: true,
+                isDiscoverable: true,
                 ...(input.provinceId ? { provinceId: input.provinceId } : {}),
                 ...(input.cityId ? { cityId: input.cityId } : {}),
                 OR: orClauses,

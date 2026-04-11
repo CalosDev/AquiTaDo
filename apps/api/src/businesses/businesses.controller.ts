@@ -16,6 +16,8 @@ import {
     ReviewBusinessClaimRequestDto,
     BusinessClaimRequestQueryDto,
     CreateAdminCatalogBusinessDto,
+    OwnershipHistoryQueryDto,
+    RevokeBusinessOwnershipDto,
 } from './dto/business.dto';
 import {
     BusinessDuplicateCaseQueryDto,
@@ -121,6 +123,28 @@ export class BusinessesController {
         @CurrentUser('id') adminUserId: string,
     ) {
         return this.businessesService.reviewClaimRequest(id, dto, adminUserId);
+    }
+
+    @Get('admin/:id/ownership-history')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async listOwnershipHistory(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Query() query: OwnershipHistoryQueryDto,
+    ) {
+        return this.businessesService.listOwnershipHistory(id, query.limit);
+    }
+
+    @Post('admin/:id/ownerships/:ownershipId/revoke')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async revokeBusinessOwnership(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Param('ownershipId', new ParseUUIDPipe()) ownershipId: string,
+        @Body() dto: RevokeBusinessOwnershipDto,
+        @CurrentUser('id') adminUserId: string,
+    ) {
+        return this.businessesService.revokeBusinessOwnership(id, ownershipId, dto.reason, adminUserId);
     }
 
     @Get('admin/duplicate-cases')

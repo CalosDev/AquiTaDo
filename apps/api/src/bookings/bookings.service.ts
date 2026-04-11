@@ -112,6 +112,15 @@ export class BookingsService {
                 organizationId: true,
                 verified: true,
                 claimStatus: true,
+                ownerships: {
+                    where: {
+                        isActive: true,
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    take: 1,
+                },
                 features: {
                     select: {
                         feature: {
@@ -128,10 +137,10 @@ export class BookingsService {
             throw new NotFoundException('Negocio no disponible para reservas');
         }
 
-        if (!business.organizationId) {
+        const effectiveOrganizationId = business.organizationId ?? business.ownerships[0]?.organizationId ?? null;
+        if (!effectiveOrganizationId) {
             throw new BadRequestException('Este negocio aun no tiene una organizacion activa para reservas');
         }
-        const effectiveOrganizationId = business.organizationId;
 
         const canAcceptBookings = business.features.some((entry) =>
             this.supportsBookingFeature(entry.feature.name),

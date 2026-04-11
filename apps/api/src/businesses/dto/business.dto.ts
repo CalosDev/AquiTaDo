@@ -28,7 +28,7 @@ const BUSINESS_PRICE_RANGES = ['BUDGET', 'MODERATE', 'PREMIUM', 'LUXURY'] as con
 const BUSINESS_PUBLIC_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED', 'SUSPENDED'] as const;
 const BUSINESS_CLAIM_STATUSES = ['UNCLAIMED', 'PENDING_CLAIM', 'CLAIMED'] as const;
 const BUSINESS_SOURCES = ['ADMIN', 'OWNER', 'IMPORT', 'USER_SUGGESTION', 'SYSTEM'] as const;
-const BUSINESS_CLAIM_REQUEST_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELED'] as const;
+const BUSINESS_CLAIM_REQUEST_STATUSES = ['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELED'] as const;
 const BUSINESS_CLAIM_EVIDENCE_TYPES = ['PHONE', 'EMAIL', 'WEBSITE', 'INSTAGRAM', 'DOCUMENT', 'NOTE', 'OTHER'] as const;
 
 export class BusinessHourInputDto {
@@ -539,7 +539,7 @@ export class ReviewBusinessClaimRequestDto {
 export class BusinessClaimRequestQueryDto {
     @IsOptional()
     @IsIn(BUSINESS_CLAIM_REQUEST_STATUSES)
-    status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED';
+    status?: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED';
 
     @IsOptional()
     @Type(() => Number)
@@ -567,4 +567,21 @@ export class CreateAdminCatalogBusinessDto extends CreateBusinessDto {
     @Type(() => Boolean)
     @IsBoolean()
     isClaimable?: boolean;
+}
+
+export class OwnershipHistoryQueryDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number;
+}
+
+export class RevokeBusinessOwnershipDto {
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(8)
+    @MaxLength(1000)
+    reason!: string;
 }

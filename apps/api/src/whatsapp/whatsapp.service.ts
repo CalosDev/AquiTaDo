@@ -128,6 +128,15 @@ export class WhatsAppService {
                 claimStatus: true,
                 provinceId: true,
                 cityId: true,
+                ownerships: {
+                    where: {
+                        isActive: true,
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    take: 1,
+                },
                 categories: {
                     select: {
                         categoryId: true,
@@ -160,14 +169,15 @@ export class WhatsAppService {
         const variantKey = dto.variantKey?.trim() || null;
 
         const conversion = await this.prisma.$transaction(async (tx) => {
-            if (!business.organizationId) {
+            const effectiveOrganizationId = business.organizationId ?? business.ownerships[0]?.organizationId ?? null;
+            if (!effectiveOrganizationId) {
                 throw new BadRequestException('Este negocio aun no tiene una organizacion activa para WhatsApp');
             }
 
             const created = await tx.whatsAppClickConversion.create({
                 data: {
                     businessId: business.id,
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     userId: userId ?? null,
                     source,
                     sessionId,
@@ -187,7 +197,7 @@ export class WhatsAppService {
                 data: {
                     eventType: GrowthEventType.WHATSAPP_CLICK,
                     businessId: business.id,
-                    organizationId: business.organizationId,
+                    organizationId: effectiveOrganizationId,
                     userId: userId ?? null,
                     categoryId: business.categories[0]?.categoryId ?? null,
                     provinceId: business.provinceId,
@@ -311,6 +321,9 @@ export class WhatsAppService {
             autoResponderEnabled: boolean;
             latitude: number | null;
             longitude: number | null;
+            ownerships: Array<{
+                organizationId: string;
+            }>;
         } | null = null;
 
         if (businessId) {
@@ -324,6 +337,15 @@ export class WhatsAppService {
                     autoResponderEnabled: true,
                     latitude: true,
                     longitude: true,
+                    ownerships: {
+                        where: {
+                            isActive: true,
+                        },
+                        select: {
+                            organizationId: true,
+                        },
+                        take: 1,
+                    },
                 },
             });
 
@@ -344,7 +366,10 @@ export class WhatsAppService {
             },
         });
 
-        const organizationId = scopedBusiness?.organizationId ?? previousConversation?.organizationId ?? null;
+        const scopedOrganizationId = scopedBusiness?.organizationId
+            ?? scopedBusiness?.ownerships[0]?.organizationId
+            ?? null;
+        const organizationId = scopedOrganizationId ?? previousConversation?.organizationId ?? null;
         const businessContextId = scopedBusiness?.id ?? previousConversation?.businessId ?? null;
 
         let conversationId: string | null = null;

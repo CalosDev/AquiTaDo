@@ -150,9 +150,16 @@ enum BusinessSource {
 
 enum BusinessClaimRequestStatus {
   PENDING
+  UNDER_REVIEW
   APPROVED
   REJECTED
+  EXPIRED
   CANCELED
+}
+
+enum OwnershipRole {
+  PRIMARY_OWNER
+  MANAGER
 }
 
 enum BusinessSuggestionStatus {
@@ -344,9 +351,13 @@ model User {
   checkIns                 CheckIn[]
   salesLeadsAsCustomer     SalesLead[]                    @relation("SalesLeadCustomer")
   salesLeadsCreated        SalesLead[]                    @relation("SalesLeadCreator")
+  businessesCreated        Business[]                     @relation("BusinessCreatedBy")
+  businessesUpdated        Business[]                     @relation("BusinessUpdatedBy")
   claimedBusinesses        Business[]                     @relation("BusinessClaimedBy")
   businessClaimRequests    BusinessClaimRequest[]         @relation("BusinessClaimRequester")
   businessClaimReviews     BusinessClaimRequest[]         @relation("BusinessClaimReviewer")
+  businessOwnershipsGranted BusinessOwnership[]          @relation("OwnershipGrantedBy")
+  businessOwnershipsRevoked BusinessOwnership[]          @relation("OwnershipRevokedBy")
   businessSuggestionsSubmitted BusinessSuggestion[]       @relation("BusinessSuggestionSubmitter")
   businessSuggestionReviews BusinessSuggestion[]          @relation("BusinessSuggestionReviewer")
   duplicateCasesResolved   BusinessDuplicateCase[]        @relation("BusinessDuplicateResolver")
@@ -382,14 +393,19 @@ model Business {
   claimStatus             BusinessClaimStatus        @default(CLAIMED)
   source                  BusinessSource             @default(OWNER)
   publishedAt             DateTime?
+  firstPublishedAt        DateTime?
   claimedAt               DateTime?
   claimedByUserId         String?
   claimedByUser           User?                      @relation("BusinessClaimedBy", fields: [claimedByUserId], references: [id])
   catalogManagedByAdmin   Boolean                    @default(false)
   isClaimable             Boolean                    @default(true)
+  isPublished             Boolean                    @default(true)
+  isSearchable            Boolean                    @default(true)
+  isDiscoverable          Boolean                    @default(true)
   verificationSubmittedAt DateTime?
   verificationReviewedAt  DateTime?
   verificationNotes       String?                    @db.VarChar(500)
+  lastReviewedAt          DateTime?
   riskScore               Int                        @default(0)
   reputationScore         Decimal                    @default(0) @db.Decimal(6, 2)
   reputationTier          BusinessTier               @default(BRONZE)
@@ -401,6 +417,10 @@ model Business {
   owner          User?        @relation(fields: [ownerId], references: [id])
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
+  createdByUserId String?
+  createdByUser   User?        @relation("BusinessCreatedBy", fields: [createdByUserId], references: [id])
+  updatedByUserId String?
+  updatedByUser   User?        @relation("BusinessUpdatedBy", fields: [updatedByUserId], references: [id])
   provinceId     String
   province       Province     @relation(fields: [provinceId], references: [id])
   cityId         String?
@@ -429,12 +449,16 @@ model Business {
   checkIns              CheckIn[]
   salesLeads            SalesLead[]
   claimRequests         BusinessClaimRequest[]
+  ownerships            BusinessOwnership[]
   approvedFromSuggestions BusinessSuggestion[]            @relation("BusinessSuggestionCreatedBusiness")
   primaryDuplicateCases BusinessDuplicateCase[]          @relation("BusinessDuplicatePrimary")
 
+  @@index([name])
   @@index([slug])
   @@index([ownerId])
   @@index([organizationId])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
   @@index([organizationId, deletedAt, verified, createdAt])
   @@index([provinceId])
   @@index([latitude, longitude])
@@ -448,8 +472,10 @@ model Business {
   @@index([claimStatus, createdAt])
   @@index([source, createdAt])
   @@index([claimedByUserId])
+  @@index([isPublished, isSearchable, isDiscoverable, publicStatus])
   @@index([provinceId, reputationScore])
   @@index([reputationTier, reputationScore])
+  @@index([createdAt])
   @@map("businesses")
 }
 
@@ -490,6 +516,7 @@ model Organization {
   checkIns              CheckIn[]
   salesLeads            SalesLead[]
   claimRequests         BusinessClaimRequest[]
+  businessOwnerships    BusinessOwnership[]
 
   @@index([ownerUserId])
   @@index([plan, subscriptionStatus])
@@ -508,17 +535,53 @@ model BusinessClaimRequest {
   evidenceType            BusinessClaimEvidenceType
   evidenceValue           String?                    @db.VarChar(255)
   notes                   String?                    @db.Text
+  adminNotes              String?                    @db.Text
   reviewedByAdminId       String?
   reviewedByAdmin         User?                      @relation("BusinessClaimReviewer", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
   reviewedAt              DateTime?
+  approvedAt              DateTime?
+  rejectedAt              DateTime?
+  expiredAt               DateTime?
+  canceledAt              DateTime?
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
+  ownership               BusinessOwnership?
 
   @@index([businessId, status, createdAt])
   @@index([requesterUserId, status, createdAt])
   @@index([requesterOrganizationId, status, createdAt])
   @@index([reviewedByAdminId, reviewedAt])
+  @@index([status])
+  @@index([createdAt])
   @@map("business_claim_requests")
+}
+
+model BusinessOwnership {
+  id             String                @id @default(uuid())
+  businessId     String
+  organizationId String
+  grantedByUserId String?
+  claimRequestId String?               @unique
+  role           OwnershipRole         @default(PRIMARY_OWNER)
+  isActive       Boolean               @default(true)
+  grantedAt      DateTime              @default(now())
+  revokedAt      DateTime?
+  revokedByUserId String?
+  revokeReason   String?               @db.Text
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  business       Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  grantedByUser  User?                 @relation("OwnershipGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+  revokedByUser  User?                 @relation("OwnershipRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+  claimRequest   BusinessClaimRequest? @relation(fields: [claimRequestId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, isActive])
+  @@index([organizationId, isActive])
+  @@index([grantedAt])
+  @@index([claimRequestId])
+  @@map("business_ownerships")
 }
 
 model BusinessSuggestion {

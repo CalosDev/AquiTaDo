@@ -39,6 +39,15 @@ export class MessagingService {
                 verified: true,
                 claimStatus: true,
                 name: true,
+                ownerships: {
+                    where: {
+                        isActive: true,
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    take: 1,
+                },
             },
         });
 
@@ -46,10 +55,10 @@ export class MessagingService {
             throw new BadRequestException('Negocio no disponible para mensajería');
         }
 
-        if (!business.organizationId) {
+        const effectiveOrganizationId = business.organizationId ?? business.ownerships[0]?.organizationId ?? null;
+        if (!effectiveOrganizationId) {
             throw new BadRequestException('Este negocio aun no tiene una organizacion activa para mensajeria');
         }
-        const effectiveOrganizationId = business.organizationId;
 
         const content = dto.message.trim();
         if (!content) {

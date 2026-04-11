@@ -168,7 +168,7 @@ export const businessApi = {
         limit?: number;
     }) =>
         api.get('/businesses/claim-search', { params }),
-    getClaimRequestsAdmin: (params?: { status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'; limit?: number }) =>
+    getClaimRequestsAdmin: (params?: { status?: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED'; limit?: number }) =>
         api.get('/businesses/admin/claim-requests', { params }),
     getDuplicateCasesAdmin: (params?: { status?: 'MERGED' | 'DISMISSED' | 'CONFLICT'; limit?: number }) =>
         api.get('/businesses/admin/duplicate-cases', { params }),
@@ -193,6 +193,13 @@ export const businessApi = {
         resetBusinessDiscoveryCaches();
         return response;
     }),
+    getOwnershipHistoryAdmin: (businessId: string, params?: { limit?: number }) =>
+        api.get(`/businesses/admin/${businessId}/ownership-history`, { params }),
+    revokeOwnershipAdmin: (businessId: string, ownershipId: string, data: { reason: string }) =>
+        api.post(`/businesses/admin/${businessId}/ownerships/${ownershipId}/revoke`, data).then((response) => {
+            resetBusinessDiscoveryCaches();
+            return response;
+        }),
     getByIdentifier: (identifier: string) => (
         shouldUsePublicDetailCache()
             ? resolveMappedCachedRequest(
