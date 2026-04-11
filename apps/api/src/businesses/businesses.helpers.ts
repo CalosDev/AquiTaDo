@@ -98,67 +98,349 @@ export function normalizeBusinessHours(
 export function findDuplicateCandidates(
     businesses: Array<Record<string, any> & DecoratedBusinessProfile>,
 ) {
-    const candidates = new Map<string, {
-        key: string;
-        reasons: Set<string>;
-        businesses: Array<Record<string, any>>;
-    }>();
-    const phoneGroups = new Map<string, Array<Record<string, any>>>();
-    const nameLocationGroups = new Map<string, Array<Record<string, any>>>();
+    const businessById = new Map(
+        businesses.map((business) => [String(business.id), business]),
+    );
+    const adjacency = new Map<string, Set<string>>();
+    const edgeReasons = new Map<string, Set<string>>();
 
-    for (const business of businesses) {
-        const normalizedPhone = String(business.phone ?? '').replace(/\D/g, '');
-        if (normalizedPhone.length >= 7) {
-            const group = phoneGroups.get(normalizedPhone) ?? [];
-            group.push(business);
-            phoneGroups.set(normalizedPhone, group);
-        }
+    for (let leftIndex = 0; leftIndex < businesses.length; leftIndex += 1) {
+        const left = businesses[leftIndex];
 
-        const normalizedName = String(business.name ?? '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .trim()
-            .toLowerCase();
-        const cityKey = String(business.city?.id ?? business.province?.id ?? '');
-        if (normalizedName && cityKey) {
-            const compositeKey = `${normalizedName}::${cityKey}`;
-            const group = nameLocationGroups.get(compositeKey) ?? [];
-            group.push(business);
-            nameLocationGroups.set(compositeKey, group);
-        }
-    }
+        for (let rightIndex = leftIndex + 1; rightIndex < businesses.length; rightIndex += 1) {
+            const right = businesses[rightIndex];
+            const match = scoreDuplicatePair(left, right);
 
-    const registerGroups = (groups: Iterable<Array<Record<string, any>>>, reason: string) => {
-        for (const group of groups) {
-            if (group.length < 2) {
+            if (match.score < 60) {
                 continue;
             }
 
-            const key = group
-                .map((entry) => String(entry.id))
-                .sort()
-                .join(':');
+            const leftId = String(left.id);
+            const rightId = String(right.id);
+            const pairKey = [leftId, rightId].sort().join(':');
 
-            const existing = candidates.get(key) ?? {
-                key,
-                reasons: new Set<string>(),
-                businesses: group,
-            };
-            existing.reasons.add(reason);
-            candidates.set(key, existing);
+            const leftNeighbors = adjacency.get(leftId) ?? new Set<string>();
+            leftNeighbors.add(rightId);
+            adjacency.set(leftId, leftNeighbors);
+
+            const rightNeighbors = adjacency.get(rightId) ?? new Set<string>();
+            rightNeighbors.add(leftId);
+            adjacency.set(rightId, rightNeighbors);
+
+            const reasons = edgeReasons.get(pairKey) ?? new Set<string>();
+            match.reasons.forEach((reason) => reasons.add(reason));
+            edgeReasons.set(pairKey, reasons);
         }
+    }
+
+    const visited = new Set<string>();
+    const clusters: Array<{
+        key: string;
+        reasons: string[];
+        businesses: Array<Record<string, any> & DecoratedBusinessProfile>;
+    }> = [];
+
+    for (const business of businesses) {
+        const rootId = String(business.id);
+        if (visited.has(rootId) || !adjacency.has(rootId)) {
+            continue;
+        }
+
+        const stack = [rootId];
+        const component = new Set<string>();
+
+        while (stack.length > 0) {
+            const currentId = stack.pop()!;
+            if (visited.has(currentId)) {
+                continue;
+            }
+
+            visited.add(currentId);
+            component.add(currentId);
+
+            const neighbors = adjacency.get(currentId);
+            if (!neighbors) {
+                continue;
+            }
+
+            neighbors.forEach((neighborId) => {
+                if (!visited.has(neighborId)) {
+                    stack.push(neighborId);
+                }
+            });
+        }
+
+        if (component.size < 2) {
+            continue;
+        }
+
+        const componentIds = [...component].sort();
+        const reasons = new Set<string>();
+        for (let index = 0; index < componentIds.length; index += 1) {
+            for (let nextIndex = index + 1; nextIndex < componentIds.length; nextIndex += 1) {
+                const pairKey = [componentIds[index], componentIds[nextIndex]].sort().join(':');
+                edgeReasons.get(pairKey)?.forEach((reason) => reasons.add(reason));
+            }
+        }
+
+        clusters.push({
+            key: componentIds.join(':'),
+            reasons: [...reasons].sort((left, right) => left.localeCompare(right)),
+            businesses: componentIds
+                .map((id) => businessById.get(id))
+                .filter((entry): entry is Record<string, any> & DecoratedBusinessProfile => Boolean(entry)),
+        });
+    }
+
+    return clusters.sort((left, right) => {
+        if (right.businesses.length !== left.businesses.length) {
+            return right.businesses.length - left.businesses.length;
+        }
+
+        return left.key.localeCompare(right.key);
+    });
+}
+
+function scoreDuplicatePair(
+    left: Record<string, any>,
+    right: Record<string, any>,
+): {
+    score: number;
+    reasons: string[];
+} {
+    const reasons = new Set<string>();
+    let score = 0;
+
+    const leftName = normalizeDuplicateValue(left.name);
+    const rightName = normalizeDuplicateValue(right.name);
+    const leftSlug = normalizeSlugValue(left.slug);
+    const rightSlug = normalizeSlugValue(right.slug);
+    const leftPhone = normalizeDigits(left.phone);
+    const rightPhone = normalizeDigits(right.phone);
+    const leftWhatsapp = normalizeDigits(left.whatsapp);
+    const rightWhatsapp = normalizeDigits(right.whatsapp);
+    const leftWebsite = normalizeWebsite(left.website);
+    const rightWebsite = normalizeWebsite(right.website);
+    const leftInstagram = normalizeHandle(left.instagramUrl);
+    const rightInstagram = normalizeHandle(right.instagramUrl);
+    const leftAddress = normalizeDuplicateValue(left.address);
+    const rightAddress = normalizeDuplicateValue(right.address);
+    const leftProvinceId = String(left.province?.id ?? '');
+    const rightProvinceId = String(right.province?.id ?? '');
+    const leftCityId = String(left.city?.id ?? '');
+    const rightCityId = String(right.city?.id ?? '');
+    const leftSectorId = String(left.sector?.id ?? '');
+    const rightSectorId = String(right.sector?.id ?? '');
+    const sameProvince = Boolean(leftProvinceId && rightProvinceId && leftProvinceId === rightProvinceId);
+    const sameCity = Boolean(leftCityId && rightCityId && leftCityId === rightCityId);
+    const sameSector = Boolean(leftSectorId && rightSectorId && leftSectorId === rightSectorId);
+    const leftCategoryIds = extractCategoryIds(left);
+    const rightCategoryIds = extractCategoryIds(right);
+    const sharedCategories = leftCategoryIds.filter((categoryId) => rightCategoryIds.includes(categoryId));
+    const coordinateDistanceKm = calculateCoordinateDistanceKm(left, right);
+    const tokenOverlap = calculateTokenOverlap(leftName, rightName);
+
+    if (leftPhone && rightPhone && leftPhone === rightPhone) {
+        score += 92;
+        reasons.add('telefono_compartido');
+    }
+
+    if (leftWhatsapp && rightWhatsapp && leftWhatsapp === rightWhatsapp) {
+        score += 90;
+        reasons.add('whatsapp_compartido');
+    }
+
+    if (leftPhone && rightWhatsapp && leftPhone === rightWhatsapp) {
+        score += 90;
+        reasons.add('telefono_whatsapp_cruzado');
+    }
+
+    if (leftWhatsapp && rightPhone && leftWhatsapp === rightPhone) {
+        score += 90;
+        reasons.add('telefono_whatsapp_cruzado');
+    }
+
+    if (leftWebsite && rightWebsite && leftWebsite === rightWebsite) {
+        score += 84;
+        reasons.add('website_compartido');
+    }
+
+    if (leftInstagram && rightInstagram && leftInstagram === rightInstagram) {
+        score += 78;
+        reasons.add('instagram_compartido');
+    }
+
+    if (leftName && rightName && leftName === rightName) {
+        score += 64;
+        reasons.add('nombre_exacto');
+    } else if (leftName && rightName && tokenOverlap >= 0.8) {
+        score += 42;
+        reasons.add('nombre_similar');
+    }
+
+    if (leftSlug && rightSlug && leftSlug === rightSlug) {
+        score += 52;
+        reasons.add('slug_compartido');
+    }
+
+    if (leftAddress && rightAddress && leftAddress === rightAddress) {
+        score += 46;
+        reasons.add('direccion_exacta');
+    } else if (leftAddress && rightAddress && calculateTokenOverlap(leftAddress, rightAddress) >= 0.75) {
+        score += 24;
+        reasons.add('direccion_similar');
+    }
+
+    if (sameProvince) {
+        score += 3;
+        reasons.add('provincia_compartida');
+    }
+
+    if (sameCity) {
+        score += 5;
+        reasons.add('ciudad_compartida');
+    }
+
+    if (sameSector) {
+        score += 4;
+        reasons.add('sector_compartido');
+    }
+
+    if (sharedCategories.length > 0) {
+        score += 6;
+        reasons.add('categoria_compartida');
+    }
+
+    if (coordinateDistanceKm !== null && coordinateDistanceKm <= 0.15) {
+        score += 14;
+        reasons.add('coordenadas_cercanas');
+    } else if (coordinateDistanceKm !== null && coordinateDistanceKm <= 0.5) {
+        score += 8;
+        reasons.add('coordenadas_cercanas');
+    }
+
+    const strongNameMatch = reasons.has('nombre_exacto') || reasons.has('nombre_similar');
+    const strongAddressMatch = reasons.has('direccion_exacta') || reasons.has('direccion_similar');
+    if (strongNameMatch && sharedCategories.length > 0 && (sameCity || sameProvince)) {
+        score += 14;
+        reasons.add('nombre_categoria_ubicacion');
+    }
+
+    if (strongNameMatch && strongAddressMatch) {
+        score += 10;
+        reasons.add('nombre_y_direccion');
+    }
+
+    return {
+        score: Math.min(score, 99),
+        reasons: [...reasons],
     };
+}
 
-    registerGroups(phoneGroups.values(), 'telefono_compartido');
-    registerGroups(nameLocationGroups.values(), 'nombre_y_ciudad_similares');
+function normalizeDuplicateValue(value?: string | null): string {
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+}
 
-    return [...candidates.values()]
-        .map((entry) => ({
-            key: entry.key,
-            reasons: [...entry.reasons],
-            businesses: entry.businesses,
-        }))
-        .sort((left, right) => right.businesses.length - left.businesses.length);
+function normalizeSlugValue(value?: string | null): string {
+    return String(value ?? '')
+        .trim()
+        .toLowerCase();
+}
+
+function normalizeDigits(value?: string | null): string | null {
+    const digits = String(value ?? '').replace(/\D/g, '');
+    return digits.length >= 7 ? digits : null;
+}
+
+function normalizeWebsite(value?: string | null): string | null {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+        return null;
+    }
+
+    return normalized
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
+}
+
+function normalizeHandle(value?: string | null): string | null {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+        return null;
+    }
+
+    const withoutProtocol = normalized
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .replace(/^instagram\.com\//i, '')
+        .replace(/^@/, '')
+        .replace(/\/+$/, '');
+
+    return withoutProtocol.trim().toLowerCase() || null;
+}
+
+function calculateTokenOverlap(left: string, right: string): number {
+    if (!left || !right) {
+        return 0;
+    }
+
+    const leftTokens = new Set(left.split(' ').filter((token) => token.length >= 3));
+    const rightTokens = new Set(right.split(' ').filter((token) => token.length >= 3));
+    if (leftTokens.size === 0 || rightTokens.size === 0) {
+        return 0;
+    }
+
+    let shared = 0;
+    leftTokens.forEach((token) => {
+        if (rightTokens.has(token)) {
+            shared += 1;
+        }
+    });
+
+    return shared / Math.max(leftTokens.size, rightTokens.size);
+}
+
+function extractCategoryIds(business: Record<string, any>): string[] {
+    const categoryIds: string[] = (business.categories ?? [])
+        .map((entry: { category?: { id?: string } }) => entry.category?.id)
+        .filter((value: string | undefined): value is string => Boolean(value));
+
+    return Array.from(new Set(categoryIds));
+}
+
+function calculateCoordinateDistanceKm(
+    left: Record<string, any>,
+    right: Record<string, any>,
+): number | null {
+    const leftLatitude = typeof left.latitude === 'number' ? left.latitude : null;
+    const leftLongitude = typeof left.longitude === 'number' ? left.longitude : null;
+    const rightLatitude = typeof right.latitude === 'number' ? right.latitude : null;
+    const rightLongitude = typeof right.longitude === 'number' ? right.longitude : null;
+
+    if (leftLatitude === null || leftLongitude === null || rightLatitude === null || rightLongitude === null) {
+        return null;
+    }
+
+    const earthRadiusKm = 6371;
+    const deltaLat = toRadians(rightLatitude - leftLatitude);
+    const deltaLng = toRadians(rightLongitude - leftLongitude);
+    const a = Math.sin(deltaLat / 2) ** 2
+        + Math.cos(toRadians(leftLatitude))
+        * Math.cos(toRadians(rightLatitude))
+        * Math.sin(deltaLng / 2) ** 2;
+
+    return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function toRadians(value: number): number {
+    return value * (Math.PI / 180);
 }
 
 export function assertCoordinatePair(latitude?: number, longitude?: number): void {

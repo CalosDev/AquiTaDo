@@ -142,8 +142,8 @@ export function SuggestBusiness() {
         };
     }, [form.cityId, form.provinceId]);
 
-    const leafCategories = useMemo(
-        () => categories.filter((category) => !category.parentId),
+    const categoryOptions = useMemo(
+        () => [...categories].sort((left, right) => left.name.localeCompare(right.name, 'es')),
         [categories],
     );
 
@@ -236,7 +236,7 @@ export function SuggestBusiness() {
                                 onChange={(event) => setForm((current) => ({ ...current, categoryId: event.target.value }))}
                             >
                                 <option value="">Selecciona categoria</option>
-                                {leafCategories.map((category) => (
+                                {categoryOptions.map((category) => (
                                     <option key={category.id} value={category.id}>
                                         {category.name}
                                     </option>

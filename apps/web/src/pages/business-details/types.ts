@@ -49,8 +49,8 @@ export interface Business {
     todayHoursLabel?: string | null;
     profileCompletenessScore?: number;
     reputationScore?: number | string | null;
-    province?: { name: string };
-    city?: { name: string };
+    province?: { id: string; name: string };
+    city?: { id: string; name: string };
     sector?: { name: string } | null;
     images: BusinessImageEntry[];
     categories?: BusinessCategoryEntry[];

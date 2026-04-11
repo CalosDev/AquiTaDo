@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
     IsString,
     IsNotEmpty,
@@ -440,6 +440,68 @@ export class ClaimSearchQueryDto {
     @IsOptional()
     @IsUUID()
     cityId?: string;
+
+    @IsOptional()
+    @IsUUID()
+    sectorId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    address?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(20)
+    phone?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(20)
+    whatsapp?: string;
+
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    website?: string;
+
+    @IsOptional()
+    @IsUrl(URL_OPTIONS)
+    @MaxLength(255)
+    instagramUrl?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    @Min(-90)
+    @Max(90)
+    latitude?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    @Min(-180)
+    @Max(180)
+    longitude?: number;
+
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (Array.isArray(value)) {
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            return value
+                .split(',')
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0);
+        }
+
+        return undefined;
+    })
+    @IsArray()
+    @IsUUID('all', { each: true })
+    categoryIds?: string[];
 
     @IsOptional()
     @Type(() => Number)

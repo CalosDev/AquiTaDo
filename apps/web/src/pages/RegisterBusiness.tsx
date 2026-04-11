@@ -63,8 +63,8 @@ interface ClaimSearchCandidate {
     matchScore?: number;
     matchReasons?: string[];
     alreadyClaimed?: boolean;
-    city?: { name: string } | null;
-    province?: { name: string } | null;
+    city?: { id: string; name: string } | null;
+    province?: { id: string; name: string } | null;
 }
 
 const BOOKING_FEATURE_CANONICAL = 'reservaciones';
@@ -312,6 +312,7 @@ export function RegisterBusiness() {
             formData.phone.trim(),
             formData.whatsapp.trim(),
             formData.website.trim(),
+            formData.instagramUrl.trim(),
         ].filter((value) => value.length >= 2);
 
         return Array.from(new Set(rawTerms));
@@ -327,27 +328,23 @@ export function RegisterBusiness() {
 
         setDuplicateCheckLoading(true);
         try {
-            const responses = await Promise.all(
-                searchTerms.map((term) => businessApi.claimSearch({
-                    q: term,
-                    provinceId: formData.provinceId || undefined,
-                    cityId: formData.cityId || undefined,
-                    limit: 6,
-                })),
-            );
-
-            const candidatesById = new Map<string, ClaimSearchCandidate>();
-            responses.forEach((response) => {
-                const rows = ((response.data?.data || []) as ClaimSearchCandidate[]);
-                rows.forEach((candidate) => {
-                    const existing = candidatesById.get(candidate.id);
-                    if (!existing || Number(candidate.matchScore ?? 0) > Number(existing.matchScore ?? 0)) {
-                        candidatesById.set(candidate.id, candidate);
-                    }
-                });
+            const response = await businessApi.claimSearch({
+                q: formData.name.trim() || searchTerms[0],
+                provinceId: formData.provinceId || undefined,
+                cityId: formData.cityId || undefined,
+                sectorId: formData.sectorId || undefined,
+                address: formData.address.trim() || undefined,
+                phone: formData.phone.trim() || undefined,
+                whatsapp: formData.whatsapp.trim() || undefined,
+                website: formData.website.trim() || undefined,
+                instagramUrl: formData.instagramUrl.trim() || undefined,
+                latitude: formData.latitude.trim() ? Number(formData.latitude) : undefined,
+                longitude: formData.longitude.trim() ? Number(formData.longitude) : undefined,
+                categoryIds: formData.categoryIds.length > 0 ? formData.categoryIds.join(',') : undefined,
+                limit: 6,
             });
 
-            const matches = Array.from(candidatesById.values())
+            const matches = (((response.data?.data || []) as ClaimSearchCandidate[]))
                 .sort((left, right) => Number(right.matchScore ?? 0) - Number(left.matchScore ?? 0))
                 .slice(0, 6);
 

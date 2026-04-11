@@ -71,8 +71,8 @@ function normalizeBaseUrl(value) {
     return candidate.replace(/\/+$/, '');
 }
 
-function buildSitemap(baseUrl) {
-    const lastmod = resolveLastmod();
+function buildSitemap(baseUrl, sitemapPath) {
+    const lastmod = resolveLastmod(sitemapPath);
     const staticPaths = ['/', '/businesses', '/about', '/terms', '/privacy'];
     const categoryPaths = CATEGORY_SLUGS.map((slug) => `/negocios/categoria/${slug}`);
     const provincePaths = PROVINCE_SLUGS.map((slug) => `/negocios/provincia/${slug}`);
@@ -125,13 +125,28 @@ function buildSitemap(baseUrl) {
     return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
 }
 
-function resolveLastmod() {
+function readExistingSitemapLastmod(sitemapPath) {
+    if (!existsSync(sitemapPath)) {
+        return null;
+    }
+
+    const current = readFileSync(sitemapPath, 'utf8');
+    const match = current.match(/<lastmod>([^<]+)<\/lastmod>/);
+    return match?.[1]?.trim() || null;
+}
+
+function resolveLastmod(sitemapPath) {
     const override = process.env.SITEMAP_LASTMOD?.trim();
     if (override) {
         return override;
     }
 
-    // Keep sitemap deterministic by day to avoid dirty git state on every build.
+    // Preserve the tracked date when the sitemap content is otherwise unchanged.
+    const existing = readExistingSitemapLastmod(sitemapPath);
+    if (existing) {
+        return existing;
+    }
+
     return new Date().toISOString().slice(0, 10);
 }
 
@@ -152,4 +167,5 @@ function writeIfChanged(path, content) {
 const baseUrl = normalizeBaseUrl(process.env.VITE_PUBLIC_WEB_URL);
 mkdirSync(publicDir, { recursive: true });
 writeIfChanged(resolve(publicDir, 'robots.txt'), buildRobots(baseUrl));
-writeIfChanged(resolve(publicDir, 'sitemap.xml'), buildSitemap(baseUrl));
+const sitemapPath = resolve(publicDir, 'sitemap.xml');
+writeIfChanged(sitemapPath, buildSitemap(baseUrl, sitemapPath));

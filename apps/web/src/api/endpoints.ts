@@ -152,7 +152,21 @@ export const businessApi = {
         api.get('/businesses/admin/all', { params }),
     getCatalogQuality: (params?: { limit?: number }) =>
         api.get('/businesses/admin/catalog-quality', { params }),
-    claimSearch: (params: { q: string; provinceId?: string; cityId?: string; limit?: number }) =>
+    claimSearch: (params: {
+        q: string;
+        provinceId?: string;
+        cityId?: string;
+        sectorId?: string;
+        address?: string;
+        phone?: string;
+        whatsapp?: string;
+        website?: string;
+        instagramUrl?: string;
+        latitude?: number;
+        longitude?: number;
+        categoryIds?: string;
+        limit?: number;
+    }) =>
         api.get('/businesses/claim-search', { params }),
     getClaimRequestsAdmin: (params?: { status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'; limit?: number }) =>
         api.get('/businesses/admin/claim-requests', { params }),

@@ -72,6 +72,8 @@ type CatalogBusinessInput = {
     tiktokUrl?: string | null;
     priceRange?: CreateAdminCatalogBusinessDto['priceRange'];
     address: string;
+    latitude?: number;
+    longitude?: number;
     provinceId: string;
     cityId?: string | null;
     sectorId?: string | null;
@@ -83,6 +85,22 @@ type CatalogBusinessInput = {
     catalogManagedByAdmin?: boolean;
     isClaimable?: boolean;
     source: 'ADMIN' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+};
+
+type BusinessDuplicateSignalInput = {
+    name?: string | null;
+    search?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    whatsapp?: string | null;
+    website?: string | null;
+    instagramUrl?: string | null;
+    provinceId?: string | null;
+    cityId?: string | null;
+    sectorId?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    categoryIds?: string[];
 };
 
 @Injectable()
@@ -380,9 +398,19 @@ export class BusinessesService {
     }
 
     async claimSearch(query: ClaimSearchQueryDto) {
-        const matches = await this.searchClaimCandidates(query.q, {
+        const matches = await this.searchClaimCandidates({
+            search: query.q,
+            address: query.address,
+            phone: query.phone,
+            whatsapp: query.whatsapp,
+            website: query.website,
+            instagramUrl: query.instagramUrl,
             provinceId: query.provinceId,
             cityId: query.cityId,
+            sectorId: query.sectorId,
+            latitude: query.latitude,
+            longitude: query.longitude,
+            categoryIds: query.categoryIds,
             limit: query.limit,
         });
 
@@ -575,6 +603,14 @@ export class BusinessesService {
                 return createdRequest;
             });
 
+            this.domainEventsService.publishClaimRequestCreated({
+                claimRequestId: claimRequest.id,
+                businessId: claimRequest.business.id,
+                businessSlug: claimRequest.business.slug,
+                requesterUserId,
+                requesterOrganizationId: requesterOrganizationId ?? null,
+            });
+
             return {
                 ...claimRequest,
                 message: 'Solicitud de reclamacion enviada para revision administrativa',
@@ -698,6 +734,9 @@ export class BusinessesService {
                         status: 'APPROVED' as const,
                         businessId: claimRequest.businessId,
                         businessSlug: claimRequest.business.slug,
+                        requesterUserId: claimRequest.requesterUserId,
+                        requesterOrganizationId: effectiveOrganizationId,
+                        organizationId: effectiveOrganizationId,
                     };
                 }
 
@@ -742,6 +781,9 @@ export class BusinessesService {
                     status: 'REJECTED' as const,
                     businessId: claimRequest.businessId,
                     businessSlug: claimRequest.business.slug,
+                    requesterUserId: claimRequest.requesterUserId,
+                    requesterOrganizationId: claimRequest.requesterOrganizationId,
+                    organizationId: claimRequest.requesterOrganizationId,
                 };
             });
 
@@ -750,6 +792,26 @@ export class BusinessesService {
                 reviewedClaim.businessSlug,
                 'updated',
             );
+
+            this.domainEventsService.publishClaimRequestReviewed({
+                claimRequestId: reviewedClaim.id,
+                businessId: reviewedClaim.businessId,
+                businessSlug: reviewedClaim.businessSlug,
+                status: reviewedClaim.status,
+                requesterUserId: reviewedClaim.requesterUserId,
+                requesterOrganizationId: reviewedClaim.requesterOrganizationId ?? null,
+                reviewedByAdminId: adminUserId,
+            });
+
+            if (reviewedClaim.status === 'APPROVED' && reviewedClaim.organizationId) {
+                this.domainEventsService.publishBusinessLinkedToOrganization({
+                    businessId: reviewedClaim.businessId,
+                    businessSlug: reviewedClaim.businessSlug,
+                    organizationId: reviewedClaim.organizationId,
+                    ownerUserId: reviewedClaim.requesterUserId,
+                    linkedByUserId: adminUserId,
+                });
+            }
 
             return reviewedClaim;
         } catch (error) {
@@ -1239,6 +1301,14 @@ export class BusinessesService {
             );
         }
 
+        this.domainEventsService.publishBusinessDuplicatesMerged({
+            duplicateCaseId: mergeResult.case.id,
+            primaryBusinessId: mergeResult.primaryBusiness.id,
+            primaryBusinessSlug: mergeResult.primaryBusiness.slug,
+            archivedBusinessIds: mergeResult.archivedBusinesses.map((business) => business.id),
+            resolvedByAdminId: adminUserId,
+        });
+
         return mergeResult.case;
     }
 
@@ -1258,6 +1328,7 @@ export class BusinessesService {
         adminUserId: string,
         auditSource: string,
     ) {
+        assertCoordinatePair(input.latitude, input.longitude);
         const baseSlug = slugify(input.name, { lower: true, strict: true });
         if (!baseSlug) {
             throw new BadRequestException('El nombre del negocio no es valido para generar un slug');
@@ -1278,20 +1349,30 @@ export class BusinessesService {
             address: input.address,
             provinceId: input.provinceId,
             cityId: input.cityId ?? undefined,
-            latitude: undefined,
-            longitude: undefined,
+            latitude: input.latitude,
+            longitude: input.longitude,
         });
 
         await this.assertNoStrongDuplicateMatch(
             {
                 name: input.name,
+                address: input.address,
                 phone: contactChannels.phone ?? null,
                 whatsapp: contactChannels.whatsapp ?? null,
                 website,
+                instagramUrl,
                 provinceId: input.provinceId,
                 cityId: input.cityId ?? undefined,
+                sectorId: input.sectorId ?? undefined,
+                latitude: coordinates.latitude ?? null,
+                longitude: coordinates.longitude ?? null,
+                categoryIds,
             },
             input.ignorePotentialDuplicates,
+            {
+                source: auditSource,
+                actorUserId: adminUserId,
+            },
         );
 
         try {
@@ -1333,6 +1414,8 @@ export class BusinessesService {
                     select: {
                         id: true,
                         slug: true,
+                        organizationId: true,
+                        ownerId: true,
                     },
                 });
 
@@ -1391,6 +1474,12 @@ export class BusinessesService {
                 coordinates.longitude,
             );
             this.publishBusinessChangedEvent(createdBusiness.id, createdBusiness.slug, 'created');
+            this.domainEventsService.publishCatalogBusinessCreated({
+                businessId: createdBusiness.id,
+                slug: createdBusiness.slug,
+                source: input.source,
+                actorUserId: adminUserId,
+            });
 
             const hydratedBusiness = await this.findBusinessByIdWithReviews(createdBusiness.id);
             if (!hydratedBusiness) {
@@ -2053,13 +2142,23 @@ export class BusinessesService {
         await this.assertNoStrongDuplicateMatch(
             {
                 name: dto.name,
+                address: dto.address,
                 phone: contactChannels.phone ?? null,
                 whatsapp: contactChannels.whatsapp ?? null,
                 website,
+                instagramUrl,
                 provinceId: dto.provinceId,
                 cityId: dto.cityId,
+                sectorId: dto.sectorId,
+                latitude: coordinates.latitude ?? null,
+                longitude: coordinates.longitude ?? null,
+                categoryIds,
             },
             dto.ignorePotentialDuplicates,
+            {
+                source: 'owner-create',
+                actorUserId: userId,
+            },
         );
 
         try {
@@ -2114,6 +2213,8 @@ export class BusinessesService {
                     select: {
                         id: true,
                         slug: true,
+                        organizationId: true,
+                        ownerId: true,
                     },
                 });
 
@@ -2159,6 +2260,15 @@ export class BusinessesService {
             await this.syncBusinessLocation(this.prisma, createdBusiness.id, coordinates.latitude, coordinates.longitude);
 
             this.publishBusinessChangedEvent(createdBusiness.id, createdBusiness.slug, 'created');
+            if (createdBusiness.organizationId && createdBusiness.ownerId) {
+                this.domainEventsService.publishBusinessLinkedToOrganization({
+                    businessId: createdBusiness.id,
+                    businessSlug: createdBusiness.slug,
+                    organizationId: createdBusiness.organizationId,
+                    ownerUserId: createdBusiness.ownerId,
+                    linkedByUserId: userId,
+                });
+            }
 
             const hydratedBusiness = await this.findBusinessByIdWithReviews(createdBusiness.id);
             if (!hydratedBusiness) {
@@ -2662,11 +2772,15 @@ export class BusinessesService {
             .filter((business) => business.profileCompletenessScore < 80)
             .sort((left, right) => left.profileCompletenessScore - right.profileCompletenessScore)
             .slice(0, safeLimit);
-        const duplicateCandidates = findDuplicateCandidates(decoratedBusinesses).slice(0, safeLimit);
+        const allDuplicateCandidates = findDuplicateCandidates(decoratedBusinesses);
+        const duplicateCandidates = allDuplicateCandidates.slice(0, safeLimit);
         const totalBusinesses = decoratedBusinesses.length;
         const publishedBusinesses = decoratedBusinesses.filter((business) => business.publicStatus === 'PUBLISHED').length;
         const incompleteCount = decoratedBusinesses.filter((business) => business.profileCompletenessScore < 80).length;
-        const duplicateClusterCount = duplicateCandidates.length;
+        const duplicateClusterCount = allDuplicateCandidates.length;
+        const duplicateInvolvedBusinessCount = new Set(
+            allDuplicateCandidates.flatMap((cluster) => cluster.businesses.map((business) => String(business.id))),
+        ).size;
         const missingSector = decoratedBusinesses.filter((business) => !business.sector).length;
         const missingCoordinates = decoratedBusinesses.filter((business) =>
             typeof business.latitude !== 'number' || typeof business.longitude !== 'number').length;
@@ -2778,6 +2892,9 @@ export class BusinessesService {
                 }, 0) / duplicateCaseTimings.length
             ).toFixed(1))
             : 0;
+        const duplicateDetectionRatePct = totalBusinesses > 0
+            ? Number(((duplicateInvolvedBusinessCount / totalBusinesses) * 100).toFixed(1))
+            : 0;
 
         const approvedClaims = claimRequestSummary.APPROVED ?? 0;
         const rejectedClaims = claimRequestSummary.REJECTED ?? 0;
@@ -2807,8 +2924,8 @@ export class BusinessesService {
             .map((entry) => entry.organizationId)
             .filter((organizationId): organizationId is string => Boolean(organizationId));
         const claimedOrganizations = claimedOrganizationIds.length;
-        const paidClaimOrganizations = claimedOrganizationIds.length > 0
-            ? await this.prisma.organization.count({
+        const paidClaimOrganizationRows = claimedOrganizationIds.length > 0
+            ? await this.prisma.organization.findMany({
                 where: {
                     id: {
                         in: claimedOrganizationIds,
@@ -2817,13 +2934,210 @@ export class BusinessesService {
                         not: 'FREE',
                     },
                 },
+                select: {
+                    id: true,
+                },
             })
-            : 0;
+            : [];
+        const paidClaimOrganizationIds = paidClaimOrganizationRows.map((organization) => organization.id);
+        const paidClaimOrganizations = paidClaimOrganizationIds.length;
         const claimedToOrganizationRatePct = claimedBusinesses > 0
             ? Number(((claimedBusinessesWithOrganization / claimedBusinesses) * 100).toFixed(1))
             : 0;
         const organizationToPaidRatePct = claimedOrganizations > 0
             ? Number(((paidClaimOrganizations / claimedOrganizations) * 100).toFixed(1))
+            : 0;
+        const [
+            paidOrganizationsUsingAnalytics,
+            paidOrganizationsUsingPromotions,
+            paidOrganizationsUsingAds,
+        ] = paidClaimOrganizationIds.length > 0
+            ? await Promise.all([
+                this.prisma.business.findMany({
+                    where: {
+                        organizationId: {
+                            in: paidClaimOrganizationIds,
+                        },
+                        analytics: {
+                            some: {
+                                date: {
+                                    gte: last30Days,
+                                },
+                                OR: [
+                                    { views: { gt: 0 } },
+                                    { clicks: { gt: 0 } },
+                                    { conversions: { gt: 0 } },
+                                    { reservationRequests: { gt: 0 } },
+                                    { grossRevenue: { gt: 0 } },
+                                ],
+                            },
+                        },
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    distinct: ['organizationId'],
+                }).then((rows) => rows.length),
+                this.prisma.promotion.findMany({
+                    where: {
+                        organizationId: {
+                            in: paidClaimOrganizationIds,
+                        },
+                        deletedAt: null,
+                        OR: [
+                            { isActive: true },
+                            {
+                                createdAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                            {
+                                endsAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                        ],
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    distinct: ['organizationId'],
+                }).then((rows) => rows.length),
+                this.prisma.adCampaign.findMany({
+                    where: {
+                        organizationId: {
+                            in: paidClaimOrganizationIds,
+                        },
+                        OR: [
+                            {
+                                startsAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                            {
+                                endsAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                            {
+                                createdAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                        ],
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    distinct: ['organizationId'],
+                }).then((rows) => rows.length),
+            ])
+            : [0, 0, 0];
+        const paidOrganizationsUsingAnyPremiumFeature = new Set<string>();
+        if (paidClaimOrganizationIds.length > 0) {
+            const [
+                analyticsOrgRows,
+                promotionOrgRows,
+                adOrgRows,
+            ] = await Promise.all([
+                this.prisma.business.findMany({
+                    where: {
+                        organizationId: {
+                            in: paidClaimOrganizationIds,
+                        },
+                        analytics: {
+                            some: {
+                                date: {
+                                    gte: last30Days,
+                                },
+                                OR: [
+                                    { views: { gt: 0 } },
+                                    { clicks: { gt: 0 } },
+                                    { conversions: { gt: 0 } },
+                                    { reservationRequests: { gt: 0 } },
+                                    { grossRevenue: { gt: 0 } },
+                                ],
+                            },
+                        },
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    distinct: ['organizationId'],
+                }),
+                this.prisma.promotion.findMany({
+                    where: {
+                        organizationId: {
+                            in: paidClaimOrganizationIds,
+                        },
+                        deletedAt: null,
+                        OR: [
+                            { isActive: true },
+                            {
+                                createdAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                            {
+                                endsAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                        ],
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    distinct: ['organizationId'],
+                }),
+                this.prisma.adCampaign.findMany({
+                    where: {
+                        organizationId: {
+                            in: paidClaimOrganizationIds,
+                        },
+                        OR: [
+                            {
+                                startsAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                            {
+                                endsAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                            {
+                                createdAt: {
+                                    gte: last30Days,
+                                },
+                            },
+                        ],
+                    },
+                    select: {
+                        organizationId: true,
+                    },
+                    distinct: ['organizationId'],
+                }),
+            ]);
+
+            analyticsOrgRows.forEach((row) => {
+                if (row.organizationId) {
+                    paidOrganizationsUsingAnyPremiumFeature.add(row.organizationId);
+                }
+            });
+            promotionOrgRows.forEach((row) => {
+                if (row.organizationId) {
+                    paidOrganizationsUsingAnyPremiumFeature.add(row.organizationId);
+                }
+            });
+            adOrgRows.forEach((row) => {
+                if (row.organizationId) {
+                    paidOrganizationsUsingAnyPremiumFeature.add(row.organizationId);
+                }
+            });
+        }
+        const premiumFeatureUsageRatePct = paidClaimOrganizations > 0
+            ? Number(((paidOrganizationsUsingAnyPremiumFeature.size / paidClaimOrganizations) * 100).toFixed(1))
             : 0;
 
         return {
@@ -2840,6 +3154,7 @@ export class BusinessesService {
                 weeklyCatalogGrowth,
                 suggestionApprovalRatePct,
                 resolvedDuplicateCases,
+                duplicateDetectionRatePct,
                 duplicateResolutionAvgHours,
                 claimCtaClicksLast30Days,
                 claimRequestsLast30Days,
@@ -2850,11 +3165,13 @@ export class BusinessesService {
                 paidClaimOrganizations,
                 claimedToOrganizationRatePct,
                 organizationToPaidRatePct,
+                premiumFeatureUsageRatePct,
             },
             totalBusinesses,
             publishedBusinesses,
             incompleteCount,
             duplicateClusterCount,
+            duplicateDetectionRatePct,
             unclaimedBusinesses,
             pendingClaims,
             claimedBusinesses,
@@ -2869,6 +3186,7 @@ export class BusinessesService {
             duplicateResolutionAvgHours,
             claimedBusinessesWithOrganization,
             paidClaimOrganizations,
+            premiumFeatureUsageRatePct,
             metrics: {
                 catalog: {
                     totalBusinesses,
@@ -2885,6 +3203,8 @@ export class BusinessesService {
                     missingSector,
                     missingCoordinates,
                     duplicateClusterCount,
+                    duplicateInvolvedBusinessCount,
+                    duplicateDetectionRatePct,
                     resolvedDuplicateCases,
                     mergedDuplicateCases,
                     conflictDuplicateCases: duplicateCaseSummary.CONFLICT ?? 0,
@@ -2911,6 +3231,11 @@ export class BusinessesService {
                     paidClaimOrganizations,
                     claimedToOrganizationRatePct,
                     organizationToPaidRatePct,
+                    paidOrganizationsUsingAnalytics,
+                    paidOrganizationsUsingPromotions,
+                    paidOrganizationsUsingAds,
+                    paidOrganizationsUsingAnyPremiumFeature: paidOrganizationsUsingAnyPremiumFeature.size,
+                    premiumFeatureUsageRatePct,
                 },
             },
             incompleteBusinesses,
@@ -3410,64 +3735,27 @@ export class BusinessesService {
     }
 
     private async searchClaimCandidates(
-        search: string,
-        options: {
-            provinceId?: string;
-            cityId?: string;
+        input: BusinessDuplicateSignalInput & {
+            search: string;
             limit?: number;
-        } = {},
+        },
     ) {
-        const trimmedSearch = search.trim();
+        const trimmedSearch = input.search.trim();
         if (trimmedSearch.length < 2) {
             return [];
         }
 
-        const safeLimit = Math.min(Math.max(options.limit ?? 6, 1), 12);
-        const slugQuery = slugify(trimmedSearch, { lower: true, strict: true });
-        const normalizedDigits = trimmedSearch.replace(/\D/g, '');
-        const normalizedWebsite = this.normalizeWebsiteValue(trimmedSearch);
-        const orClauses: Prisma.BusinessWhereInput[] = [
-            {
-                name: {
-                    contains: trimmedSearch,
-                    mode: 'insensitive',
-                },
-            },
-            {
-                address: {
-                    contains: trimmedSearch,
-                    mode: 'insensitive',
-                },
-            },
-        ];
-
-        if (slugQuery) {
-            orClauses.push({
-                slug: {
-                    contains: slugQuery,
-                },
-            });
-        }
-
-        if (normalizedDigits.length >= 7) {
-            orClauses.push({ phone: normalizedDigits });
-            orClauses.push({ whatsapp: normalizedDigits });
-        }
-
-        if (normalizedWebsite) {
-            orClauses.push({
-                website: {
-                    contains: normalizedWebsite,
-                    mode: 'insensitive',
-                },
-            });
+        const safeLimit = Math.min(Math.max(input.limit ?? 6, 1), 12);
+        const orClauses = this.buildDuplicateCandidateSearchClauses(input);
+        if (orClauses.length === 0) {
+            return [];
         }
 
         const rows = await this.prisma.business.findMany({
             where: {
                 deletedAt: null,
-                provinceId: options.provinceId,
-                cityId: options.cityId,
+                ...(input.provinceId ? { provinceId: input.provinceId } : {}),
+                ...(input.cityId ? { cityId: input.cityId } : {}),
                 OR: orClauses,
             },
             select: {
@@ -3478,6 +3766,12 @@ export class BusinessesService {
                 phone: true,
                 whatsapp: true,
                 website: true,
+                instagramUrl: true,
+                latitude: true,
+                longitude: true,
+                provinceId: true,
+                cityId: true,
+                sectorId: true,
                 verified: true,
                 claimStatus: true,
                 publicStatus: true,
@@ -3512,12 +3806,12 @@ export class BusinessesService {
                 { verified: 'desc' },
                 { createdAt: 'desc' },
             ],
-            take: Math.min(safeLimit * 4, 40),
+            take: Math.min(safeLimit * 5, 50),
         });
 
         return rows
             .map((row) => {
-                const scoredCandidate = this.scoreClaimSearchCandidate(row, trimmedSearch, normalizedDigits, normalizedWebsite);
+                const scoredCandidate = this.scoreDuplicateCandidate(row, input);
                 return {
                     ...row,
                     matchType: scoredCandidate.matchType,
@@ -3526,7 +3820,7 @@ export class BusinessesService {
                     alreadyClaimed: row.claimStatus === 'CLAIMED',
                 };
             })
-            .filter((row) => row.matchScore > 0)
+            .filter((row) => row.matchScore >= 35)
             .sort((left, right) => {
                 if (right.matchScore !== left.matchScore) {
                     return right.matchScore - left.matchScore;
@@ -3539,88 +3833,16 @@ export class BusinessesService {
             .slice(0, safeLimit);
     }
 
-    private scoreClaimSearchCandidate(
-        candidate: {
-            name: string;
-            address: string;
-            phone: string | null;
-            whatsapp: string | null;
-            website: string | null;
-        },
-        search: string,
-        normalizedDigits: string,
-        normalizedWebsite: string | null,
-    ): {
-        score: number;
-        matchType: 'exacta' | 'probable' | 'debil' | null;
-        reasons: string[];
-    } {
-        const normalizedSearch = this.normalizeComparisonValue(search);
-        const normalizedCandidateName = this.normalizeComparisonValue(candidate.name);
-        const normalizedCandidateAddress = this.normalizeComparisonValue(candidate.address);
-        const candidateWebsite = this.normalizeWebsiteValue(candidate.website);
-        const reasons = new Set<string>();
-        let score = 0;
-
-        if (normalizedSearch && normalizedCandidateName === normalizedSearch) {
-            score = Math.max(score, 96);
-            reasons.add('nombre_exacto');
-        } else if (
-            normalizedSearch
-            && (
-                normalizedCandidateName.includes(normalizedSearch)
-                || normalizedSearch.includes(normalizedCandidateName)
-            )
-        ) {
-            score = Math.max(score, 76);
-            reasons.add('nombre_similar');
-        }
-
-        if (normalizedDigits.length >= 7 && candidate.phone === normalizedDigits) {
-            score = Math.max(score, 95);
-            reasons.add('telefono');
-        }
-
-        if (normalizedDigits.length >= 7 && candidate.whatsapp === normalizedDigits) {
-            score = Math.max(score, 92);
-            reasons.add('whatsapp');
-        }
-
-        if (normalizedWebsite && candidateWebsite === normalizedWebsite) {
-            score = Math.max(score, 90);
-            reasons.add('website');
-        }
-
-        if (normalizedSearch && normalizedCandidateAddress.includes(normalizedSearch)) {
-            score = Math.max(score, 62);
-            reasons.add('direccion');
-        }
-
-        const matchType = score >= 90
-            ? 'exacta'
-            : score >= 70
-                ? 'probable'
-                : score > 0
-                    ? 'debil'
-                    : null;
-
-        return {
-            score,
-            matchType,
-            reasons: [...reasons],
-        };
-    }
-
     private async assertNoStrongDuplicateMatch(
-        input: {
+        input: BusinessDuplicateSignalInput & {
             name: string;
-            phone: string | null;
-            whatsapp: string | null;
-            website: string | null;
             provinceId: string;
-            cityId?: string;
         },
         ignorePotentialDuplicates?: boolean,
+        eventContext?: {
+            source: string;
+            actorUserId?: string | null;
+        },
     ) {
         if (ignorePotentialDuplicates) {
             return;
@@ -3631,47 +3853,34 @@ export class BusinessesService {
             return;
         }
 
+        if (eventContext) {
+            const reasons = new Set<string>();
+            strongCandidates.forEach((candidate) => {
+                candidate.matchReasons.forEach((reason) => reasons.add(reason));
+            });
+
+            this.domainEventsService.publishPotentialDuplicateDetected({
+                source: eventContext.source,
+                actorUserId: eventContext.actorUserId ?? null,
+                candidateBusinessIds: strongCandidates.map((candidate) => candidate.id),
+                candidateSlugs: strongCandidates.map((candidate) => candidate.slug),
+                reasons: [...reasons],
+            });
+        }
+
         throw new ConflictException(
             'Encontramos negocios que parecen duplicados. Revisa las coincidencias y reclama el negocio existente o continua con la opcion explicita de crear de todos modos.',
         );
     }
 
-    private async findStrongDuplicateCandidates(input: {
+    private async findStrongDuplicateCandidates(input: BusinessDuplicateSignalInput & {
         name: string;
-        phone: string | null;
-        whatsapp: string | null;
-        website: string | null;
         provinceId: string;
-        cityId?: string;
     }) {
-        const normalizedName = this.normalizeComparisonValue(input.name);
-        const normalizedWebsite = this.normalizeWebsiteValue(input.website);
-        const phoneCandidates = [input.phone, input.whatsapp].filter((value): value is string => Boolean(value));
-        const orClauses: Prisma.BusinessWhereInput[] = [];
-
-        if (input.name.trim()) {
-            orClauses.push({
-                name: {
-                    contains: input.name.trim(),
-                    mode: 'insensitive',
-                },
-            });
-        }
-
-        for (const phoneValue of phoneCandidates) {
-            orClauses.push({ phone: phoneValue });
-            orClauses.push({ whatsapp: phoneValue });
-        }
-
-        if (normalizedWebsite) {
-            orClauses.push({
-                website: {
-                    contains: normalizedWebsite,
-                    mode: 'insensitive',
-                },
-            });
-        }
-
+        const orClauses = this.buildDuplicateCandidateSearchClauses({
+            ...input,
+            search: input.name,
+        });
         if (orClauses.length === 0) {
             return [];
         }
@@ -3680,31 +3889,294 @@ export class BusinessesService {
             where: {
                 deletedAt: null,
                 provinceId: input.provinceId,
-                cityId: input.cityId,
+                ...(input.cityId ? { cityId: input.cityId } : {}),
                 OR: orClauses,
             },
             select: {
                 id: true,
                 name: true,
                 slug: true,
+                address: true,
                 phone: true,
                 whatsapp: true,
                 website: true,
+                instagramUrl: true,
+                latitude: true,
+                longitude: true,
+                provinceId: true,
+                cityId: true,
+                sectorId: true,
                 claimStatus: true,
+                publicStatus: true,
+                source: true,
+                categories: {
+                    select: {
+                        category: {
+                            select: { id: true, name: true, slug: true, icon: true, parentId: true },
+                        },
+                    },
+                },
             },
-            take: 12,
+            take: 20,
         });
 
-        return candidates.filter((candidate) => {
-            const sameName = normalizedName.length > 0
-                && this.normalizeComparisonValue(candidate.name) === normalizedName;
-            const samePhone = phoneCandidates.some((phoneValue) =>
-                candidate.phone === phoneValue || candidate.whatsapp === phoneValue);
-            const sameWebsite = Boolean(normalizedWebsite)
-                && this.normalizeWebsiteValue(candidate.website) === normalizedWebsite;
+        return candidates
+            .map((candidate) => {
+                const match = this.scoreDuplicateCandidate(candidate, input);
+                return {
+                    ...candidate,
+                    matchScore: match.score,
+                    matchType: match.matchType,
+                    matchReasons: match.reasons,
+                };
+            })
+            .filter((candidate) => candidate.matchScore >= 60)
+            .sort((left, right) => right.matchScore - left.matchScore)
+            .slice(0, 12);
+    }
 
-            return sameName || samePhone || sameWebsite;
-        });
+    private buildDuplicateCandidateSearchClauses(input: BusinessDuplicateSignalInput): Prisma.BusinessWhereInput[] {
+        const orClauses: Prisma.BusinessWhereInput[] = [];
+        const textSignals = [...new Set(
+            [input.search, input.name, input.address]
+                .map((value) => normalizeOptionalText(value) ?? null)
+                .filter((value): value is string => Boolean(value && value.length >= 2)),
+        )];
+        const digitSignals = [...new Set(
+            [input.phone, input.whatsapp, input.search]
+                .map((value) => this.normalizePhoneDigits(value))
+                .filter((value): value is string => Boolean(value)),
+        )];
+        const websiteSignals = [...new Set(
+            [input.website, input.search]
+                .map((value) => this.normalizeWebsiteValue(value))
+                .filter((value): value is string => Boolean(value)),
+        )];
+        const instagramSignals = [...new Set(
+            [input.instagramUrl, input.search]
+                .map((value) => this.normalizeInstagramValue(value))
+                .filter((value): value is string => Boolean(value)),
+        )];
+
+        for (const textSignal of textSignals) {
+            orClauses.push({
+                name: {
+                    contains: textSignal,
+                    mode: 'insensitive',
+                },
+            });
+            orClauses.push({
+                address: {
+                    contains: textSignal,
+                    mode: 'insensitive',
+                },
+            });
+
+            const slugSignal = slugify(textSignal, { lower: true, strict: true });
+            if (slugSignal) {
+                orClauses.push({
+                    slug: {
+                        contains: slugSignal,
+                    },
+                });
+            }
+        }
+
+        for (const digitSignal of digitSignals) {
+            orClauses.push({ phone: digitSignal });
+            orClauses.push({ whatsapp: digitSignal });
+        }
+
+        for (const websiteSignal of websiteSignals) {
+            orClauses.push({
+                website: {
+                    contains: websiteSignal,
+                    mode: 'insensitive',
+                },
+            });
+        }
+
+        for (const instagramSignal of instagramSignals) {
+            orClauses.push({
+                instagramUrl: {
+                    contains: instagramSignal,
+                    mode: 'insensitive',
+                },
+            });
+        }
+
+        return orClauses;
+    }
+
+    private scoreDuplicateCandidate(
+        candidate: {
+            id: string;
+            name: string;
+            slug: string;
+            address: string;
+            phone: string | null;
+            whatsapp: string | null;
+            website: string | null;
+            instagramUrl?: string | null;
+            latitude?: number | null;
+            longitude?: number | null;
+            provinceId?: string | null;
+            cityId?: string | null;
+            sectorId?: string | null;
+            categories?: Array<{
+                category: {
+                    id: string;
+                };
+            }>;
+        },
+        input: BusinessDuplicateSignalInput,
+    ): {
+        score: number;
+        matchType: 'exacta' | 'probable' | 'debil' | null;
+        reasons: string[];
+    } {
+        const reasons = new Set<string>();
+        let score = 0;
+
+        const normalizedNameInput = this.normalizeComparisonValue(input.name ?? input.search);
+        const normalizedAddressInput = this.normalizeComparisonValue(input.address);
+        const normalizedSlugInput = this.normalizeSlugValue(input.name ?? input.search);
+        const normalizedCandidateName = this.normalizeComparisonValue(candidate.name);
+        const normalizedCandidateAddress = this.normalizeComparisonValue(candidate.address);
+        const normalizedCandidateSlug = this.normalizeSlugValue(candidate.slug);
+        const phoneSignals = [...new Set(
+            [input.phone, input.whatsapp, input.search]
+                .map((value) => this.normalizePhoneDigits(value))
+                .filter((value): value is string => Boolean(value)),
+        )];
+        const websiteSignals = [...new Set(
+            [input.website, input.search]
+                .map((value) => this.normalizeWebsiteValue(value))
+                .filter((value): value is string => Boolean(value)),
+        )];
+        const instagramSignals = [...new Set(
+            [input.instagramUrl, input.search]
+                .map((value) => this.normalizeInstagramValue(value))
+                .filter((value): value is string => Boolean(value)),
+        )];
+        const candidatePhone = this.normalizePhoneDigits(candidate.phone);
+        const candidateWhatsapp = this.normalizePhoneDigits(candidate.whatsapp);
+        const candidateWebsite = this.normalizeWebsiteValue(candidate.website);
+        const candidateInstagram = this.normalizeInstagramValue(candidate.instagramUrl);
+        const sameProvince = Boolean(input.provinceId && candidate.provinceId && input.provinceId === candidate.provinceId);
+        const sameCity = Boolean(input.cityId && candidate.cityId && input.cityId === candidate.cityId);
+        const sameSector = Boolean(input.sectorId && candidate.sectorId && input.sectorId === candidate.sectorId);
+        const categoryOverlapCount = this.countOverlappingCategoryIds(input.categoryIds, candidate.categories);
+        const coordinateDistanceKm = this.calculateCoordinateDistanceKm(
+            input.latitude,
+            input.longitude,
+            candidate.latitude ?? null,
+            candidate.longitude ?? null,
+        );
+        const nameOverlap = this.calculateTokenOverlap(normalizedNameInput, normalizedCandidateName);
+        const addressOverlap = this.calculateTokenOverlap(normalizedAddressInput, normalizedCandidateAddress);
+
+        if (normalizedNameInput && normalizedCandidateName === normalizedNameInput) {
+            score += 64;
+            reasons.add('nombre_exacto');
+        } else if (
+            normalizedNameInput
+            && (
+                normalizedCandidateName.includes(normalizedNameInput)
+                || normalizedNameInput.includes(normalizedCandidateName)
+                || nameOverlap >= 0.8
+            )
+        ) {
+            score += 42;
+            reasons.add('nombre_similar');
+        }
+
+        if (normalizedSlugInput && normalizedCandidateSlug === normalizedSlugInput) {
+            score += 52;
+            reasons.add('slug');
+        }
+
+        if (phoneSignals.some((value) => value === candidatePhone)) {
+            score += 92;
+            reasons.add('telefono');
+        }
+
+        if (phoneSignals.some((value) => value === candidateWhatsapp)) {
+            score += 90;
+            reasons.add('whatsapp');
+        }
+
+        if (websiteSignals.some((value) => value === candidateWebsite)) {
+            score += 84;
+            reasons.add('website');
+        }
+
+        if (instagramSignals.some((value) => value === candidateInstagram)) {
+            score += 78;
+            reasons.add('instagram');
+        }
+
+        if (normalizedAddressInput && normalizedCandidateAddress === normalizedAddressInput) {
+            score += 46;
+            reasons.add('direccion_exacta');
+        } else if (
+            normalizedAddressInput
+            && (
+                normalizedCandidateAddress.includes(normalizedAddressInput)
+                || normalizedAddressInput.includes(normalizedCandidateAddress)
+                || addressOverlap >= 0.75
+            )
+        ) {
+            score += 24;
+            reasons.add('direccion_similar');
+        }
+
+        if (sameProvince) {
+            score += 3;
+            reasons.add('provincia');
+        }
+
+        if (sameCity) {
+            score += 5;
+            reasons.add('ciudad');
+        }
+
+        if (sameSector) {
+            score += 4;
+            reasons.add('sector');
+        }
+
+        if (categoryOverlapCount > 0) {
+            score += 6;
+            reasons.add('categoria');
+        }
+
+        if (coordinateDistanceKm !== null && coordinateDistanceKm <= 0.15) {
+            score += 14;
+            reasons.add('coordenadas_cercanas');
+        } else if (coordinateDistanceKm !== null && coordinateDistanceKm <= 0.5) {
+            score += 8;
+            reasons.add('coordenadas_cercanas');
+        }
+
+        const strongNameMatch = reasons.has('nombre_exacto') || reasons.has('nombre_similar');
+        const strongAddressMatch = reasons.has('direccion_exacta') || reasons.has('direccion_similar');
+        if (strongNameMatch && categoryOverlapCount > 0 && (sameCity || sameProvince)) {
+            score += 14;
+            reasons.add('nombre_categoria_ubicacion');
+        }
+
+        if (strongNameMatch && strongAddressMatch) {
+            score += 10;
+            reasons.add('nombre_y_direccion');
+        }
+
+        const normalizedScore = Math.min(score, 99);
+        return {
+            score: normalizedScore,
+            matchType: this.resolveDuplicateMatchType(normalizedScore),
+            reasons: [...reasons],
+        };
     }
 
     private normalizeComparisonValue(value?: string | null): string {
@@ -3714,6 +4186,21 @@ export class BusinessesService {
             .replace(/\s+/g, ' ')
             .trim()
             .toLowerCase();
+    }
+
+    private normalizeSlugValue(value?: string | null): string | null {
+        const normalized = normalizeOptionalText(value);
+        if (!normalized) {
+            return null;
+        }
+
+        const slug = slugify(normalized, { lower: true, strict: true });
+        return slug || null;
+    }
+
+    private normalizePhoneDigits(value?: string | null): string | null {
+        const digits = String(value ?? '').replace(/\D/g, '');
+        return digits.length >= 7 ? digits : null;
     }
 
     private normalizeWebsiteValue(value?: string | null): string | null {
@@ -3727,6 +4214,100 @@ export class BusinessesService {
             .replace(/^www\./i, '')
             .replace(/\/+$/, '')
             .toLowerCase();
+    }
+
+    private normalizeInstagramValue(value?: string | null): string | null {
+        const normalized = normalizeOptionalText(value);
+        if (!normalized) {
+            return null;
+        }
+
+        return normalized
+            .replace(/^https?:\/\//i, '')
+            .replace(/^www\./i, '')
+            .replace(/^instagram\.com\//i, '')
+            .replace(/^@/, '')
+            .replace(/\/+$/, '')
+            .toLowerCase();
+    }
+
+    private resolveDuplicateMatchType(score: number): 'exacta' | 'probable' | 'debil' | null {
+        if (score >= 85) {
+            return 'exacta';
+        }
+
+        if (score >= 60) {
+            return 'probable';
+        }
+
+        if (score >= 35) {
+            return 'debil';
+        }
+
+        return null;
+    }
+
+    private calculateTokenOverlap(left: string, right: string): number {
+        if (!left || !right) {
+            return 0;
+        }
+
+        const leftTokens = new Set(left.split(' ').filter((token) => token.length >= 3));
+        const rightTokens = new Set(right.split(' ').filter((token) => token.length >= 3));
+        if (leftTokens.size === 0 || rightTokens.size === 0) {
+            return 0;
+        }
+
+        let shared = 0;
+        leftTokens.forEach((token) => {
+            if (rightTokens.has(token)) {
+                shared += 1;
+            }
+        });
+
+        return shared / Math.max(leftTokens.size, rightTokens.size);
+    }
+
+    private countOverlappingCategoryIds(
+        inputCategoryIds: string[] | undefined,
+        candidateCategories: Array<{ category: { id: string } }> | undefined,
+    ): number {
+        if (!inputCategoryIds?.length || !candidateCategories?.length) {
+            return 0;
+        }
+
+        const candidateIds = new Set(candidateCategories.map((entry) => entry.category.id));
+        return [...new Set(inputCategoryIds)].filter((categoryId) => candidateIds.has(categoryId)).length;
+    }
+
+    private calculateCoordinateDistanceKm(
+        leftLatitude?: number | null,
+        leftLongitude?: number | null,
+        rightLatitude?: number | null,
+        rightLongitude?: number | null,
+    ): number | null {
+        if (
+            typeof leftLatitude !== 'number'
+            || typeof leftLongitude !== 'number'
+            || typeof rightLatitude !== 'number'
+            || typeof rightLongitude !== 'number'
+        ) {
+            return null;
+        }
+
+        const earthRadiusKm = 6371;
+        const deltaLat = this.toRadians(rightLatitude - leftLatitude);
+        const deltaLng = this.toRadians(rightLongitude - leftLongitude);
+        const a = Math.sin(deltaLat / 2) ** 2
+            + Math.cos(this.toRadians(leftLatitude))
+            * Math.cos(this.toRadians(rightLatitude))
+            * Math.sin(deltaLng / 2) ** 2;
+
+        return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    private toRadians(value: number): number {
+        return value * (Math.PI / 180);
     }
 
     private async resolveFeatureIds(featureQuery: string): Promise<string[]> {

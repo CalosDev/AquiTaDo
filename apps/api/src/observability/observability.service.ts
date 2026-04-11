@@ -15,9 +15,9 @@ const FRONTEND_HEALTH_WINDOW_MS = 1000 * 60 * 60 * 24;
 const FRONTEND_ROUTE_VIEW_REDIS_KEY = 'observability:frontend:route-views:v1';
 const FRONTEND_CLIENT_ERROR_REDIS_KEY = 'observability:frontend:client-errors:v1';
 const FRONTEND_WEB_VITAL_REDIS_KEY = 'observability:frontend:web-vitals:v1';
-const FRONTEND_CLIENT_ERROR_WARN_COUNT = 2;
+const FRONTEND_CLIENT_ERROR_WARN_COUNT = 1;
 const FRONTEND_CLIENT_ERROR_CRITICAL_COUNT = 5;
-const FRONTEND_WEB_VITAL_WARN_COUNT = 2;
+const FRONTEND_WEB_VITAL_WARN_COUNT = 1;
 const FRONTEND_WEB_VITAL_CRITICAL_COUNT = 3;
 
 type FrontendRouteViewSnapshot = {

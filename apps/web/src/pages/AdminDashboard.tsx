@@ -90,9 +90,11 @@ interface CatalogQualitySnapshot {
     claimReviewAvgHours?: number;
     suggestionApprovalRatePct?: number;
     resolvedDuplicateCases?: number;
+    duplicateDetectionRatePct?: number;
     duplicateResolutionAvgHours?: number;
     claimedBusinessesWithOrganization?: number;
     paidClaimOrganizations?: number;
+    premiumFeatureUsageRatePct?: number;
     metrics?: {
         catalog?: {
             totalBusinesses: number;
@@ -109,6 +111,8 @@ interface CatalogQualitySnapshot {
             missingSector: number;
             missingCoordinates: number;
             duplicateClusterCount: number;
+            duplicateInvolvedBusinessCount: number;
+            duplicateDetectionRatePct: number;
             resolvedDuplicateCases: number;
             mergedDuplicateCases: number;
             conflictDuplicateCases: number;
@@ -135,6 +139,11 @@ interface CatalogQualitySnapshot {
             paidClaimOrganizations: number;
             claimedToOrganizationRatePct: number;
             organizationToPaidRatePct: number;
+            paidOrganizationsUsingAnalytics: number;
+            paidOrganizationsUsingPromotions: number;
+            paidOrganizationsUsingAds: number;
+            paidOrganizationsUsingAnyPremiumFeature: number;
+            premiumFeatureUsageRatePct: number;
         };
     };
     incompleteBusinesses: Array<{
@@ -586,6 +595,7 @@ export function AdminDashboard() {
             );
         });
     }, [businessSearch, businessStatusFilter, businesses]);
+    const catalogMetrics = catalogQuality?.metrics;
     const parentCategoryOptions = useMemo(
         () => categories.filter((category) => !category.parentId),
         [categories],
@@ -1758,6 +1768,51 @@ export function AdminDashboard() {
                                         </p>
                                     </div>
                                 </div>
+
+                                <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-4">
+                                    <div className="rounded-xl border border-primary-100 bg-primary-50 p-4">
+                                        <p className="text-xs text-primary-700">Crecimiento semanal</p>
+                                        <p className="mt-1 text-2xl font-semibold text-primary-900">
+                                            {catalogMetrics?.catalog?.weeklyCatalogGrowth ?? catalogQuality?.weeklyCatalogGrowth ?? 0}
+                                        </p>
+                                        <p className="mt-2 text-xs text-primary-700">
+                                            Publicados: {catalogMetrics?.catalog?.publishedBusinesses ?? catalogQuality?.publishedBusinesses ?? 0}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
+                                        <p className="text-xs text-amber-700">Embudo de claim 30d</p>
+                                        <p className="mt-1 text-2xl font-semibold text-amber-900">
+                                            {catalogMetrics?.claim?.requestCompletionRatePct ?? catalogQuality?.claimRequestCompletionRatePct ?? 0}%
+                                        </p>
+                                        <p className="mt-2 text-xs text-amber-700">
+                                            CTA: {catalogMetrics?.claim?.ctaClicksLast30Days ?? catalogQuality?.claimCtaClicksLast30Days ?? 0} | Solicitudes: {catalogMetrics?.claim?.requestsLast30Days ?? catalogQuality?.claimRequestsLast30Days ?? 0}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+                                        <p className="text-xs text-red-700">Calidad y duplicados</p>
+                                        <p className="mt-1 text-2xl font-semibold text-red-900">
+                                            {catalogMetrics?.quality?.duplicateDetectionRatePct ?? catalogQuality?.duplicateDetectionRatePct ?? 0}%
+                                        </p>
+                                        <p className="mt-2 text-xs text-red-700">
+                                            Merge: {catalogMetrics?.quality?.duplicateMergeRatePct ?? 0}% | TMR: {catalogMetrics?.quality?.duplicateResolutionAvgHours ?? catalogQuality?.duplicateResolutionAvgHours ?? 0}h
+                                        </p>
+                                        <p className="mt-1 text-xs text-red-700">
+                                            Clusters: {catalogMetrics?.quality?.duplicateClusterCount ?? catalogQuality?.duplicateClusterCount ?? 0} | Fichas involucradas: {catalogMetrics?.quality?.duplicateInvolvedBusinessCount ?? 0}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                        <p className="text-xs text-slate-600">SaaS y moderacion</p>
+                                        <p className="mt-1 text-2xl font-semibold text-slate-900">
+                                            {catalogMetrics?.saas?.premiumFeatureUsageRatePct ?? catalogQuality?.premiumFeatureUsageRatePct ?? 0}%
+                                        </p>
+                                        <p className="mt-2 text-xs text-slate-600">
+                                            Pago: {catalogMetrics?.saas?.organizationToPaidRatePct ?? 0}% | Premium activo: {catalogMetrics?.saas?.paidOrganizationsUsingAnyPremiumFeature ?? 0}/{catalogMetrics?.saas?.paidClaimOrganizations ?? catalogQuality?.paidClaimOrganizations ?? 0}
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            Analytics: {catalogMetrics?.saas?.paidOrganizationsUsingAnalytics ?? 0} | Promos: {catalogMetrics?.saas?.paidOrganizationsUsingPromotions ?? 0} | Ads: {catalogMetrics?.saas?.paidOrganizationsUsingAds ?? 0}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -2041,12 +2096,73 @@ export function AdminDashboard() {
                                                     <div className="space-y-2">
                                                         {cluster.businesses.map((business) => (
                                                             <div key={business.id} className="rounded-lg border border-white bg-white px-3 py-2">
-                                                                <p className="text-sm font-medium text-gray-900">{business.name}</p>
-                                                                <p className="text-xs text-gray-500">
-                                                                    {[business.city?.name, business.province?.name].filter(Boolean).join(', ') || 'Ubicacion pendiente'}
-                                                                </p>
+                                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                    <div>
+                                                                        <p className="text-sm font-medium text-gray-900">{business.name}</p>
+                                                                        <p className="text-xs text-gray-500">
+                                                                            {[business.city?.name, business.province?.name].filter(Boolean).join(', ') || 'Ubicacion pendiente'}
+                                                                        </p>
+                                                                    </div>
+                                                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                                                        {business.claimStatus || 'UNCLAIMED'}
+                                                                    </span>
+                                                                </div>
                                                             </div>
                                                         ))}
+                                                    </div>
+                                                    <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                                                        <div className="space-y-3">
+                                                            <select
+                                                                className="input-field text-sm"
+                                                                value={duplicatePrimarySelection[cluster.key] || ''}
+                                                                onChange={(event) => setDuplicatePrimarySelection((current) => ({
+                                                                    ...current,
+                                                                    [cluster.key]: event.target.value,
+                                                                }))}
+                                                            >
+                                                                <option value="">Selecciona ficha primaria para fusion</option>
+                                                                {cluster.businesses.map((business) => (
+                                                                    <option key={`${cluster.key}-${business.id}`} value={business.id}>
+                                                                        {business.name}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <textarea
+                                                                className="input-field h-24 w-full resize-none text-sm"
+                                                                placeholder="Notas para fusionar, descartar o marcar conflicto"
+                                                                value={duplicateResolutionNotes[cluster.key] || ''}
+                                                                onChange={(event) => setDuplicateResolutionNotes((current) => ({
+                                                                    ...current,
+                                                                    [cluster.key]: event.target.value,
+                                                                }))}
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-2">
+                                                            <button
+                                                                type="button"
+                                                                className="btn-primary text-sm"
+                                                                disabled={processingId === `duplicate:${cluster.key}`}
+                                                                onClick={() => void handleResolveDuplicateCluster(cluster, 'MERGED')}
+                                                            >
+                                                                Fusionar
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-secondary text-sm"
+                                                                disabled={processingId === `duplicate:${cluster.key}`}
+                                                                onClick={() => void handleResolveDuplicateCluster(cluster, 'CONFLICT')}
+                                                            >
+                                                                Marcar conflicto
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-secondary text-sm"
+                                                                disabled={processingId === `duplicate:${cluster.key}`}
+                                                                onClick={() => void handleResolveDuplicateCluster(cluster, 'DISMISSED')}
+                                                            >
+                                                                Descartar
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))
@@ -2085,30 +2201,120 @@ export function AdminDashboard() {
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                 <div className="card p-5">
                                     <h3 className="font-display font-semibold mb-3">Sugerencias de usuarios</h3>
-                                    <div className="space-y-3">
-                                        {userSuggestionBusinesses.length > 0 ? userSuggestionBusinesses.slice(0, 8).map((business) => (
-                                            <div key={business.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex flex-wrap gap-2">
+                                            {(['PENDING', 'APPROVED', 'REJECTED'] as const).map((status) => (
+                                                <span key={status} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                    {status}: {suggestionSummary[status] ?? 0}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <select
+                                            className="input-field text-sm"
+                                            value={suggestionStatusFilter}
+                                            onChange={(event) => setSuggestionStatusFilter(event.target.value as 'PENDING' | 'APPROVED' | 'REJECTED')}
+                                        >
+                                            <option value="PENDING">Pendientes</option>
+                                            <option value="APPROVED">Aprobadas</option>
+                                            <option value="REJECTED">Rechazadas</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="mt-4 space-y-3">
+                                        {businessSuggestions.length > 0 ? businessSuggestions.map((suggestion) => (
+                                            <div key={suggestion.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
                                                     <div>
-                                                        <p className="font-medium text-gray-900">{business.name}</p>
-                                                        <p className="mt-1 text-sm text-slate-600">
-                                                            {business.province?.name || 'Provincia pendiente'}
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <p className="font-medium text-gray-900">{suggestion.name}</p>
+                                                            <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-semibold text-primary-700">
+                                                                {suggestion.status}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-sm text-slate-600">
+                                                            {[suggestion.city?.name, suggestion.province?.name].filter(Boolean).join(', ') || suggestion.address}
                                                         </p>
+                                                        <p className="mt-1 text-xs text-slate-500">
+                                                            Enviada por {suggestion.submittedByUser?.name || 'usuario'} el {new Date(suggestion.createdAt).toLocaleDateString('es-DO')}
+                                                        </p>
+                                                        {suggestion.notes ? (
+                                                            <p className="mt-2 text-sm whitespace-pre-wrap text-slate-700">{suggestion.notes}</p>
+                                                        ) : null}
                                                     </div>
-                                                    <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-semibold text-primary-700">
-                                                        USER_SUGGESTION
-                                                    </span>
+                                                    {suggestion.createdBusiness ? (
+                                                        <a
+                                                            href={`/businesses/${suggestion.createdBusiness.slug}`}
+                                                            className="btn-secondary text-sm"
+                                                        >
+                                                            Ver ficha
+                                                        </a>
+                                                    ) : null}
                                                 </div>
+
+                                                {suggestion.status === 'PENDING' ? (
+                                                    <div className="mt-3 space-y-3">
+                                                        <textarea
+                                                            className="input-field h-24 w-full resize-none text-sm"
+                                                            placeholder="Notas administrativas para aprobar o rechazar la sugerencia"
+                                                            value={suggestionReviewNotes[suggestion.id] || ''}
+                                                            onChange={(event) => setSuggestionReviewNotes((current) => ({
+                                                                ...current,
+                                                                [suggestion.id]: event.target.value,
+                                                            }))}
+                                                        />
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <button
+                                                                type="button"
+                                                                className="btn-primary text-sm"
+                                                                disabled={processingId === suggestion.id}
+                                                                onClick={() => void handleReviewSuggestion(suggestion.id, 'APPROVED')}
+                                                            >
+                                                                Aprobar y publicar
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-secondary text-sm"
+                                                                disabled={processingId === suggestion.id}
+                                                                onClick={() => void handleReviewSuggestion(suggestion.id, 'REJECTED')}
+                                                            >
+                                                                Rechazar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="mt-3 text-xs text-slate-500">
+                                                        Revisada {suggestion.reviewedAt ? new Date(suggestion.reviewedAt).toLocaleString('es-DO') : 'sin fecha'} por {suggestion.reviewedByAdmin?.name || 'sistema'}
+                                                    </p>
+                                                )}
                                             </div>
                                         )) : (
-                                            <p className="text-sm text-gray-500">No hay sugerencias de usuarios en la muestra cargada.</p>
+                                            <p className="text-sm text-gray-500">No hay sugerencias para este filtro.</p>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="card p-5">
                                     <h3 className="font-display font-semibold mb-3">Resolucion de conflictos</h3>
-                                    <div className="space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex flex-wrap gap-2">
+                                            {(['MERGED', 'DISMISSED', 'CONFLICT'] as const).map((status) => (
+                                                <span key={status} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                    {status}: {duplicateCaseSummary[status] ?? 0}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <select
+                                            className="input-field text-sm"
+                                            value={duplicateCaseStatusFilter}
+                                            onChange={(event) => setDuplicateCaseStatusFilter(event.target.value as 'MERGED' | 'DISMISSED' | 'CONFLICT')}
+                                        >
+                                            <option value="MERGED">Fusionados</option>
+                                            <option value="CONFLICT">Conflictos</option>
+                                            <option value="DISMISSED">Descartados</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="mt-4 space-y-3">
                                         {catalogConflictQueue.length > 0 ? catalogConflictQueue.map((item) => (
                                             <div key={item.key} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                                                 <div className="flex flex-wrap items-center gap-2">
@@ -2116,9 +2322,15 @@ export function AdminDashboard() {
                                                     <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                                                         item.kind === 'PENDING_CLAIM'
                                                             ? 'border border-amber-200 bg-amber-50 text-amber-800'
-                                                            : 'border border-red-200 bg-red-50 text-red-800'
+                                                            : item.kind === 'PENDING_SUGGESTION'
+                                                                ? 'border border-primary-200 bg-primary-50 text-primary-700'
+                                                                : 'border border-red-200 bg-red-50 text-red-800'
                                                     }`}>
-                                                        {item.kind === 'PENDING_CLAIM' ? 'Claim pendiente' : 'Duplicado probable'}
+                                                        {item.kind === 'PENDING_CLAIM'
+                                                            ? 'Claim pendiente'
+                                                            : item.kind === 'PENDING_SUGGESTION'
+                                                                ? 'Sugerencia pendiente'
+                                                                : 'Duplicado probable'}
                                                     </span>
                                                 </div>
                                                 <p className="mt-2 text-sm text-slate-700">{item.detail}</p>
@@ -2127,6 +2339,48 @@ export function AdminDashboard() {
                                         )) : (
                                             <p className="text-sm text-gray-500">No hay conflictos priorizados con la data actualmente cargada.</p>
                                         )}
+
+                                        <div className="border-t border-gray-100 pt-3">
+                                            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                                Historial auditado
+                                            </p>
+                                            <div className="space-y-3">
+                                                {duplicateCases.length > 0 ? duplicateCases.map((duplicateCase) => (
+                                                    <div key={duplicateCase.id} className="rounded-xl border border-gray-100 bg-white p-4">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <p className="font-medium text-gray-900">{duplicateCase.status}</p>
+                                                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                                                    {duplicateCase.businessIds.length} fichas
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-xs text-slate-500">
+                                                                {duplicateCase.resolvedAt ? new Date(duplicateCase.resolvedAt).toLocaleString('es-DO') : 'Sin fecha'}
+                                                            </p>
+                                                        </div>
+                                                        {duplicateCase.primaryBusiness ? (
+                                                            <p className="mt-2 text-sm text-slate-700">
+                                                                Ficha primaria: {duplicateCase.primaryBusiness.name}
+                                                            </p>
+                                                        ) : null}
+                                                        {duplicateCase.reasons && duplicateCase.reasons.length > 0 ? (
+                                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                                {duplicateCase.reasons.map((reason) => (
+                                                                    <span key={`${duplicateCase.id}-${reason}`} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700">
+                                                                        {reason}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : null}
+                                                        {duplicateCase.resolutionNotes ? (
+                                                            <p className="mt-2 text-sm text-slate-600 whitespace-pre-wrap">{duplicateCase.resolutionNotes}</p>
+                                                        ) : null}
+                                                    </div>
+                                                )) : (
+                                                    <p className="text-sm text-gray-500">No hay resoluciones auditadas para este filtro.</p>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
