@@ -21,6 +21,7 @@ export const pageLoaders = {
     notFound: () => import('../pages/NotFound'),
     profile: () => import('../pages/Profile'),
     adminSecurity: () => import('../pages/AdminSecurity'),
+    acceptOrganizationInvite: () => import('../pages/AcceptOrganizationInvite'),
 } as const;
 
 type LoaderKey = keyof typeof pageLoaders;
@@ -103,6 +104,11 @@ export function preloadRouteChunk(pathname: string): void {
 
     if (normalizedPath === '/app/customer') {
         preloadByKey('customerDashboard');
+        return;
+    }
+
+    if (normalizedPath === '/app/invite') {
+        preloadByKey('acceptOrganizationInvite');
         return;
     }
 

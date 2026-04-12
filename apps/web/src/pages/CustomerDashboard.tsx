@@ -7,6 +7,7 @@ import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 import { formatDateTimeDo } from '../lib/market';
+import { CustomerActivityWorkspace } from './customer-dashboard/CustomerActivityWorkspace';
 
 interface FavoriteBusinessItem {
     businessId: string;
@@ -343,6 +344,8 @@ export function CustomerDashboard() {
                     )}
                 </article>
             </section>
+
+            <CustomerActivityWorkspace />
         </div>
     );
 }

@@ -9,6 +9,18 @@ import { useTimedMessage } from '../hooks/useTimedMessage';
 const VerificationWorkspace = lazy(async () => ({
     default: (await import('./dashboard-business/VerificationWorkspace')).VerificationWorkspace,
 }));
+const BillingWorkspace = lazy(async () => ({
+    default: (await import('./dashboard-business/BillingWorkspace')).BillingWorkspace,
+}));
+const OperationsWorkspace = lazy(async () => ({
+    default: (await import('./dashboard-business/OperationsWorkspace')).OperationsWorkspace,
+}));
+const GrowthWorkspace = lazy(async () => ({
+    default: (await import('./dashboard-business/GrowthWorkspace')).GrowthWorkspace,
+}));
+const OrganizationWorkspace = lazy(async () => ({
+    default: (await import('./dashboard-business/OrganizationWorkspace')).OrganizationWorkspace,
+}));
 
 type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
 
@@ -200,8 +212,135 @@ function LazyOwnerSectionFallback({ label }: { label: string }) {
     );
 }
 
+function LazyBillingSectionFallback() {
+    return (
+        <section className="section-shell p-6 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-2">
+                    <div className="h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
+                    <div className="h-8 w-64 rounded-full bg-slate-100 animate-pulse" />
+                </div>
+                <div className="h-10 w-36 rounded-full bg-slate-100 animate-pulse" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
+                {Array.from({ length: 6 }).map((_, index) => (
+                    <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div className="h-3 w-16 rounded-full bg-slate-100 animate-pulse" />
+                        <div className="mt-3 h-7 w-20 rounded-full bg-slate-100 animate-pulse" />
+                    </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="h-5 w-40 rounded-full bg-slate-100 animate-pulse" />
+                    <div className="mt-4 h-48 rounded-3xl bg-slate-50 animate-pulse" />
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="h-5 w-32 rounded-full bg-slate-100 animate-pulse" />
+                    <div className="mt-4 h-48 rounded-3xl bg-slate-50 animate-pulse" />
+                </div>
+            </div>
+        </section>
+    );
+}
+
+function LazyOperationsSectionFallback() {
+    return (
+        <section className="section-shell p-6 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-2">
+                    <div className="h-3 w-32 rounded-full bg-slate-100 animate-pulse" />
+                    <div className="h-8 w-72 rounded-full bg-slate-100 animate-pulse" />
+                </div>
+                <div className="h-10 w-36 rounded-full bg-slate-100 animate-pulse" />
+            </div>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, index) => (
+                    <div key={index} className="rounded-3xl border border-slate-200 bg-white p-5">
+                        <div className="h-5 w-40 rounded-full bg-slate-100 animate-pulse" />
+                        <div className="mt-4 h-48 rounded-3xl bg-slate-50 animate-pulse" />
+                    </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, index) => (
+                    <div key={index} className="rounded-3xl border border-slate-200 bg-white p-5">
+                        <div className="h-5 w-40 rounded-full bg-slate-100 animate-pulse" />
+                        <div className="mt-4 h-56 rounded-3xl bg-slate-50 animate-pulse" />
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function LazyOrganizationSectionFallback() {
+    return (
+        <section className="section-shell p-6 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-2">
+                    <div className="h-3 w-32 rounded-full bg-slate-100 animate-pulse" />
+                    <div className="h-8 w-80 rounded-full bg-slate-100 animate-pulse" />
+                </div>
+                <div className="h-10 w-36 rounded-full bg-slate-100 animate-pulse" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div className="h-3 w-20 rounded-full bg-slate-100 animate-pulse" />
+                        <div className="mt-3 h-7 w-16 rounded-full bg-slate-100 animate-pulse" />
+                    </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, index) => (
+                    <div key={index} className="rounded-3xl border border-slate-200 bg-white p-5">
+                        <div className="h-5 w-44 rounded-full bg-slate-100 animate-pulse" />
+                        <div className="mt-4 h-56 rounded-3xl bg-slate-50 animate-pulse" />
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function LazyGrowthSectionFallback() {
+    return (
+        <section className="section-shell p-6 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-2">
+                    <div className="h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
+                    <div className="h-8 w-72 rounded-full bg-slate-100 animate-pulse" />
+                </div>
+                <div className="h-10 w-36 rounded-full bg-slate-100 animate-pulse" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div className="h-3 w-20 rounded-full bg-slate-100 animate-pulse" />
+                        <div className="mt-3 h-7 w-16 rounded-full bg-slate-100 animate-pulse" />
+                    </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                {Array.from({ length: 2 }).map((_, index) => (
+                    <div key={index} className="rounded-3xl border border-slate-200 bg-white p-5">
+                        <div className="h-5 w-44 rounded-full bg-slate-100 animate-pulse" />
+                        <div className="mt-4 h-56 rounded-3xl bg-slate-50 animate-pulse" />
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+}
+
 export function DashboardBusiness() {
-    const { activeOrganizationId, loading: organizationLoading, organizations } = useOrganization();
+    const {
+        activeOrganization,
+        activeOrganizationId,
+        loading: organizationLoading,
+        organizations,
+    } = useOrganization();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [verificationLoading, setVerificationLoading] = useState(false);
@@ -729,6 +868,50 @@ export function DashboardBusiness() {
                     />
                 </Suspense>
             </section>
+
+            <Suspense fallback={<LazyBillingSectionFallback />}>
+                <BillingWorkspace
+                    activeOrganizationId={activeOrganizationId}
+                    organizationName={activeOrganization?.name || null}
+                />
+            </Suspense>
+
+            <Suspense fallback={<LazyOperationsSectionFallback />}>
+                <OperationsWorkspace
+                    activeOrganizationId={activeOrganizationId}
+                    businesses={businesses.map((business) => ({
+                        id: business.id,
+                        name: business.name,
+                        slug: business.slug,
+                    }))}
+                    selectedBusinessId={selectedBusinessId}
+                />
+            </Suspense>
+
+            <Suspense fallback={<LazyGrowthSectionFallback />}>
+                <GrowthWorkspace
+                    activeOrganizationId={activeOrganizationId}
+                    businesses={businesses.map((business) => ({
+                        id: business.id,
+                        name: business.name,
+                        slug: business.slug,
+                    }))}
+                    selectedBusinessId={selectedBusinessId}
+                />
+            </Suspense>
+
+            <Suspense fallback={<LazyOrganizationSectionFallback />}>
+                <OrganizationWorkspace
+                    activeOrganizationId={activeOrganizationId}
+                    organizationName={activeOrganization?.name || null}
+                    businesses={businesses.map((business) => ({
+                        id: business.id,
+                        name: business.name,
+                        slug: business.slug,
+                    }))}
+                    selectedBusinessId={selectedBusinessId}
+                />
+            </Suspense>
         </div>
     );
 }

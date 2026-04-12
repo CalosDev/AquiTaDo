@@ -1,0 +1,994 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getApiErrorMessage } from '../../api/error';
+import { paymentsApi, plansApi, subscriptionsApi } from '../../api/endpoints';
+import { PageFeedbackStack } from '../../components/PageFeedbackStack';
+import { useTimedMessage } from '../../hooks/useTimedMessage';
+import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
+
+type PlanCode = 'FREE' | 'GROWTH' | 'SCALE';
+type SubscriptionStatus = 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'INCOMPLETE' | 'UNPAID';
+type PaymentStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELED' | string;
+type InvoiceStatus = 'DRAFT' | 'OPEN' | 'PAID' | 'VOID' | 'UNCOLLECTIBLE' | string;
+type TopupStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELED' | string;
+
+interface PlanSnapshot {
+    id: string;
+    code: PlanCode;
+    name: string;
+    description?: string | null;
+    priceMonthly: string | number;
+    currency: string;
+    transactionFeeBps: number;
+    maxBusinesses: number | null;
+    maxMembers: number | null;
+    maxImagesPerBusiness: number | null;
+    maxPromotions: number | null;
+    analyticsRetentionDays: number | null;
+}
+
+interface SubscriptionSnapshot {
+    id: string;
+    organizationId: string;
+    status: SubscriptionStatus;
+    providerCustomerId?: string | null;
+    providerSubscriptionId?: string | null;
+    currentPeriodStart?: string | null;
+    currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd: boolean;
+    canceledAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    plan: PlanSnapshot;
+}
+
+interface BillingSummarySnapshot {
+    range: {
+        from: string | null;
+        to: string | null;
+    };
+    invoices: {
+        byStatus: Record<string, { count: number; total: number }>;
+        subtotal: number;
+        tax: number;
+        total: number;
+    };
+    payments: {
+        byStatus: Record<string, { count: number; total: number }>;
+        totalCollected: number;
+        totalFailed: number;
+    };
+    marketplace: {
+        successfulTransactions: number;
+        grossAmount: number;
+        platformFeeAmount: number;
+        netAmount: number;
+    };
+}
+
+interface FiscalMonthSnapshot {
+    period: string;
+    invoicesIssued: number;
+    invoicesPaid: number;
+    subtotal: number;
+    tax: number;
+    total: number;
+    paidTotal: number;
+}
+
+interface FiscalSummarySnapshot {
+    range: {
+        from: string | null;
+        to: string | null;
+    };
+    totals: {
+        invoicesIssued: number;
+        invoicesPaid: number;
+        subtotal: number;
+        tax: number;
+        total: number;
+        paidTotal: number;
+        pendingTotal: number;
+    };
+    monthly: FiscalMonthSnapshot[];
+}
+
+interface PaymentSnapshot {
+    id: string;
+    provider: string;
+    amount: string | number;
+    currency: string;
+    status: PaymentStatus;
+    createdAt: string;
+    paidAt?: string | null;
+    failureReason?: string | null;
+}
+
+interface InvoiceSnapshot {
+    id: string;
+    number?: string | null;
+    status: InvoiceStatus;
+    issuedAt: string;
+    dueAt?: string | null;
+    paidAt?: string | null;
+    currency: string;
+    amountSubtotal: string | number;
+    amountTax: string | number;
+    amountTotal: string | number;
+    pdfUrl?: string | null;
+}
+
+interface WalletTopupSnapshot {
+    id: string;
+    amount: string | number;
+    currency: string;
+    status: TopupStatus;
+    createdAt: string;
+    paidAt?: string | null;
+    failureReason?: string | null;
+}
+
+interface AdsWalletSnapshot {
+    organizationId: string;
+    balance: string | number;
+    topups: WalletTopupSnapshot[];
+}
+
+interface BillingWorkspaceProps {
+    activeOrganizationId: string | null;
+    organizationName?: string | null;
+}
+
+interface BillingDateRange {
+    from: string;
+    to: string;
+}
+
+function asArray<T>(value: unknown): T[] {
+    if (Array.isArray(value)) {
+        return value as T[];
+    }
+    if (value && typeof value === 'object' && Array.isArray((value as { data?: unknown }).data)) {
+        return (value as { data: T[] }).data;
+    }
+    return [];
+}
+
+function normalizePlanCode(code?: string | null): PlanCode | null {
+    if (code === 'FREE' || code === 'GROWTH' || code === 'SCALE') {
+        return code;
+    }
+    return null;
+}
+
+function resolveInitialDateRange(): BillingDateRange {
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - 89);
+    return {
+        from: from.toISOString().slice(0, 10),
+        to: today.toISOString().slice(0, 10),
+    };
+}
+
+function getSubscriptionTone(status: SubscriptionStatus): string {
+    switch (status) {
+        case 'ACTIVE':
+            return 'bg-primary-100 text-primary-700';
+        case 'PAST_DUE':
+            return 'bg-amber-100 text-amber-800';
+        case 'CANCELED':
+            return 'bg-slate-200 text-slate-700';
+        default:
+            return 'bg-red-100 text-red-700';
+    }
+}
+
+function getSubscriptionLabel(status: SubscriptionStatus): string {
+    switch (status) {
+        case 'ACTIVE':
+            return 'Activa';
+        case 'PAST_DUE':
+            return 'Pago pendiente';
+        case 'CANCELED':
+            return 'Cancelada';
+        case 'INCOMPLETE':
+            return 'Incompleta';
+        case 'UNPAID':
+            return 'Sin pagar';
+        default:
+            return status;
+    }
+}
+
+function getPaymentTone(status: string): string {
+    switch (status) {
+        case 'SUCCEEDED':
+        case 'PAID':
+            return 'bg-primary-100 text-primary-700';
+        case 'PENDING':
+        case 'OPEN':
+        case 'DRAFT':
+            return 'bg-amber-100 text-amber-800';
+        case 'CANCELED':
+        case 'VOID':
+            return 'bg-slate-200 text-slate-700';
+        default:
+            return 'bg-red-100 text-red-700';
+    }
+}
+
+function getPaymentLabel(status: string): string {
+    switch (status) {
+        case 'SUCCEEDED':
+            return 'Cobrado';
+        case 'PENDING':
+            return 'Pendiente';
+        case 'FAILED':
+            return 'Fallido';
+        case 'CANCELED':
+            return 'Cancelado';
+        case 'OPEN':
+            return 'Abierta';
+        case 'DRAFT':
+            return 'Borrador';
+        case 'PAID':
+            return 'Pagada';
+        case 'VOID':
+            return 'Anulada';
+        case 'UNCOLLECTIBLE':
+            return 'Incobrable';
+        default:
+            return status;
+    }
+}
+
+function formatCapabilityLimit(value: number | null, suffix: string): string {
+    if (value === null) {
+        return `Ilimitado ${suffix}`;
+    }
+    return `${formatNumberDo(value)} ${suffix}`;
+}
+
+function buildReturnUrl(): string {
+    if (typeof window === 'undefined') {
+        return 'http://localhost:5173/dashboard';
+    }
+
+    const url = new URL(window.location.href);
+    url.hash = '';
+    return url.toString();
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+}
+
+function resolveExportFileName(
+    headers: Record<string, string | undefined>,
+    fallback: string,
+): string {
+    const disposition = headers['content-disposition'] || headers['Content-Disposition'];
+    if (!disposition) {
+        return fallback;
+    }
+
+    const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
+    return match?.[1] || fallback;
+}
+
+export function BillingWorkspace({
+    activeOrganizationId,
+    organizationName,
+}: BillingWorkspaceProps) {
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [actionKey, setActionKey] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [dateRange, setDateRange] = useState<BillingDateRange>(resolveInitialDateRange);
+    const [topupAmount, setTopupAmount] = useState('2500');
+    const [plans, setPlans] = useState<PlanSnapshot[]>([]);
+    const [subscription, setSubscription] = useState<SubscriptionSnapshot | null>(null);
+    const [billingSummary, setBillingSummary] = useState<BillingSummarySnapshot | null>(null);
+    const [fiscalSummary, setFiscalSummary] = useState<FiscalSummarySnapshot | null>(null);
+    const [payments, setPayments] = useState<PaymentSnapshot[]>([]);
+    const [invoices, setInvoices] = useState<InvoiceSnapshot[]>([]);
+    const [adsWallet, setAdsWallet] = useState<AdsWalletSnapshot | null>(null);
+
+    useTimedMessage(errorMessage, setErrorMessage, 6500);
+    useTimedMessage(successMessage, setSuccessMessage, 4500);
+
+    const loadBillingData = useCallback(async (options?: { silent?: boolean }) => {
+        if (!activeOrganizationId) {
+            setPlans([]);
+            setSubscription(null);
+            setBillingSummary(null);
+            setFiscalSummary(null);
+            setPayments([]);
+            setInvoices([]);
+            setAdsWallet(null);
+            setLoading(false);
+            setRefreshing(false);
+            return;
+        }
+
+        if (options?.silent) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
+
+        try {
+            const params = {
+                from: dateRange.from || undefined,
+                to: dateRange.to || undefined,
+            };
+
+            const [
+                plansResponse,
+                subscriptionResponse,
+                billingSummaryResponse,
+                fiscalSummaryResponse,
+                paymentsResponse,
+                invoicesResponse,
+                adsWalletResponse,
+            ] = await Promise.all([
+                plansApi.getAll(),
+                subscriptionsApi.getCurrent(),
+                paymentsApi.getBillingSummary(params),
+                paymentsApi.getFiscalSummary(params),
+                paymentsApi.getMyPayments({ limit: 8 }),
+                paymentsApi.getMyInvoices({ limit: 8 }),
+                paymentsApi.getAdsWalletOverview({ limit: 6 }),
+            ]);
+
+            setPlans(asArray<PlanSnapshot>(plansResponse.data));
+            setSubscription((subscriptionResponse.data || null) as SubscriptionSnapshot | null);
+            setBillingSummary((billingSummaryResponse.data || null) as BillingSummarySnapshot | null);
+            setFiscalSummary((fiscalSummaryResponse.data || null) as FiscalSummarySnapshot | null);
+            setPayments(asArray<PaymentSnapshot>(paymentsResponse.data));
+            setInvoices(asArray<InvoiceSnapshot>(invoicesResponse.data));
+            setAdsWallet((adsWalletResponse.data || null) as AdsWalletSnapshot | null);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar la facturacion de la organizacion'));
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [activeOrganizationId, dateRange.from, dateRange.to]);
+
+    useEffect(() => {
+        void loadBillingData();
+    }, [loadBillingData]);
+
+    const currentPlanCode = normalizePlanCode(subscription?.plan.code);
+    const paidPlans = useMemo(
+        () => plans.filter((plan) => Number(plan.priceMonthly) > 0),
+        [plans],
+    );
+    const fiscalPreview = useMemo(
+        () => (fiscalSummary?.monthly ?? []).slice(-6).reverse(),
+        [fiscalSummary],
+    );
+
+    const handleCheckoutPlan = async (planCode: PlanCode) => {
+        setActionKey(`plan:${planCode}`);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            const returnUrl = buildReturnUrl();
+            const response = await subscriptionsApi.createCheckoutSession({
+                planCode,
+                successUrl: returnUrl,
+                cancelUrl: returnUrl,
+            });
+
+            const payload = (response.data || {}) as { checkoutUrl?: string | null };
+            if (payload.checkoutUrl && typeof window !== 'undefined') {
+                window.location.assign(payload.checkoutUrl);
+                return;
+            }
+
+            setSuccessMessage('Sesion de pago creada. Puedes refrescar el panel para confirmar el cambio.');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar el checkout del plan'));
+        } finally {
+            setActionKey('');
+        }
+    };
+
+    const handleCancelAtPeriodEnd = async () => {
+        setActionKey('cancel-subscription');
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await subscriptionsApi.cancelAtPeriodEnd();
+            setSuccessMessage('La suscripcion quedo programada para finalizar al cierre del periodo actual');
+            await loadBillingData({ silent: true });
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo programar la cancelacion'));
+        } finally {
+            setActionKey('');
+        }
+    };
+
+    const handleTopupCheckout = async () => {
+        const parsedAmount = Number(topupAmount);
+        if (!Number.isFinite(parsedAmount) || parsedAmount < 1) {
+            setErrorMessage('Ingresa un monto valido para la recarga del wallet');
+            return;
+        }
+
+        setActionKey('ads-topup');
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            const returnUrl = buildReturnUrl();
+            const response = await paymentsApi.createAdsWalletCheckoutSession({
+                amount: parsedAmount,
+                successUrl: returnUrl,
+                cancelUrl: returnUrl,
+            });
+
+            const payload = (response.data || {}) as { checkoutUrl?: string | null };
+            if (payload.checkoutUrl && typeof window !== 'undefined') {
+                window.location.assign(payload.checkoutUrl);
+                return;
+            }
+
+            setSuccessMessage('Sesion de recarga creada. Actualiza el panel despues de completar el pago.');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo iniciar la recarga del wallet'));
+        } finally {
+            setActionKey('');
+        }
+    };
+
+    const handleExportCsv = async (kind: 'invoices' | 'payments' | 'fiscal') => {
+        setActionKey(`export:${kind}`);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            const params = {
+                from: dateRange.from || undefined,
+                to: dateRange.to || undefined,
+            };
+            const response = kind === 'invoices'
+                ? await paymentsApi.exportInvoicesCsv(params)
+                : kind === 'payments'
+                    ? await paymentsApi.exportPaymentsCsv(params)
+                    : await paymentsApi.exportFiscalCsv(params);
+
+            const blob = response.data instanceof Blob
+                ? response.data
+                : new Blob([response.data], { type: 'text/csv;charset=utf-8' });
+            const fileName = resolveExportFileName(
+                response.headers as Record<string, string | undefined>,
+                `${kind}.csv`,
+            );
+            downloadBlob(blob, fileName);
+            setSuccessMessage('CSV descargado correctamente');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo descargar el archivo CSV'));
+        } finally {
+            setActionKey('');
+        }
+    };
+
+    if (loading) {
+        return (
+            <section className="section-shell p-6 space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-2">
+                        <div className="h-3 w-24 rounded-full bg-slate-100 animate-pulse" />
+                        <div className="h-8 w-56 rounded-full bg-slate-100 animate-pulse" />
+                    </div>
+                    <div className="h-9 w-32 rounded-full bg-slate-100 animate-pulse" />
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                        <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <div className="h-3 w-20 rounded-full bg-slate-100 animate-pulse" />
+                            <div className="mt-3 h-7 w-24 rounded-full bg-slate-100 animate-pulse" />
+                            <div className="mt-2 h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
+                        </div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                        <div key={index} className="rounded-2xl border border-slate-200 bg-white p-5">
+                            <div className="h-5 w-32 rounded-full bg-slate-100 animate-pulse" />
+                            <div className="mt-4 h-24 rounded-2xl bg-slate-50 animate-pulse" />
+                        </div>
+                    ))}
+                </div>
+            </section>
+        );
+    }
+
+    return (
+        <section className="section-shell p-6 space-y-6">
+            <PageFeedbackStack
+                items={[
+                    { id: 'billing-error', tone: 'danger', text: errorMessage },
+                    { id: 'billing-success', tone: 'success', text: successMessage },
+                ]}
+            />
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Billing / SaaS</p>
+                    <h2 className="font-display text-xl font-bold text-slate-900">Planes, suscripcion y caja operativa</h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                        {organizationName
+                            ? `Controla el plan activo y la facturacion de ${organizationName}.`
+                            : 'Controla el plan activo y la facturacion de tu organizacion.'}
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        className="btn-secondary text-sm"
+                        onClick={() => void loadBillingData({ silent: true })}
+                        disabled={refreshing}
+                    >
+                        {refreshing ? 'Actualizando...' : 'Actualizar billing'}
+                    </button>
+                    {subscription && currentPlanCode !== 'FREE' && !subscription.cancelAtPeriodEnd ? (
+                        <button
+                            type="button"
+                            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={() => void handleCancelAtPeriodEnd()}
+                            disabled={actionKey === 'cancel-subscription'}
+                        >
+                            {actionKey === 'cancel-subscription' ? 'Procesando...' : 'Cancelar al final del periodo'}
+                        </button>
+                    ) : null}
+                </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5">
+                <span className="chip">
+                    Plan actual: {subscription?.plan.name || 'Sin plan'}
+                </span>
+                {subscription ? (
+                    <span className={`chip ${getSubscriptionTone(subscription.status)}`}>
+                        Suscripcion: {getSubscriptionLabel(subscription.status)}
+                    </span>
+                ) : null}
+                {subscription?.currentPeriodEnd ? (
+                    <span className="chip">
+                        Periodo vigente hasta: {formatDateDo(subscription.currentPeriodEnd)}
+                    </span>
+                ) : null}
+                {subscription?.cancelAtPeriodEnd ? (
+                    <span className="chip bg-amber-100 text-amber-800">
+                        Se cancela al cierre del periodo
+                    </span>
+                ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
+                <article className="panel-premium p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Plan</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">{subscription?.plan.name || 'N/D'}</p>
+                    <p className="mt-2 text-sm text-slate-500">
+                        {subscription ? formatCurrencyDo(subscription.plan.priceMonthly, subscription.plan.currency) : 'Sin suscripcion'}
+                        /mes
+                    </p>
+                </article>
+                <article className="panel-premium p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Balance Ads</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">
+                        {formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP')}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">Disponible para campanas CPC</p>
+                </article>
+                <article className="panel-premium p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Cobrado</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">
+                        {formatCurrencyDo(billingSummary?.payments.totalCollected ?? 0, 'DOP')}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">Pagos exitosos en el rango</p>
+                </article>
+                <article className="panel-premium p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Facturado</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">
+                        {formatCurrencyDo(billingSummary?.invoices.total ?? 0, 'DOP')}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">Total de invoices emitidas</p>
+                </article>
+                <article className="panel-premium p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Marketplace neto</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">
+                        {formatCurrencyDo(billingSummary?.marketplace.netAmount ?? 0, 'DOP')}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                        Fee plataforma: {formatCurrencyDo(billingSummary?.marketplace.platformFeeAmount ?? 0, 'DOP')}
+                    </p>
+                </article>
+                <article className="panel-premium p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pendiente fiscal</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">
+                        {formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                        {fiscalSummary?.totals.invoicesIssued ?? 0} invoices emitidas
+                    </p>
+                </article>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
+                <article className="rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 className="font-display text-lg font-semibold text-slate-900">Comparador de planes</h3>
+                            <p className="mt-1 text-sm text-slate-600">
+                                Sube de plan cuando necesites mas negocios, equipo, imagenes o menor fee de transaccion.
+                            </p>
+                        </div>
+                        {subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd ? (
+                            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                La suscripcion cerrara el {formatDateDo(subscription.currentPeriodEnd)}.
+                            </p>
+                        ) : null}
+                    </div>
+                    <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                        {plans.map((plan) => {
+                            const isCurrent = plan.code === currentPlanCode;
+                            const isPaidPlan = Number(plan.priceMonthly) > 0;
+                            const canCheckout = isPaidPlan && !isCurrent;
+
+                            return (
+                                <article
+                                    key={plan.id}
+                                    className={`rounded-3xl border p-5 ${
+                                        isCurrent
+                                            ? 'border-primary-300 bg-white shadow-sm'
+                                            : 'border-slate-200 bg-white'
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{plan.code}</p>
+                                            <h4 className="mt-2 font-display text-xl font-bold text-slate-900">{plan.name}</h4>
+                                        </div>
+                                        {isCurrent ? (
+                                            <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700">
+                                                Plan actual
+                                            </span>
+                                        ) : null}
+                                    </div>
+
+                                    <p className="mt-3 text-3xl font-bold text-slate-900">
+                                        {formatCurrencyDo(plan.priceMonthly, plan.currency)}
+                                        <span className="ml-1 text-base font-medium text-slate-500">/ mes</span>
+                                    </p>
+                                    <p className="mt-2 text-sm text-slate-600">{plan.description || 'Sin descripcion.'}</p>
+
+                                    <div className="mt-4 space-y-2 text-sm text-slate-700">
+                                        <p>{formatCapabilityLimit(plan.maxBusinesses, 'negocios')}</p>
+                                        <p>{formatCapabilityLimit(plan.maxMembers, 'miembros')}</p>
+                                        <p>{formatCapabilityLimit(plan.maxImagesPerBusiness, 'imagenes por ficha')}</p>
+                                        <p>{formatCapabilityLimit(plan.maxPromotions, 'promociones')}</p>
+                                        <p>
+                                            Retencion analytics:{' '}
+                                            {plan.analyticsRetentionDays === null
+                                                ? 'Ilimitada'
+                                                : `${formatNumberDo(plan.analyticsRetentionDays)} dias`}
+                                        </p>
+                                        <p>Fee por transaccion: {(plan.transactionFeeBps / 100).toFixed(2)}%</p>
+                                    </div>
+
+                                    <div className="mt-5">
+                                        {canCheckout ? (
+                                            <button
+                                                type="button"
+                                                className="btn-primary w-full text-sm"
+                                                onClick={() => void handleCheckoutPlan(plan.code)}
+                                                disabled={actionKey === `plan:${plan.code}`}
+                                            >
+                                                {actionKey === `plan:${plan.code}` ? 'Abriendo checkout...' : `Cambiar a ${plan.name}`}
+                                            </button>
+                                        ) : isCurrent ? (
+                                            <p className="rounded-2xl border border-primary-100 bg-primary-50 px-3 py-2 text-sm text-primary-700">
+                                                Este plan gobierna actualmente tu organizacion.
+                                            </p>
+                                        ) : (
+                                            <p className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                                                El plan gratuito sirve como base operativa; si necesitas bajar desde un plan pago, usa la cancelacion al cierre del periodo.
+                                            </p>
+                                        )}
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                    {paidPlans.length === 0 ? (
+                        <p className="mt-4 text-sm text-slate-500">Todavia no hay planes pagos disponibles para esta organizacion.</p>
+                    ) : null}
+                </article>
+
+                <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-5">
+                    <div>
+                        <h3 className="font-display text-lg font-semibold text-slate-900">Ads Wallet</h3>
+                        <p className="mt-1 text-sm text-slate-600">
+                            Recarga saldo para campanas patrocinadas sin salir del dashboard.
+                        </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Saldo disponible</p>
+                        <p className="mt-2 text-3xl font-bold text-slate-900">
+                            {formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP')}
+                        </p>
+                    </div>
+
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <label className="text-sm font-medium text-slate-800" htmlFor="ads-topup-amount">
+                            Recarga rapida
+                        </label>
+                        <input
+                            id="ads-topup-amount"
+                            className="input-field"
+                            inputMode="decimal"
+                            value={topupAmount}
+                            onChange={(event) => setTopupAmount(event.target.value)}
+                            placeholder="2500"
+                        />
+                        <button
+                            type="button"
+                            className="btn-secondary w-full text-sm"
+                            onClick={() => void handleTopupCheckout()}
+                            disabled={actionKey === 'ads-topup'}
+                        >
+                            {actionKey === 'ads-topup' ? 'Abriendo checkout...' : 'Recargar wallet'}
+                        </button>
+                    </div>
+
+                    <div>
+                        <h4 className="font-medium text-slate-900">Recargas recientes</h4>
+                        {adsWallet?.topups?.length ? (
+                            <div className="mt-3 space-y-2">
+                                {adsWallet.topups.map((topup) => (
+                                    <div key={topup.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="text-sm font-medium text-slate-900">
+                                                {formatCurrencyDo(topup.amount, topup.currency)}
+                                            </p>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getPaymentTone(topup.status)}`}>
+                                                {getPaymentLabel(topup.status)}
+                                            </span>
+                                        </div>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {formatDateTimeDo(topup.createdAt)}
+                                        </p>
+                                        {topup.failureReason ? (
+                                            <p className="mt-1 text-xs text-red-700">{topup.failureReason}</p>
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="mt-3 text-sm text-slate-500">Aun no hay recargas registradas.</p>
+                        )}
+                    </div>
+                </article>
+            </div>
+
+            <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 className="font-display text-lg font-semibold text-slate-900">Resumen contable</h3>
+                        <p className="mt-1 text-sm text-slate-600">
+                            Filtra el rango para revisar facturacion, cobros y cierre fiscal sin salir del panel.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <input
+                            type="date"
+                            className="input-field min-w-[10.5rem]"
+                            value={dateRange.from}
+                            onChange={(event) => setDateRange((current) => ({ ...current, from: event.target.value }))}
+                        />
+                        <input
+                            type="date"
+                            className="input-field min-w-[10.5rem]"
+                            value={dateRange.to}
+                            onChange={(event) => setDateRange((current) => ({ ...current, to: event.target.value }))}
+                        />
+                        <button
+                            type="button"
+                            className="btn-secondary text-sm"
+                            onClick={() => void loadBillingData({ silent: true })}
+                            disabled={refreshing}
+                        >
+                            Aplicar rango
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+                    <div className="space-y-5">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Invoices emitidas</p>
+                                <p className="mt-2 text-2xl font-bold text-slate-900">
+                                    {fiscalSummary?.totals.invoicesIssued ?? 0}
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Invoices pagadas</p>
+                                <p className="mt-2 text-2xl font-bold text-slate-900">
+                                    {fiscalSummary?.totals.invoicesPaid ?? 0}
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Pagado</p>
+                                <p className="mt-2 text-2xl font-bold text-slate-900">
+                                    {formatCurrencyDo(fiscalSummary?.totals.paidTotal ?? 0, 'DOP')}
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Pendiente</p>
+                                <p className="mt-2 text-2xl font-bold text-slate-900">
+                                    {formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h4 className="font-medium text-slate-900">Cierre mensual</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                        onClick={() => void handleExportCsv('invoices')}
+                                        disabled={actionKey === 'export:invoices'}
+                                    >
+                                        {actionKey === 'export:invoices' ? 'Descargando...' : 'CSV invoices'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                        onClick={() => void handleExportCsv('payments')}
+                                        disabled={actionKey === 'export:payments'}
+                                    >
+                                        {actionKey === 'export:payments' ? 'Descargando...' : 'CSV pagos'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                        onClick={() => void handleExportCsv('fiscal')}
+                                        disabled={actionKey === 'export:fiscal'}
+                                    >
+                                        {actionKey === 'export:fiscal' ? 'Descargando...' : 'CSV fiscal'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {fiscalPreview.length > 0 ? (
+                                <div className="mt-4 space-y-2">
+                                    {fiscalPreview.map((row) => (
+                                        <div key={row.period} className="rounded-2xl border border-white bg-white px-4 py-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                                <div>
+                                                    <p className="font-medium text-slate-900">{row.period}</p>
+                                                    <p className="mt-1 text-xs text-slate-500">
+                                                        Emitidas {row.invoicesIssued} - Pagadas {row.invoicesPaid}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-semibold text-slate-900">
+                                                        {formatCurrencyDo(row.total, 'DOP')}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-slate-500">
+                                                        Cobrado {formatCurrencyDo(row.paidTotal, 'DOP')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="mt-4 text-sm text-slate-500">No hay movimientos fiscales en el rango seleccionado.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                            <h4 className="font-medium text-slate-900">Pagos recientes</h4>
+                            {payments.length > 0 ? (
+                                <div className="mt-3 space-y-2">
+                                    {payments.map((payment) => (
+                                        <div key={payment.id} className="rounded-2xl border border-white bg-white px-4 py-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-sm font-medium text-slate-900">
+                                                        {formatCurrencyDo(payment.amount, payment.currency)}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-slate-500">
+                                                        {payment.provider} - {formatDateTimeDo(payment.createdAt)}
+                                                    </p>
+                                                </div>
+                                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getPaymentTone(payment.status)}`}>
+                                                    {getPaymentLabel(payment.status)}
+                                                </span>
+                                            </div>
+                                            {payment.failureReason ? (
+                                                <p className="mt-2 text-xs text-red-700">{payment.failureReason}</p>
+                                            ) : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="mt-3 text-sm text-slate-500">Todavia no hay pagos registrados.</p>
+                            )}
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                            <h4 className="font-medium text-slate-900">Invoices recientes</h4>
+                            {invoices.length > 0 ? (
+                                <div className="mt-3 space-y-2">
+                                    {invoices.map((invoice) => (
+                                        <div key={invoice.id} className="rounded-2xl border border-white bg-white px-4 py-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-sm font-medium text-slate-900">
+                                                        {invoice.number || invoice.id.slice(0, 8)}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-slate-500">
+                                                        Emitida {formatDateTimeDo(invoice.issuedAt)}
+                                                    </p>
+                                                </div>
+                                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getPaymentTone(invoice.status)}`}>
+                                                    {getPaymentLabel(invoice.status)}
+                                                </span>
+                                            </div>
+                                            <p className="mt-2 text-sm text-slate-700">
+                                                Total {formatCurrencyDo(invoice.amountTotal, invoice.currency)}
+                                            </p>
+                                            <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                                                {invoice.dueAt ? <span>Vence {formatDateDo(invoice.dueAt)}</span> : null}
+                                                {invoice.paidAt ? <span>Pagada {formatDateDo(invoice.paidAt)}</span> : null}
+                                                {invoice.pdfUrl ? (
+                                                    <a
+                                                        className="font-semibold text-primary-700 hover:text-primary-800"
+                                                        href={invoice.pdfUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                    >
+                                                        Abrir PDF
+                                                    </a>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="mt-3 text-sm text-slate-500">Todavia no hay invoices registradas.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </section>
+    );
+}

@@ -25,6 +25,7 @@ const About = lazy(async () => ({ default: (await pageLoaders.about()).About }))
 const NotFound = lazy(async () => ({ default: (await pageLoaders.notFound()).NotFound }));
 const Profile = lazy(async () => ({ default: (await pageLoaders.profile()).Profile }));
 const AdminSecurity = lazy(async () => ({ default: (await pageLoaders.adminSecurity()).AdminSecurity }));
+const AcceptOrganizationInvite = lazy(async () => ({ default: (await pageLoaders.acceptOrganizationInvite()).AcceptOrganizationInvite }));
 
 function RouteFallback() {
     const location = useLocation();
@@ -127,6 +128,14 @@ export function AppRouter() {
                         element={
                             <ProtectedRoute roles={['USER']}>
                                 <CustomerDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/app/invite"
+                        element={
+                            <ProtectedRoute>
+                                <AcceptOrganizationInvite />
                             </ProtectedRoute>
                         }
                     />
