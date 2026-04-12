@@ -4,7 +4,7 @@ BEGIN
         SELECT 1
         FROM pg_enum
         WHERE enumlabel = 'SUSPENDED'
-          AND enumtypid = 'BusinessClaimStatus'::regtype
+          AND enumtypid = to_regtype('"BusinessClaimStatus"')
     ) THEN
         ALTER TYPE "BusinessClaimStatus" ADD VALUE 'SUSPENDED';
     END IF;
