@@ -36,7 +36,7 @@ type SuggestionItem = {
         id: string;
         name: string;
         slug: string;
-        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
         publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
     } | null;
 };

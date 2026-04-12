@@ -57,8 +57,11 @@ interface ClaimSearchCandidate {
     name: string;
     slug: string;
     address: string;
-    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
     publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+    source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    catalogSource?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    lifecycleStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SOFT_DELETED';
     matchType?: 'exacta' | 'probable' | 'debil' | null;
     matchScore?: number;
     matchReasons?: string[];
@@ -1260,11 +1263,15 @@ export function RegisterBusiness() {
                                                 ? 'Reclamado'
                                                 : candidate.claimStatus === 'PENDING_CLAIM'
                                                     ? 'Pendiente de reclamacion'
+                                                    : candidate.claimStatus === 'SUSPENDED'
+                                                        ? 'Claim suspendido'
                                                     : 'No reclamado';
                                             const claimClass = candidate.claimStatus === 'CLAIMED'
                                                 ? 'bg-primary-100 text-primary-700 border border-primary-200'
                                                 : candidate.claimStatus === 'PENDING_CLAIM'
                                                     ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                                    : candidate.claimStatus === 'SUSPENDED'
+                                                        ? 'bg-red-100 text-red-800 border border-red-200'
                                                     : 'bg-white text-slate-700 border border-slate-200';
 
                                             return (
@@ -1302,7 +1309,7 @@ export function RegisterBusiness() {
                                                             >
                                                                 Ver perfil
                                                             </Link>
-                                                            {candidate.claimStatus !== 'CLAIMED' ? (
+                                                            {candidate.claimStatus !== 'CLAIMED' && candidate.claimStatus !== 'SUSPENDED' ? (
                                                                 <Link
                                                                     to={`/businesses/${candidate.slug || candidate.id}?claim=1`}
                                                                     className="btn-primary text-sm"
@@ -1322,6 +1329,10 @@ export function RegisterBusiness() {
                                                                 >
                                                                     Abrir y reclamar
                                                                 </Link>
+                                                            ) : candidate.claimStatus === 'SUSPENDED' ? (
+                                                                <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                                                                    Claim suspendido
+                                                                </span>
                                                             ) : null}
                                                         </div>
                                                     </div>

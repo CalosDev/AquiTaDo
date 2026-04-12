@@ -22,6 +22,10 @@ import {
     calculateBusinessDiscoveryRelevance,
     DiscoveryPopularitySignals,
 } from './discovery-ranking';
+import {
+    normalizeCatalogSource,
+    toLifecycleStatus,
+} from '../businesses/catalog-taxonomy.helpers';
 
 type DiscoveryTrackingContext = {
     visitorId?: string;
@@ -64,7 +68,11 @@ type PublicBusinessCandidate = {
     publicStatus: string;
     claimStatus: string;
     source: string;
+    catalogSource: string | null;
+    lifecycleStatus: string | null;
     isClaimable: boolean;
+    isActive: boolean;
+    primaryManagingOrganizationId: string | null;
     reputationScore: Prisma.Decimal;
     verificationStatus: string;
     createdAt: Date;
@@ -175,7 +183,11 @@ export class SearchService {
         publicStatus: true,
         claimStatus: true,
         source: true,
+        catalogSource: true,
+        lifecycleStatus: true,
         isClaimable: true,
+        isActive: true,
+        primaryManagingOrganizationId: true,
         reputationScore: true,
         verificationStatus: true,
         createdAt: true,
@@ -337,12 +349,14 @@ export class SearchService {
                     b.slug,
                     b.address,
                     b.verified,
-                    b."organizationId",
+                    COALESCE(b."primaryManagingOrganizationId", b."organizationId") AS "organizationId",
                     b."provinceId",
                     b."cityId",
+                    b."sectorId",
                     ST_Distance(b.location::geography, ${origin}) AS "distanceMeters"
                 FROM businesses b
                 WHERE b."deletedAt" IS NULL
+                  AND b."isActive" = true
                   AND b."publicStatus" = 'PUBLISHED'
                   AND b."isPublished" = true
                   AND b."isSearchable" = true
@@ -438,9 +452,17 @@ export class SearchService {
             publicStatus: candidate.publicStatus,
             claimStatus: candidate.claimStatus,
             source: candidate.source,
+            catalogSource: normalizeCatalogSource(candidate.catalogSource ?? candidate.source),
+            lifecycleStatus: toLifecycleStatus({
+                lifecycleStatus: candidate.lifecycleStatus,
+                publicStatus: candidate.publicStatus,
+                isActive: candidate.isActive,
+            }),
+            isActive: candidate.isActive,
             isClaimable: candidate.isClaimable,
             reputationScore: candidate.reputationScore,
             verificationStatus: candidate.verificationStatus,
+            primaryManagingOrganizationId: candidate.primaryManagingOrganizationId,
             province: candidate.province,
             city: candidate.city,
             categories: candidate.categories,
@@ -560,6 +582,7 @@ export class SearchService {
     private async buildPublicWhere(query: NormalizedPublicDiscoveryQuery): Promise<Prisma.BusinessWhereInput> {
         const where: Prisma.BusinessWhereInput = {
             deletedAt: null,
+            isActive: true,
             publicStatus: 'PUBLISHED',
             isPublished: true,
             isSearchable: true,

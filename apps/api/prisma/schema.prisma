@@ -138,6 +138,7 @@ enum BusinessClaimStatus {
   UNCLAIMED
   PENDING_CLAIM
   CLAIMED
+  SUSPENDED
 }
 
 enum BusinessSource {
@@ -146,6 +147,21 @@ enum BusinessSource {
   IMPORT
   USER_SUGGESTION
   SYSTEM
+}
+
+enum BusinessCatalogSource {
+  OWNER_CREATED
+  ADMIN_CREATED
+  USER_SUGGESTED
+  IMPORTED
+  SYSTEM_MIGRATED
+}
+
+enum BusinessLifecycleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  SOFT_DELETED
 }
 
 enum BusinessClaimRequestStatus {
@@ -175,12 +191,12 @@ enum BusinessDuplicateCaseStatus {
 }
 
 enum BusinessClaimEvidenceType {
-  PHONE
-  EMAIL
-  WEBSITE
-  INSTAGRAM
-  DOCUMENT
-  NOTE
+  BUSINESS_EMAIL
+  BUSINESS_PHONE
+  SOCIAL_PROFILE
+  TAX_DOCUMENT
+  BRAND_ASSET
+  MANUAL_REVIEW
   OTHER
 }
 
@@ -389,9 +405,11 @@ model Business {
   verified                Boolean                    @default(false)
   verifiedAt              DateTime?
   verificationStatus      BusinessVerificationStatus @default(UNVERIFIED)
-  publicStatus            BusinessPublicStatus       @default(DRAFT)
-  claimStatus             BusinessClaimStatus        @default(CLAIMED)
-  source                  BusinessSource             @default(OWNER)
+  publicStatus            BusinessPublicStatus       @default(PUBLISHED)
+  claimStatus             BusinessClaimStatus        @default(UNCLAIMED)
+  source                  BusinessSource             @default(SYSTEM)
+  catalogSource           BusinessCatalogSource      @default(OWNER_CREATED)
+  lifecycleStatus         BusinessLifecycleStatus    @default(PUBLISHED)
   publishedAt             DateTime?
   firstPublishedAt        DateTime?
   claimedAt               DateTime?
@@ -399,6 +417,7 @@ model Business {
   claimedByUser           User?                      @relation("BusinessClaimedBy", fields: [claimedByUserId], references: [id])
   catalogManagedByAdmin   Boolean                    @default(false)
   isClaimable             Boolean                    @default(true)
+  isActive                Boolean                    @default(true)
   isPublished             Boolean                    @default(true)
   isSearchable            Boolean                    @default(true)
   isDiscoverable          Boolean                    @default(true)
@@ -406,6 +425,9 @@ model Business {
   verificationReviewedAt  DateTime?
   verificationNotes       String?                    @db.VarChar(500)
   lastReviewedAt          DateTime?
+  primaryManagingOrganizationId String?
+  primaryManagingOrganization   Organization?         @relation("BusinessPrimaryManagingOrganization", fields: [primaryManagingOrganizationId], references: [id])
+  legacyOwnerMode        Boolean                    @default(false)
   riskScore               Int                        @default(0)
   reputationScore         Decimal                    @default(0) @db.Decimal(6, 2)
   reputationTier          BusinessTier               @default(BRONZE)
@@ -416,7 +438,7 @@ model Business {
   ownerId        String?
   owner          User?        @relation(fields: [ownerId], references: [id])
   organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organization   Organization? @relation("OrganizationBusinesses", fields: [organizationId], references: [id])
   createdByUserId String?
   createdByUser   User?        @relation("BusinessCreatedBy", fields: [createdByUserId], references: [id])
   updatedByUserId String?
@@ -471,8 +493,12 @@ model Business {
   @@index([publicStatus, createdAt])
   @@index([claimStatus, createdAt])
   @@index([source, createdAt])
+  @@index([catalogSource, createdAt])
+  @@index([lifecycleStatus, createdAt])
   @@index([claimedByUserId])
+  @@index([primaryManagingOrganizationId])
   @@index([isPublished, isSearchable, isDiscoverable, publicStatus])
+  @@index([isActive, publicStatus, claimStatus])
   @@index([provinceId, reputationScore])
   @@index([reputationTier, reputationScore])
   @@index([createdAt])
@@ -492,7 +518,8 @@ model Organization {
   createdAt            DateTime                       @default(now())
   updatedAt            DateTime                       @updatedAt
 
-  businesses            Business[]
+  businesses            Business[]                    @relation("OrganizationBusinesses")
+  primaryManagedBusinesses Business[]                  @relation("BusinessPrimaryManagingOrganization")
   members               OrganizationMember[]
   invites               OrganizationInvite[]
   auditLogs             AuditLog[]

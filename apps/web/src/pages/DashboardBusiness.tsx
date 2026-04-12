@@ -18,6 +18,13 @@ interface BusinessItem {
     name: string;
     verified?: boolean;
     verificationStatus?: VerificationStatus;
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
+    publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
+    source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    catalogSource?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    lifecycleStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SOFT_DELETED';
+    isActive?: boolean;
+    primaryManagingOrganizationId?: string | null;
     profileCompletenessScore?: number;
     missingCoreFields?: string[];
     openNow?: boolean | null;
@@ -53,6 +60,25 @@ interface BusinessVerificationStatus {
     verificationSubmittedAt?: string | null;
     verificationReviewedAt?: string | null;
     verificationNotes?: string | null;
+}
+
+interface MyClaimRequestItem {
+    id: string;
+    status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED';
+    createdAt: string;
+    reviewedAt?: string | null;
+    approvedAt?: string | null;
+    rejectedAt?: string | null;
+    expiredAt?: string | null;
+    canceledAt?: string | null;
+    evidenceType: 'PHONE' | 'EMAIL_DOMAIN' | 'DOCUMENT' | 'SOCIAL' | 'MANUAL';
+    business: {
+        id: string;
+        name: string;
+        slug: string;
+        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
+        lifecycleStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SOFT_DELETED';
+    };
 }
 
 function asArray<T>(value: unknown): T[] {
@@ -94,6 +120,52 @@ function getStatusClass(status: VerificationStatus | 'APPROVED' | 'REJECTED' | '
             return 'bg-gray-200 text-gray-700';
         default:
             return 'bg-gray-100 text-gray-700';
+    }
+}
+
+function getClaimRequestStatusLabel(status: MyClaimRequestItem['status']): string {
+    switch (status) {
+        case 'UNDER_REVIEW':
+            return 'En revisión';
+        case 'APPROVED':
+            return 'Aprobado';
+        case 'REJECTED':
+            return 'Rechazado';
+        case 'EXPIRED':
+            return 'Expirado';
+        case 'CANCELED':
+            return 'Cancelado';
+        default:
+            return 'Pendiente';
+    }
+}
+
+function getClaimRequestStatusClass(status: MyClaimRequestItem['status']): string {
+    switch (status) {
+        case 'APPROVED':
+            return 'bg-primary-100 text-primary-700';
+        case 'UNDER_REVIEW':
+            return 'bg-blue-100 text-blue-700';
+        case 'REJECTED':
+        case 'CANCELED':
+            return 'bg-red-100 text-red-700';
+        case 'EXPIRED':
+            return 'bg-slate-200 text-slate-700';
+        default:
+            return 'bg-amber-100 text-amber-700';
+    }
+}
+
+function getBusinessClaimStatusLabel(status?: BusinessItem['claimStatus']): string {
+    switch (status) {
+        case 'CLAIMED':
+            return 'Reclamado';
+        case 'PENDING_CLAIM':
+            return 'Claim pendiente';
+        case 'SUSPENDED':
+            return 'Claim suspendido';
+        default:
+            return 'No reclamado';
     }
 }
 
@@ -142,6 +214,8 @@ export function DashboardBusiness() {
     const [businesses, setBusinesses] = useState<BusinessItem[]>([]);
     const [selectedBusinessId, setSelectedBusinessId] = useState('');
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+    const [claimRequests, setClaimRequests] = useState<MyClaimRequestItem[]>([]);
+    const [claimSummary, setClaimSummary] = useState<Record<string, number>>({});
 
     const [verificationStatus, setVerificationStatus] = useState<BusinessVerificationStatus | null>(null);
     const [documents, setDocuments] = useState<VerificationDocument[]>([]);
@@ -171,14 +245,29 @@ export function DashboardBusiness() {
         () => businesses.filter((business) => (business.profileCompletenessScore ?? 0) >= 80).length,
         [businesses],
     );
+    const activeClaimRequests = useMemo(
+        () => claimRequests.filter((claimRequest) => claimRequest.status === 'PENDING' || claimRequest.status === 'UNDER_REVIEW'),
+        [claimRequests],
+    );
+
+    const loadClaimRequests = useCallback(async () => {
+        try {
+            const response = await businessApi.getMyClaimRequests({ limit: 10 });
+            setClaimRequests(asArray<MyClaimRequestItem>(response.data));
+            setClaimSummary(((response.data as { summary?: Record<string, number> } | undefined)?.summary || {}) as Record<string, number>);
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cargar el estado de tus claims'));
+        }
+    }, []);
 
     const loadDashboard = useCallback(async () => {
         setLoading(true);
         setErrorMessage('');
         try {
-            const [businessesRes, metricsRes] = await Promise.all([
+            const [businessesRes, metricsRes, claimRequestsRes] = await Promise.all([
                 businessApi.getMine(),
                 analyticsApi.getMyDashboard({ days: 30 }),
+                businessApi.getMyClaimRequests({ limit: 10 }),
             ]);
 
             const nextBusinesses = asArray<BusinessItem>(businessesRes.data);
@@ -190,6 +279,8 @@ export function DashboardBusiness() {
             });
             setBusinesses(nextBusinesses);
             setMetrics((metricsRes.data || null) as DashboardMetrics | null);
+            setClaimRequests(asArray<MyClaimRequestItem>(claimRequestsRes.data));
+            setClaimSummary(((claimRequestsRes.data as { summary?: Record<string, number> } | undefined)?.summary || {}) as Record<string, number>);
 
             setSelectedBusinessId((current) => {
                 if (current && nextBusinesses.some((business) => business.id === current)) {
@@ -287,11 +378,12 @@ export function DashboardBusiness() {
             setDocuments([]);
             setVerificationLoading(false);
             setVerificationLoadedBusinessId('');
+            void loadClaimRequests();
             return;
         }
 
         void loadDashboard();
-    }, [activeOrganizationId, loadDashboard, organizationLoading]);
+    }, [activeOrganizationId, loadClaimRequests, loadDashboard, organizationLoading]);
 
     useEffect(() => {
         if (!activeOrganizationId || !selectedBusinessId) {
@@ -423,6 +515,12 @@ export function DashboardBusiness() {
                     <span className={`chip !border-white/30 !bg-white/10 !text-white ${verificationStatus?.verified ? '!text-blue-100' : ''}`}>
                         Estado KYC: {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
                     </span>
+                    <span className="chip !border-white/30 !bg-white/10 !text-white">
+                        Claim activo: {getBusinessClaimStatusLabel(selectedBusiness?.claimStatus)}
+                    </span>
+                    <span className="chip !border-white/30 !bg-white/10 !text-white">
+                        Claims en curso: {activeClaimRequests.length}
+                    </span>
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -460,6 +558,67 @@ export function DashboardBusiness() {
                     </div>
                 </section>
             )}
+
+            <section className="section-shell p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Claim / ownership</p>
+                        <h2 className="font-display text-xl font-bold text-slate-900">Estado de tus reclamaciones</h2>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Sigue las solicitudes enviadas para reclamar perfiles existentes del catálogo.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {(['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELED'] as const).map((status) => (
+                            <span key={status} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                {status}: {claimSummary[status] ?? 0}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
+                {claimRequests.length > 0 ? (
+                    <div className="mt-5 grid gap-3 md:grid-cols-2">
+                        {claimRequests.map((claimRequest) => (
+                            <article key={claimRequest.id} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p className="font-medium text-slate-900">{claimRequest.business.name}</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            Enviada {new Date(claimRequest.createdAt).toLocaleDateString('es-DO')}
+                                        </p>
+                                    </div>
+                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getClaimRequestStatusClass(claimRequest.status)}`}>
+                                        {getClaimRequestStatusLabel(claimRequest.status)}
+                                    </span>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                    <span className="rounded-full bg-white px-2.5 py-1">
+                                        Evidencia: {claimRequest.evidenceType}
+                                    </span>
+                                    <span className="rounded-full bg-white px-2.5 py-1">
+                                        Perfil: {getBusinessClaimStatusLabel(claimRequest.business.claimStatus)}
+                                    </span>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-3">
+                                    <Link className="btn-secondary text-sm" to={`/businesses/${claimRequest.business.slug}`}>
+                                        Ver ficha
+                                    </Link>
+                                    {claimRequest.business.claimStatus === 'CLAIMED' ? (
+                                        <span className="text-sm text-primary-700">
+                                            Si ya fue aprobado, este perfil debe aparecer también en “Mis negocios”.
+                                        </span>
+                                    ) : null}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="mt-5 text-sm text-slate-600">
+                        Todavía no tienes reclamaciones registradas. Si encuentras tu negocio en el directorio, ábrelo y usa la opción para reclamarlo.
+                    </p>
+                )}
+            </section>
 
             <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                 <article className="panel-premium p-5">
@@ -524,6 +683,9 @@ export function DashboardBusiness() {
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         <span className="text-[11px] rounded-full bg-primary-50 px-2 py-1 text-primary-700">
                                             Ficha {business.profileCompletenessScore ?? 0}%
+                                        </span>
+                                        <span className="text-[11px] rounded-full bg-white px-2 py-1 text-slate-700 border border-slate-200">
+                                            {getBusinessClaimStatusLabel(business.claimStatus)}
                                         </span>
                                         {business.openNow !== null && business.openNow !== undefined ? (
                                             <span className={`text-[11px] rounded-full px-2 py-1 ${

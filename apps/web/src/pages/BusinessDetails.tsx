@@ -67,16 +67,22 @@ const CLAIM_STATUS_META = {
         eyebrowClass: 'text-slate-600',
         description: 'Esta ficha pertenece al catalogo publico. Las herramientas SaaS se habilitan cuando el dueno reclama el perfil.',
     },
+    SUSPENDED: {
+        label: 'Claim suspendido',
+        heroClass: 'bg-red-100 text-red-900 ring-1 ring-red-200',
+        badgeClass: 'bg-red-100 text-red-800 border border-red-200',
+        cardClass: 'border-red-200 bg-red-50',
+        eyebrowClass: 'text-red-700',
+        description: 'El control operativo de esta ficha fue suspendido. El equipo admin debe revisar el caso antes de habilitar nuevos claims.',
+    },
 } as const;
 
 const CLAIM_EVIDENCE_OPTIONS = [
     { value: 'PHONE', label: 'Telefono del negocio' },
-    { value: 'EMAIL', label: 'Email del negocio' },
-    { value: 'WEBSITE', label: 'Sitio web oficial' },
-    { value: 'INSTAGRAM', label: 'Instagram del negocio' },
+    { value: 'EMAIL_DOMAIN', label: 'Dominio de email oficial' },
     { value: 'DOCUMENT', label: 'Documento o constancia' },
-    { value: 'NOTE', label: 'Nota explicativa' },
-    { value: 'OTHER', label: 'Otra evidencia' },
+    { value: 'SOCIAL', label: 'Red social o web oficial' },
+    { value: 'MANUAL', label: 'Nota explicativa manual' },
 ] as const;
 
 function getClaimEvidencePlaceholder(
@@ -85,14 +91,11 @@ function getClaimEvidencePlaceholder(
     if (evidenceType === 'PHONE') {
         return 'Ej. 8095550101';
     }
-    if (evidenceType === 'EMAIL') {
-        return 'Ej. hola@negocio.com';
+    if (evidenceType === 'EMAIL_DOMAIN') {
+        return 'Ej. @negocio.com o hola@negocio.com';
     }
-    if (evidenceType === 'WEBSITE') {
-        return 'Ej. https://negocio.com';
-    }
-    if (evidenceType === 'INSTAGRAM') {
-        return 'Ej. https://instagram.com/negocio';
+    if (evidenceType === 'SOCIAL') {
+        return 'Ej. https://negocio.com o https://instagram.com/negocio';
     }
     if (evidenceType === 'DOCUMENT') {
         return 'Ej. RNC, licencia o nombre del archivo';
@@ -708,7 +711,7 @@ export function BusinessDetails() {
     const whatsappDirectUrl = business?.whatsapp
         ? `https://wa.me/${business.whatsapp.replace(/[^0-9]/g, '')}`
         : null;
-    const claimStatus = business?.claimStatus ?? 'CLAIMED';
+    const claimStatus = business?.claimStatus ?? 'UNCLAIMED';
     const claimMeta = CLAIM_STATUS_META[claimStatus];
     const isClaimedBusiness = claimStatus === 'CLAIMED';
     const showClaimCallout = claimStatus !== 'CLAIMED';
@@ -1479,6 +1482,10 @@ export function BusinessDetails() {
                                 {claimStatus === 'PENDING_CLAIM' ? (
                                     <div className="mt-4 rounded-xl border border-amber-200 bg-white/80 px-4 py-3 text-sm text-slate-700">
                                         Ya existe una solicitud pendiente. Cuando el equipo admin termine la revision, el perfil podra activar su organizacion tenant y sus herramientas operativas.
+                                    </div>
+                                ) : claimStatus === 'SUSPENDED' ? (
+                                    <div className="mt-4 rounded-xl border border-red-200 bg-white/80 px-4 py-3 text-sm text-slate-700">
+                                        El claim de esta ficha esta suspendido temporalmente. Si necesitas recuperar el control, contacta al equipo admin con evidencia oficial.
                                     </div>
                                 ) : null}
 

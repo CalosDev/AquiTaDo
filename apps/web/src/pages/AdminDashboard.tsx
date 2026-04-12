@@ -44,9 +44,13 @@ interface Business {
     name: string;
     slug: string;
     verified: boolean;
-    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
     publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
     source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    catalogSource?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    lifecycleStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SOFT_DELETED';
+    isActive?: boolean;
+    primaryManagingOrganizationId?: string | null;
     verificationStatus: BusinessVerificationState;
     createdAt: string;
     profileCompletenessScore?: number;
@@ -162,9 +166,11 @@ interface CatalogQualitySnapshot {
             id: string;
             slug: string;
             name: string;
-            claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+            claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
             publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
             source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+            catalogSource?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+            lifecycleStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SOFT_DELETED';
             city?: { name: string } | null;
             province?: { name: string } | null;
         }>;
@@ -174,7 +180,7 @@ interface CatalogQualitySnapshot {
 interface ClaimRequestItem {
     id: string;
     status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED';
-    evidenceType: 'PHONE' | 'EMAIL' | 'WEBSITE' | 'INSTAGRAM' | 'DOCUMENT' | 'NOTE' | 'OTHER';
+    evidenceType: 'PHONE' | 'EMAIL_DOMAIN' | 'DOCUMENT' | 'SOCIAL' | 'MANUAL';
     evidenceValue?: string | null;
     notes?: string | null;
     adminNotes?: string | null;
@@ -188,9 +194,12 @@ interface ClaimRequestItem {
         id: string;
         name: string;
         slug: string;
-        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
         publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
         source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+        catalogSource?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+        lifecycleStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SOFT_DELETED';
+        primaryManagingOrganizationId?: string | null;
     };
     requesterUser?: {
         id: string;
@@ -248,9 +257,10 @@ interface OwnershipHistorySnapshot {
         id: string;
         name: string;
         slug: string;
-        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
         ownerId?: string | null;
         organizationId?: string | null;
+        primaryManagingOrganizationId?: string | null;
     };
     data: OwnershipHistoryItem[];
 }
@@ -297,7 +307,7 @@ interface BusinessSuggestionItem {
         id: string;
         name: string;
         slug: string;
-        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+        claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
         publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
     } | null;
 }
@@ -500,6 +510,20 @@ export function AdminDashboard() {
     const [ownershipHistoryLoading, setOwnershipHistoryLoading] = useState(false);
     const [ownershipRevokeReasons, setOwnershipRevokeReasons] = useState<Record<string, string>>({});
     const [confirmOwnershipRevokeId, setConfirmOwnershipRevokeId] = useState<string | null>(null);
+    const [catalogOperationNotes, setCatalogOperationNotes] = useState('');
+    const [manualClaimForm, setManualClaimForm] = useState<{
+        organizationId: string;
+        ownerUserId: string;
+        role: 'PRIMARY_OWNER' | 'MANAGER';
+        notes: string;
+    }>({
+        organizationId: '',
+        ownerUserId: '',
+        role: 'PRIMARY_OWNER',
+        notes: '',
+    });
+    const [adminUnclaimReason, setAdminUnclaimReason] = useState('');
+    const [adminUnclaimMakeClaimable, setAdminUnclaimMakeClaimable] = useState(true);
     const [businessSuggestions, setBusinessSuggestions] = useState<BusinessSuggestionItem[]>([]);
     const [suggestionSummary, setSuggestionSummary] = useState<Record<string, number>>({});
     const [suggestionStatusFilter, setSuggestionStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
@@ -583,6 +607,7 @@ export function AdminDashboard() {
         unclaimed: businesses.filter((business) => business.claimStatus === 'UNCLAIMED').length,
         pending: businesses.filter((business) => business.claimStatus === 'PENDING_CLAIM').length,
         claimed: businesses.filter((business) => business.claimStatus === 'CLAIMED').length,
+        suspended: businesses.filter((business) => business.claimStatus === 'SUSPENDED').length,
     }), [businesses]);
 
     const activeClaimRequestCount = (claimRequestSummary.PENDING ?? 0) + (claimRequestSummary.UNDER_REVIEW ?? 0);
@@ -620,6 +645,10 @@ export function AdminDashboard() {
 
         return [...pendingClaimConflicts, ...pendingSuggestionConflicts, ...duplicateConflicts].slice(0, 8);
     }, [businessSuggestions, catalogQuality, claimRequests]);
+    const selectedOwnershipBusiness = useMemo(
+        () => businesses.find((business) => business.id === selectedOwnershipBusinessId) || null,
+        [businesses, selectedOwnershipBusinessId],
+    );
 
     const filteredBusinesses = useMemo(() => {
         const normalizedSearch = businessSearch.trim().toLowerCase();
@@ -938,8 +967,28 @@ export function AdminDashboard() {
     const handleSelectOwnershipBusiness = (businessId: string) => {
         setSelectedOwnershipBusinessId(businessId);
         setConfirmOwnershipRevokeId(null);
+        const selectedBusiness = businesses.find((business) => business.id === businessId);
+        if (selectedBusiness) {
+            setManualClaimForm({
+                organizationId: selectedBusiness.primaryManagingOrganizationId || selectedBusiness.organization?.id || '',
+                ownerUserId: '',
+                role: 'PRIMARY_OWNER',
+                notes: '',
+            });
+            setAdminUnclaimMakeClaimable(true);
+            setCatalogOperationNotes('');
+            setAdminUnclaimReason('');
+        }
         if (!businessId) {
             setOwnershipHistory(null);
+            setManualClaimForm({
+                organizationId: '',
+                ownerUserId: '',
+                role: 'PRIMARY_OWNER',
+                notes: '',
+            });
+            setCatalogOperationNotes('');
+            setAdminUnclaimReason('');
         }
     };
 
@@ -971,6 +1020,107 @@ export function AdminDashboard() {
             setSuccessMessage('Ownership suspendido y historial actualizado');
         } catch (error) {
             setErrorMessage(getApiErrorMessage(error, 'No se pudo suspender el ownership'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleUpdatePublicationState = async (businessId: string, shouldPublish: boolean) => {
+        setProcessingId(`publication:${businessId}:${shouldPublish ? 'publish' : 'unpublish'}`);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            if (shouldPublish) {
+                await businessApi.publishAdmin(businessId, {
+                    notes: catalogOperationNotes.trim() || undefined,
+                });
+            } else {
+                await businessApi.unpublishAdmin(businessId, {
+                    notes: catalogOperationNotes.trim() || undefined,
+                });
+            }
+
+            await Promise.all([
+                loadData(),
+                loadCatalogQuality(),
+                selectedOwnershipBusinessId === businessId ? loadOwnershipHistory(businessId) : Promise.resolve(),
+            ]);
+
+            setSuccessMessage(shouldPublish ? 'Ficha publicada nuevamente en el catalogo' : 'Ficha retirada del catalogo publico');
+            setCatalogOperationNotes('');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo actualizar el estado publico del negocio'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleMarkClaimedBusiness = async (businessId: string) => {
+        if (!manualClaimForm.organizationId.trim() || !manualClaimForm.ownerUserId.trim()) {
+            setErrorMessage('Debes indicar organizationId y ownerUserId para marcar el negocio como reclamado');
+            return;
+        }
+
+        setProcessingId(`mark-claimed:${businessId}`);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await businessApi.markClaimedAdmin(businessId, {
+                organizationId: manualClaimForm.organizationId.trim(),
+                ownerUserId: manualClaimForm.ownerUserId.trim(),
+                role: manualClaimForm.role,
+                notes: manualClaimForm.notes.trim() || undefined,
+            });
+
+            await Promise.all([
+                loadData(),
+                loadCatalogQuality(),
+                loadClaimRequests(),
+                loadOwnershipHistory(businessId),
+            ]);
+
+            setSuccessMessage('Negocio marcado como reclamado y ownership sincronizado');
+            setManualClaimForm((current) => ({
+                ...current,
+                ownerUserId: '',
+                notes: '',
+            }));
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo marcar la ficha como reclamada'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleUnclaimBusiness = async (businessId: string) => {
+        if (adminUnclaimReason.trim().length < 8) {
+            setErrorMessage('Agrega un motivo claro para quitar el claim');
+            return;
+        }
+
+        setProcessingId(`unclaim:${businessId}`);
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        try {
+            await businessApi.unclaimAdmin(businessId, {
+                reason: adminUnclaimReason.trim(),
+                makeClaimable: adminUnclaimMakeClaimable,
+            });
+
+            await Promise.all([
+                loadData(),
+                loadCatalogQuality(),
+                loadClaimRequests(),
+                loadOwnershipHistory(businessId),
+            ]);
+
+            setSuccessMessage('Claim removido y ficha devuelta al flujo de catalogo');
+            setAdminUnclaimReason('');
+        } catch (error) {
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo quitar el claim del negocio'));
         } finally {
             setProcessingId(null);
         }
@@ -2252,6 +2402,137 @@ export function AdminDashboard() {
                                                         </div>
                                                     </div>
 
+                                                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Operaciones de catálogo</p>
+                                                                <h4 className="mt-2 font-display text-lg font-semibold text-slate-900">Publicación y estado del claim</h4>
+                                                                <p className="mt-2 text-sm text-slate-600">
+                                                                    Ajusta publicación, desactiva claims erróneos o asigna manualmente ownership cuando haga falta.
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                                    Público: {selectedOwnershipBusiness?.publicStatus || 'PUBLISHED'}
+                                                                </span>
+                                                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                                    Claim: {selectedOwnershipBusiness?.claimStatus || ownershipHistory.business.claimStatus || 'UNCLAIMED'}
+                                                                </span>
+                                                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                                    Source: {selectedOwnershipBusiness?.catalogSource || selectedOwnershipBusiness?.source || 'SYSTEM'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                                                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                                                <p className="text-sm font-semibold text-slate-900">Publicar o retirar</p>
+                                                                <textarea
+                                                                    className="input-field mt-3 h-24 w-full resize-none text-sm"
+                                                                    placeholder="Nota opcional para auditoría de publicación"
+                                                                    value={catalogOperationNotes}
+                                                                    onChange={(event) => setCatalogOperationNotes(event.target.value)}
+                                                                />
+                                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-primary text-sm"
+                                                                        disabled={processingId === `publication:${ownershipHistory.business.id}:publish`}
+                                                                        onClick={() => void handleUpdatePublicationState(ownershipHistory.business.id, true)}
+                                                                    >
+                                                                        Publicar
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary text-sm"
+                                                                        disabled={processingId === `publication:${ownershipHistory.business.id}:unpublish`}
+                                                                        onClick={() => void handleUpdatePublicationState(ownershipHistory.business.id, false)}
+                                                                    >
+                                                                        Despublicar
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                                                <p className="text-sm font-semibold text-slate-900">Marcar como reclamado</p>
+                                                                <div className="mt-3 space-y-3">
+                                                                    <input
+                                                                        className="input-field text-sm"
+                                                                        placeholder="organizationId"
+                                                                        value={manualClaimForm.organizationId}
+                                                                        onChange={(event) => setManualClaimForm((current) => ({
+                                                                            ...current,
+                                                                            organizationId: event.target.value,
+                                                                        }))}
+                                                                    />
+                                                                    <input
+                                                                        className="input-field text-sm"
+                                                                        placeholder="ownerUserId"
+                                                                        value={manualClaimForm.ownerUserId}
+                                                                        onChange={(event) => setManualClaimForm((current) => ({
+                                                                            ...current,
+                                                                            ownerUserId: event.target.value,
+                                                                        }))}
+                                                                    />
+                                                                    <select
+                                                                        className="input-field text-sm"
+                                                                        value={manualClaimForm.role}
+                                                                        onChange={(event) => setManualClaimForm((current) => ({
+                                                                            ...current,
+                                                                            role: event.target.value as 'PRIMARY_OWNER' | 'MANAGER',
+                                                                        }))}
+                                                                    >
+                                                                        <option value="PRIMARY_OWNER">PRIMARY_OWNER</option>
+                                                                        <option value="MANAGER">MANAGER</option>
+                                                                    </select>
+                                                                    <textarea
+                                                                        className="input-field h-20 w-full resize-none text-sm"
+                                                                        placeholder="Notas para auditoría del mark-claimed"
+                                                                        value={manualClaimForm.notes}
+                                                                        onChange={(event) => setManualClaimForm((current) => ({
+                                                                            ...current,
+                                                                            notes: event.target.value,
+                                                                        }))}
+                                                                    />
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-primary mt-3 text-sm"
+                                                                    disabled={processingId === `mark-claimed:${ownershipHistory.business.id}`}
+                                                                    onClick={() => void handleMarkClaimedBusiness(ownershipHistory.business.id)}
+                                                                >
+                                                                    Marcar reclamado
+                                                                </button>
+                                                            </div>
+
+                                                            <div className="rounded-xl border border-red-100 bg-red-50/70 p-4">
+                                                                <p className="text-sm font-semibold text-slate-900">Quitar claim</p>
+                                                                <textarea
+                                                                    className="input-field mt-3 h-24 w-full resize-none text-sm"
+                                                                    placeholder="Motivo administrativo para quitar el claim"
+                                                                    value={adminUnclaimReason}
+                                                                    onChange={(event) => setAdminUnclaimReason(event.target.value)}
+                                                                />
+                                                                <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={adminUnclaimMakeClaimable}
+                                                                        onChange={(event) => setAdminUnclaimMakeClaimable(event.target.checked)}
+                                                                    />
+                                                                    Dejar la ficha disponible para un nuevo claim
+                                                                </label>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-secondary mt-3 text-sm"
+                                                                    disabled={processingId === `unclaim:${ownershipHistory.business.id}`}
+                                                                    onClick={() => void handleUnclaimBusiness(ownershipHistory.business.id)}
+                                                                >
+                                                                    Quitar claim
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
                                                     {ownershipHistory.data.length > 0 ? ownershipHistory.data.map((ownership) => (
                                                         <div key={ownership.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                                                             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2478,7 +2759,7 @@ export function AdminDashboard() {
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-medium text-gray-900">{business.name}</p>
                                                 <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                                                    {business.source || 'SIN SOURCE'}
+                                                    {business.catalogSource || business.source || 'SIN SOURCE'}
                                                 </span>
                                             </div>
                                             <p className="mt-2 text-sm text-slate-600">

@@ -42,9 +42,13 @@ export interface Business {
     longitude?: number;
     verified: boolean;
     publicStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SUSPENDED';
-    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
     source?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    catalogSource?: 'ADMIN' | 'OWNER' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
+    lifecycleStatus?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'SOFT_DELETED';
     isClaimable?: boolean;
+    isActive?: boolean;
+    primaryManagingOrganizationId?: string | null;
     openNow?: boolean | null;
     todayHoursLabel?: string | null;
     profileCompletenessScore?: number;

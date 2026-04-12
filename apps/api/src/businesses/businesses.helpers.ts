@@ -2,6 +2,11 @@ import { BadRequestException } from '@nestjs/common';
 import type { BusinessQueryDto, BusinessHourInputDto } from './dto/business.dto';
 import { resolveActiveBusinessOrganizationId } from './business-ownership.helpers';
 import {
+    normalizeCatalogSource,
+    toLifecycleStatus,
+    toPublicStatusFromLifecycleStatus,
+} from './catalog-taxonomy.helpers';
+import {
     buildTodayBusinessHoursLabel,
     calculateBusinessProfileCompletenessScore,
     isBusinessOpenNow,
@@ -17,9 +22,28 @@ export interface DecoratedBusinessProfile {
 
 export function decorateBusinessProfile<T extends Record<string, any>>(business: T): T & DecoratedBusinessProfile {
     const profileCompletenessScore = calculateBusinessProfileCompletenessScore(business);
+    const effectiveCatalogSource = normalizeCatalogSource(business.catalogSource ?? business.source ?? null);
+    const effectivePrimaryManagingOrganizationId = resolveActiveBusinessOrganizationId({
+        primaryManagingOrganizationId: business.primaryManagingOrganizationId ?? null,
+        organizationId: business.organizationId ?? null,
+        ownerships: Array.isArray(business.ownerships) ? business.ownerships : null,
+    });
+    const lifecycleStatus = toLifecycleStatus({
+        lifecycleStatus: business.lifecycleStatus ?? null,
+        publicStatus: business.publicStatus ?? null,
+        deletedAt: business.deletedAt ?? null,
+        isActive: business.isActive ?? null,
+    });
+    const publicStatus = toPublicStatusFromLifecycleStatus(lifecycleStatus, business.publicStatus ?? 'PUBLISHED');
 
     return {
         ...business,
+        catalogSource: effectiveCatalogSource,
+        source: business.source ?? effectiveCatalogSource,
+        lifecycleStatus,
+        publicStatus,
+        primaryManagingOrganizationId: effectivePrimaryManagingOrganizationId,
+        isActive: business.isActive ?? !business.deletedAt,
         profileCompletenessScore,
         missingCoreFields: listMissingBusinessProfileFields(business),
         openNow: isBusinessOpenNow(business.hours),

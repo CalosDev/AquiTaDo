@@ -9,6 +9,7 @@ export const activeBusinessOwnershipSelect = {
 } as const;
 
 type BusinessOrganizationRef = {
+    primaryManagingOrganizationId?: string | null;
     organizationId?: string | null;
     ownerships?: Array<{
         organizationId: string;
@@ -23,6 +24,7 @@ export function resolveActiveBusinessOrganizationId(
     }
 
     return business.ownerships?.[0]?.organizationId
+        ?? business.primaryManagingOrganizationId
         ?? business.organizationId
         ?? null;
 }

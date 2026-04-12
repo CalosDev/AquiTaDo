@@ -26,10 +26,23 @@ const URL_OPTIONS = {
 
 const BUSINESS_PRICE_RANGES = ['BUDGET', 'MODERATE', 'PREMIUM', 'LUXURY'] as const;
 const BUSINESS_PUBLIC_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED', 'SUSPENDED'] as const;
-const BUSINESS_CLAIM_STATUSES = ['UNCLAIMED', 'PENDING_CLAIM', 'CLAIMED'] as const;
+const BUSINESS_CLAIM_STATUSES = ['UNCLAIMED', 'PENDING_CLAIM', 'CLAIMED', 'SUSPENDED'] as const;
 const BUSINESS_SOURCES = ['ADMIN', 'OWNER', 'IMPORT', 'USER_SUGGESTION', 'SYSTEM'] as const;
 const BUSINESS_CLAIM_REQUEST_STATUSES = ['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELED'] as const;
-const BUSINESS_CLAIM_EVIDENCE_TYPES = ['PHONE', 'EMAIL', 'WEBSITE', 'INSTAGRAM', 'DOCUMENT', 'NOTE', 'OTHER'] as const;
+const BUSINESS_CLAIM_EVIDENCE_TYPES = [
+    'PHONE',
+    'EMAIL_DOMAIN',
+    'DOCUMENT',
+    'SOCIAL',
+    'MANUAL',
+    'BUSINESS_EMAIL',
+    'BUSINESS_PHONE',
+    'SOCIAL_PROFILE',
+    'TAX_DOCUMENT',
+    'BRAND_ASSET',
+    'MANUAL_REVIEW',
+    'OTHER',
+] as const;
 
 export class BusinessHourInputDto {
     @IsNumber()
@@ -326,7 +339,7 @@ export class BusinessQueryDto {
 
     @IsOptional()
     @IsIn(BUSINESS_CLAIM_STATUSES)
-    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED';
+    claimStatus?: 'UNCLAIMED' | 'PENDING_CLAIM' | 'CLAIMED' | 'SUSPENDED';
 
     @IsOptional()
     @IsIn(BUSINESS_SOURCES)
@@ -513,7 +526,19 @@ export class ClaimSearchQueryDto {
 
 export class CreateBusinessClaimRequestDto {
     @IsIn(BUSINESS_CLAIM_EVIDENCE_TYPES)
-    evidenceType!: 'PHONE' | 'EMAIL' | 'WEBSITE' | 'INSTAGRAM' | 'DOCUMENT' | 'NOTE' | 'OTHER';
+    evidenceType!:
+        | 'PHONE'
+        | 'EMAIL_DOMAIN'
+        | 'DOCUMENT'
+        | 'SOCIAL'
+        | 'MANUAL'
+        | 'BUSINESS_EMAIL'
+        | 'BUSINESS_PHONE'
+        | 'SOCIAL_PROFILE'
+        | 'TAX_DOCUMENT'
+        | 'BRAND_ASSET'
+        | 'MANUAL_REVIEW'
+        | 'OTHER';
 
     @IsOptional()
     @IsString()
@@ -584,4 +609,56 @@ export class RevokeBusinessOwnershipDto {
     @MinLength(8)
     @MaxLength(1000)
     reason!: string;
+}
+
+export class AdminCatalogPublicationDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    notes?: string;
+}
+
+export class AdminCatalogPublicationTargetDto extends AdminCatalogPublicationDto {
+    @IsUUID()
+    businessId!: string;
+}
+
+export class AdminMarkBusinessClaimedDto {
+    @IsUUID()
+    organizationId!: string;
+
+    @IsUUID()
+    ownerUserId!: string;
+
+    @IsOptional()
+    @IsIn(['PRIMARY_OWNER', 'MANAGER'])
+    role?: 'PRIMARY_OWNER' | 'MANAGER';
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    notes?: string;
+}
+
+export class AdminMarkBusinessClaimedTargetDto extends AdminMarkBusinessClaimedDto {
+    @IsUUID()
+    businessId!: string;
+}
+
+export class AdminUnclaimBusinessDto {
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(8)
+    @MaxLength(1000)
+    reason!: string;
+
+    @IsOptional()
+    @Type(() => Boolean)
+    @IsBoolean()
+    makeClaimable?: boolean;
+}
+
+export class AdminUnclaimBusinessTargetDto extends AdminUnclaimBusinessDto {
+    @IsUUID()
+    businessId!: string;
 }

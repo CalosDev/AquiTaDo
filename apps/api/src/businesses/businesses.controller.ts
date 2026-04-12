@@ -18,6 +18,9 @@ import {
     CreateAdminCatalogBusinessDto,
     OwnershipHistoryQueryDto,
     RevokeBusinessOwnershipDto,
+    AdminCatalogPublicationDto,
+    AdminMarkBusinessClaimedDto,
+    AdminUnclaimBusinessDto,
 } from './dto/business.dto';
 import {
     BusinessDuplicateCaseQueryDto,
@@ -104,6 +107,22 @@ export class BusinessesController {
         return this.businessesService.listClaimRequests(query);
     }
 
+    @Get('me/claim-requests')
+    @UseGuards(JwtAuthGuard)
+    async listMyClaimRequests(
+        @CurrentUser('id') requesterUserId: string,
+        @Query() query: BusinessClaimRequestQueryDto,
+    ) {
+        return this.businessesService.listMyClaimRequests(requesterUserId, query);
+    }
+
+    @Get('admin/claim-requests/:id')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async getClaimRequestAdmin(@Param('id', new ParseUUIDPipe()) id: string) {
+        return this.businessesService.getClaimRequestAdmin(id);
+    }
+
     @Post('admin/catalog')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')
@@ -145,6 +164,50 @@ export class BusinessesController {
         @CurrentUser('id') adminUserId: string,
     ) {
         return this.businessesService.revokeBusinessOwnership(id, ownershipId, dto.reason, adminUserId);
+    }
+
+    @Post('admin/:id/publish')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async publishBusinessAdmin(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: AdminCatalogPublicationDto,
+        @CurrentUser('id') adminUserId: string,
+    ) {
+        return this.businessesService.updateAdminPublicationState(id, true, dto.notes, adminUserId);
+    }
+
+    @Post('admin/:id/unpublish')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async unpublishBusinessAdmin(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: AdminCatalogPublicationDto,
+        @CurrentUser('id') adminUserId: string,
+    ) {
+        return this.businessesService.updateAdminPublicationState(id, false, dto.notes, adminUserId);
+    }
+
+    @Post('admin/:id/mark-claimed')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async markClaimedBusinessAdmin(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: AdminMarkBusinessClaimedDto,
+        @CurrentUser('id') adminUserId: string,
+    ) {
+        return this.businessesService.markBusinessClaimedAdmin(id, dto, adminUserId);
+    }
+
+    @Post('admin/:id/unclaim')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    async unclaimBusinessAdmin(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: AdminUnclaimBusinessDto,
+        @CurrentUser('id') adminUserId: string,
+    ) {
+        return this.businessesService.unclaimBusinessAdmin(id, dto, adminUserId);
     }
 
     @Get('admin/duplicate-cases')

@@ -23,6 +23,8 @@ import {
     ReviewBusinessClaimRequestDto,
     BusinessClaimRequestQueryDto,
     CreateAdminCatalogBusinessDto,
+    AdminMarkBusinessClaimedDto,
+    AdminUnclaimBusinessDto,
 } from './dto/business.dto';
 import {
     BusinessSuggestionQueryDto,
@@ -53,6 +55,13 @@ import {
     normalizePublicListQuery,
     resolvePagination,
 } from './businesses.helpers';
+import {
+    normalizeClaimEvidenceType,
+    normalizeCatalogSource,
+    toCanonicalClaimEvidenceType,
+    toCanonicalCatalogSource,
+    toLifecycleStatus,
+} from './catalog-taxonomy.helpers';
 import {
     activeBusinessOwnershipSelect,
     businessBelongsToOrganization,
@@ -110,6 +119,59 @@ type BusinessDuplicateSignalInput = {
 
 const ACTIVE_CLAIM_REQUEST_STATUSES = ['PENDING', 'UNDER_REVIEW'] as const;
 const CLAIM_REQUEST_EXPIRATION_DAYS = 30;
+const CLAIM_REQUEST_DETAIL_SELECT = {
+    id: true,
+    businessId: true,
+    requesterUserId: true,
+    requesterOrganizationId: true,
+    status: true,
+    evidenceType: true,
+    evidenceValue: true,
+    notes: true,
+    adminNotes: true,
+    createdAt: true,
+    updatedAt: true,
+    reviewedAt: true,
+    approvedAt: true,
+    rejectedAt: true,
+    expiredAt: true,
+    canceledAt: true,
+    business: {
+        select: {
+            id: true,
+            name: true,
+            slug: true,
+            claimStatus: true,
+            publicStatus: true,
+            source: true,
+            catalogSource: true,
+            lifecycleStatus: true,
+            primaryManagingOrganizationId: true,
+        },
+    },
+    requesterUser: {
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+        },
+    },
+    requesterOrganization: {
+        select: {
+            id: true,
+            name: true,
+            slug: true,
+        },
+    },
+    reviewedByAdmin: {
+        select: {
+            id: true,
+            name: true,
+            email: true,
+        },
+    },
+} satisfies Prisma.BusinessClaimRequestSelect;
 
 @Injectable()
 export class BusinessesService {
@@ -516,6 +578,7 @@ export class BusinessesService {
                 },
                 select: {
                     businessId: true,
+                    organizationId: true,
                 },
                 distinct: ['businessId'],
             }),
@@ -536,6 +599,9 @@ export class BusinessesService {
         ]);
 
         const activeOwnershipBusinessIds = new Set(activeOwnershipRows.map((row) => row.businessId));
+        const activeOwnershipByBusinessId = new Map(
+            activeOwnershipRows.map((row) => [row.businessId, row.organizationId]),
+        );
         const activeClaimCounts = new Map(
             activeClaimSummary.map((row) => [row.businessId, row._count._all]),
         );
@@ -549,6 +615,7 @@ export class BusinessesService {
                         : (activeClaimCounts.get(affectedBusinessId) ?? 0) > 0
                             ? 'PENDING_CLAIM'
                             : 'UNCLAIMED',
+                    primaryManagingOrganizationId: activeOwnershipByBusinessId.get(affectedBusinessId) ?? null,
                     lastReviewedAt: referenceDate,
                 },
                 select: {
@@ -569,53 +636,7 @@ export class BusinessesService {
             where: {
                 status,
             },
-            select: {
-                id: true,
-                status: true,
-                evidenceType: true,
-                evidenceValue: true,
-                notes: true,
-                adminNotes: true,
-                createdAt: true,
-                updatedAt: true,
-                reviewedAt: true,
-                approvedAt: true,
-                rejectedAt: true,
-                expiredAt: true,
-                canceledAt: true,
-                business: {
-                    select: {
-                        id: true,
-                        name: true,
-                        slug: true,
-                        claimStatus: true,
-                        publicStatus: true,
-                        source: true,
-                    },
-                },
-                requesterUser: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        role: true,
-                    },
-                },
-                requesterOrganization: {
-                    select: {
-                        id: true,
-                        name: true,
-                        slug: true,
-                    },
-                },
-                reviewedByAdmin: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                    },
-                },
-            },
+            select: CLAIM_REQUEST_DETAIL_SELECT,
             orderBy: { createdAt: 'asc' },
             take: limit,
         });
@@ -628,12 +649,66 @@ export class BusinessesService {
         });
 
         return {
-            data: items,
+            data: items.map((item) => this.hydrateClaimRequestSnapshot(item)),
             summary: summary.reduce<Record<string, number>>((accumulator, item) => {
                 accumulator[item.status] = item._count._all;
                 return accumulator;
             }, {}),
         };
+    }
+
+    async listMyClaimRequests(
+        requesterUserId: string,
+        query: BusinessClaimRequestQueryDto,
+    ) {
+        await this.expireStaleClaimRequests(this.prisma);
+
+        const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
+        const where: Prisma.BusinessClaimRequestWhereInput = {
+            requesterUserId,
+            ...(query.status ? { status: query.status } : {}),
+        };
+
+        const [items, summary] = await Promise.all([
+            this.prisma.businessClaimRequest.findMany({
+                where,
+                select: CLAIM_REQUEST_DETAIL_SELECT,
+                orderBy: { createdAt: 'desc' },
+                take: limit,
+            }),
+            this.prisma.businessClaimRequest.groupBy({
+                by: ['status'],
+                where: {
+                    requesterUserId,
+                },
+                _count: {
+                    _all: true,
+                },
+            }),
+        ]);
+
+        return {
+            data: items.map((item) => this.hydrateClaimRequestSnapshot(item)),
+            summary: summary.reduce<Record<string, number>>((accumulator, item) => {
+                accumulator[item.status] = item._count._all;
+                return accumulator;
+            }, {}),
+        };
+    }
+
+    async getClaimRequestAdmin(claimRequestId: string) {
+        await this.expireStaleClaimRequests(this.prisma);
+
+        const claimRequest = await this.prisma.businessClaimRequest.findUnique({
+            where: { id: claimRequestId },
+            select: CLAIM_REQUEST_DETAIL_SELECT,
+        });
+
+        if (!claimRequest) {
+            throw new NotFoundException('Solicitud de reclamacion no encontrada');
+        }
+
+        return this.hydrateClaimRequestSnapshot(claimRequest);
     }
 
     async createClaimRequest(
@@ -706,7 +781,7 @@ export class BusinessesService {
                         businessId,
                         requesterUserId,
                         requesterOrganizationId: requesterOrganizationId ?? null,
-                        evidenceType: dto.evidenceType,
+                        evidenceType: toCanonicalClaimEvidenceType(dto.evidenceType),
                         evidenceValue: normalizedEvidenceValue,
                         notes: normalizedNotes,
                     },
@@ -743,7 +818,7 @@ export class BusinessesService {
                         metadata: {
                             businessId,
                             businessSlug: business.slug,
-                            evidenceType: dto.evidenceType,
+                            evidenceType: toCanonicalClaimEvidenceType(dto.evidenceType),
                         } as Prisma.InputJsonValue,
                     },
                 });
@@ -758,7 +833,7 @@ export class BusinessesService {
                         cityId: business.cityId,
                         metadata: {
                             claimRequestId: createdRequest.id,
-                            evidenceType: dto.evidenceType,
+                            evidenceType: toCanonicalClaimEvidenceType(dto.evidenceType),
                         } as Prisma.InputJsonValue,
                     },
                 });
@@ -831,6 +906,7 @@ export class BusinessesService {
                         },
                         select: {
                             id: true,
+                            organizationId: true,
                         },
                     });
 
@@ -849,6 +925,7 @@ export class BusinessesService {
                         where: { id: claimRequest.businessId },
                         data: {
                             claimStatus: activeOwnership ? 'CLAIMED' : 'PENDING_CLAIM',
+                            primaryManagingOrganizationId: activeOwnership?.organizationId ?? null,
                             updatedByUserId: adminUserId,
                             lastReviewedAt: reviewedAt,
                         },
@@ -917,9 +994,11 @@ export class BusinessesService {
                         data: {
                             ownerId: claimRequest.requesterUserId,
                             organizationId: effectiveOrganizationId,
+                            primaryManagingOrganizationId: effectiveOrganizationId,
                             claimStatus: 'CLAIMED',
                             claimedAt: reviewedAt,
                             claimedByUserId: claimRequest.requesterUserId,
+                            legacyOwnerMode: false,
                             updatedByUserId: adminUserId,
                             lastReviewedAt: reviewedAt,
                         },
@@ -1022,6 +1101,7 @@ export class BusinessesService {
                         },
                         select: {
                             id: true,
+                            organizationId: true,
                         },
                     }),
                 ]);
@@ -1046,6 +1126,7 @@ export class BusinessesService {
                             : remainingActiveClaims > 0
                                 ? 'PENDING_CLAIM'
                                 : 'UNCLAIMED',
+                        primaryManagingOrganizationId: activeOwnership?.organizationId ?? null,
                         updatedByUserId: adminUserId,
                         lastReviewedAt: reviewedAt,
                     },
@@ -1124,6 +1205,7 @@ export class BusinessesService {
                 claimStatus: true,
                 ownerId: true,
                 organizationId: true,
+                primaryManagingOrganizationId: true,
             },
         });
 
@@ -1262,10 +1344,13 @@ export class BusinessesService {
                     where: { id: businessId },
                     data: {
                         organizationId: nextActiveOwnership?.organizationId ?? null,
+                        primaryManagingOrganizationId: nextActiveOwnership?.organizationId ?? null,
                         ownerId: nextActiveOwnership ? undefined : null,
-                        claimStatus: nextActiveOwnership ? 'CLAIMED' : 'UNCLAIMED',
+                        claimStatus: nextActiveOwnership ? 'CLAIMED' : 'SUSPENDED',
                         claimedByUserId: nextActiveOwnership ? undefined : null,
                         claimedAt: nextActiveOwnership ? undefined : null,
+                        isClaimable: nextActiveOwnership ? true : false,
+                        legacyOwnerMode: false,
                         updatedByUserId: adminUserId,
                         lastReviewedAt: revokedAt,
                     },
@@ -1307,6 +1392,375 @@ export class BusinessesService {
             this.handlePrismaError(error);
             throw error;
         }
+    }
+
+    async updateAdminPublicationState(
+        businessId: string,
+        shouldPublish: boolean,
+        notes: string | undefined,
+        adminUserId: string,
+    ) {
+        const reviewNotes = normalizeOptionalText(notes) ?? null;
+        const reviewedAt = new Date();
+
+        const result = await this.prisma.$transaction(async (tx) => {
+            const business = await tx.business.findUnique({
+                where: { id: businessId },
+                select: {
+                    id: true,
+                    slug: true,
+                    deletedAt: true,
+                    publishedAt: true,
+                    firstPublishedAt: true,
+                    organizationId: true,
+                    primaryManagingOrganizationId: true,
+                    ownerships: activeBusinessOwnershipSelect,
+                },
+            });
+
+            if (!business || business.deletedAt) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            const publicationTimestamp = shouldPublish ? reviewedAt : null;
+            const updateData: Prisma.BusinessUpdateInput = {
+                publicStatus: shouldPublish ? 'PUBLISHED' : 'ARCHIVED',
+                lifecycleStatus: shouldPublish ? 'PUBLISHED' : 'ARCHIVED',
+                isActive: true,
+                isPublished: shouldPublish,
+                isSearchable: shouldPublish,
+                isDiscoverable: shouldPublish,
+                updatedByUser: {
+                    connect: {
+                        id: adminUserId,
+                    },
+                },
+                lastReviewedAt: reviewedAt,
+            };
+
+            if (shouldPublish) {
+                updateData.publishedAt = publicationTimestamp;
+                updateData.firstPublishedAt = business.firstPublishedAt ?? publicationTimestamp;
+            } else {
+                updateData.publishedAt = null;
+            }
+
+            await tx.business.update({
+                where: { id: businessId },
+                data: updateData,
+                select: { id: true },
+            });
+
+            await tx.auditLog.create({
+                data: {
+                    organizationId: resolveActiveBusinessOrganizationId(business),
+                    actorUserId: adminUserId,
+                    action: shouldPublish ? 'business.catalog.published' : 'business.catalog.unpublished',
+                    targetType: 'business',
+                    targetId: businessId,
+                    metadata: {
+                        notes: reviewNotes,
+                    } as Prisma.InputJsonValue,
+                },
+            });
+
+            return {
+                id: business.id,
+                slug: business.slug,
+            };
+        });
+
+        this.publishBusinessChangedEvent(result.id, result.slug, 'updated');
+
+        const hydratedBusiness = await this.findBusinessByIdWithReviews(result.id);
+        if (!hydratedBusiness) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        return decorateBusinessProfile(hydratedBusiness as Record<string, any>);
+    }
+
+    async markBusinessClaimedAdmin(
+        businessId: string,
+        dto: AdminMarkBusinessClaimedDto,
+        adminUserId: string,
+    ) {
+        const reviewedAt = new Date();
+        const reviewNotes = normalizeOptionalText(dto.notes) ?? null;
+
+        const result = await this.prisma.$transaction(async (tx) => {
+            const business = await tx.business.findUnique({
+                where: { id: businessId },
+                select: {
+                    id: true,
+                    slug: true,
+                    deletedAt: true,
+                    claimStatus: true,
+                    ownerId: true,
+                    organizationId: true,
+                    ownerships: {
+                        where: { isActive: true },
+                        select: {
+                            id: true,
+                            organizationId: true,
+                        },
+                        take: 1,
+                    },
+                },
+            });
+
+            if (!business || business.deletedAt) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            const organization = await tx.organization.findUnique({
+                where: { id: dto.organizationId },
+                select: { id: true },
+            });
+            if (!organization) {
+                throw new NotFoundException('Organizacion no encontrada');
+            }
+            await this.ensureOrganizationSubscription(tx, dto.organizationId);
+
+            const ownerUser = await tx.user.findUnique({
+                where: { id: dto.ownerUserId },
+                select: { id: true, role: true },
+            });
+
+            if (!ownerUser) {
+                throw new NotFoundException('Usuario owner no encontrado');
+            }
+
+            if (ownerUser.role === 'USER') {
+                await tx.user.update({
+                    where: { id: dto.ownerUserId },
+                    data: { role: 'BUSINESS_OWNER' },
+                });
+            }
+
+            await tx.organizationMember.upsert({
+                where: {
+                    organizationId_userId: {
+                        organizationId: dto.organizationId,
+                        userId: dto.ownerUserId,
+                    },
+                },
+                update: {
+                    role: dto.role === 'MANAGER' ? 'MANAGER' : 'OWNER',
+                },
+                create: {
+                    organizationId: dto.organizationId,
+                    userId: dto.ownerUserId,
+                    role: dto.role === 'MANAGER' ? 'MANAGER' : 'OWNER',
+                },
+            });
+
+            const activeOwnership = business.ownerships[0];
+            if (activeOwnership && activeOwnership.organizationId !== dto.organizationId) {
+                throw new ConflictException('Este negocio ya tiene un ownership activo en otra organizacion');
+            }
+
+            if (!activeOwnership) {
+                await tx.businessOwnership.create({
+                    data: {
+                        businessId,
+                        organizationId: dto.organizationId,
+                        grantedByUserId: adminUserId,
+                        role: dto.role ?? 'PRIMARY_OWNER',
+                        isActive: true,
+                        grantedAt: reviewedAt,
+                    },
+                    select: { id: true },
+                });
+            }
+
+            await tx.business.update({
+                where: { id: businessId },
+                data: {
+                    ownerId: dto.ownerUserId,
+                    organizationId: dto.organizationId,
+                    primaryManagingOrganizationId: dto.organizationId,
+                    claimStatus: 'CLAIMED',
+                    claimedAt: reviewedAt,
+                    claimedByUserId: dto.ownerUserId,
+                    isClaimable: true,
+                    legacyOwnerMode: false,
+                    updatedByUserId: adminUserId,
+                    lastReviewedAt: reviewedAt,
+                },
+                select: { id: true },
+            });
+
+            await tx.businessClaimRequest.updateMany({
+                where: {
+                    businessId,
+                    status: {
+                        in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                    },
+                },
+                data: {
+                    status: 'CANCELED',
+                    adminNotes: 'Cancelada automaticamente porque un admin marco la ficha como reclamada.',
+                    reviewedByAdminId: adminUserId,
+                    reviewedAt,
+                    canceledAt: reviewedAt,
+                },
+            });
+
+            await tx.auditLog.create({
+                data: {
+                    organizationId: dto.organizationId,
+                    actorUserId: adminUserId,
+                    action: 'business.catalog.mark_claimed',
+                    targetType: 'business',
+                    targetId: businessId,
+                    metadata: {
+                        ownerUserId: dto.ownerUserId,
+                        role: dto.role ?? 'PRIMARY_OWNER',
+                        notes: reviewNotes,
+                    } as Prisma.InputJsonValue,
+                },
+            });
+
+            return {
+                id: business.id,
+                slug: business.slug,
+                organizationId: dto.organizationId,
+                ownerUserId: dto.ownerUserId,
+            };
+        });
+
+        this.publishBusinessChangedEvent(result.id, result.slug, 'updated');
+
+        if (result.organizationId && result.ownerUserId) {
+            this.domainEventsService.publishBusinessLinkedToOrganization({
+                businessId: result.id,
+                businessSlug: result.slug,
+                organizationId: result.organizationId,
+                ownerUserId: result.ownerUserId,
+                linkedByUserId: adminUserId,
+            });
+        }
+
+        const hydratedBusiness = await this.findBusinessByIdWithReviews(result.id);
+        if (!hydratedBusiness) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        return decorateBusinessProfile(hydratedBusiness as Record<string, any>);
+    }
+
+    async unclaimBusinessAdmin(
+        businessId: string,
+        dto: AdminUnclaimBusinessDto,
+        adminUserId: string,
+    ) {
+        const reviewedAt = new Date();
+        const reason = normalizeOptionalText(dto.reason);
+        if (!reason) {
+            throw new BadRequestException('El motivo para quitar el claim es obligatorio');
+        }
+
+        const makeClaimable = dto.makeClaimable ?? true;
+
+        const result = await this.prisma.$transaction(async (tx) => {
+            const business = await tx.business.findUnique({
+                where: { id: businessId },
+                select: {
+                    id: true,
+                    slug: true,
+                    deletedAt: true,
+                    organizationId: true,
+                    primaryManagingOrganizationId: true,
+                    ownerships: {
+                        where: { isActive: true },
+                        select: {
+                            id: true,
+                        },
+                    },
+                },
+            });
+
+            if (!business || business.deletedAt) {
+                throw new NotFoundException('Negocio no encontrado');
+            }
+
+            if (business.ownerships.length > 0) {
+                await tx.businessOwnership.updateMany({
+                    where: {
+                        businessId,
+                        isActive: true,
+                    },
+                    data: {
+                        isActive: false,
+                        revokedAt: reviewedAt,
+                        revokedByUserId: adminUserId,
+                        revokeReason: reason,
+                    },
+                });
+            }
+
+            await tx.business.update({
+                where: { id: businessId },
+                data: {
+                    ownerId: null,
+                    organizationId: null,
+                    primaryManagingOrganizationId: null,
+                    claimStatus: 'UNCLAIMED',
+                    claimedAt: null,
+                    claimedByUserId: null,
+                    isClaimable: makeClaimable,
+                    legacyOwnerMode: false,
+                    updatedByUserId: adminUserId,
+                    lastReviewedAt: reviewedAt,
+                },
+                select: { id: true },
+            });
+
+            await tx.businessClaimRequest.updateMany({
+                where: {
+                    businessId,
+                    status: {
+                        in: [...ACTIVE_CLAIM_REQUEST_STATUSES],
+                    },
+                },
+                data: {
+                    status: 'CANCELED',
+                    adminNotes: `Cancelada automaticamente por un unclaim administrativo. Motivo: ${reason}`,
+                    reviewedByAdminId: adminUserId,
+                    reviewedAt,
+                    canceledAt: reviewedAt,
+                },
+            });
+
+            await tx.auditLog.create({
+                data: {
+                    organizationId: business.organizationId ?? business.primaryManagingOrganizationId ?? null,
+                    actorUserId: adminUserId,
+                    action: 'business.catalog.unclaim',
+                    targetType: 'business',
+                    targetId: businessId,
+                    metadata: {
+                        reason,
+                        makeClaimable,
+                    } as Prisma.InputJsonValue,
+                },
+            });
+
+            return {
+                id: business.id,
+                slug: business.slug,
+            };
+        });
+
+        this.publishBusinessChangedEvent(result.id, result.slug, 'updated');
+
+        const hydratedBusiness = await this.findBusinessByIdWithReviews(result.id);
+        if (!hydratedBusiness) {
+            throw new NotFoundException('Negocio no encontrado');
+        }
+
+        return decorateBusinessProfile(hydratedBusiness as Record<string, any>);
     }
 
     async submitBusinessSuggestion(
@@ -1895,15 +2349,23 @@ export class BusinessesService {
                         publicStatus: input.publicStatus ?? 'PUBLISHED',
                         claimStatus: 'UNCLAIMED',
                         source: input.source,
+                        catalogSource: toCanonicalCatalogSource(input.source),
+                        lifecycleStatus: toLifecycleStatus({
+                            publicStatus: input.publicStatus ?? 'PUBLISHED',
+                            isActive: true,
+                        }),
                         publishedAt,
                         firstPublishedAt: publishedAt,
                         claimedAt: null,
                         claimedByUserId: null,
                         catalogManagedByAdmin: input.catalogManagedByAdmin ?? true,
                         isClaimable: input.isClaimable ?? true,
+                        isActive: true,
                         isPublished,
                         isSearchable: isPublished,
                         isDiscoverable: isPublished,
+                        primaryManagingOrganizationId: null,
+                        legacyOwnerMode: false,
                         createdByUserId: adminUserId,
                         updatedByUserId: adminUserId,
                     },
@@ -1955,7 +2417,7 @@ export class BusinessesService {
                         metadata: {
                             source: auditSource,
                             publicStatus: input.publicStatus ?? 'PUBLISHED',
-                            catalogSource: input.source,
+                            catalogSource: toCanonicalCatalogSource(input.source),
                         } as Prisma.InputJsonValue,
                     },
                 });
@@ -2520,7 +2982,11 @@ export class BusinessesService {
         }
         if (primaryBusiness.publicStatus !== 'PUBLISHED' && secondaryBusinesses.some((business) => business.publicStatus === 'PUBLISHED')) {
             patchData.publicStatus = 'PUBLISHED';
+            patchData.lifecycleStatus = 'PUBLISHED';
             patchData.publishedAt = new Date();
+            patchData.isPublished = true;
+            patchData.isSearchable = true;
+            patchData.isDiscoverable = true;
         }
         if (Object.keys(patchData).length > 0) {
             await tx.business.update({
@@ -2537,12 +3003,16 @@ export class BusinessesService {
             data: {
                 deletedAt: archivedAt,
                 publicStatus: 'ARCHIVED',
+                lifecycleStatus: 'SOFT_DELETED',
                 claimStatus: 'UNCLAIMED',
                 claimedAt: null,
                 claimedByUserId: null,
                 ownerId: null,
                 organizationId: null,
+                primaryManagingOrganizationId: null,
                 isClaimable: false,
+                isActive: false,
+                legacyOwnerMode: false,
             },
         });
 
@@ -2719,15 +3189,20 @@ export class BusinessesService {
                         publicStatus: 'PUBLISHED',
                         claimStatus: 'CLAIMED',
                         source: 'OWNER',
+                        catalogSource: 'OWNER_CREATED',
+                        lifecycleStatus: 'PUBLISHED',
                         publishedAt,
                         firstPublishedAt: publishedAt,
                         claimedAt,
                         claimedByUserId: userId,
                         catalogManagedByAdmin: false,
                         isClaimable: true,
+                        isActive: true,
                         isPublished: true,
                         isSearchable: true,
                         isDiscoverable: true,
+                        primaryManagingOrganizationId: effectiveOrganizationId,
+                        legacyOwnerMode: false,
                         createdByUserId: userId,
                         updatedByUserId: userId,
                     },
@@ -3068,6 +3543,12 @@ export class BusinessesService {
                         verified: false,
                         verificationStatus: 'SUSPENDED',
                         publicStatus: 'ARCHIVED',
+                        lifecycleStatus: 'SOFT_DELETED',
+                        isActive: false,
+                        isPublished: false,
+                        isSearchable: false,
+                        isDiscoverable: false,
+                        primaryManagingOrganizationId: null,
                     },
                     select: {
                         id: true,
@@ -3834,6 +4315,40 @@ export class BusinessesService {
         return slug;
     }
 
+    private hydrateClaimRequestSnapshot<
+        T extends {
+            evidenceType?: string | null;
+            business?: {
+                source?: string | null;
+                catalogSource?: string | null;
+                lifecycleStatus?: string | null;
+                primaryManagingOrganizationId?: string | null;
+            } | null;
+        },
+    >(claimRequest: T): T {
+        if (!claimRequest.business) {
+            return claimRequest;
+        }
+
+        return {
+            ...claimRequest,
+            evidenceType: normalizeClaimEvidenceType(claimRequest.evidenceType ?? null),
+            business: {
+                ...claimRequest.business,
+                source: claimRequest.business.source
+                    ?? normalizeCatalogSource(claimRequest.business.catalogSource ?? null)
+                    ?? null,
+                catalogSource: normalizeCatalogSource(
+                    claimRequest.business.catalogSource ?? claimRequest.business.source ?? null,
+                ),
+                lifecycleStatus: toLifecycleStatus({
+                    lifecycleStatus: claimRequest.business.lifecycleStatus ?? null,
+                }),
+                primaryManagingOrganizationId: claimRequest.business.primaryManagingOrganizationId ?? null,
+            },
+        };
+    }
+
     private publishBusinessChangedEvent(
         businessId: string,
         slug: string | null,
@@ -4273,6 +4788,7 @@ export class BusinessesService {
     private buildPublicCatalogWhere(): Prisma.BusinessWhereInput {
         return {
             deletedAt: null,
+            isActive: true,
             publicStatus: 'PUBLISHED',
             isPublished: true,
             isSearchable: true,
@@ -4300,6 +4816,7 @@ export class BusinessesService {
         const rows = await this.prisma.business.findMany({
             where: {
                 deletedAt: null,
+                isActive: true,
                 publicStatus: 'PUBLISHED',
                 isPublished: true,
                 isSearchable: true,
@@ -4326,6 +4843,9 @@ export class BusinessesService {
                 claimStatus: true,
                 publicStatus: true,
                 source: true,
+                catalogSource: true,
+                lifecycleStatus: true,
+                primaryManagingOrganizationId: true,
                 province: {
                     select: { id: true, name: true, slug: true },
                 },
@@ -4364,6 +4884,8 @@ export class BusinessesService {
                 const scoredCandidate = this.scoreDuplicateCandidate(row, input);
                 return {
                     ...row,
+                    catalogSource: normalizeCatalogSource(row.catalogSource ?? row.source),
+                    source: row.source ?? normalizeCatalogSource(row.catalogSource),
                     matchType: scoredCandidate.matchType,
                     matchScore: scoredCandidate.score,
                     matchReasons: scoredCandidate.reasons,

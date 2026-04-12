@@ -168,8 +168,12 @@ export const businessApi = {
         limit?: number;
     }) =>
         api.get('/businesses/claim-search', { params }),
+    getMyClaimRequests: (params?: { status?: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED'; limit?: number }) =>
+        api.get('/businesses/me/claim-requests', { params }),
     getClaimRequestsAdmin: (params?: { status?: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELED'; limit?: number }) =>
         api.get('/businesses/admin/claim-requests', { params }),
+    getClaimRequestAdmin: (claimRequestId: string) =>
+        api.get(`/businesses/admin/claim-requests/${claimRequestId}`),
     getDuplicateCasesAdmin: (params?: { status?: 'MERGED' | 'DISMISSED' | 'CONFLICT'; limit?: number }) =>
         api.get('/businesses/admin/duplicate-cases', { params }),
     reviewClaimRequestAdmin: (
@@ -200,6 +204,30 @@ export const businessApi = {
             resetBusinessDiscoveryCaches();
             return response;
         }),
+    publishAdmin: (businessId: string, data?: { notes?: string }) =>
+        api.post(`/businesses/admin/${businessId}/publish`, data ?? {}).then((response) => {
+            resetBusinessDiscoveryCaches();
+            return response;
+        }),
+    unpublishAdmin: (businessId: string, data?: { notes?: string }) =>
+        api.post(`/businesses/admin/${businessId}/unpublish`, data ?? {}).then((response) => {
+            resetBusinessDiscoveryCaches();
+            return response;
+        }),
+    markClaimedAdmin: (
+        businessId: string,
+        data: { organizationId: string; ownerUserId: string; role?: 'PRIMARY_OWNER' | 'MANAGER'; notes?: string },
+    ) => api.post(`/businesses/admin/${businessId}/mark-claimed`, data).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
+    unclaimAdmin: (
+        businessId: string,
+        data: { reason: string; makeClaimable?: boolean },
+    ) => api.post(`/businesses/admin/${businessId}/unclaim`, data).then((response) => {
+        resetBusinessDiscoveryCaches();
+        return response;
+    }),
     getByIdentifier: (identifier: string) => (
         shouldUsePublicDetailCache()
             ? resolveMappedCachedRequest(
@@ -252,7 +280,7 @@ export const businessApi = {
     createClaimRequest: (
         businessId: string,
         data: {
-            evidenceType: 'PHONE' | 'EMAIL' | 'WEBSITE' | 'INSTAGRAM' | 'DOCUMENT' | 'NOTE' | 'OTHER';
+            evidenceType: 'PHONE' | 'EMAIL_DOMAIN' | 'DOCUMENT' | 'SOCIAL' | 'MANUAL';
             evidenceValue?: string;
             notes?: string;
         },
