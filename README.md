@@ -122,7 +122,9 @@ Servicios:
 - `THROTTLE_TTL_MS=60000`
 - `THROTTLE_LIMIT=120`
 - `RATE_LIMIT_SEARCH_IP_LIMIT=120`
-- `REDIS_URL=redis://localhost:6379`
+- `REDIS_URL=redis://localhost:6379` (fallback compartido para cache + BullMQ)
+- `CACHE_REDIS_URL=redis://localhost:6379` (opcional, recomendado para separar cache/rate-limit del Redis de colas)
+- `BULLMQ_REDIS_URL=redis://localhost:6379` (opcional, recomendado dedicarlo a BullMQ con politica `noeviction`)
 - `REDIS_CACHE_TTL_SECONDS=120`
 - `BULLMQ_PREFIX=aquita`
 - `BULLMQ_DEFAULT_ATTEMPTS=3`

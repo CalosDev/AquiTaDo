@@ -20,6 +20,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(RedisService.name);
     private client: Redis | null = null;
     private readonly redisUrl: string | null;
+    private readonly redisConfigSource: 'CACHE_REDIS_URL' | 'REDIS_URL' | null;
     private readonly defaultTtlSeconds: number;
     private readonly fallbackSWRLocks = new Set<string>();
 
@@ -27,17 +28,24 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         @Inject(ConfigService)
         private readonly configService: ConfigService,
     ) {
-        this.redisUrl = this.configService.get<string>('REDIS_URL')?.trim() ?? null;
+        const cacheRedisUrl = this.configService.get<string>('CACHE_REDIS_URL')?.trim();
+        const sharedRedisUrl = this.configService.get<string>('REDIS_URL')?.trim();
+        this.redisUrl = cacheRedisUrl || sharedRedisUrl || null;
+        this.redisConfigSource = cacheRedisUrl
+            ? 'CACHE_REDIS_URL'
+            : sharedRedisUrl
+                ? 'REDIS_URL'
+                : null;
         this.defaultTtlSeconds = this.resolveDefaultTtlSeconds();
     }
 
     async onModuleInit() {
         if (!this.redisUrl) {
-            this.logger.log('Redis disabled: REDIS_URL not configured');
+            this.logger.log('Redis disabled: CACHE_REDIS_URL/REDIS_URL not configured');
             return;
         }
         if (!this.isRedisUrlValid(this.redisUrl)) {
-            this.logger.warn('Redis disabled: REDIS_URL is invalid');
+            this.logger.warn(`Redis disabled: ${this.redisConfigSource ?? 'CACHE_REDIS_URL/REDIS_URL'} is invalid`);
             return;
         }
 
@@ -57,7 +65,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         try {
             await client.connect();
             this.client = client;
-            this.logger.log('Redis cache connected');
+            this.logger.log(`Redis cache connected via ${this.redisConfigSource ?? 'CACHE_REDIS_URL/REDIS_URL'}`);
         } catch (error) {
             this.logger.warn(
                 `Redis unavailable; continuing without distributed cache (${error instanceof Error ? error.message : String(error)})`,

@@ -105,13 +105,13 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
     }
 
     async onModuleInit() {
-        const redisUrl = this.configService.get<string>('REDIS_URL')?.trim();
+        const { redisUrl, sourceKey } = this.resolveQueueRedisConfig();
         if (!redisUrl) {
-            this.logger.warn('BullMQ disabled: REDIS_URL not configured');
+            this.logger.warn('BullMQ disabled: BULLMQ_REDIS_URL/REDIS_URL not configured');
             return;
         }
         if (!this.isRedisUrlValid(redisUrl)) {
-            this.logger.warn('BullMQ disabled: REDIS_URL is invalid');
+            this.logger.warn(`BullMQ disabled: ${sourceKey ?? 'BULLMQ_REDIS_URL/REDIS_URL'} is invalid`);
             return;
         }
         const redisReachable = await this.canReachRedis(redisUrl);
@@ -152,7 +152,7 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
             this.logger.warn(`BullMQ queue error: ${error.message}`);
         });
 
-        this.logger.log(`BullMQ notification worker online (queue="${this.queueName}")`);
+        this.logger.log(`BullMQ notification worker online (queue="${this.queueName}", redis="${sourceKey ?? 'BULLMQ_REDIS_URL/REDIS_URL'}")`);
     }
 
     async onModuleDestroy() {
@@ -477,6 +477,32 @@ export class NotificationsQueueService implements OnModuleInit, OnModuleDestroy 
         } catch {
             return false;
         }
+    }
+
+    private resolveQueueRedisConfig(): {
+        redisUrl: string | null;
+        sourceKey: 'BULLMQ_REDIS_URL' | 'REDIS_URL' | null;
+    } {
+        const queueRedisUrl = this.configService.get<string>('BULLMQ_REDIS_URL')?.trim();
+        if (queueRedisUrl) {
+            return {
+                redisUrl: queueRedisUrl,
+                sourceKey: 'BULLMQ_REDIS_URL',
+            };
+        }
+
+        const sharedRedisUrl = this.configService.get<string>('REDIS_URL')?.trim();
+        if (sharedRedisUrl) {
+            return {
+                redisUrl: sharedRedisUrl,
+                sourceKey: 'REDIS_URL',
+            };
+        }
+
+        return {
+            redisUrl: null,
+            sourceKey: null,
+        };
     }
 
     private async canReachRedis(redisUrl: string): Promise<boolean> {

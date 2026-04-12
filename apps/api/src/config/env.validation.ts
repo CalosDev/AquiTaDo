@@ -149,6 +149,9 @@ export function validateEnv(config: EnvRecord): EnvRecord {
     assertPositiveInteger(config, 'CIRCUIT_BREAKER_FAILURE_THRESHOLD');
     assertPositiveInteger(config, 'CIRCUIT_BREAKER_COOLDOWN_MS');
 
+    assertValidUrl(config, 'REDIS_URL', ['redis:', 'rediss:']);
+    assertValidUrl(config, 'CACHE_REDIS_URL', ['redis:', 'rediss:']);
+    assertValidUrl(config, 'BULLMQ_REDIS_URL', ['redis:', 'rediss:']);
     assertValidUrl(config, 'APP_PUBLIC_WEB_URL', ['http:', 'https:']);
     assertValidUrl(config, 'GEOAPIFY_BASE_URL', ['http:', 'https:']);
     assertValidUrl(config, 'NOMINATIM_BASE_URL', ['http:', 'https:']);

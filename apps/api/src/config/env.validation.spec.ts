@@ -82,4 +82,28 @@ describe('validateEnv', () => {
             }),
         ).toThrow('GEOAPIFY_BASE_URL must be a valid URL');
     });
+
+    it('accepts split Redis URLs for cache and BullMQ', () => {
+        const result = validateEnv({
+            DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+            JWT_SECRET: 'this-is-a-long-enough-secret',
+            CACHE_REDIS_URL: 'rediss://cache.example.com:6379',
+            BULLMQ_REDIS_URL: 'redis://queue.example.com:6379',
+        });
+
+        expect(result).toMatchObject({
+            CACHE_REDIS_URL: 'rediss://cache.example.com:6379',
+            BULLMQ_REDIS_URL: 'redis://queue.example.com:6379',
+        });
+    });
+
+    it('throws if BULLMQ_REDIS_URL uses an invalid protocol', () => {
+        expect(() =>
+            validateEnv({
+                DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
+                JWT_SECRET: 'this-is-a-long-enough-secret',
+                BULLMQ_REDIS_URL: 'https://queue.example.com',
+            }),
+        ).toThrow('BULLMQ_REDIS_URL must use one of: redis:, rediss:');
+    });
 });
