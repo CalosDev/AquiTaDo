@@ -93,6 +93,8 @@ interface MyClaimRequestItem {
     };
 }
 
+type OwnerWorkspaceId = 'overview' | 'operations' | 'growth' | 'billing' | 'organization';
+
 function asArray<T>(value: unknown): T[] {
     if (Array.isArray(value)) {
         return value as T[];
@@ -346,6 +348,7 @@ export function DashboardBusiness() {
     const [verificationLoading, setVerificationLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [activeWorkspace, setActiveWorkspace] = useState<OwnerWorkspaceId>('overview');
 
     useTimedMessage(errorMessage, setErrorMessage, 6500);
     useTimedMessage(successMessage, setSuccessMessage, 4500);
@@ -387,6 +390,41 @@ export function DashboardBusiness() {
     const activeClaimRequests = useMemo(
         () => claimRequests.filter((claimRequest) => claimRequest.status === 'PENDING' || claimRequest.status === 'UNDER_REVIEW'),
         [claimRequests],
+    );
+    const workspaceTabs = useMemo(
+        () => ([
+            {
+                id: 'overview' as const,
+                label: 'Resumen',
+                description: 'Claims, portafolio y verificacion',
+                badge: `${businesses.length} negocios`,
+            },
+            {
+                id: 'operations' as const,
+                label: 'Operacion',
+                description: 'Reservas, mensajeria y ejecucion',
+                badge: selectedBusiness ? selectedBusiness.name : 'Negocio',
+            },
+            {
+                id: 'growth' as const,
+                label: 'Crecimiento',
+                description: 'Visibilidad, campanas y demanda',
+                badge: `${totals.views ?? 0} vistas`,
+            },
+            {
+                id: 'billing' as const,
+                label: 'Facturacion',
+                description: 'Plan, wallet y pagos',
+                badge: activeOrganization ? activeOrganization.name : 'Requiere org',
+            },
+            {
+                id: 'organization' as const,
+                label: 'Organizacion',
+                description: 'Equipo, permisos y gobierno',
+                badge: `${organizations.length} org`,
+            },
+        ]),
+        [activeOrganization, businesses.length, organizations.length, selectedBusiness, totals.views],
     );
 
     const loadClaimRequests = useCallback(async () => {
@@ -530,6 +568,12 @@ export function DashboardBusiness() {
         }
         void loadVerificationData(selectedBusinessId);
     }, [activeOrganizationId, loadVerificationData, selectedBusinessId]);
+
+    useEffect(() => {
+        if (!activeOrganizationId && activeWorkspace !== 'overview') {
+            setActiveWorkspace('overview');
+        }
+    }, [activeOrganizationId, activeWorkspace]);
 
     const handleUploadDocument = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -680,12 +724,61 @@ export function DashboardBusiness() {
                 </div>
             </section>
 
+            <section className="section-shell p-4 lg:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Espacios de trabajo</p>
+                        <h2 className="font-display text-xl font-bold text-slate-900">Abre solo lo que necesitas ahora</h2>
+                        <p className="mt-2 text-sm text-slate-600">
+                            En vez de apilar todos los modulos en una sola pagina, el panel separa resumen, operacion,
+                            crecimiento, facturacion y organizacion.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {workspaceTabs.map((workspace) => {
+                            const disabled = workspace.id !== 'overview' && !activeOrganizationId;
+
+                            return (
+                                <button
+                                    key={workspace.id}
+                                    type="button"
+                                    className={`min-w-[12rem] rounded-2xl border px-4 py-3 text-left transition-all ${
+                                        activeWorkspace === workspace.id
+                                            ? 'border-primary-300 bg-primary-50 shadow-sm'
+                                            : 'border-slate-200/80 bg-white hover:border-primary-100 hover:shadow-sm'
+                                    } ${disabled ? 'cursor-not-allowed opacity-60 hover:border-slate-200/80 hover:shadow-none' : ''}`}
+                                    onClick={() => {
+                                        if (!disabled) {
+                                            setActiveWorkspace(workspace.id);
+                                        }
+                                    }}
+                                    aria-pressed={activeWorkspace === workspace.id}
+                                    disabled={disabled}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="font-semibold text-slate-900">{workspace.label}</p>
+                                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                            {workspace.badge}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs text-slate-500">{workspace.description}</p>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </section>
+
+            {activeWorkspace === 'overview' && (
+                <>
+
             {needsFirstBusinessSetup && (
                 <section className="section-shell border border-primary-100 bg-primary-50/70 p-6 lg:p-8">
                     <p className="text-sm uppercase tracking-wide text-primary-700 font-semibold">Primer paso</p>
                     <h2 className="font-display text-2xl font-bold text-slate-900 mt-2">Registra tu primer negocio</h2>
                     <p className="text-slate-600 mt-2 max-w-2xl">
-                        Tu panel de negocio se activa después de crear el primer negocio. En ese proceso se prepara tu organización interna y la verificación documental.
+                        La organizacion solo se prepara dentro del flujo de negocio, cuando publicas tu primer negocio
+                        o entras a una invitacion. Las cuentas cliente no crean organizacion.
                     </p>
                     <div className="mt-5 flex flex-wrap gap-3">
                         <Link className="btn-primary" to="/register-business">
@@ -868,15 +961,20 @@ export function DashboardBusiness() {
                     />
                 </Suspense>
             </section>
+                </>
+            )}
 
-            <Suspense fallback={<LazyBillingSectionFallback />}>
+            {activeWorkspace === 'billing' && (
+                <Suspense fallback={<LazyBillingSectionFallback />}>
                 <BillingWorkspace
                     activeOrganizationId={activeOrganizationId}
                     organizationName={activeOrganization?.name || null}
                 />
-            </Suspense>
+                </Suspense>
+            )}
 
-            <Suspense fallback={<LazyOperationsSectionFallback />}>
+            {activeWorkspace === 'operations' && (
+                <Suspense fallback={<LazyOperationsSectionFallback />}>
                 <OperationsWorkspace
                     activeOrganizationId={activeOrganizationId}
                     businesses={businesses.map((business) => ({
@@ -886,9 +984,11 @@ export function DashboardBusiness() {
                     }))}
                     selectedBusinessId={selectedBusinessId}
                 />
-            </Suspense>
+                </Suspense>
+            )}
 
-            <Suspense fallback={<LazyGrowthSectionFallback />}>
+            {activeWorkspace === 'growth' && (
+                <Suspense fallback={<LazyGrowthSectionFallback />}>
                 <GrowthWorkspace
                     activeOrganizationId={activeOrganizationId}
                     businesses={businesses.map((business) => ({
@@ -898,9 +998,11 @@ export function DashboardBusiness() {
                     }))}
                     selectedBusinessId={selectedBusinessId}
                 />
-            </Suspense>
+                </Suspense>
+            )}
 
-            <Suspense fallback={<LazyOrganizationSectionFallback />}>
+            {activeWorkspace === 'organization' && (
+                <Suspense fallback={<LazyOrganizationSectionFallback />}>
                 <OrganizationWorkspace
                     activeOrganizationId={activeOrganizationId}
                     organizationName={activeOrganization?.name || null}
@@ -911,7 +1013,8 @@ export function DashboardBusiness() {
                     }))}
                     selectedBusinessId={selectedBusinessId}
                 />
-            </Suspense>
+                </Suspense>
+            )}
         </div>
     );
 }

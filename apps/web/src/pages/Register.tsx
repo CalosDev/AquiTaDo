@@ -9,6 +9,21 @@ import { useTimedMessage } from '../hooks/useTimedMessage';
 
 const PHONE_REGEX = /^[0-9+()\-\s]{7,20}$/;
 
+const ACCOUNT_TYPE_OPTIONS = [
+    {
+        value: 'USER' as const,
+        title: 'Cuenta cliente',
+        description: 'Explora negocios, guarda favoritos, compara listas y reserva sin activar una organizacion.',
+        badge: 'Sin organizacion',
+    },
+    {
+        value: 'BUSINESS_OWNER' as const,
+        title: 'Cuenta negocio',
+        description: 'Publica y gestiona tu presencia. La organizacion se crea cuando registras tu primer negocio o aceptas una invitacion.',
+        badge: 'Con organizacion despues',
+    },
+] as const;
+
 export function Register() {
     const { register, loginWithGoogle } = useAuth();
     const navigate = useNavigate();
@@ -190,24 +205,46 @@ export function Register() {
                 </div>
 
                 <div>
-                    <label htmlFor="register-account-type" className="mb-1 block text-sm font-medium text-slate-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                         Tipo de cuenta
                     </label>
-                    <select
-                        id="register-account-type"
-                        required
-                        value={formData.accountType}
-                        onChange={(event) =>
-                            setFormData({
-                                ...formData,
-                                accountType: event.target.value as '' | 'USER' | 'BUSINESS_OWNER',
-                            })}
-                        className="input-field"
-                    >
-                        <option value="">Selecciona una opcion...</option>
-                        <option value="USER">Cliente (descubrir y reservar)</option>
-                        <option value="BUSINESS_OWNER">Negocio (vender y gestionar)</option>
-                    </select>
+                    <div className="grid gap-3 md:grid-cols-2">
+                        {ACCOUNT_TYPE_OPTIONS.map((option) => {
+                            const selected = formData.accountType === option.value;
+
+                            return (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    className={`rounded-2xl border p-4 text-left transition-all ${
+                                        selected
+                                            ? 'border-primary-300 bg-primary-50 shadow-sm'
+                                            : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50'
+                                    }`}
+                                    onClick={() => setFormData({ ...formData, accountType: option.value })}
+                                    aria-pressed={selected}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-semibold text-slate-900">{option.title}</p>
+                                            <p className="mt-2 text-sm leading-relaxed text-slate-600">{option.description}</p>
+                                        </div>
+                                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                            selected
+                                                ? 'bg-primary-100 text-primary-700'
+                                                : 'bg-slate-100 text-slate-600'
+                                        }`}>
+                                            {option.badge}
+                                        </span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                        Las cuentas cliente no crean organizacion. La organizacion solo aparece en el flujo de negocio
+                        cuando registras tu primer negocio o entras a una invitacion.
+                    </p>
                 </div>
 
                 <div>
