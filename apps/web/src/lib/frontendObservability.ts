@@ -34,6 +34,24 @@ const reportedRouteViews = new Set<string>();
 const reportedVitals = new Set<string>();
 const SYNTHETIC_QUERY_PARAMS = ['synthetic_audit', 'synthetic_monitoring', 'synthetic'];
 
+function isLocalHost(value: string): boolean {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'localhost' || normalized === '127.0.0.1';
+}
+
+function shouldSkipLocalCrossOriginObservability(): boolean {
+    if (!canUseWindow) {
+        return false;
+    }
+
+    try {
+        const targetUrl = new URL(FRONTEND_OBSERVABILITY_URL, window.location.origin);
+        return isLocalHost(window.location.hostname) && targetUrl.origin !== window.location.origin;
+    } catch {
+        return false;
+    }
+}
+
 function sanitizeSignalText(value: string | undefined, fallback: string): string {
     const normalized = (value ?? '').trim();
     if (!normalized) {
@@ -56,6 +74,10 @@ function isExternalNoise(message: string): boolean {
 export function shouldSkipFrontendObservability(): boolean {
     if (!canUseWindow) {
         return false;
+    }
+
+    if (shouldSkipLocalCrossOriginObservability()) {
+        return true;
     }
 
     try {

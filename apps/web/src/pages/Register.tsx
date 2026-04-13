@@ -13,14 +13,14 @@ const ACCOUNT_TYPE_OPTIONS = [
     {
         value: 'USER' as const,
         title: 'Cuenta cliente',
-        description: 'Explora negocios, guarda favoritos, compara listas y reserva sin activar una organizacion.',
-        badge: 'Sin organizacion',
+        description: 'Explora negocios, guarda favoritos, compara listas y reserva.',
+        support: 'No crea organizacion.',
     },
     {
         value: 'BUSINESS_OWNER' as const,
         title: 'Cuenta negocio',
-        description: 'Publica y gestiona tu presencia. La organizacion se crea cuando registras tu primer negocio o aceptas una invitacion.',
-        badge: 'Con organizacion despues',
+        description: 'Publica y gestiona tu presencia comercial.',
+        support: 'La organizacion aparece al registrar tu primer negocio o aceptar una invitacion.',
     },
 ] as const;
 
@@ -204,40 +204,57 @@ export function Register() {
                     />
                 </div>
 
-                <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                <fieldset className="space-y-3">
+                    <legend className="text-sm font-medium text-slate-700">
                         Tipo de cuenta
-                    </label>
-                    <div className="grid gap-3 md:grid-cols-2">
+                    </legend>
+                    <div className="space-y-3">
                         {ACCOUNT_TYPE_OPTIONS.map((option) => {
                             const selected = formData.accountType === option.value;
 
                             return (
-                                <button
+                                <label
                                     key={option.value}
-                                    type="button"
-                                    className={`rounded-2xl border p-4 text-left transition-all ${
+                                    className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-all ${
                                         selected
                                             ? 'border-primary-300 bg-primary-50 shadow-sm'
                                             : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50'
                                     }`}
-                                    onClick={() => setFormData({ ...formData, accountType: option.value })}
-                                    aria-pressed={selected}
                                 >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-semibold text-slate-900">{option.title}</p>
-                                            <p className="mt-2 text-sm leading-relaxed text-slate-600">{option.description}</p>
-                                        </div>
-                                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                    <input
+                                        type="radio"
+                                        name="accountType"
+                                        value={option.value}
+                                        checked={selected}
+                                        onChange={() => setFormData({ ...formData, accountType: option.value })}
+                                        className="sr-only"
+                                    />
+                                    <span
+                                        aria-hidden="true"
+                                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all ${
                                             selected
-                                                ? 'bg-primary-100 text-primary-700'
-                                                : 'bg-slate-100 text-slate-600'
+                                                ? 'border-primary-600 bg-primary-600 shadow-sm shadow-primary-600/30'
+                                                : 'border-slate-300 bg-white'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`h-2 w-2 rounded-full bg-white transition-opacity ${
+                                                selected ? 'opacity-100' : 'opacity-0'
+                                            }`}
+                                        />
+                                    </span>
+                                    <div className="min-w-0 text-left">
+                                        <p className="font-semibold text-slate-900">{option.title}</p>
+                                        <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                                            {option.description}
+                                        </p>
+                                        <p className={`mt-2 text-xs font-medium ${
+                                            selected ? 'text-primary-700' : 'text-slate-500'
                                         }`}>
-                                            {option.badge}
-                                        </span>
+                                            {option.support}
+                                        </p>
                                     </div>
-                                </button>
+                                </label>
                             );
                         })}
                     </div>
@@ -245,7 +262,7 @@ export function Register() {
                         Las cuentas cliente no crean organizacion. La organizacion solo aparece en el flujo de negocio
                         cuando registras tu primer negocio o entras a una invitacion.
                     </p>
-                </div>
+                </fieldset>
 
                 <div>
                     <label htmlFor="register-phone" className="mb-1 block text-sm font-medium text-slate-700">
