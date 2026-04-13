@@ -145,6 +145,29 @@ export function Register() {
                 'Acceso con Google para flujos rápidos',
                 'Base visual coherente desde el primer paso',
             ]}
+            storyPanels={[
+                {
+                    eyebrow: 'Cliente',
+                    title: 'Explora sin cargar complejidad',
+                    body: 'Una cuenta simple para descubrir negocios, guardar favoritos y volver despues sin ruido operativo.',
+                },
+                {
+                    eyebrow: 'Negocio',
+                    title: 'Opera cuando de verdad toca',
+                    body: 'La organizacion aparece dentro del flujo comercial, no como una sorpresa durante el alta.',
+                },
+                {
+                    eyebrow: 'Atajos',
+                    title: 'Google y formularios mas claros',
+                    body: 'La decision principal aparece antes y el formulario deja de competir con demasiados mensajes.',
+                },
+                {
+                    eyebrow: 'Continuidad',
+                    title: 'Del registro al panel sin choque visual',
+                    body: 'La misma energia del discovery ahora acompana el acceso y la operacion desde el primer clic.',
+                },
+            ]}
+            heroFooterNote="Cliente y negocio comparten base visual, pero no la misma complejidad. Cada ruta aparece cuando realmente hace falta."
         >
             <PageFeedbackStack
                 items={[
@@ -215,10 +238,10 @@ export function Register() {
                             return (
                                 <label
                                     key={option.value}
-                                    className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-all ${
+                                    className={`auth-choice-card ${
                                         selected
-                                            ? 'border-primary-300 bg-primary-50 shadow-sm'
-                                            : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50'
+                                            ? 'auth-choice-card-selected'
+                                            : ''
                                     }`}
                                 >
                                     <input
@@ -231,10 +254,10 @@ export function Register() {
                                     />
                                     <span
                                         aria-hidden="true"
-                                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all ${
+                                        className={`auth-choice-indicator ${
                                             selected
-                                                ? 'border-primary-600 bg-primary-600 shadow-sm shadow-primary-600/30'
-                                                : 'border-slate-300 bg-white'
+                                                ? 'auth-choice-indicator-selected'
+                                                : ''
                                         }`}
                                     >
                                         <span
@@ -258,7 +281,7 @@ export function Register() {
                             );
                         })}
                     </div>
-                    <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                    <p className="auth-inline-note">
                         Las cuentas cliente no crean organizacion. La organizacion solo aparece en el flujo de negocio
                         cuando registras tu primer negocio o entras a una invitacion.
                     </p>

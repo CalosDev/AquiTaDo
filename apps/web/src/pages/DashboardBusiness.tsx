@@ -426,6 +426,69 @@ export function DashboardBusiness() {
         ]),
         [activeOrganization, businesses.length, organizations.length, selectedBusiness, totals.views],
     );
+    const openNowCount = useMemo(
+        () => businesses.filter((business) => business.openNow).length,
+        [businesses],
+    );
+    const selectedBusinessMissingFields = selectedBusiness?.missingCoreFields ?? [];
+    const overviewMetrics = useMemo(
+        () => ([
+            {
+                label: 'Vistas calificadas',
+                value: `${(totals.views ?? 0).toLocaleString('es-DO')}`,
+                meta: '+12% vs mes pasado',
+            },
+            {
+                label: 'Clicks a contacto',
+                value: `${(totals.clicks ?? 0).toLocaleString('es-DO')}`,
+                meta: `${activeClaimRequests.length} claims activos`,
+            },
+            {
+                label: 'Conversión',
+                value: `${totals.conversionRate ?? 0}%`,
+                meta: verificationStatus?.verified ? 'Con perfil verificado' : 'Aún sin KYC completo',
+            },
+            {
+                label: 'Perfiles fuertes',
+                value: `${completeProfiles}`,
+                meta: `${openNowCount} abiertos ahora`,
+            },
+        ]),
+        [
+            activeClaimRequests.length,
+            completeProfiles,
+            openNowCount,
+            totals.clicks,
+            totals.conversionRate,
+            totals.views,
+            verificationStatus?.verified,
+        ],
+    );
+    const focusChecklist = useMemo(() => {
+        const items: string[] = [];
+
+        if (selectedBusinessMissingFields.length > 0) {
+            items.push(`Completar ${selectedBusinessMissingFields.slice(0, 2).join(' y ')}.`);
+        }
+
+        if (!verificationStatus?.verified) {
+            items.push('Subir o revisar la documentación de verificación.');
+        }
+
+        if (activeClaimRequests.length > 0) {
+            items.push(`Atender ${activeClaimRequests.length} claims activos antes de publicar más visibilidad.`);
+        }
+
+        if (items.length === 0) {
+            items.push('La base está estable. El siguiente paso es activar campañas o promoción puntual.');
+        }
+
+        return items.slice(0, 3);
+    }, [activeClaimRequests.length, selectedBusinessMissingFields, verificationStatus?.verified]);
+    const activeWorkspaceMeta = workspaceTabs.find((workspace) => workspace.id === activeWorkspace) ?? workspaceTabs[0];
+    const selectedBusinessSummary = selectedBusiness
+        ? `${selectedBusiness.verified ? 'Publicado' : 'En preparación'} · ${getBusinessClaimStatusLabel(selectedBusiness.claimStatus)}`
+        : 'Selecciona un negocio para centrar la operación.';
 
     const loadClaimRequests = useCallback(async () => {
         try {
@@ -655,7 +718,7 @@ export function DashboardBusiness() {
     }
 
     return (
-        <div className="page-shell space-y-6 animate-fade-in">
+        <div className="page-shell animate-fade-in">
             <PageFeedbackStack
                 items={[
                     { id: 'business-dashboard-error', tone: 'danger', text: errorMessage },
@@ -663,358 +726,426 @@ export function DashboardBusiness() {
                 ]}
             />
 
-            <section className="role-hero role-hero-owner">
-                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel de negocio</p>
-                <h1 className="font-display text-3xl font-bold text-white mt-2">Estado del catálogo y visibilidad</h1>
-                <p className="text-blue-100 mt-2 max-w-2xl">
-                    Vista enfocada en calidad de ficha, visibilidad orgánica y verificación documental.
-                </p>
-
-                <div className="mt-5 role-kpi-grid">
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Negocios activos</p>
-                        <p className="role-kpi-value">{businesses.length}</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Vistas</p>
-                        <p className="role-kpi-value">{totals.views ?? 0}</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Conversión</p>
-                        <p className="role-kpi-value">{totals.conversionRate ?? 0}%</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Perfiles fuertes</p>
-                        <p className="role-kpi-value">
-                            {completeProfiles}
-                        </p>
-                    </article>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2.5">
-                    <span className="chip !border-white/30 !bg-white/10 !text-white">
-                        Negocio seleccionado: {selectedBusiness?.name || 'Ninguno'}
-                    </span>
-                    <span className={`chip !border-white/30 !bg-white/10 !text-white ${verificationStatus?.verified ? '!text-blue-100' : ''}`}>
-                        Estado KYC: {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
-                    </span>
-                    <span className="chip !border-white/30 !bg-white/10 !text-white">
-                        Claim activo: {getBusinessClaimStatusLabel(selectedBusiness?.claimStatus)}
-                    </span>
-                    <span className="chip !border-white/30 !bg-white/10 !text-white">
-                        Claims en curso: {activeClaimRequests.length}
-                    </span>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                    <Link className="btn-primary" to="/register-business">
-                        Registrar otro negocio
-                    </Link>
-                    {selectedBusinessId && (
-                        <Link
-                            className="btn-secondary"
-                            to={`/dashboard/businesses/${selectedBusinessId}/edit`}
-                        >
-                            Editar negocio
-                        </Link>
-                    )}
-                    <Link className="btn-secondary" to="/profile">
-                        Editar perfil
-                    </Link>
-                </div>
-            </section>
-
-            <section className="section-shell p-4 lg:p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Espacios de trabajo</p>
-                        <h2 className="font-display text-xl font-bold text-slate-900">Abre solo lo que necesitas ahora</h2>
-                        <p className="mt-2 text-sm text-slate-600">
-                            En vez de apilar todos los modulos en una sola pagina, el panel separa resumen, operacion,
-                            crecimiento, facturacion y organizacion.
-                        </p>
+            <div className="owner-dashboard-shell">
+                <aside className="owner-dashboard-sidebar space-y-5">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xl font-black text-white">
+                            A
+                        </div>
+                        <div>
+                            <p className="font-display text-2xl font-bold text-white">AquiTa.do</p>
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-blue-100/80">
+                                Control center para negocios
+                            </p>
+                        </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+
+                    <div className="owner-dashboard-glass-card p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-100/78">
+                            Organización activa
+                        </p>
+                        <h2 className="mt-3 font-display text-2xl font-bold text-white">
+                            {activeOrganization?.name || 'Negocio independiente'}
+                        </h2>
+                        <p className="mt-2 text-sm text-blue-50/88">{selectedBusinessSummary}</p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <span className="kpi-chip-soft">
+                                {verificationStatus?.verified ? 'KYC aprobado' : 'KYC pendiente'}
+                            </span>
+                            <span className="kpi-chip-soft">{businesses.length} negocios</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-100/75">
+                            Áreas de trabajo
+                        </p>
                         {workspaceTabs.map((workspace) => {
                             const disabled = workspace.id !== 'overview' && !activeOrganizationId;
+                            const active = activeWorkspace === workspace.id;
 
                             return (
                                 <button
                                     key={workspace.id}
                                     type="button"
-                                    className={`min-w-[12rem] rounded-2xl border px-4 py-3 text-left transition-all ${
-                                        activeWorkspace === workspace.id
-                                            ? 'border-primary-300 bg-primary-50 shadow-sm'
-                                            : 'border-slate-200/80 bg-white hover:border-primary-100 hover:shadow-sm'
-                                    } ${disabled ? 'cursor-not-allowed opacity-60 hover:border-slate-200/80 hover:shadow-none' : ''}`}
+                                    className={`owner-dashboard-glass-card w-full px-4 py-3 text-left transition-all ${
+                                        active
+                                            ? 'border-white/18 bg-white/14 shadow-[0_22px_34px_-28px_rgba(6,54,168,0.72)]'
+                                            : 'opacity-92 hover:bg-white/12'
+                                    } ${disabled ? 'cursor-not-allowed opacity-55 hover:bg-white/8' : ''}`}
                                     onClick={() => {
                                         if (!disabled) {
                                             setActiveWorkspace(workspace.id);
                                         }
                                     }}
-                                    aria-pressed={activeWorkspace === workspace.id}
+                                    aria-pressed={active}
                                     disabled={disabled}
                                 >
-                                    <div className="flex items-center justify-between gap-3">
-                                        <p className="font-semibold text-slate-900">{workspace.label}</p>
-                                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-semibold text-white">{workspace.label}</p>
+                                            <p className="mt-1 text-xs text-blue-100/72">{workspace.description}</p>
+                                        </div>
+                                        <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85">
                                             {workspace.badge}
                                         </span>
                                     </div>
-                                    <p className="mt-1 text-xs text-slate-500">{workspace.description}</p>
                                 </button>
                             );
                         })}
                     </div>
-                </div>
-            </section>
 
-            {activeWorkspace === 'overview' && (
-                <>
-
-            {needsFirstBusinessSetup && (
-                <section className="section-shell border border-primary-100 bg-primary-50/70 p-6 lg:p-8">
-                    <p className="text-sm uppercase tracking-wide text-primary-700 font-semibold">Primer paso</p>
-                    <h2 className="font-display text-2xl font-bold text-slate-900 mt-2">Registra tu primer negocio</h2>
-                    <p className="text-slate-600 mt-2 max-w-2xl">
-                        La organizacion solo se prepara dentro del flujo de negocio, cuando publicas tu primer negocio
-                        o entras a una invitacion. Las cuentas cliente no crean organizacion.
-                    </p>
-                    <div className="mt-5 flex flex-wrap gap-3">
-                        <Link className="btn-primary" to="/register-business">
-                            Registrar negocio ahora
-                        </Link>
-                        <Link className="btn-secondary" to="/businesses">
-                            Ver directorio publico
-                        </Link>
-                    </div>
-                </section>
-            )}
-
-            <section className="section-shell p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Claim / ownership</p>
-                        <h2 className="font-display text-xl font-bold text-slate-900">Estado de tus reclamaciones</h2>
-                        <p className="mt-2 text-sm text-slate-600">
-                            Sigue las solicitudes enviadas para reclamar perfiles existentes del catálogo.
+                    <div className="owner-dashboard-glass-card p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-100/78">
+                            Enfoque de hoy
                         </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {(['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELED'] as const).map((status) => (
-                            <span key={status} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                                {status}: {claimSummary[status] ?? 0}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-
-                {claimRequests.length > 0 ? (
-                    <div className="mt-5 grid gap-3 md:grid-cols-2">
-                        {claimRequests.map((claimRequest) => (
-                            <article key={claimRequest.id} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <p className="font-medium text-slate-900">{claimRequest.business.name}</p>
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Enviada {new Date(claimRequest.createdAt).toLocaleDateString('es-DO')}
-                                        </p>
-                                    </div>
-                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getClaimRequestStatusClass(claimRequest.status)}`}>
-                                        {getClaimRequestStatusLabel(claimRequest.status)}
-                                    </span>
+                        <h3 className="mt-3 font-display text-2xl font-bold text-white">
+                            Menos módulos, más decisión.
+                        </h3>
+                        <div className="mt-4 space-y-3">
+                            {focusChecklist.map((item) => (
+                                <div key={item} className="flex gap-3 rounded-2xl border border-white/10 bg-white/8 px-3 py-3">
+                                    <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-white" />
+                                    <p className="text-sm leading-6 text-blue-50/88">{item}</p>
                                 </div>
-                                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-                                    <span className="rounded-full bg-white px-2.5 py-1">
-                                        Evidencia: {claimRequest.evidenceType}
-                                    </span>
-                                    <span className="rounded-full bg-white px-2.5 py-1">
-                                        Perfil: {getBusinessClaimStatusLabel(claimRequest.business.claimStatus)}
-                                    </span>
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-3">
-                                    <Link className="btn-secondary text-sm" to={`/businesses/${claimRequest.business.slug}`}>
-                                        Ver ficha
-                                    </Link>
-                                    {claimRequest.business.claimStatus === 'CLAIMED' ? (
-                                        <span className="text-sm text-primary-700">
-                                            Si ya fue aprobado, este perfil debe aparecer también en “Mis negocios”.
-                                        </span>
-                                    ) : null}
-                                </div>
-                            </article>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="mt-5 text-sm text-slate-600">
-                        Todavía no tienes reclamaciones registradas. Si encuentras tu negocio en el directorio, ábrelo y usa la opción para reclamarlo.
-                    </p>
-                )}
-            </section>
-
-            <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Negocios activos</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{businesses.length}</p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Vistas</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{totals.views ?? 0}</p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Clicks</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{totals.clicks ?? 0}</p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conversión</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{totals.conversionRate ?? 0}%</p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Abiertos ahora</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">
-                        {businesses.filter((business) => business.openNow).length}
-                    </p>
-                </article>
-            </section>
-
-            <section className="defer-render-section grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <article className="section-shell p-6">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Portafolio</p>
-                            <h2 className="font-display text-xl font-bold text-slate-900">Mis negocios</h2>
-                        </div>
-                        {selectedBusinessId && (
-                            <Link
-                                to={`/dashboard/businesses/${selectedBusinessId}/edit`}
-                                className="text-xs rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 font-semibold text-primary-700 hover:bg-primary-100"
-                            >
-                                Editar seleccionado
-                            </Link>
-                        )}
-                    </div>
-                    {businesses.length === 0 ? (
-                        <p className="text-sm text-gray-500">Aún no tienes negocios creados.</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {businesses.map((business) => (
-                                <button
-                                    type="button"
-                                    key={business.id}
-                                    className={`w-full rounded-2xl border px-3 py-3 text-left transition-all ${
-                                        selectedBusinessId === business.id
-                                            ? 'border-primary-300 bg-primary-50 shadow-sm'
-                                            : 'border-slate-200/80 bg-white hover:border-primary-100 hover:shadow-sm'
-                                    }`}
-                                    onClick={() => setSelectedBusinessId(business.id)}
-                                >
-                                    <p className="font-medium text-slate-900">{business.name}</p>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        {business.verified ? 'Publicado y verificado' : 'Pendiente de verificación'}
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        <span className="text-[11px] rounded-full bg-primary-50 px-2 py-1 text-primary-700">
-                                            Ficha {business.profileCompletenessScore ?? 0}%
-                                        </span>
-                                        <span className="text-[11px] rounded-full bg-white px-2 py-1 text-slate-700 border border-slate-200">
-                                            {getBusinessClaimStatusLabel(business.claimStatus)}
-                                        </span>
-                                        {business.openNow !== null && business.openNow !== undefined ? (
-                                            <span className={`text-[11px] rounded-full px-2 py-1 ${
-                                                business.openNow
-                                                    ? 'bg-primary-100 text-primary-700'
-                                                    : 'bg-slate-100 text-slate-600'
-                                            }`}>
-                                                {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                    {business.missingCoreFields && business.missingCoreFields.length > 0 ? (
-                                        <p className="mt-2 text-[11px] text-amber-700">
-                                            Faltan: {business.missingCoreFields.slice(0, 3).join(', ')}
-                                        </p>
-                                    ) : null}
-                                </button>
                             ))}
                         </div>
+                    </div>
+                </aside>
+
+                <div className="owner-dashboard-main">
+                    <section className="owner-dashboard-hero">
+                        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_320px]">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-100/90">
+                                    {activeWorkspaceMeta.label}
+                                </p>
+                                <h1 className="mt-3 max-w-3xl font-display text-4xl font-bold leading-tight text-white lg:text-[2.9rem]">
+                                    Un panel que prioriza lo que mueve el negocio.
+                                </h1>
+                                <p className="mt-3 max-w-2xl text-base leading-7 text-blue-50/88">
+                                    El dashboard deja de apilar bloques y pasa a operar como un centro de trabajo:
+                                    negocio activo arriba, navegación persistente a la izquierda y una narrativa clara
+                                    entre catálogo, claims y verificación.
+                                </p>
+
+                                <div className="mt-5 flex flex-wrap gap-2.5">
+                                    <span className="kpi-chip-soft">
+                                        Seleccionado: {selectedBusiness?.name || 'Ninguno'}
+                                    </span>
+                                    <span className="kpi-chip-soft">
+                                        Estado KYC: {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
+                                    </span>
+                                    <span className="kpi-chip-soft">
+                                        Claim activo: {getBusinessClaimStatusLabel(selectedBusiness?.claimStatus)}
+                                    </span>
+                                    <span className="kpi-chip-soft">
+                                        Claims en curso: {activeClaimRequests.length}
+                                    </span>
+                                </div>
+
+                                <div className="role-hero-actions mt-6">
+                                    <Link className="btn-primary role-hero-action" to="/register-business">
+                                        Registrar otro negocio
+                                    </Link>
+                                    {selectedBusinessId && (
+                                        <Link
+                                            className="btn-secondary role-hero-action !border-white/20 !bg-white/90 !text-primary-900 hover:!bg-white"
+                                            to={`/dashboard/businesses/${selectedBusinessId}/edit`}
+                                        >
+                                            Editar negocio
+                                        </Link>
+                                    )}
+                                    <Link className="btn-secondary role-hero-action !border-white/20 !bg-white/10 !text-white hover:!bg-white/16" to="/profile">
+                                        Editar perfil
+                                    </Link>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <article className="rounded-[26px] border border-white/14 bg-white/92 p-5 text-slate-900 shadow-[0_24px_40px_-32px_rgba(8,27,91,0.45)]">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-700">Salud del perfil</p>
+                                    <div className="mt-3 flex items-end gap-3">
+                                        <p className="font-display text-5xl font-bold leading-none text-slate-950">
+                                            {selectedBusiness?.profileCompletenessScore ?? 0}
+                                        </p>
+                                        <p className="pb-1 text-sm font-medium text-slate-500">/100</p>
+                                    </div>
+                                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-primary-100">
+                                        <div
+                                            className="h-full rounded-full bg-[linear-gradient(90deg,#0e4dff_0%,#ff3b6a_100%)]"
+                                            style={{ width: `${selectedBusiness?.profileCompletenessScore ?? 0}%` }}
+                                        />
+                                    </div>
+                                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                                        {selectedBusinessMissingFields.length > 0
+                                            ? `Aún faltan ${selectedBusinessMissingFields.slice(0, 3).join(', ')} para cerrar la ficha.`
+                                            : 'La base está completa. El siguiente paso es exprimir visibilidad y conversiones.'}
+                                    </p>
+                                </article>
+
+                                <article className="rounded-[26px] border border-white/12 bg-white/10 p-5 backdrop-blur-md">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100/88">
+                                        Siguiente mejor jugada
+                                    </p>
+                                    <div className="mt-4 space-y-3">
+                                        {focusChecklist.map((item) => (
+                                            <div key={item} className="flex gap-3 rounded-2xl border border-white/12 bg-white/8 px-3 py-3">
+                                                <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-white" />
+                                                <p className="text-sm leading-6 text-blue-50/90">{item}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </article>
+                            </div>
+                        </div>
+                    </section>
+
+                    {activeWorkspace === 'overview' && needsFirstBusinessSetup && (
+                        <section className="owner-dashboard-soft-card border border-primary-200 bg-primary-50/75">
+                            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary-700">Primer paso</p>
+                            <h2 className="mt-2 font-display text-3xl font-bold text-slate-900">Registra tu primer negocio</h2>
+                            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+                                La organización solo se prepara dentro del flujo de negocio, cuando publicas tu primer negocio
+                                o entras a una invitación. Las cuentas cliente no crean organización por sí solas.
+                            </p>
+                            <div className="mt-5 flex flex-wrap gap-3">
+                                <Link className="btn-primary" to="/register-business">
+                                    Registrar negocio ahora
+                                </Link>
+                                <Link className="btn-secondary" to="/businesses">
+                                    Ver directorio público
+                                </Link>
+                            </div>
+                        </section>
                     )}
-                </article>
 
-                <Suspense fallback={<LazyOwnerSectionFallback label="Cargando verificacion documental" />}>
-                    <VerificationWorkspace
-                        selectedBusiness={selectedBusiness}
-                        selectedBusinessId={selectedBusinessId}
-                        showVerificationSkeleton={showVerificationSkeleton}
-                        verificationStatus={verificationStatus}
-                        documents={documents}
-                        documentType={documentType}
-                        hasSelectedFile={Boolean(selectedFile)}
-                        verificationNotes={verificationNotes}
-                        saving={saving}
-                        onDocumentTypeChange={(value) => setDocumentType(value as VerificationDocument['documentType'])}
-                        onFileChange={setSelectedFile}
-                        onVerificationNotesChange={setVerificationNotes}
-                        onUploadDocument={handleUploadDocument}
-                        onSubmitBusinessVerification={() => void handleSubmitBusinessVerification()}
-                        getStatusClass={getStatusClass}
-                        getStatusLabel={getStatusLabel}
-                    />
-                </Suspense>
-            </section>
-                </>
-            )}
+                    {activeWorkspace === 'overview' && (
+                        <>
+                            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                {overviewMetrics.map((metric) => (
+                                    <article key={metric.label} className="owner-dashboard-metric">
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700/80">
+                                            {metric.label}
+                                        </p>
+                                        <p className="mt-3 font-display text-[2.35rem] font-bold leading-none text-slate-950">
+                                            {metric.value}
+                                        </p>
+                                        <p className="mt-3 text-sm text-slate-500">{metric.meta}</p>
+                                    </article>
+                                ))}
+                            </section>
 
-            {activeWorkspace === 'billing' && (
-                <Suspense fallback={<LazyBillingSectionFallback />}>
-                <BillingWorkspace
-                    activeOrganizationId={activeOrganizationId}
-                    organizationName={activeOrganization?.name || null}
-                />
-                </Suspense>
-            )}
+                            <section className="grid grid-cols-1 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+                                <article className="owner-dashboard-soft-card">
+                                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Portafolio</p>
+                                            <h2 className="mt-2 font-display text-2xl font-bold text-slate-900">Mis negocios</h2>
+                                            <p className="mt-2 text-sm text-slate-600">
+                                                Una lectura rápida de ficha, estado público y próximas correcciones.
+                                            </p>
+                                        </div>
+                                        {selectedBusinessId && (
+                                            <Link
+                                                to={`/dashboard/businesses/${selectedBusinessId}/edit`}
+                                                className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+                                            >
+                                                Editar seleccionado
+                                            </Link>
+                                        )}
+                                    </div>
 
-            {activeWorkspace === 'operations' && (
-                <Suspense fallback={<LazyOperationsSectionFallback />}>
-                <OperationsWorkspace
-                    activeOrganizationId={activeOrganizationId}
-                    businesses={businesses.map((business) => ({
-                        id: business.id,
-                        name: business.name,
-                        slug: business.slug,
-                    }))}
-                    selectedBusinessId={selectedBusinessId}
-                />
-                </Suspense>
-            )}
+                                    {businesses.length === 0 ? (
+                                        <p className="text-sm text-slate-500">Aún no tienes negocios creados.</p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {businesses.map((business) => (
+                                                <button
+                                                    type="button"
+                                                    key={business.id}
+                                                    className={`w-full rounded-[22px] border px-4 py-4 text-left transition-all ${
+                                                        selectedBusinessId === business.id
+                                                            ? 'border-primary-300 bg-primary-50 shadow-sm'
+                                                            : 'border-slate-200/80 bg-white hover:border-primary-100 hover:shadow-sm'
+                                                    }`}
+                                                    onClick={() => setSelectedBusinessId(business.id)}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <p className="font-semibold text-slate-900">{business.name}</p>
+                                                            <p className="mt-1 text-xs text-slate-500">
+                                                                {business.verified ? 'Publicado y verificado' : 'Pendiente de verificación'}
+                                                            </p>
+                                                        </div>
+                                                        <span className="rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-semibold text-primary-700">
+                                                            {business.profileCompletenessScore ?? 0}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-3 flex flex-wrap gap-2">
+                                                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-700">
+                                                            {getBusinessClaimStatusLabel(business.claimStatus)}
+                                                        </span>
+                                                        {business.openNow !== null && business.openNow !== undefined ? (
+                                                            <span className={`rounded-full px-2.5 py-1 text-[11px] ${
+                                                                business.openNow
+                                                                    ? 'bg-primary-100 text-primary-700'
+                                                                    : 'bg-slate-100 text-slate-600'
+                                                            }`}>
+                                                                {business.openNow ? 'Abierto ahora' : 'Cerrado ahora'}
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                    {business.missingCoreFields && business.missingCoreFields.length > 0 ? (
+                                                        <p className="mt-3 text-[11px] leading-5 text-amber-700">
+                                                            Faltan: {business.missingCoreFields.slice(0, 3).join(', ')}
+                                                        </p>
+                                                    ) : null}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </article>
 
-            {activeWorkspace === 'growth' && (
-                <Suspense fallback={<LazyGrowthSectionFallback />}>
-                <GrowthWorkspace
-                    activeOrganizationId={activeOrganizationId}
-                    businesses={businesses.map((business) => ({
-                        id: business.id,
-                        name: business.name,
-                        slug: business.slug,
-                    }))}
-                    selectedBusinessId={selectedBusinessId}
-                />
-                </Suspense>
-            )}
+                                <Suspense fallback={<LazyOwnerSectionFallback label="Cargando verificación documental" />}>
+                                    <VerificationWorkspace
+                                        selectedBusiness={selectedBusiness}
+                                        selectedBusinessId={selectedBusinessId}
+                                        showVerificationSkeleton={showVerificationSkeleton}
+                                        verificationStatus={verificationStatus}
+                                        documents={documents}
+                                        documentType={documentType}
+                                        hasSelectedFile={Boolean(selectedFile)}
+                                        verificationNotes={verificationNotes}
+                                        saving={saving}
+                                        onDocumentTypeChange={(value) => setDocumentType(value as VerificationDocument['documentType'])}
+                                        onFileChange={setSelectedFile}
+                                        onVerificationNotesChange={setVerificationNotes}
+                                        onUploadDocument={handleUploadDocument}
+                                        onSubmitBusinessVerification={() => void handleSubmitBusinessVerification()}
+                                        getStatusClass={getStatusClass}
+                                        getStatusLabel={getStatusLabel}
+                                    />
+                                </Suspense>
+                            </section>
 
-            {activeWorkspace === 'organization' && (
-                <Suspense fallback={<LazyOrganizationSectionFallback />}>
-                <OrganizationWorkspace
-                    activeOrganizationId={activeOrganizationId}
-                    organizationName={activeOrganization?.name || null}
-                    businesses={businesses.map((business) => ({
-                        id: business.id,
-                        name: business.name,
-                        slug: business.slug,
-                    }))}
-                    selectedBusinessId={selectedBusinessId}
-                />
-                </Suspense>
-            )}
+                            <section className="owner-dashboard-soft-card">
+                                <div className="flex flex-wrap items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Claim / ownership</p>
+                                        <h2 className="mt-2 font-display text-2xl font-bold text-slate-900">Estado de tus reclamaciones</h2>
+                                        <p className="mt-2 text-sm text-slate-600">
+                                            Reclamaciones visibles como una cola de decisiones, no como otro módulo perdido.
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {(['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELED'] as const).map((status) => (
+                                            <span key={status} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                {status}: {claimSummary[status] ?? 0}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {claimRequests.length > 0 ? (
+                                    <div className="mt-5 grid gap-3 xl:grid-cols-2">
+                                        {claimRequests.map((claimRequest) => (
+                                            <article key={claimRequest.id} className="rounded-[22px] border border-slate-200 bg-slate-50/90 p-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div>
+                                                        <p className="font-semibold text-slate-900">{claimRequest.business.name}</p>
+                                                        <p className="mt-1 text-xs text-slate-500">
+                                                            Enviada {new Date(claimRequest.createdAt).toLocaleDateString('es-DO')}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getClaimRequestStatusClass(claimRequest.status)}`}>
+                                                        {getClaimRequestStatusLabel(claimRequest.status)}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                                    <span className="rounded-full bg-white px-2.5 py-1">
+                                                        Evidencia: {claimRequest.evidenceType}
+                                                    </span>
+                                                    <span className="rounded-full bg-white px-2.5 py-1">
+                                                        Perfil: {getBusinessClaimStatusLabel(claimRequest.business.claimStatus)}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-4 flex flex-wrap gap-3">
+                                                    <Link className="btn-secondary text-sm" to={`/businesses/${claimRequest.business.slug}`}>
+                                                        Ver ficha
+                                                    </Link>
+                                                    {claimRequest.business.claimStatus === 'CLAIMED' ? (
+                                                        <span className="text-sm text-primary-700">
+                                                            Si ya fue aprobado, este perfil debe aparecer también en “Mis negocios”.
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </article>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="mt-5 text-sm text-slate-600">
+                                        Todavía no tienes reclamaciones registradas. Si encuentras tu negocio en el directorio,
+                                        ábrelo y usa la opción para reclamarlo.
+                                    </p>
+                                )}
+                            </section>
+                        </>
+                    )}
+
+                    {activeWorkspace === 'billing' && (
+                        <Suspense fallback={<LazyBillingSectionFallback />}>
+                            <BillingWorkspace
+                                activeOrganizationId={activeOrganizationId}
+                                organizationName={activeOrganization?.name || null}
+                            />
+                        </Suspense>
+                    )}
+
+                    {activeWorkspace === 'operations' && (
+                        <Suspense fallback={<LazyOperationsSectionFallback />}>
+                            <OperationsWorkspace
+                                activeOrganizationId={activeOrganizationId}
+                                businesses={businesses.map((business) => ({
+                                    id: business.id,
+                                    name: business.name,
+                                    slug: business.slug,
+                                }))}
+                                selectedBusinessId={selectedBusinessId}
+                            />
+                        </Suspense>
+                    )}
+
+                    {activeWorkspace === 'growth' && (
+                        <Suspense fallback={<LazyGrowthSectionFallback />}>
+                            <GrowthWorkspace
+                                activeOrganizationId={activeOrganizationId}
+                                businesses={businesses.map((business) => ({
+                                    id: business.id,
+                                    name: business.name,
+                                    slug: business.slug,
+                                }))}
+                                selectedBusinessId={selectedBusinessId}
+                            />
+                        </Suspense>
+                    )}
+
+                    {activeWorkspace === 'organization' && (
+                        <Suspense fallback={<LazyOrganizationSectionFallback />}>
+                            <OrganizationWorkspace
+                                activeOrganizationId={activeOrganizationId}
+                                organizationName={activeOrganization?.name || null}
+                                businesses={businesses.map((business) => ({
+                                    id: business.id,
+                                    name: business.name,
+                                    slug: business.slug,
+                                }))}
+                                selectedBusinessId={selectedBusinessId}
+                            />
+                        </Suspense>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
