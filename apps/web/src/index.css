@@ -73,12 +73,24 @@
       0 18px 34px -34px rgba(255, 45, 93, 0.14);
   }
 
-  .page-shell {
-    @apply mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8;
+  .container-sm {
+    @apply mx-auto w-full max-w-sm px-4 sm:px-6;
   }
 
-  .page-shell-narrow {
-    @apply mx-auto w-full max-w-4xl px-4 py-12 sm:px-6 lg:px-8;
+  .container-md {
+    @apply mx-auto w-full max-w-2xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .container-lg {
+    @apply mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .container-xl {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .container-full-shell {
+    @apply mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8;
   }
 
   .surface-panel {
@@ -817,3 +829,456 @@
       0 18px 34px -38px rgba(255, 45, 93, 0.12);
   }
 }
+
+/* ============================================================
+   BLUEPRINT SYSTEM — Fase 1: Tokens, Contenedores, Densidad
+   AquiTaDo_UI_UX_SYSTEM_BLUEPRINT.md § 5, 7, 8, 12
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* --- Spacing tokens (§ 5.3) -------------------------------- */
+    --space-xs:  0.25rem;   /* 4px  — separación intra-componente */
+    --space-sm:  0.5rem;    /* 8px  — labels, actions, chips       */
+    --space-md:  1rem;      /* 16px — bloques dentro de una card   */
+    --space-lg:  1.5rem;    /* 24px — entre cards de una sección   */
+    --space-xl:  2.5rem;    /* 40px — entre secciones mayores      */
+    --space-2xl: 4rem;      /* 64px — sectores de marketing        */
+
+    /* --- Surface tokens (§ 8.2) -------------------------------- */
+    --surface-bg:    #f5f8ff;   /* fondo general suave               */
+    --surface-0:     #f5f8ff;   /* sinónimo legacy                   */
+    --surface-1:     #ffffff;   /* cards principales                 */
+    --surface-2:     #f1f5fb;   /* fondos de secciones inner         */
+    --surface-3:     #e8eef8;   /* hover states, separadores         */
+
+    /* --- Ink tokens -------------------------------------------- */
+    --ink-950:  #060f23;
+    --ink-900:  #0f172a;
+    --ink-700:  #334155;
+    --ink-500:  #64748b;
+    --ink-400:  #94a3b8;
+    --ink-300:  #cbd5e1;
+
+    /* --- Brand tokens ------------------------------------------ */
+    --brand-primary:  #0636a8;
+    --brand-accent:   #ff2d5d;
+    --brand-blue-dr:  #002d62;
+    --brand-red-dr:   #ce1126;
+
+    /* --- Border radius tokens ---------------------------------- */
+    --radius-sm:   0.75rem;    /* 12px — chips, badges, tags        */
+    --radius-md:   1rem;       /* 16px — inputs, small cards        */
+    --radius-lg:   1.25rem;    /* 20px — cards operativas           */
+    --radius-xl:   1.5rem;     /* 24px — cards section              */
+    --radius-2xl:  2rem;       /* 32px — panels principales         */
+    --radius-full: 9999px;     /* pills, círculos                   */
+
+    /* --- Density tokens (§ 12) --------------------------------- */
+    /* Se sobreescriben por clase de densidad en el elemento padre  */
+    --density-card-px:  1.25rem;
+    --density-card-py:  1rem;
+    --density-gap:      1rem;
+    --density-h-scale:  1;
+  }
+}
+
+/* ============================================================
+   CONTENEDORES ESTÁNDAR (§ 5.1)
+   Cada ruta debe declarar explícitamente cuál usa.
+   ============================================================ */
+
+@layer components {
+
+  /* auth, legal, formularios simples */
+  .container-sm {
+    @apply mx-auto w-full max-w-md px-4 sm:px-6;
+  }
+
+  /* detalle de negocio, profile, settings */
+  .container-md {
+    @apply mx-auto w-full max-w-2xl px-4 sm:px-6;
+  }
+
+  /* discovery y páginas mixtas */
+  .container-lg {
+    @apply mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* dashboards y admin */
+  .container-xl {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* app shell con sidebar + contenido */
+  .container-full-shell {
+    @apply w-full px-0;
+  }
+
+  /* padding vertical estándar por superficie */
+  .container-sm,
+  .container-md,
+  .container-lg,
+  .container-xl {
+    padding-top: var(--space-xl);
+    padding-bottom: var(--space-xl);
+  }
+
+  /* ============================================================
+     SISTEMA DE DENSIDAD (§ 12)
+     Aplicar en el elemento padre del bloque/sección.
+     ============================================================ */
+
+  /* Cómoda: marketing, legal, auth */
+  .density-cozy {
+    --density-card-px:  2rem;
+    --density-card-py:  1.75rem;
+    --density-gap:      1.5rem;
+    --density-h-scale:  1.1;
+  }
+
+  /* Media: discovery y detalle de negocio */
+  .density-medium {
+    --density-card-px:  1.25rem;
+    --density-card-py:  1rem;
+    --density-gap:      1rem;
+    --density-h-scale:  1;
+  }
+
+  /* Compacta: dashboards, inbox, admin, CRM, colas */
+  .density-compact {
+    --density-card-px:  0.875rem;
+    --density-card-py:  0.75rem;
+    --density-gap:      0.75rem;
+    --density-h-scale:  0.9;
+  }
+
+  /* ============================================================
+     TIPOS DE CARD OFICIALES (§ 7.1)
+     Cada card debe clasificarse en uno de estos tipos.
+     ============================================================ */
+
+  /* Base compartida — no usar directamente */
+  .card-base {
+    background: var(--surface-1);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--ink-300);
+    overflow: hidden;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+  }
+
+  /* 1. Summary Card — métricas y KPIs (§ 7.1.1) */
+  .card-summary {
+    background: var(--surface-1);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--ink-300);
+    overflow: hidden;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+    padding: var(--density-card-py) var(--density-card-px);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  }
+
+  .card-summary__label {
+    @apply text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-500;
+  }
+
+  .card-summary__value {
+    @apply font-display text-3xl font-bold leading-none text-slate-900 tabular-nums mt-2;
+    letter-spacing: -0.03em;
+  }
+
+  .card-summary__delta {
+    @apply mt-1.5 text-xs font-semibold text-slate-500;
+  }
+
+  /* 2. Section Card — agrupación de módulos funcionales (§ 7.1.2) */
+  .card-section {
+    background: var(--surface-1);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--ink-300);
+    overflow: hidden;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+    padding: var(--density-card-py) var(--density-card-px);
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.07);
+  }
+
+  .card-section__header {
+    @apply flex items-center justify-between gap-3 mb-3;
+  }
+
+  .card-section__title {
+    @apply text-sm font-bold text-slate-800;
+  }
+
+  .card-section__description {
+    @apply text-xs text-slate-500 mt-0.5;
+  }
+
+  /* 3. Filter Card — búsqueda, selects y refinamiento (§ 7.1.3) */
+  .card-filter {
+    background: var(--surface-1);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--ink-300);
+    overflow: hidden;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+    padding: var(--density-card-py) var(--density-card-px);
+    background: var(--surface-2);
+    border-color: var(--ink-300);
+    box-shadow: none;
+  }
+
+  .card-filter:focus-within {
+    border-color: #92b6ff;
+    box-shadow: 0 0 0 3px rgba(6, 54, 168, 0.08);
+  }
+
+  /* 4. List / Queue Card — colas, conversaciones, reservas (§ 7.1.4) */
+  .card-list {
+    background: var(--surface-1);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--ink-300);
+    overflow: hidden;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .card-list__header {
+    @apply flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3;
+    background: var(--surface-2);
+  }
+
+  .card-list__item {
+    @apply flex items-center gap-3 border-b border-slate-100 px-4 py-3 transition-colors;
+  }
+
+  .card-list__item:last-child {
+    border-bottom: none;
+  }
+
+  .card-list__item:hover {
+    background: var(--surface-2);
+  }
+
+  .card-list__item--active {
+    background: #eef4ff;
+    border-left: 3px solid var(--brand-primary);
+  }
+
+  /* 5. Form Card — edición y creación (§ 7.1.5) */
+  .card-form {
+    background: var(--surface-1);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--ink-300);
+    overflow: hidden;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+    padding: var(--density-card-py) var(--density-card-px);
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.07);
+  }
+
+  .card-form__group {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .card-form__label {
+    @apply text-xs font-semibold text-slate-600;
+  }
+
+  .card-form__footer {
+    @apply flex items-center justify-end gap-2 border-t border-slate-100 pt-4 mt-4;
+  }
+
+  /* 6. Empty State Card — estados sin datos (§ 7.1.6) */
+  .card-empty {
+    @apply flex flex-col items-center justify-center gap-3 rounded-[20px] border border-dashed border-slate-200 bg-slate-50/60 text-center;
+    padding: calc(var(--density-card-py) * 2) var(--density-card-px);
+    min-height: 180px;
+  }
+
+  .card-empty__icon {
+    @apply flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400;
+  }
+
+  .card-empty__title {
+    @apply text-sm font-semibold text-slate-600;
+  }
+
+  .card-empty__body {
+    @apply text-xs text-slate-400 max-w-xs;
+  }
+
+  /* ============================================================
+     JERARQUÍA TIPOGRÁFICA OPERATIVA (§ 7.4)
+     display solo en marketing/hero. h1-h3 en vistas.
+     ============================================================ */
+
+  .text-display {
+    @apply font-display text-4xl font-bold leading-tight tracking-tight text-slate-900;
+  }
+
+  .text-h1 {
+    @apply font-display text-2xl font-bold leading-snug tracking-tight text-slate-900;
+  }
+
+  .text-h2 {
+    @apply font-display text-xl font-bold leading-snug text-slate-800;
+  }
+
+  .text-h3 {
+    @apply font-display text-base font-bold text-slate-700;
+  }
+
+  .text-body {
+    @apply text-sm leading-relaxed text-slate-700;
+  }
+
+  .text-meta {
+    @apply text-xs font-medium text-slate-500;
+  }
+
+  /* ============================================================
+     JERARQUÍA DE BOTONES COMPLETA (§ 7.2)
+     ============================================================ */
+
+  /* Ghost / Tertiary — acciones de baja prioridad */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
+           text-sm font-semibold text-slate-600 transition-all duration-150
+           hover:bg-slate-100 hover:text-slate-800 active:bg-slate-200
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Danger — acciones destructivas */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-red-200
+           bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700
+           transition-all duration-150 hover:bg-red-100 hover:border-red-300
+           active:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* ============================================================
+     ESTADOS UX OBLIGATORIOS — base styles (§ 10)
+     Los componentes React usan estas clases como base.
+     ============================================================ */
+
+  .ux-state-wrap {
+    @apply flex w-full flex-col items-center justify-center gap-4 rounded-2xl
+           border border-slate-100 bg-slate-50/60 px-6 py-12 text-center;
+    min-height: 220px;
+  }
+
+  .ux-state-icon {
+    @apply flex h-14 w-14 items-center justify-center rounded-2xl;
+  }
+
+  .ux-state-icon--loading {
+    @apply bg-primary-50 text-primary-600;
+  }
+
+  .ux-state-icon--empty {
+    @apply bg-slate-100 text-slate-400;
+  }
+
+  .ux-state-icon--error {
+    @apply bg-red-50 text-red-500;
+  }
+
+  .ux-state-icon--no-permission {
+    @apply bg-amber-50 text-amber-500;
+  }
+
+  .ux-state-title {
+    @apply text-sm font-semibold text-slate-700;
+  }
+
+  .ux-state-body {
+    @apply text-xs text-slate-500 max-w-xs;
+  }
+
+  /* ============================================================
+     APP SHELL base (§ 6)
+     Los layouts React construyen sobre estas clases.
+     ============================================================ */
+
+  /* Shell para toda la app autenticada */
+  .app-shell {
+    @apply flex min-h-screen w-full flex-col bg-[color:var(--surface-bg)];
+  }
+
+  /* Top bar global */
+  .app-topbar {
+    @apply sticky top-0 z-40 flex h-14 w-full items-center gap-3 border-b
+           border-slate-200/80 bg-white/90 px-4 backdrop-blur-md sm:px-6;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+  }
+
+  /* Sidebar contextual */
+  .app-sidebar {
+    @apply flex h-full w-64 flex-col border-r border-slate-200 bg-white;
+    transition: width 200ms ease;
+  }
+
+  .app-sidebar--collapsed {
+    @apply w-14;
+  }
+
+  .app-sidebar__identity {
+    @apply flex items-center gap-2.5 border-b border-slate-100 px-4 py-3;
+  }
+
+  .app-sidebar__context {
+    @apply border-b border-slate-100 px-4 py-3;
+  }
+
+  .app-sidebar__nav {
+    @apply flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-3;
+  }
+
+  .app-sidebar__nav-item {
+    @apply flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium
+           text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900;
+  }
+
+  .app-sidebar__nav-item--active {
+    @apply bg-primary-50 text-primary-700 hover:bg-primary-100;
+  }
+
+  .app-sidebar__footer {
+    @apply border-t border-slate-100 px-4 py-3;
+  }
+
+  /* Content area principal */
+  .app-content {
+    @apply flex flex-1 flex-col overflow-y-auto;
+    background: var(--surface-bg);
+  }
+
+  /* Shell completo: sidebar + content */
+  .app-shell-body {
+    @apply flex flex-1 overflow-hidden;
+  }
+
+  /* Page header inside app shell */
+  .app-page-header {
+    @apply flex items-start justify-between gap-4 border-b border-slate-100
+           bg-white px-6 py-4;
+  }
+
+  .app-page-header__title {
+    @apply font-display text-xl font-bold text-slate-900;
+  }
+
+  .app-page-header__breadcrumb {
+    @apply flex items-center gap-1.5 text-xs text-slate-500;
+  }
+
+  .app-page-inner {
+    @apply flex-1 overflow-y-auto;
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--density-gap);
+  }
+}
+
+

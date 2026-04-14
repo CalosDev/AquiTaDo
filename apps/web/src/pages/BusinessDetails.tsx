@@ -1225,7 +1225,7 @@ export function BusinessDetails() {
 
     if (!business) {
         return (
-            <div className="max-w-7xl mx-auto px-4 py-20 text-center space-y-4">
+            <div className="container-lg py-20 text-center space-y-4">
                 <p className="text-5xl">:(</p>
                 <h2 className="text-2xl font-bold text-gray-900">Negocio no encontrado</h2>
                 {errorMessage && (
@@ -1236,7 +1236,7 @@ export function BusinessDetails() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8 animate-fade-in">
+        <div className="container-lg py-8 pb-28 lg:pb-8 animate-fade-in">
             {errorMessage && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {errorMessage}
@@ -1881,4 +1881,5 @@ export function BusinessDetails() {
         </div>
     );
 }
+
 

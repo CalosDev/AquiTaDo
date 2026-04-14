@@ -4,7 +4,6 @@ import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
-import { AuthShell } from '../components/auth/AuthShell';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 
 const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[A-Za-z])(?=.*\d).+$/;
@@ -69,19 +68,16 @@ export function ResetPassword() {
     };
 
     return (
-        <AuthShell
-            title="Nueva contraseña"
-            subtitle="Define una clave nueva para volver a entrar"
-            heroEyebrow="Paso final"
-            heroTitle="Cierra la recuperación con un flujo más claro."
-            heroDescription="La última parte del acceso ahora mantiene mejor jerarquía visual, mensajes más limpios y una composición menos improvisada."
-            highlights={[
-                'Validación clara de la nueva clave',
-                'Estados visibles sin ruido innecesario',
-                'Continuidad con el resto del sistema de acceso',
-                'Footer más ligero en pantallas auth',
-            ]}
-        >
+        <div className="auth-stage flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
+            <div className="container-sm w-full max-w-md">
+                <div className="card-form">
+                    <div className="mb-8 text-center">
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-2xl font-bold text-white shadow-lg shadow-slate-500/30">
+                            A
+                        </div>
+                        <h2 className="font-display text-2xl font-bold text-slate-900">Nueva contraseña</h2>
+                        <p className="mt-2 text-sm text-slate-500">Define una clave nueva para volver a entrar</p>
+                    </div>
             <PageFeedbackStack
                 items={[
                     {
@@ -138,6 +134,8 @@ export function ResetPassword() {
                     Solicitar un nuevo enlace
                 </Link>
             </p>
-        </AuthShell>
+          </div>
+        </div>
+      </div>
     );
 }

@@ -1499,7 +1499,7 @@ export function AdminDashboard() {
     ] as const;
 
     return (
-        <div className="page-shell max-w-6xl animate-fade-in">
+        <div className="container-xl py-8 pb-28 animate-fade-in">
             <PageFeedbackStack
                 items={[
                     { id: 'admin-dashboard-error', tone: 'danger', text: errorMessage },
@@ -3229,4 +3229,5 @@ export function AdminDashboard() {
         </div>
     );
 }
+
 

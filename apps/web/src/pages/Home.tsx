@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { getApiErrorMessage } from '../api/error';
@@ -10,7 +10,7 @@ import { formatPublicCategoryName } from '../lib/categoryLabel';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { useNearViewport } from '../hooks/useNearViewport';
 import { preloadRouteChunk } from '../routes/preload';
-
+import { EmptyState } from '../components/ui/EmptyState';
 interface Category {
     id: string;
     name: string;
@@ -724,11 +724,11 @@ export function Home() {
                             ))}
                         </div>
                     ) : rankings.length === 0 ? (
-                        <div className="discovery-callout mt-5">
-                            <p className="text-sm font-semibold text-slate-900">Aun no hay ranking disponible para ese filtro.</p>
-                            <p className="mt-1 text-sm text-slate-600">
-                                Prueba otra provincia o vuelve cuando existan suficientes senales para comparar.
-                            </p>
+                        <div className="mt-5">
+                            <EmptyState
+                                title="Aun no hay ranking disponible para ese filtro."
+                                body="Prueba otra provincia o vuelve cuando existan suficientes señales para comparar."
+                            />
                         </div>
                     ) : (
                         <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -802,10 +802,16 @@ export function Home() {
                         ))}
                     </div>
                 ) : recentBusinesses.length === 0 ? (
-                    <div className="section-shell mt-6 p-10 text-center">
-                        <p className="font-display text-2xl font-semibold text-slate-800">Aún no hay negocios registrados.</p>
-                        <p className="mt-2 text-sm text-slate-600">Aporta la primera ficha útil para esa zona o categoría.</p>
-                        <Link to={registerBusinessPath} className="btn-primary mt-5 inline-flex">{registerBusinessLabel}</Link>
+                    <div className="mt-6 p-6">
+                        <EmptyState
+                            title="Aún no hay negocios registrados."
+                            body="Aporta la primera ficha útil para esa zona o categoría."
+                            action={
+                                <Link to={registerBusinessPath} className="btn-primary mt-3 inline-flex">
+                                    {registerBusinessLabel}
+                                </Link>
+                            }
+                        />
                     </div>
                 ) : (
                     <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">

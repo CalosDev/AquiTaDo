@@ -4,7 +4,6 @@ import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
-import { AuthShell } from '../components/auth/AuthShell';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 
 export function ForgotPassword() {
@@ -43,19 +42,16 @@ export function ForgotPassword() {
     };
 
     return (
-        <AuthShell
-            title="Recuperar acceso"
-            subtitle="Te enviaremos un enlace para volver a entrar"
-            heroEyebrow="Recuperación segura"
-            heroTitle="Recupera tu cuenta sin perder el hilo."
-            heroDescription="El flujo de recuperación ahora acompaña mejor al usuario y mantiene la misma dirección visual que el resto de la plataforma."
-            highlights={[
-                'Enlace de recuperación con mensaje claro',
-                'Estados de error y éxito más consistentes',
-                'Menos ruido visual en una tarea sensible',
-                'Continuidad visual con login y registro',
-            ]}
-        >
+        <div className="auth-stage flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
+            <div className="container-sm w-full max-w-md">
+                <div className="card-form">
+                    <div className="mb-8 text-center">
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-2xl font-bold text-white shadow-lg shadow-slate-500/30">
+                            A
+                        </div>
+                        <h2 className="font-display text-2xl font-bold text-slate-900">Recuperar acceso</h2>
+                        <p className="mt-2 text-sm text-slate-500">Te enviaremos un enlace para volver a entrar</p>
+                    </div>
             <PageFeedbackStack
                 items={[
                     { id: 'forgot-password-error', tone: 'danger', text: errorMessage },
@@ -90,6 +86,8 @@ export function ForgotPassword() {
                     Volver a iniciar sesión
                 </Link>
             </p>
-        </AuthShell>
+          </div>
+        </div>
+      </div>
     );
 }

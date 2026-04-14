@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
-import { AuthShell } from '../components/auth/AuthShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -110,43 +109,41 @@ export function Login() {
     };
 
     return (
-        <AuthShell
-            title="Bienvenido de vuelta"
-            subtitle="Inicia sesión en tu cuenta"
-            heroEyebrow="Acceso rápido"
-            heroTitle="Vuelve a tu cuenta con una experiencia más clara y útil."
-            heroDescription="Retoma favoritos, actividad, gestión de negocio y accesos sensibles desde una entrada mejor conectada con el resto de la plataforma."
-            highlights={[
-                'Acceso unificado para clientes y negocios',
-                'Ingreso con Google cuando esté disponible',
-                'Segundo factor para accesos sensibles',
-                'Diseño más consistente en toda la app',
-            ]}
-        >
-            <PageFeedbackStack
-                items={[
-                    { id: 'login-notice', tone: 'success', text: noticeMessage },
-                    { id: 'login-error', tone: 'danger', text: error },
-                ]}
-            />
-
-            {googleClientId && (
-                <div className="mb-6 space-y-4">
-                    <GoogleIdentityButton
-                        clientId={googleClientId}
-                        text="signin_with"
-                        disabled={loading || Boolean(pendingGoogleIdToken)}
-                        onCredential={handleGoogleCredential}
-                    />
-                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
-                        <div className="h-px flex-1 bg-slate-200"></div>
-                        <span>o</span>
-                        <div className="h-px flex-1 bg-slate-200"></div>
+        <div className="auth-stage flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
+            <div className="container-sm w-full max-w-md">
+                <div className="card-form">
+                    <div className="mb-8 text-center">
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600 text-2xl font-bold text-white shadow-lg shadow-primary-500/30">
+                            A
+                        </div>
+                        <h2 className="font-display text-2xl font-bold text-slate-900">Sign in to your account</h2>
+                        <p className="mt-2 text-sm text-slate-500">Welcome back to AquiTa.do</p>
                     </div>
-                </div>
-            )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+                    <PageFeedbackStack
+                        items={[
+                            { id: 'login-notice', tone: 'success', text: noticeMessage },
+                            { id: 'login-error', tone: 'danger', text: error },
+                        ]}
+                    />
+
+                    {googleClientId && (
+                        <div className="mb-6 space-y-4">
+                            <GoogleIdentityButton
+                                clientId={googleClientId}
+                                text="signin_with"
+                                disabled={loading || Boolean(pendingGoogleIdToken)}
+                                onCredential={handleGoogleCredential}
+                            />
+                            <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+                                <div className="h-px flex-1 bg-slate-200"></div>
+                                <span>or</span>
+                                <div className="h-px flex-1 bg-slate-200"></div>
+                            </div>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
                 {!pendingGoogleIdToken && (
                     <>
                         <div>
@@ -234,17 +231,19 @@ export function Login() {
                     </div>
                 )}
 
-                <button type="submit" disabled={loading} className="btn-primary w-full">
-                    {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
-                </button>
-            </form>
+                        <button type="submit" disabled={loading} className="btn-primary w-full">
+                            {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
+                        </button>
+                    </form>
 
-            <p className="mt-6 text-center text-sm text-slate-500">
-                ¿No tienes cuenta?{' '}
-                <Link to="/register" className="font-medium text-primary-600 hover:text-primary-700">
-                    Regístrate
-                </Link>
-            </p>
-        </AuthShell>
+                    <p className="mt-6 text-center text-sm text-slate-500">
+                        ¿No tienes cuenta?{' '}
+                        <Link to="/register" className="font-medium text-primary-600 hover:text-primary-700">
+                            Regístrate
+                        </Link>
+                    </p>
+                </div>
+            </div>
+        </div>
     );
 }

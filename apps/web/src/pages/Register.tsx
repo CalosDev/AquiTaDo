@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
-import { AuthShell } from '../components/auth/AuthShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -133,47 +132,22 @@ export function Register() {
     };
 
     return (
-        <AuthShell
-            title="Crea tu cuenta"
-            subtitle="Abre tu acceso en AquiTa.do"
-            heroEyebrow="Alta guiada"
-            heroTitle="Elige un punto de entrada que sí se sienta pensado."
-            heroDescription="Registra una cuenta de cliente o negocio con una experiencia más ordenada, más clara y mejor alineada con el producto que viene después."
-            highlights={[
-                'Cuenta cliente para explorar y guardar',
-                'Cuenta negocio para operar y vender',
-                'Acceso con Google para flujos rápidos',
-                'Base visual coherente desde el primer paso',
-            ]}
-            storyPanels={[
-                {
-                    eyebrow: 'Cliente',
-                    title: 'Explora sin cargar complejidad',
-                    body: 'Una cuenta simple para descubrir negocios, guardar favoritos y volver despues sin ruido operativo.',
-                },
-                {
-                    eyebrow: 'Negocio',
-                    title: 'Opera cuando de verdad toca',
-                    body: 'La organizacion aparece dentro del flujo comercial, no como una sorpresa durante el alta.',
-                },
-                {
-                    eyebrow: 'Atajos',
-                    title: 'Google y formularios mas claros',
-                    body: 'La decision principal aparece antes y el formulario deja de competir con demasiados mensajes.',
-                },
-                {
-                    eyebrow: 'Continuidad',
-                    title: 'Del registro al panel sin choque visual',
-                    body: 'La misma energia del discovery ahora acompana el acceso y la operacion desde el primer clic.',
-                },
-            ]}
-            heroFooterNote="Cliente y negocio comparten base visual, pero no la misma complejidad. Cada ruta aparece cuando realmente hace falta."
-        >
-            <PageFeedbackStack
-                items={[
-                    { id: 'register-error', tone: 'danger', text: error },
-                ]}
-            />
+        <div className="auth-stage flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
+            <div className="container-sm w-full max-w-md">
+                <div className="card-form">
+                    <div className="mb-8 text-center">
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-600 text-2xl font-bold text-white shadow-lg shadow-accent-500/30">
+                            A
+                        </div>
+                        <h2 className="font-display text-2xl font-bold text-slate-900">Create your account</h2>
+                        <p className="mt-2 text-sm text-slate-500">Join AquiTa.do</p>
+                    </div>
+
+                    <PageFeedbackStack
+                        items={[
+                            { id: 'register-error', tone: 'danger', text: error },
+                        ]}
+                    />
 
             {googleClientId && (
                 <div className="mb-6 space-y-4">
@@ -349,17 +323,19 @@ export function Register() {
                     </span>
                 </label>
 
-                <button type="submit" disabled={loading} className="btn-primary w-full">
-                    {loading ? 'Creando cuenta...' : 'Registrarse'}
-                </button>
-            </form>
+                    <button type="submit" disabled={loading} className="btn-primary w-full">
+                        {loading ? 'Creando cuenta...' : 'Registrarse'}
+                    </button>
+                </form>
 
-            <p className="mt-6 text-center text-sm text-slate-500">
-                ¿Ya tienes cuenta?{' '}
-                <Link to="/login" className="font-medium text-primary-600 hover:text-primary-700">
-                    Inicia sesión
-                </Link>
-            </p>
-        </AuthShell>
+                <p className="mt-6 text-center text-sm text-slate-500">
+                    ¿Ya tienes cuenta?{' '}
+                    <Link to="/login" className="font-medium text-primary-600 hover:text-primary-700">
+                        Inicia sesión
+                    </Link>
+                </p>
+            </div>
+          </div>
+        </div>
     );
 }

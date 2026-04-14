@@ -5,6 +5,7 @@ import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationA
 import { OptimizedImage } from '../components/OptimizedImage';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
+import { EmptyState } from '../components/ui/EmptyState';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { businessPriceRangeLabel } from '../lib/businessProfile';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
@@ -1398,39 +1399,43 @@ export function BusinessesList() {
                             </div>
                         </>
                     ) : (
-                        <div className="discovery-callout px-6 py-16 text-center text-slate-500">
-                            <p className="text-sm font-semibold text-slate-700">No encontramos coincidencias con esta combinacion</p>
-                            <p className="mt-2 text-sm leading-relaxed">
-                                Ajusta uno o dos filtros, cambia la provincia o prueba una intencion rapida para descubrir negocios cercanos.
-                            </p>
-                            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={handleClearFilters}
-                                    className="btn-primary text-sm"
-                                >
-                                    Limpiar filtros
-                                </button>
-                                {!isAuthenticated || isCustomerRole ? (
-                                    <Link to="/suggest-business" className="btn-secondary text-sm">
-                                        Sugerir este negocio
-                                    </Link>
-                                ) : null}
-                                <Link to="/" className="btn-secondary text-sm">
-                                    Volver al inicio
-                                </Link>
-                            </div>
-                            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                                {NO_RESULTS_SUGGESTIONS.map((suggestion) => (
-                                    <Link
-                                        key={suggestion.to}
-                                        to={suggestion.to}
-                                        className="chip transition hover:!bg-primary-50 hover:!text-primary-700"
-                                    >
-                                        {suggestion.label}
-                                    </Link>
-                                ))}
-                            </div>
+                        <div className="py-16">
+                            <EmptyState
+                                title="No encontramos coincidencias con esta combinación"
+                                body="Ajusta uno o dos filtros, cambia la provincia o prueba una intención rápida para descubrir negocios cercanos."
+                                action={
+                                    <div className="mt-2 flex flex-col items-center gap-5">
+                                        <div className="flex flex-wrap items-center justify-center gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={handleClearFilters}
+                                                className="btn-primary text-sm"
+                                            >
+                                                Limpiar filtros
+                                            </button>
+                                            {!isAuthenticated || isCustomerRole ? (
+                                                <Link to="/suggest-business" className="btn-secondary text-sm">
+                                                    Sugerir este negocio
+                                                </Link>
+                                            ) : null}
+                                            <Link to="/" className="btn-secondary text-sm">
+                                                Volver al inicio
+                                            </Link>
+                                        </div>
+                                        <div className="flex flex-wrap items-center justify-center gap-2">
+                                            {NO_RESULTS_SUGGESTIONS.map((suggestion) => (
+                                                <Link
+                                                    key={suggestion.to}
+                                                    to={suggestion.to}
+                                                    className="chip transition hover:!bg-primary-50 hover:!text-primary-700"
+                                                >
+                                                    {suggestion.label}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                }
+                            />
                         </div>
                     )}
                 </div>

@@ -142,7 +142,7 @@ export function AdminSecurity() {
     }
 
     return (
-        <div className="page-shell max-w-5xl space-y-6">
+        <div className="container-lg py-8 pb-28 space-y-6">
             <section className="role-hero role-hero-admin">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">Seguridad admin</p>
                 <h1 className="mt-2 font-display text-3xl font-bold text-white">Seguridad de Administrador</h1>
@@ -336,3 +336,4 @@ export function AdminSecurity() {
         </div>
     );
 }
+

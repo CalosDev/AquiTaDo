@@ -153,7 +153,7 @@ export function Navbar() {
     return (
         <header className="sticky top-0 z-50 overflow-x-clip">
             <div className="hidden xl:block border-b border-primary-100/70 bg-white/88 backdrop-blur-md">
-                <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:px-6 lg:px-8">
+                <div className="container-full-shell flex items-center justify-between py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     <div className="flex items-center gap-3">
                         <span className="chip !px-2.5 !py-0.5 !text-[10px] !shadow-none">Hecho en RD</span>
                         <span>Discovery local de negocios en RD</span>
@@ -163,8 +163,7 @@ export function Navbar() {
             </div>
 
             <nav className="nav-shell">
-                <div className="flag-ribbon" aria-hidden="true"></div>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="container-full-shell">
                     <div className="flex h-16 items-center justify-between gap-4">
                         <Link to="/" className="group inline-flex shrink-0 items-center gap-3">
                             <div className="relative h-10 w-10 overflow-hidden rounded-2xl border border-primary-200 bg-white shadow-md shadow-primary-200/60">
@@ -518,3 +517,4 @@ export function Navbar() {
         </header>
     );
 }
+

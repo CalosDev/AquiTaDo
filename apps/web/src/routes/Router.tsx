@@ -2,6 +2,9 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
+import { AuthLayout } from '../layouts/AuthLayout';
+import { DashboardLayout } from '../layouts/DashboardLayout';
+import { AdminLayout } from '../layouts/AdminLayout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { pageLoaders } from './preload';
 
@@ -27,71 +30,90 @@ const Profile = lazy(async () => ({ default: (await pageLoaders.profile()).Profi
 const AdminSecurity = lazy(async () => ({ default: (await pageLoaders.adminSecurity()).AdminSecurity }));
 const AcceptOrganizationInvite = lazy(async () => ({ default: (await pageLoaders.acceptOrganizationInvite()).AcceptOrganizationInvite }));
 
-function RouteFallback() {
-    const location = useLocation();
-    const pathname = location.pathname;
-    const isDiscoveryRoute = pathname === '/businesses'
-        || pathname.startsWith('/businesses/')
-        || pathname.startsWith('/negocios/');
-    const isRoleRoute = pathname === '/admin'
-        || pathname === '/security'
-        || pathname === '/dashboard'
-        || pathname.startsWith('/dashboard/')
-        || pathname === '/register-business'
-        || pathname === '/profile'
-        || pathname === '/app/customer';
-    const heroClass = isRoleRoute ? 'role-hero role-hero-owner' : 'discovery-callout';
-
+// ── Skeleton de carga por tipo de ruta ───────────────────
+function PublicSkeleton() {
     return (
-        <div className="page-shell py-10">
-            <section className={heroClass}>
-                <div className="space-y-4">
-                    <div className="h-4 w-32 rounded-full bg-white/20 animate-pulse"></div>
-                    <div className="h-10 w-72 max-w-full rounded-full bg-white/15 animate-pulse"></div>
-                    <div className="h-4 w-[30rem] max-w-full rounded-full bg-white/10 animate-pulse"></div>
-                </div>
-            </section>
-
-            {isDiscoveryRoute ? (
-                <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
-                    <aside className="hidden xl:block">
-                        <div className="section-shell space-y-4 p-5">
-                            <div className="h-4 w-20 rounded-full bg-slate-100 animate-pulse"></div>
-                            {Array.from({ length: 6 }).map((_, index) => (
-                                <div key={`filter-${index}`} className="h-11 rounded-xl bg-slate-100 animate-pulse"></div>
-                            ))}
-                        </div>
-                    </aside>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {Array.from({ length: 3 }).map((_, index) => (
-                            <div key={index} className="section-shell overflow-hidden p-4">
-                                <div className="aspect-[4/3] rounded-2xl bg-slate-100 animate-pulse"></div>
-                                <div className="mt-4 h-6 w-2/3 rounded-full bg-slate-100 animate-pulse"></div>
-                                <div className="mt-2 h-4 w-1/2 rounded-full bg-slate-100 animate-pulse"></div>
-                                <div className="mt-3 h-4 w-4/5 rounded-full bg-slate-100 animate-pulse"></div>
-                            </div>
-                        ))}
+        <div className="container-lg py-10">
+            <div className="h-10 w-64 max-w-full animate-pulse rounded-2xl bg-slate-100" />
+            <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="card-section animate-pulse">
+                        <div className="aspect-[4/3] rounded-xl bg-slate-100" />
+                        <div className="mt-3 h-5 w-2/3 rounded-full bg-slate-100" />
+                        <div className="mt-2 h-4 w-1/2 rounded-full bg-slate-100" />
                     </div>
-                </div>
-            ) : (
-                <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                    {Array.from({ length: 4 }).map((_, index) => (
-                        <div key={index} className="section-shell p-5">
-                            <div className="h-5 w-28 rounded-full bg-slate-100 animate-pulse"></div>
-                            <div className="mt-4 h-24 rounded-2xl bg-slate-100 animate-pulse"></div>
-                            <div className="mt-3 h-4 w-4/5 rounded-full bg-slate-100 animate-pulse"></div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                ))}
+            </div>
         </div>
     );
 }
 
+function DashboardSkeleton() {
+    return (
+        <div className="app-page-inner density-compact">
+            <div className="app-page-header">
+                <div className="h-6 w-40 animate-pulse rounded-xl bg-slate-100" />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mt-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="card-summary animate-pulse">
+                        <div className="h-3 w-20 rounded-full bg-slate-100" />
+                        <div className="mt-3 h-9 w-24 rounded-xl bg-slate-100" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function AdminSkeleton() {
+    return (
+        <div className="p-5 density-compact">
+            <div className="h-5 w-32 animate-pulse rounded-lg bg-slate-700" />
+            <div className="mt-5 space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="h-10 animate-pulse rounded-md bg-slate-800" />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function AuthSkeleton() {
+    return (
+        <div className="auth-stage">
+            <div className="container-sm">
+                <div className="card-form animate-pulse space-y-4">
+                    <div className="h-6 w-40 rounded-xl bg-slate-100" />
+                    <div className="h-11 rounded-xl bg-slate-100" />
+                    <div className="h-11 rounded-xl bg-slate-100" />
+                    <div className="h-11 rounded-2xl bg-slate-200" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Fallback contextual por tipo de ruta ─────────────────
+function RouteFallback() {
+    const { pathname } = useLocation();
+    const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/') || pathname === '/security';
+    const isDashboard = pathname === '/dashboard' || pathname.startsWith('/dashboard/') || pathname === '/profile' || pathname.startsWith('/app');
+    const isAuth = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password' || pathname === '/reset-password';
+
+    if (isAdmin)     return <AdminSkeleton />;
+    if (isDashboard) return <DashboardSkeleton />;
+    if (isAuth)      return <AuthSkeleton />;
+    return <PublicSkeleton />;
+}
+
+// ── Router principal ─────────────────────────────────────
 export function AppRouter() {
     return (
         <Suspense fallback={<RouteFallback />}>
             <Routes>
+
+                {/* ── Marketing / Discovery / Público (§ 4.1, § 4.2) ── */}
                 <Route element={<MainLayout />}>
                     <Route path="/" element={<Home />} />
                     <Route path="/businesses" element={<BusinessesList />} />
@@ -100,29 +122,50 @@ export function AppRouter() {
                     <Route path="/negocios/intencion/:intentSlug" element={<BusinessesList />} />
                     <Route path="/negocios/:provinceSlug/:categorySlug" element={<BusinessesList />} />
                     <Route path="/businesses/:slug" element={<BusinessDetails />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/reset-password" element={<ResetPassword />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route
-                        path="/suggest-business"
-                        element={
-                            <ProtectedRoute roles={['USER']}>
-                                <SuggestBusiness />
-                            </ProtectedRoute>
-                        }
-                    />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
                     <Route path="/about" element={<About />} />
+                    <Route path="*" element={<NotFound />} />
+                </Route>
+
+                {/* ── Auth — shell mínimo sin Navbar/Footer (§ 9.3) ── */}
+                <Route element={<AuthLayout />}>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                </Route>
+
+                {/* ── SaaS / Negocio — dashboard shell (§ 4.3, § 6) ── */}
+                <Route
+                    element={
+                        <ProtectedRoute roles={['BUSINESS_OWNER']}>
+                            <DashboardLayout />
+                        </ProtectedRoute>
+                    }
+                >
+                    <Route path="/dashboard" element={<DashboardBusiness />} />
                     <Route
-                        path="/app"
-                        element={
-                            <ProtectedRoute>
-                                <AppHome />
-                            </ProtectedRoute>
-                        }
+                        path="/dashboard/businesses/:businessId/edit"
+                        element={<EditBusiness />}
                     />
+                    <Route
+                        path="/register-business"
+                        element={<RegisterBusiness />}
+                    />
+                </Route>
+
+                {/* Rutas protegidas en DashboardLayout, acceso USER general */}
+                <Route
+                    element={
+                        <ProtectedRoute>
+                            <DashboardLayout />
+                        </ProtectedRoute>
+                    }
+                >
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/app" element={<AppHome />} />
+                    <Route path="/app/invite" element={<AcceptOrganizationInvite />} />
                     <Route
                         path="/app/customer"
                         element={
@@ -132,63 +175,27 @@ export function AppRouter() {
                         }
                     />
                     <Route
-                        path="/app/invite"
+                        path="/suggest-business"
                         element={
-                            <ProtectedRoute>
-                                <AcceptOrganizationInvite />
+                            <ProtectedRoute roles={['USER']}>
+                                <SuggestBusiness />
                             </ProtectedRoute>
                         }
                     />
-                    <Route
-                        path="/profile"
-                        element={
-                            <ProtectedRoute>
-                                <Profile />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/register-business"
-                        element={
-                            <ProtectedRoute roles={['BUSINESS_OWNER']}>
-                                <RegisterBusiness />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard"
-                        element={
-                            <ProtectedRoute roles={['BUSINESS_OWNER']}>
-                                <DashboardBusiness />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/businesses/:businessId/edit"
-                        element={
-                            <ProtectedRoute roles={['BUSINESS_OWNER']}>
-                                <EditBusiness />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/admin"
-                        element={
-                            <ProtectedRoute roles={['ADMIN']}>
-                                <AdminDashboard />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/security"
-                        element={
-                            <ProtectedRoute roles={['ADMIN']}>
-                                <AdminSecurity />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route path="*" element={<NotFound />} />
                 </Route>
+
+                {/* ── Admin / Plataforma — consola shell (§ 4.4, § 9.9) ── */}
+                <Route
+                    element={
+                        <ProtectedRoute roles={['ADMIN']}>
+                            <AdminLayout />
+                        </ProtectedRoute>
+                    }
+                >
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/security" element={<AdminSecurity />} />
+                </Route>
+
             </Routes>
         </Suspense>
     );
