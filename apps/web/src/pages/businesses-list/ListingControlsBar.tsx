@@ -110,8 +110,9 @@ export function ListingControlsBar({
                 <button
                     type="button"
                     onClick={onToggleFilters}
-                    aria-controls="filters-panel"
-                    aria-pressed={filtersOpen}
+                    aria-controls="filters-panel-mobile"
+                    aria-expanded={filtersOpen}
+                    aria-haspopup="dialog"
                     className="btn-secondary px-4 py-2.5"
                 >
                     Filtros

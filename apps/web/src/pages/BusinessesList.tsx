@@ -5,7 +5,7 @@ import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationA
 import { OptimizedImage } from '../components/OptimizedImage';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState } from '../components/ui';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { businessPriceRangeLabel } from '../lib/businessProfile';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
@@ -1024,6 +1024,7 @@ export function BusinessesList() {
                     filtersOpen={filtersOpen}
                     loading={filtersLoading}
                     onClearFilters={handleClearFilters}
+                    onClose={() => setFiltersOpen(false)}
                     onFeatureChange={(value) => updateFilter('feature', value)}
                     onTrackedFilterChange={handleTrackedFilterChange}
                     provinces={provinces}

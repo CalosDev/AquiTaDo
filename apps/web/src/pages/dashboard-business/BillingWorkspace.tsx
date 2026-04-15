@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '../../api/error';
 import { paymentsApi, plansApi, subscriptionsApi } from '../../api/endpoints';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
-import { EmptyState, SectionCard, SummaryCard } from '../../components/ui';
+import { EmptyState, PartialDataState, SectionCard, SummaryCard } from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
 
@@ -583,6 +583,14 @@ export function BillingWorkspace({
                     </span>
                 ) : null}
             </div>
+
+            {refreshing ? (
+                <PartialDataState
+                    compact
+                    title="Actualizando billing"
+                    body="Seguimos refrescando plan, wallet y resumen contable sin perder el contexto financiero actual."
+                />
+            ) : null}
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <SummaryCard

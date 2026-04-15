@@ -3,6 +3,9 @@ import { Outlet, Link } from 'react-router-dom';
 export function AuthLayout() {
     return (
         <div className="flex min-h-screen flex-col bg-[color:var(--surface-bg)]">
+            <a href="#main-content" className="skip-link">
+                Saltar al contenido principal
+            </a>
             <header className="app-topbar">
                 <Link
                     to="/"
@@ -28,7 +31,7 @@ export function AuthLayout() {
                 </Link>
             </header>
 
-            <main className="flex flex-1 flex-col">
+            <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col">
                 <Outlet />
             </main>
         </div>

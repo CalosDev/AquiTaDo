@@ -233,13 +233,17 @@ export function DashboardLayout() {
 
     return (
         <div className="app-shell density-compact">
+            <a href="#main-content" className="skip-link">
+                Saltar al contenido principal
+            </a>
             <header className="app-topbar">
                 <button
                     type="button"
                     onClick={() => setSidebarOpen((current) => !current)}
-                    className="btn-ghost h-9 w-9 p-0 lg:hidden"
+                    className="btn-ghost h-11 w-11 p-0 lg:hidden"
                     aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
                     aria-expanded={sidebarOpen}
+                    aria-controls="dashboard-shell-sidebar"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                         <line x1="3" y1="6" x2="21" y2="6" />
@@ -284,6 +288,7 @@ export function DashboardLayout() {
                 ) : null}
 
                 <aside
+                    id="dashboard-shell-sidebar"
                     className={`auth-shell-sidebar fixed inset-y-14 left-0 z-40 w-[320px] max-w-[calc(100vw-2rem)] -translate-x-full px-4 py-4 transition-transform lg:static lg:z-auto lg:w-[288px] lg:translate-x-0 ${
                         sidebarOpen ? 'translate-x-0' : ''
                     }`}
@@ -324,7 +329,7 @@ export function DashboardLayout() {
                     </nav>
                 </aside>
 
-                <main className="app-content min-w-0">
+                <main id="main-content" tabIndex={-1} className="app-content min-w-0">
                     <Outlet />
                 </main>
             </div>

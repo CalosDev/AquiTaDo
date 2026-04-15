@@ -120,13 +120,17 @@ export function AdminLayout() {
 
     return (
         <div className="app-shell density-compact" style={{ background: '#020617' }}>
+            <a href="#main-content" className="skip-link">
+                Saltar al contenido principal
+            </a>
             <header className="app-topbar border-slate-800/80 bg-slate-950/92 text-slate-100">
                 <button
                     type="button"
                     onClick={() => setSidebarOpen((current) => !current)}
-                    className="btn-ghost h-9 w-9 p-0 text-slate-200 lg:hidden"
+                    className="btn-ghost h-11 w-11 p-0 text-slate-200 lg:hidden"
                     aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
                     aria-expanded={sidebarOpen}
+                    aria-controls="admin-shell-sidebar"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                         <line x1="3" y1="6" x2="21" y2="6" />
@@ -171,6 +175,7 @@ export function AdminLayout() {
                 ) : null}
 
                 <aside
+                    id="admin-shell-sidebar"
                     className={`console-shell-sidebar fixed inset-y-14 left-0 z-40 w-[320px] max-w-[calc(100vw-2rem)] -translate-x-full px-4 py-4 transition-transform lg:static lg:z-auto lg:w-[288px] lg:translate-x-0 ${
                         sidebarOpen ? 'translate-x-0' : ''
                     }`}
@@ -207,7 +212,7 @@ export function AdminLayout() {
                     </nav>
                 </aside>
 
-                <main className="app-content min-w-0" style={{ background: '#020617' }}>
+                <main id="main-content" tabIndex={-1} className="app-content min-w-0" style={{ background: '#020617' }}>
                     <Outlet />
                 </main>
             </div>

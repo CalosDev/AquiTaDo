@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bookingsApi, messagingApi, whatsappApi } from '../../api/endpoints';
 import { getApiErrorMessage } from '../../api/error';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
-import { EmptyState, SectionCard, SummaryCard } from '../../components/ui';
+import { EmptyState, PartialDataState, SectionCard, SummaryCard } from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo } from '../../lib/market';
 
@@ -892,6 +892,14 @@ export function OperationsWorkspace({
                     <span className="chip">Sincronizando cambios...</span>
                 ) : null}
             </div>
+
+            {refreshing ? (
+                <PartialDataState
+                    compact
+                    title="Actualizando operacion"
+                    body="Seguimos refrescando reservas, inbox y WhatsApp sin vaciar la cola actual."
+                />
+            ) : null}
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)]">
                 <SectionCard

@@ -35,6 +35,7 @@
     min-height: 100%;
     overflow-y: scroll;
     scrollbar-gutter: stable;
+    scroll-padding-top: 5.5rem;
   }
 
   body {
@@ -53,6 +54,17 @@
   :where(a, button, input, select, textarea):focus-visible {
     outline: 2px solid #2563eb;
     outline-offset: 2px;
+  }
+
+  .skip-link {
+    @apply sr-only;
+  }
+
+  .skip-link:focus,
+  .skip-link:focus-visible {
+    @apply not-sr-only fixed left-4 top-4 z-[100] rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-lg;
+    outline: 2px solid rgba(255, 255, 255, 0.95);
+    outline-offset: 3px;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1183,8 +1195,20 @@
     @apply bg-red-50 text-red-500;
   }
 
+  .ux-state-icon--success {
+    @apply bg-emerald-50 text-emerald-600;
+  }
+
+  .ux-state-icon--partial {
+    @apply bg-amber-50 text-amber-600;
+  }
+
   .ux-state-icon--no-permission {
     @apply bg-amber-50 text-amber-500;
+  }
+
+  .ux-state-icon--feature-disabled {
+    @apply bg-slate-100 text-slate-500;
   }
 
   .ux-state-title {
@@ -1193,6 +1217,16 @@
 
   .ux-state-body {
     @apply text-xs text-slate-500 max-w-xs;
+  }
+
+  .ux-state-wrap--compact {
+    @apply min-h-0 flex-row items-start justify-between gap-4 px-4 py-4 text-left;
+  }
+
+  @media (max-width: 640px) {
+    .ux-state-wrap--compact {
+      @apply flex-col items-start;
+    }
   }
 
   /* ============================================================

@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
+import { FeatureDisabledState } from '../../components/ui';
 import { formatHoursRange } from '../../lib/businessProfile';
 import { tierLabel } from './helpers';
 import type {
@@ -306,6 +307,15 @@ export function SidebarPanel({
                         ) : null}
                         {!hasOperatorRole ? (
                             <>
+                                {isClaimedBusiness && !showBookings && !showMessaging ? (
+                                    <FeatureDisabledState
+                                        compact
+                                        className="mb-6"
+                                        title="Reservas y mensajes directos en pausa"
+                                        body="Este perfil sigue operando en modo discovery. Usa los canales de contacto visibles mientras se habilitan los flujos transaccionales."
+                                    />
+                                ) : null}
+
                                 {showBookings && isAuthenticated && isCustomerRole && canBookThisBusiness ? (
                                     <div className="mb-6">
                                         <h3 className="mb-3 font-display font-semibold text-gray-900">Reservar ahora</h3>

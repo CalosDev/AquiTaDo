@@ -158,8 +158,11 @@ export function MainLayout() {
 
     return (
         <div className="min-h-screen flex flex-col">
+            <a href="#main-content" className="skip-link">
+                Saltar al contenido principal
+            </a>
             <Navbar />
-            <main className="flex flex-1 flex-col">
+            <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col">
                 <Outlet />
             </main>
             {showFooter && <Footer compact={useCompactFooter} />}

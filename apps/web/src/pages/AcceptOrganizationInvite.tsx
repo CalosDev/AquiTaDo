@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { organizationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
+import { SuccessState } from '../components/ui';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
 import { useTimedMessage } from '../hooks/useTimedMessage';
@@ -64,7 +65,7 @@ export function AcceptOrganizationInvite() {
             <PageFeedbackStack
                 items={[
                     { id: 'accept-invite-error', tone: 'danger', text: errorMessage },
-                    { id: 'accept-invite-success', tone: 'info', text: successMessage },
+                    ...(acceptedOrganizationName ? [] : [{ id: 'accept-invite-success', tone: 'info' as const, text: successMessage }]),
                 ]}
             />
 
@@ -112,12 +113,17 @@ export function AcceptOrganizationInvite() {
                 </form>
 
                 {acceptedOrganizationName ? (
-                    <div className="mt-6 rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
-                        <p className="text-sm font-semibold text-primary-900">Acceso confirmado</p>
-                        <p className="mt-1 text-sm text-slate-700">
-                            Ya perteneces a <strong>{acceptedOrganizationName}</strong>. Puedes continuar desde tu panel o cambiar de organizacion cuando quieras.
-                        </p>
-                    </div>
+                    <SuccessState
+                        compact
+                        className="mt-6"
+                        title="Acceso confirmado"
+                        body={`Ya perteneces a ${acceptedOrganizationName}. Puedes continuar desde tu panel o cambiar de organizacion cuando quieras.`}
+                        action={(
+                            <Link to="/app" className="btn-secondary text-sm">
+                                Ir al app
+                            </Link>
+                        )}
+                    />
                 ) : null}
             </section>
         </div>

@@ -10,7 +10,10 @@
  *   EmptyState       — sin datos
  *   LoadingState     — cargando
  *   ErrorState       — error
+ *   SuccessState     — exito
+ *   PartialDataState — datos parciales
  *   NoPermissionState — sin acceso
+ *   FeatureDisabledState — feature apagada
  *
  * Nota: FilterCard, ListCard y FormCard se implementan
  * directamente con las clases CSS card-filter / card-list / card-form
@@ -22,4 +25,7 @@ export { SectionCard } from './SectionCard';
 export { EmptyState } from './EmptyState';
 export { LoadingState } from './LoadingState';
 export { ErrorState } from './ErrorState';
+export { SuccessState } from './SuccessState';
+export { PartialDataState } from './PartialDataState';
 export { NoPermissionState } from './NoPermissionState';
+export { FeatureDisabledState } from './FeatureDisabledState';
