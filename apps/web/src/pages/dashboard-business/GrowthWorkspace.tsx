@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { adsApi, categoryApi, locationApi, promotionsApi } from '../../api/endpoints';
 import { getApiErrorMessage } from '../../api/error';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
+import { EmptyState, SectionCard, SummaryCard } from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
 
@@ -611,41 +612,41 @@ export function GrowthWorkspace({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Promos activas</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{formatNumberDo(promotionSummary.active)}</p>
-                </article>
-                <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Flash</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{formatNumberDo(promotionSummary.flash)}</p>
-                </article>
-                <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Campanas activas</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{formatNumberDo(campaignSummary.active)}</p>
-                </article>
-                <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Gasto acumulado</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{formatCurrencyDo(campaignSummary.totalSpent)}</p>
-                    <p className="mt-2 text-sm text-slate-500">{formatNumberDo(campaignSummary.totalClicks)} clicks</p>
-                </article>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <SummaryCard
+                    label="Promos activas"
+                    value={formatNumberDo(promotionSummary.active)}
+                    delta={`${formatNumberDo(promotionSummary.scheduled)} programadas`}
+                />
+                <SummaryCard
+                    label="Flash offers"
+                    value={formatNumberDo(promotionSummary.flash)}
+                    delta={`${formatNumberDo(promotions.total)} promos en este filtro`}
+                />
+                <SummaryCard
+                    label="Campanas activas"
+                    value={formatNumberDo(campaignSummary.active)}
+                    delta={`${formatNumberDo(campaignSummary.draft)} borradores`}
+                />
+                <SummaryCard
+                    label="Gasto acumulado"
+                    value={formatCurrencyDo(campaignSummary.totalSpent)}
+                    delta={`${formatNumberDo(campaignSummary.totalClicks)} clicks`}
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Promocion</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">{editingPromotionId ? 'Editar oferta' : 'Crear oferta'}</h3>
-                        </div>
-                        {editingPromotionId ? (
-                            <button type="button" className="btn-secondary text-sm" onClick={handleResetPromotionDraft}>
-                                Nueva
-                            </button>
-                        ) : null}
-                    </div>
-
-                    <form className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={(event) => void handlePromotionSubmit(event)}>
+                <SectionCard
+                    title={editingPromotionId ? 'Editar oferta' : 'Crear oferta'}
+                    description="Agrupa negocio, incentivo y vigencia en un solo formulario sin competir con el listado."
+                    density="compact"
+                    actions={editingPromotionId ? (
+                        <button type="button" className="btn-secondary text-sm" onClick={handleResetPromotionDraft}>
+                            Nueva
+                        </button>
+                    ) : undefined}
+                >
+                    <form className="card-form density-compact grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={(event) => void handlePromotionSubmit(event)}>
                         <label className="block text-sm font-medium text-slate-700">
                             Negocio
                             <select className="input-field mt-2" value={promotionDraft.businessId} onChange={(event) => setPromotionDraft((current) => ({ ...current, businessId: event.target.value }))}>
@@ -708,14 +709,14 @@ export function GrowthWorkspace({
                             </button>
                         </div>
                     </form>
-                </article>
+                </SectionCard>
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Ofertas publicables</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Promociones creadas</h3>
-                        </div>
+                <SectionCard
+                    title="Promociones creadas"
+                    description="Listado publicable con filtros simples y acciones directas de edicion."
+                    density="compact"
+                >
+                    <div className="card-filter density-compact mb-4">
                         <div className="flex flex-wrap gap-2">
                             <select className="input-field min-w-[10rem]" value={promotionStatusFilter} onChange={(event) => setPromotionStatusFilter(event.target.value as PromotionLifecycleStatus)}>
                                 <option value="ALL">Todas</option>
@@ -730,7 +731,7 @@ export function GrowthWorkspace({
                         </div>
                     </div>
 
-                    <div className="mt-5 space-y-3">
+                    <div className="space-y-3">
                         {promotions.data.length > 0 ? promotions.data.map((promotion) => {
                             const lifecycle = getPromotionLifecycle(promotion);
                             return (
@@ -762,19 +763,23 @@ export function GrowthWorkspace({
                                     </div>
                                 </article>
                             );
-                        }) : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-5 text-sm text-slate-600">No hay promociones para el filtro actual.</div>}
+                        }) : (
+                            <EmptyState
+                                title="Sin promociones para este filtro"
+                                body="Cuando publiques nuevas ofertas, apareceran aqui con estado, vigencia y acciones de edicion."
+                            />
+                        )}
                     </div>
-                </article>
+                </SectionCard>
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Ads internos</p>
-                        <h3 className="mt-1 text-lg font-semibold text-slate-900">Crear campana</h3>
-                    </div>
-
-                    <form className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={(event) => void handleCampaignSubmit(event)}>
+                <SectionCard
+                    title="Crear campana"
+                    description="Define segmentacion, presupuesto y vigencia sin dispersar el flujo de adquisicion."
+                    density="compact"
+                >
+                    <form className="card-form density-compact grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={(event) => void handleCampaignSubmit(event)}>
                         <label className="block text-sm font-medium text-slate-700">
                             Negocio
                             <select className="input-field mt-2" value={campaignDraft.businessId} onChange={(event) => setCampaignDraft((current) => ({ ...current, businessId: event.target.value }))}>
@@ -838,14 +843,14 @@ export function GrowthWorkspace({
                             </button>
                         </div>
                     </form>
-                </article>
+                </SectionCard>
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Campanas</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Estado y rendimiento</h3>
-                        </div>
+                <SectionCard
+                    title="Estado y rendimiento"
+                    description="Mantiene filtros arriba y cada campana como unidad escaneable de performance."
+                    density="compact"
+                >
+                    <div className="card-filter density-compact mb-4">
                         <div className="flex flex-wrap gap-2">
                             <select className="input-field min-w-[10rem]" value={campaignStatusFilter} onChange={(event) => setCampaignStatusFilter(event.target.value as AdCampaignStatus | '')}>
                                 <option value="">Todos los estados</option>
@@ -862,7 +867,7 @@ export function GrowthWorkspace({
                         </div>
                     </div>
 
-                    <div className="mt-5 space-y-3">
+                    <div className="space-y-3">
                         {campaigns.data.length > 0 ? campaigns.data.map((campaign) => (
                             <article key={campaign.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -896,9 +901,14 @@ export function GrowthWorkspace({
                                     </div>
                                 </div>
                             </article>
-                        )) : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-5 text-sm text-slate-600">No hay campanas para el filtro actual.</div>}
+                        )) : (
+                            <EmptyState
+                                title="Sin campanas para este filtro"
+                                body="Cuando lances nuevas campañas, apareceran aqui con performance, presupuesto y cambios de estado."
+                            />
+                        )}
                     </div>
-                </article>
+                </SectionCard>
             </div>
         </section>
     );

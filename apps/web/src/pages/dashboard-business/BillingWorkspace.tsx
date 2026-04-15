@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '../../api/error';
 import { paymentsApi, plansApi, subscriptionsApi } from '../../api/endpoints';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
+import { EmptyState, SectionCard, SummaryCard } from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
 
@@ -583,72 +584,51 @@ export function BillingWorkspace({
                 ) : null}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Plan</p>
-                    <p className="mt-2 text-2xl font-bold text-gray-900">{subscription?.plan.name || 'N/D'}</p>
-                    <p className="mt-2 text-sm text-slate-500">
-                        {subscription ? formatCurrencyDo(subscription.plan.priceMonthly, subscription.plan.currency) : 'Sin suscripcion'}
-                        /mes
-                    </p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Balance Ads</p>
-                    <p className="mt-2 text-2xl font-bold text-gray-900">
-                        {formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP')}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">Disponible para campanas CPC</p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Cobrado</p>
-                    <p className="mt-2 text-2xl font-bold text-gray-900">
-                        {formatCurrencyDo(billingSummary?.payments.totalCollected ?? 0, 'DOP')}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">Pagos exitosos en el rango</p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Facturado</p>
-                    <p className="mt-2 text-2xl font-bold text-gray-900">
-                        {formatCurrencyDo(billingSummary?.invoices.total ?? 0, 'DOP')}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">Total de invoices emitidas</p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Marketplace neto</p>
-                    <p className="mt-2 text-2xl font-bold text-gray-900">
-                        {formatCurrencyDo(billingSummary?.marketplace.netAmount ?? 0, 'DOP')}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">
-                        Fee plataforma: {formatCurrencyDo(billingSummary?.marketplace.platformFeeAmount ?? 0, 'DOP')}
-                    </p>
-                </article>
-                <article className="panel-premium p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pendiente fiscal</p>
-                    <p className="mt-2 text-2xl font-bold text-gray-900">
-                        {formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">
-                        {fiscalSummary?.totals.invoicesIssued ?? 0} invoices emitidas
-                    </p>
-                </article>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                <SummaryCard
+                    label="Plan"
+                    value={subscription?.plan.name || 'N/D'}
+                    delta={subscription ? `${formatCurrencyDo(subscription.plan.priceMonthly, subscription.plan.currency)}/mes` : 'Sin suscripcion'}
+                />
+                <SummaryCard
+                    label="Balance Ads"
+                    value={formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP')}
+                    delta="Disponible para campanas CPC"
+                />
+                <SummaryCard
+                    label="Cobrado"
+                    value={formatCurrencyDo(billingSummary?.payments.totalCollected ?? 0, 'DOP')}
+                    delta="Pagos exitosos en el rango"
+                />
+                <SummaryCard
+                    label="Facturado"
+                    value={formatCurrencyDo(billingSummary?.invoices.total ?? 0, 'DOP')}
+                    delta="Total de invoices emitidas"
+                />
+                <SummaryCard
+                    label="Marketplace neto"
+                    value={formatCurrencyDo(billingSummary?.marketplace.netAmount ?? 0, 'DOP')}
+                    delta={`Fee ${formatCurrencyDo(billingSummary?.marketplace.platformFeeAmount ?? 0, 'DOP')}`}
+                />
+                <SummaryCard
+                    label="Pendiente fiscal"
+                    value={formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')}
+                    delta={`${fiscalSummary?.totals.invoicesIssued ?? 0} invoices emitidas`}
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
-                <article className="rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 className="font-display text-lg font-semibold text-slate-900">Comparador de planes</h3>
-                            <p className="mt-1 text-sm text-slate-600">
-                                Sube de plan cuando necesites mas negocios, equipo, imagenes o menor fee de transaccion.
-                            </p>
-                        </div>
-                        {subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd ? (
-                            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                                La suscripcion cerrara el {formatDateDo(subscription.currentPeriodEnd)}.
-                            </p>
-                        ) : null}
-                    </div>
-                    <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <SectionCard
+                    title="Comparador de planes"
+                    description="Sube de plan cuando necesites mas negocios, equipo, imagenes o menor fee de transaccion."
+                    density="compact"
+                    actions={subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd ? (
+                        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                            La suscripcion cerrara el {formatDateDo(subscription.currentPeriodEnd)}.
+                        </p>
+                    ) : undefined}
+                >
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                         {plans.map((plan) => {
                             const isCurrent = plan.code === currentPlanCode;
                             const isPaidPlan = Number(plan.priceMonthly) > 0;
@@ -722,15 +702,13 @@ export function BillingWorkspace({
                     {paidPlans.length === 0 ? (
                         <p className="mt-4 text-sm text-slate-500">Todavia no hay planes pagos disponibles para esta organizacion.</p>
                     ) : null}
-                </article>
+                </SectionCard>
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-5">
-                    <div>
-                        <h3 className="font-display text-lg font-semibold text-slate-900">Ads Wallet</h3>
-                        <p className="mt-1 text-sm text-slate-600">
-                            Recarga saldo para campanas patrocinadas sin salir del dashboard.
-                        </p>
-                    </div>
+                <SectionCard
+                    title="Ads Wallet"
+                    description="Recarga saldo para campanas patrocinadas sin salir del dashboard."
+                    density="compact"
+                >
 
                     <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Saldo disponible</p>
@@ -785,20 +763,22 @@ export function BillingWorkspace({
                                 ))}
                             </div>
                         ) : (
-                            <p className="mt-3 text-sm text-slate-500">Aun no hay recargas registradas.</p>
+                            <EmptyState
+                                className="mt-3"
+                                title="Sin recargas registradas"
+                                body="Cuando la organizacion recargue saldo para ads, veras aqui la trazabilidad del wallet."
+                            />
                         )}
                     </div>
-                </article>
+                </SectionCard>
             </div>
 
-            <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 className="font-display text-lg font-semibold text-slate-900">Resumen contable</h3>
-                        <p className="mt-1 text-sm text-slate-600">
-                            Filtra el rango para revisar facturacion, cobros y cierre fiscal sin salir del panel.
-                        </p>
-                    </div>
+            <SectionCard
+                title="Resumen contable"
+                description="Filtra el rango para revisar facturacion, cobros y cierre fiscal sin salir del panel."
+                density="compact"
+            >
+                <div className="card-filter density-compact mb-4">
                     <div className="flex flex-wrap gap-2">
                         <input
                             type="date"
@@ -826,30 +806,10 @@ export function BillingWorkspace({
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
                     <div className="space-y-5">
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Invoices emitidas</p>
-                                <p className="mt-2 text-2xl font-bold text-slate-900">
-                                    {fiscalSummary?.totals.invoicesIssued ?? 0}
-                                </p>
-                            </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Invoices pagadas</p>
-                                <p className="mt-2 text-2xl font-bold text-slate-900">
-                                    {fiscalSummary?.totals.invoicesPaid ?? 0}
-                                </p>
-                            </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Pagado</p>
-                                <p className="mt-2 text-2xl font-bold text-slate-900">
-                                    {formatCurrencyDo(fiscalSummary?.totals.paidTotal ?? 0, 'DOP')}
-                                </p>
-                            </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Pendiente</p>
-                                <p className="mt-2 text-2xl font-bold text-slate-900">
-                                    {formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')}
-                                </p>
-                            </div>
+                            <SummaryCard label="Invoices emitidas" value={fiscalSummary?.totals.invoicesIssued ?? 0} />
+                            <SummaryCard label="Invoices pagadas" value={fiscalSummary?.totals.invoicesPaid ?? 0} />
+                            <SummaryCard label="Pagado" value={formatCurrencyDo(fiscalSummary?.totals.paidTotal ?? 0, 'DOP')} />
+                            <SummaryCard label="Pendiente" value={formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')} />
                         </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
@@ -907,7 +867,11 @@ export function BillingWorkspace({
                                     ))}
                                 </div>
                             ) : (
-                                <p className="mt-4 text-sm text-slate-500">No hay movimientos fiscales en el rango seleccionado.</p>
+                                <EmptyState
+                                    className="mt-4"
+                                    title="Sin movimientos fiscales"
+                                    body="Ajusta el rango para revisar cierres mensuales cuando haya actividad contable."
+                                />
                             )}
                         </div>
                     </div>
@@ -939,7 +903,11 @@ export function BillingWorkspace({
                                     ))}
                                 </div>
                             ) : (
-                                <p className="mt-3 text-sm text-slate-500">Todavia no hay pagos registrados.</p>
+                                <EmptyState
+                                    className="mt-3"
+                                    title="Sin pagos registrados"
+                                    body="Cuando entren cobros o intentos de pago, apareceran aqui con su estado."
+                                />
                             )}
                         </div>
 
@@ -983,12 +951,16 @@ export function BillingWorkspace({
                                     ))}
                                 </div>
                             ) : (
-                                <p className="mt-3 text-sm text-slate-500">Todavia no hay invoices registradas.</p>
+                                <EmptyState
+                                    className="mt-3"
+                                    title="Sin invoices registradas"
+                                    body="Cuando la organizacion emita invoices, veras aqui su estado y accesos al PDF."
+                                />
                             )}
                         </div>
                     </div>
                 </div>
-            </article>
+            </SectionCard>
         </section>
     );
 }

@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { crmApi, organizationApi } from '../../api/endpoints';
 import { getApiErrorMessage } from '../../api/error';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
+import { EmptyState, SectionCard, SummaryCard } from '../../components/ui';
 import { useOrganization } from '../../context/useOrganization';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
@@ -528,6 +529,25 @@ export function OrganizationWorkspace({
         () => customers.data.find((customer) => customer.user.id === selectedCustomerId) || null,
         [customers.data, selectedCustomerId],
     );
+    const dominantPipelineStage = useMemo(() => {
+        const summaryEntry = PIPELINE_STAGES.reduce<{ stage: SalesLeadStage; count: number } | null>((current, stage) => {
+            const count = pipelineSummary.byStage[stage] ?? 0;
+            if (!current || count > current.count) {
+                return { stage, count };
+            }
+            return current;
+        }, null);
+
+        return summaryEntry && summaryEntry.count > 0 ? summaryEntry : null;
+    }, [pipelineSummary]);
+    const openPipelineCount = useMemo(
+        () => (
+            (pipelineSummary.byStage.LEAD ?? 0) +
+            (pipelineSummary.byStage.QUOTED ?? 0) +
+            (pipelineSummary.byStage.BOOKED ?? 0)
+        ),
+        [pipelineSummary],
+    );
     const orderedUsageKeys = useMemo(() => {
         const priority = [
             'businesses',
@@ -1006,27 +1026,27 @@ export function OrganizationWorkspace({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Negocios conectados</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{formatNumberDo(organization?._count?.businesses ?? 0)}</p>
-                    <p className="mt-2 text-sm text-slate-500">Portafolio administrado por esta organizacion.</p>
-                </article>
-                <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Equipo activo</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{formatNumberDo(organization?._count?.members ?? members.length)}</p>
-                    <p className="mt-2 text-sm text-slate-500">Miembros con acceso al tenant actual.</p>
-                </article>
-                <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Invites pendientes</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{formatNumberDo(invites.length)}</p>
-                    <p className="mt-2 text-sm text-slate-500">Tokens activos esperando aceptacion.</p>
-                </article>
-                <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pipeline vivo</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{formatNumberDo(pipelineSummary.total)}</p>
-                    <p className="mt-2 text-sm text-slate-500">Leads visibles con el filtro actual.</p>
-                </article>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <SummaryCard
+                    label="Negocios conectados"
+                    value={formatNumberDo(organization?._count?.businesses ?? 0)}
+                    delta="Portafolio administrado por esta organizacion"
+                />
+                <SummaryCard
+                    label="Equipo activo"
+                    value={formatNumberDo(organization?._count?.members ?? members.length)}
+                    delta="Miembros con acceso al tenant actual"
+                />
+                <SummaryCard
+                    label="Invites pendientes"
+                    value={formatNumberDo(invites.length)}
+                    delta="Tokens activos esperando aceptacion"
+                />
+                <SummaryCard
+                    label="Pipeline vivo"
+                    value={formatNumberDo(pipelineSummary.total)}
+                    delta="Leads visibles con el filtro actual"
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -1295,19 +1315,51 @@ export function OrganizationWorkspace({
                 </article>
             </div>
 
+            <div className="space-y-3">
+                <div className="space-y-2">
+                    <p className="page-kicker">CRM comercial</p>
+                    <h3 className="page-title-sm">Clientes y pipeline accionable</h3>
+                    <p className="page-description">
+                        Ordena el seguimiento comercial con filtros simples, historial accesible y oportunidades listas para mover entre etapas.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <SummaryCard
+                        label="Clientes visibles"
+                        value={formatNumberDo(customers.total)}
+                        delta={customerSearch || crmBusinessFilter ? 'Con filtros activos' : 'Base completa de la organizacion'}
+                    />
+                    <SummaryCard
+                        label="Cliente en foco"
+                        value={selectedCustomer?.user.name || 'Sin seleccionar'}
+                        delta={selectedCustomer ? `${formatNumberDo(selectedCustomer.stats.totalBookings)} reservas acumuladas` : 'Abre una ficha para ver historial'}
+                    />
+                    <SummaryCard
+                        label="Leads abiertos"
+                        value={formatNumberDo(openPipelineCount)}
+                        delta={`${formatNumberDo(pipelineSummary.byStage.PAID ?? 0)} cerrados en pago`}
+                    />
+                    <SummaryCard
+                        label="Etapa dominante"
+                        value={dominantPipelineStage ? getStageLabel(dominantPipelineStage.stage) : 'Sin datos'}
+                        delta={dominantPipelineStage ? `${formatNumberDo(dominantPipelineStage.count)} oportunidades` : 'Crea el primer lead'}
+                    />
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Base de clientes</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Descubre clientes activos</h3>
-                        </div>
+                <SectionCard
+                    title="Base de clientes"
+                    description="Filtra por negocio o busqueda y abre una ficha sin saturar la vista principal."
+                    density="compact"
+                    actions={(
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                             {formatNumberDo(customers.total)} clientes
                         </span>
-                    </div>
-
-                    <form className="mt-5 flex flex-wrap gap-3" onSubmit={(event) => void handleCustomersSearch(event)}>
+                    )}
+                >
+                    <form className="card-filter density-compact mb-4 flex flex-wrap gap-3" onSubmit={(event) => void handleCustomersSearch(event)}>
                         <input
                             className="input-field min-w-[12rem] flex-1"
                             value={customerSearchDraft}
@@ -1335,7 +1387,7 @@ export function OrganizationWorkspace({
                         </button>
                     </form>
 
-                    <div className="mt-5 space-y-3">
+                    <div className="card-list density-compact">
                         {customers.data.length > 0 ? customers.data.map((customer) => (
                             <button
                                 type="button"
@@ -1343,7 +1395,7 @@ export function OrganizationWorkspace({
                                 className={`w-full rounded-2xl border p-4 text-left transition-all ${
                                     selectedCustomerId === customer.user.id
                                         ? 'border-primary-300 bg-primary-50'
-                                        : 'border-slate-200 bg-slate-50/70 hover:border-primary-200'
+                                        : 'border-slate-200 bg-white hover:border-primary-200'
                                 }`}
                                 onClick={() => setSelectedCustomerId(customer.user.id)}
                             >
@@ -1367,119 +1419,144 @@ export function OrganizationWorkspace({
                                 </div>
                             </button>
                         )) : (
-                            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-5 text-sm text-slate-600">
-                                No hay clientes bajo el filtro actual.
-                            </div>
+                            <EmptyState
+                                title="Sin clientes bajo este filtro"
+                                body="Ajusta negocio o busqueda para recuperar actividad comercial relevante."
+                            />
                         )}
                     </div>
-                </article>
+                </SectionCard>
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Historial 360</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Ficha del cliente seleccionado</h3>
-                        </div>
-                        {selectedCustomer ? (
+                <div className="space-y-5">
+                    <SectionCard
+                        title="Ficha del cliente seleccionado"
+                        description="Resume valor, actividad y contexto del cliente sin obligarte a cambiar de pantalla."
+                        density="compact"
+                        actions={selectedCustomer ? (
                             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getSegmentTone(selectedCustomer.segment)}`}>
                                 {selectedCustomer.segment}
                             </span>
-                        ) : null}
-                    </div>
-
-                    {historyLoading ? (
-                        <div className="mt-5 space-y-3">
-                            <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
-                            <div className="h-40 rounded-2xl bg-slate-100 animate-pulse" />
-                        </div>
-                    ) : customerHistory ? (
-                        <div className="mt-5 space-y-5">
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <p className="text-xs uppercase tracking-wide text-slate-500">Reservas</p>
-                                    <p className="mt-2 text-2xl font-bold text-slate-900">{formatNumberDo(customerHistory.summary.totalBookings)}</p>
+                        ) : undefined}
+                    >
+                        {historyLoading ? (
+                            <div className="space-y-3">
+                                <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
+                                <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
+                            </div>
+                        ) : customerHistory ? (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                    <SummaryCard label="Reservas" value={formatNumberDo(customerHistory.summary.totalBookings)} />
+                                    <SummaryCard label="Transacciones" value={formatNumberDo(customerHistory.summary.totalTransactions)} />
+                                    <SummaryCard label="Conversaciones" value={formatNumberDo(customerHistory.summary.totalConversations)} />
+                                    <SummaryCard label="Valor acumulado" value={formatCurrencyDo(customerHistory.summary.totalSpent)} />
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <p className="text-xs uppercase tracking-wide text-slate-500">Transacciones</p>
-                                    <p className="mt-2 text-2xl font-bold text-slate-900">{formatNumberDo(customerHistory.summary.totalTransactions)}</p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <p className="text-xs uppercase tracking-wide text-slate-500">Conversaciones</p>
-                                    <p className="mt-2 text-2xl font-bold text-slate-900">{formatNumberDo(customerHistory.summary.totalConversations)}</p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <p className="text-xs uppercase tracking-wide text-slate-500">Valor acumulado</p>
-                                    <p className="mt-2 text-2xl font-bold text-slate-900">{formatCurrencyDo(customerHistory.summary.totalSpent)}</p>
+                                <div className="card-filter density-compact grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contacto</p>
+                                        <p className="mt-1 text-sm font-medium text-slate-900">{customerHistory.customer.email}</p>
+                                        <p className="mt-1 text-xs text-slate-500">{customerHistory.customer.phone || 'Sin telefono registrado'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Relacion comercial</p>
+                                        <p className="mt-1 text-sm font-medium text-slate-900">
+                                            Cliente desde {formatDateDo(customerHistory.customer.createdAt)}
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {selectedCustomer?.stats.lastActivityAt ? `Ultima actividad ${formatDateTimeDo(selectedCustomer.stats.lastActivityAt)}` : 'Sin actividad reciente'}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
+                        ) : (
+                            <EmptyState
+                                title="Selecciona un cliente"
+                                body="Cuando abras una ficha veras su historial cruzado de reservas, pagos y conversaciones."
+                            />
+                        )}
+                    </SectionCard>
 
+                    <SectionCard
+                        title="Actividad reciente"
+                        description="Mantiene reservas, pagos y conversaciones visibles sin sobrecargar la ficha principal."
+                        density="compact"
+                    >
+                        {historyLoading ? (
+                            <div className="space-y-3">
+                                <div className="h-24 rounded-2xl bg-slate-100 animate-pulse" />
+                                <div className="h-24 rounded-2xl bg-slate-100 animate-pulse" />
+                            </div>
+                        ) : customerHistory ? (
                             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <p className="font-medium text-slate-900">Ultimas reservas</p>
-                                    <div className="mt-3 space-y-3">
-                                        {customerHistory.bookings.slice(0, 3).map((booking) => (
-                                            <div key={booking.id} className="rounded-xl bg-white p-3">
-                                                <p className="text-sm font-medium text-slate-900">{booking.business?.name || 'Negocio'}</p>
-                                                <p className="mt-1 text-xs text-slate-500">
-                                                    {formatDateTimeDo(booking.scheduledFor)} | {booking.status}
-                                                </p>
-                                            </div>
-                                        ))}
-                                        {customerHistory.bookings.length === 0 ? (
-                                            <p className="text-sm text-slate-500">Sin reservas registradas.</p>
-                                        ) : null}
-                                    </div>
+                                <div className="card-list density-compact">
+                                    <p className="text-sm font-semibold text-slate-900">Ultimas reservas</p>
+                                    {customerHistory.bookings.slice(0, 3).map((booking) => (
+                                        <div key={booking.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                                            <p className="text-sm font-medium text-slate-900">{booking.business?.name || 'Negocio'}</p>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {formatDateTimeDo(booking.scheduledFor)} | {booking.status}
+                                            </p>
+                                        </div>
+                                    ))}
+                                    {customerHistory.bookings.length === 0 ? (
+                                        <EmptyState
+                                            title="Sin reservas registradas"
+                                            body="Apareceran aqui las ultimas reservas del cliente."
+                                        />
+                                    ) : null}
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <p className="font-medium text-slate-900">Pagos recientes</p>
-                                    <div className="mt-3 space-y-3">
-                                        {customerHistory.transactions.slice(0, 3).map((transaction) => (
-                                            <div key={transaction.id} className="rounded-xl bg-white p-3">
-                                                <p className="text-sm font-medium text-slate-900">{formatCurrencyDo(transaction.grossAmount, transaction.currency)}</p>
-                                                <p className="mt-1 text-xs text-slate-500">
-                                                    {transaction.status} | {formatDateTimeDo(transaction.createdAt)}
-                                                </p>
-                                            </div>
-                                        ))}
-                                        {customerHistory.transactions.length === 0 ? (
-                                            <p className="text-sm text-slate-500">Sin transacciones registradas.</p>
-                                        ) : null}
-                                    </div>
+                                <div className="card-list density-compact">
+                                    <p className="text-sm font-semibold text-slate-900">Pagos recientes</p>
+                                    {customerHistory.transactions.slice(0, 3).map((transaction) => (
+                                        <div key={transaction.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                                            <p className="text-sm font-medium text-slate-900">{formatCurrencyDo(transaction.grossAmount, transaction.currency)}</p>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {transaction.status} | {formatDateTimeDo(transaction.createdAt)}
+                                            </p>
+                                        </div>
+                                    ))}
+                                    {customerHistory.transactions.length === 0 ? (
+                                        <EmptyState
+                                            title="Sin pagos registrados"
+                                            body="Los cobros del cliente apareceran aqui cuando existan."
+                                        />
+                                    ) : null}
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <p className="font-medium text-slate-900">Conversaciones</p>
-                                    <div className="mt-3 space-y-3">
-                                        {customerHistory.conversations.slice(0, 3).map((conversation) => (
-                                            <div key={conversation.id} className="rounded-xl bg-white p-3">
-                                                <p className="text-sm font-medium text-slate-900">{conversation.subject || 'Consulta directa'}</p>
-                                                <p className="mt-1 text-xs text-slate-500">
-                                                    {conversation.status} | {formatDateTimeDo(conversation.lastMessageAt)}
-                                                </p>
-                                            </div>
-                                        ))}
-                                        {customerHistory.conversations.length === 0 ? (
-                                            <p className="text-sm text-slate-500">Sin conversaciones registradas.</p>
-                                        ) : null}
-                                    </div>
+                                <div className="card-list density-compact">
+                                    <p className="text-sm font-semibold text-slate-900">Conversaciones</p>
+                                    {customerHistory.conversations.slice(0, 3).map((conversation) => (
+                                        <div key={conversation.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                                            <p className="text-sm font-medium text-slate-900">{conversation.subject || 'Consulta directa'}</p>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {conversation.status} | {formatDateTimeDo(conversation.lastMessageAt)}
+                                            </p>
+                                        </div>
+                                    ))}
+                                    {customerHistory.conversations.length === 0 ? (
+                                        <EmptyState
+                                            title="Sin conversaciones"
+                                            body="Cuando el cliente escriba o responda, veras aqui su ultimo hilo."
+                                        />
+                                    ) : null}
                                 </div>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-5 text-sm text-slate-600">
-                            Selecciona un cliente para ver su historial cruzado de reservas, pagos y conversaciones.
-                        </div>
-                    )}
-                </article>
+                        ) : (
+                            <EmptyState
+                                title="Sin actividad para mostrar"
+                                body="Selecciona un cliente para abrir su actividad reciente por canal."
+                            />
+                        )}
+                    </SectionCard>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Crear oportunidad</p>
-                        <h3 className="mt-1 text-lg font-semibold text-slate-900">Lead manual para el pipeline</h3>
-                    </div>
-
-                    <form className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={(event) => void handleCreateLead(event)}>
+                <SectionCard
+                    title="Lead manual para el pipeline"
+                    description="Crea oportunidades conectadas al negocio correcto y, si aplica, al cliente seleccionado."
+                    density="compact"
+                >
+                    <form className="card-form density-compact grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={(event) => void handleCreateLead(event)}>
                         <label className="block text-sm font-medium text-slate-700">
                             Negocio
                             <select
@@ -1559,14 +1636,13 @@ export function OrganizationWorkspace({
                             </button>
                         </div>
                     </form>
-                </article>
+                </SectionCard>
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Pipeline comercial</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Seguimiento de oportunidades</h3>
-                        </div>
+                <SectionCard
+                    title="Seguimiento de oportunidades"
+                    description="Mantiene etapas claras, conteos visibles y cada lead como una unidad escaneable."
+                    density="compact"
+                    actions={(
                         <select
                             className="input-field min-w-[10rem]"
                             value={pipelineStageFilter}
@@ -1579,18 +1655,19 @@ export function OrganizationWorkspace({
                                 </option>
                             ))}
                         </select>
-                    </div>
-
-                    <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+                    )}
+                >
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
                         {PIPELINE_STAGES.map((stage) => (
-                            <article key={stage} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 text-center">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{getStageLabel(stage)}</p>
-                                <p className="mt-2 text-2xl font-bold text-slate-900">{formatNumberDo(pipelineSummary.byStage[stage] ?? 0)}</p>
-                            </article>
+                            <SummaryCard
+                                key={stage}
+                                label={getStageLabel(stage)}
+                                value={formatNumberDo(pipelineSummary.byStage[stage] ?? 0)}
+                            />
                         ))}
                     </div>
 
-                    <div className="mt-5 space-y-3">
+                    <div className="card-list density-compact mt-4">
                         {crmLoading ? (
                             <div className="space-y-3">
                                 <div className="h-24 rounded-2xl bg-slate-100 animate-pulse" />
@@ -1603,32 +1680,36 @@ export function OrganizationWorkspace({
                             };
 
                             return (
-                                <article key={lead.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                                <article key={lead.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
+                                        <div className="space-y-2">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-medium text-slate-900">{lead.title}</p>
                                                 <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStageTone(lead.stage)}`}>
                                                     {getStageLabel(lead.stage)}
                                                 </span>
                                             </div>
-                                            <p className="mt-1 text-sm text-slate-600">{lead.business.name}</p>
-                                            <p className="mt-1 text-xs text-slate-500">
-                                                Creado {formatDateTimeDo(lead.createdAt)}
-                                                {lead.customerUser?.name ? ` | ${lead.customerUser.name}` : ''}
-                                            </p>
+                                            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                                                <span>{lead.business.name}</span>
+                                                <span>Creado {formatDateTimeDo(lead.createdAt)}</span>
+                                                {lead.customerUser?.name ? <span>{lead.customerUser.name}</span> : null}
+                                                {lead.conversation?.id ? <span>Inbox conectado</span> : null}
+                                                {lead.booking?.id ? <span>Reserva ligada</span> : null}
+                                            </div>
                                         </div>
                                         <div className="text-right text-xs text-slate-500">
-                                            <p>{lead.estimatedValue ? formatCurrencyDo(lead.estimatedValue) : 'Sin valor estimado'}</p>
+                                            <p className="text-sm font-semibold text-slate-900">
+                                                {lead.estimatedValue ? formatCurrencyDo(lead.estimatedValue) : 'Sin valor estimado'}
+                                            </p>
                                             <p>{lead.expectedCloseAt ? `Cierre ${formatDateDo(lead.expectedCloseAt)}` : 'Sin fecha de cierre'}</p>
                                         </div>
                                     </div>
 
                                     {lead.notes ? (
-                                        <p className="mt-3 rounded-xl bg-white p-3 text-sm text-slate-600">{lead.notes}</p>
+                                        <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-600">{lead.notes}</p>
                                     ) : null}
 
-                                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                                    <div className="card-filter density-compact mt-4 flex flex-wrap items-center gap-2">
                                         <select
                                             className="input-field min-w-[10rem]"
                                             value={draft.stage}
@@ -1680,12 +1761,13 @@ export function OrganizationWorkspace({
                                 </article>
                             );
                         }) : (
-                            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-5 text-sm text-slate-600">
-                                No hay oportunidades en el pipeline con este filtro.
-                            </div>
+                            <EmptyState
+                                title="Sin oportunidades en este filtro"
+                                body="Ajusta etapa o crea un lead manual para empezar a mover el pipeline."
+                            />
                         )}
                     </div>
-                </article>
+                </SectionCard>
             </div>
 
             <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
