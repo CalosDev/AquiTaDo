@@ -1,197 +1,213 @@
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 
 interface AdminNavItem {
     label: string;
     to: string;
+    description: string;
+    active: boolean;
     icon: React.ReactNode;
-    end?: boolean;
 }
 
-const adminNav: AdminNavItem[] = [
-    {
-        label: 'Panel',
-        to: '/admin',
-        end: true,
-        icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
+function adminIcon(kind: 'businesses' | 'categories' | 'catalog' | 'verification' | 'observability' | 'security') {
+    if (kind === 'categories') {
+        return (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+                <path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z" />
+                <path d="M4 7l8 4 8-4" />
             </svg>
-        ),
-    },
-    {
-        label: 'Moderación',
-        to: '/admin/moderation',
-        icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
+        );
+    }
+    if (kind === 'catalog') {
+        return (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M7 8h10M7 12h10M7 16h8" />
             </svg>
-        ),
-    },
-    {
-        label: 'Verificación',
-        to: '/admin/verification',
-        icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-                <polyline points="9 11 12 14 22 4" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" strokeLinecap="round" strokeLinejoin="round" />
+        );
+    }
+    if (kind === 'verification') {
+        return (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+                <path d="m9 12 2 2 4-4" />
             </svg>
-        ),
-    },
-    {
-        label: 'Negocios',
-        to: '/admin/businesses',
-        icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" strokeLinecap="round" strokeLinejoin="round" />
+        );
+    }
+    if (kind === 'observability') {
+        return (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+                <path d="M3 12h3l3-7 4 14 3-7h5" />
             </svg>
-        ),
-    },
-    {
-        label: 'Usuarios',
-        to: '/admin/users',
-        icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="9" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" strokeLinejoin="round" />
+        );
+    }
+    if (kind === 'security') {
+        return (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="10" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-        ),
-    },
-    {
-        label: 'Seguridad',
-        to: '/security',
-        icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        ),
-    },
-    {
-        label: 'Observabilidad',
-        to: '/admin/health',
-        icon: (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        ),
-    },
-];
-
-/**
- * AdminLayout — shell tipo consola para administración (§ 9.9, § 4.4)
- *
- * Principios del blueprint:
- *   - diseño más consola, menos marketing
- *   - navegación persistente
- *   - tablas y colas como primera clase
- *   - alertas y health compactos
- *   - sobrio, muy funcional, denso pero ordenado
- *   - densidad compacta (§ 12.3)
- *
- * Rutas: /admin, /admin/*, /security
- */
-export function AdminLayout() {
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
-
-    function handleLogout() {
-        logout();
-        navigate('/login');
+        );
     }
 
     return (
-        <div className="app-shell density-compact" style={{ background: '#0f172a' }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+        </svg>
+    );
+}
 
-            {/* ── Top Bar — estilo consola ──────────────────────── */}
-            <header
-                className="sticky top-0 z-40 flex h-12 w-full shrink-0 items-center gap-3 border-b border-slate-700/80 px-4"
-                style={{ background: '#0f172a' }}
-            >
-                <Link
-                    to="/admin"
-                    className="flex items-center gap-2 text-slate-100 hover:text-white transition-colors"
-                    aria-label="Panel administrativo AquiTa.do"
+export function AdminLayout() {
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const activeTab = new URLSearchParams(location.search).get('tab') || 'businesses';
+
+    const navItems = useMemo<AdminNavItem[]>(() => [
+        {
+            label: 'Negocios',
+            to: '/admin?tab=businesses',
+            description: 'Vista general de fichas y estados.',
+            active: location.pathname === '/admin' && activeTab === 'businesses',
+            icon: adminIcon('businesses'),
+        },
+        {
+            label: 'Categorías',
+            to: '/admin?tab=categories',
+            description: 'Taxonomía y estructura del catálogo.',
+            active: location.pathname === '/admin' && activeTab === 'categories',
+            icon: adminIcon('categories'),
+        },
+        {
+            label: 'Catálogo',
+            to: '/admin?tab=catalog',
+            description: 'Claims, duplicados y ownership.',
+            active: location.pathname === '/admin' && activeTab === 'catalog',
+            icon: adminIcon('catalog'),
+        },
+        {
+            label: 'Verificación',
+            to: '/admin?tab=verification',
+            description: 'KYC, moderación y data layer.',
+            active: location.pathname === '/admin' && activeTab === 'verification',
+            icon: adminIcon('verification'),
+        },
+        {
+            label: 'Observabilidad',
+            to: '/admin?tab=observability',
+            description: 'Health, frontend y operación.',
+            active: location.pathname === '/admin' && activeTab === 'observability',
+            icon: adminIcon('observability'),
+        },
+        {
+            label: 'Seguridad',
+            to: '/security',
+            description: '2FA y controles sensibles.',
+            active: location.pathname === '/security',
+            icon: adminIcon('security'),
+        },
+    ], [activeTab, location.pathname]);
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
+
+    return (
+        <div className="app-shell density-compact" style={{ background: '#020617' }}>
+            <header className="app-topbar border-slate-800/80 bg-slate-950/92 text-slate-100">
+                <button
+                    type="button"
+                    onClick={() => setSidebarOpen((current) => !current)}
+                    className="btn-ghost h-9 w-9 p-0 text-slate-200 lg:hidden"
+                    aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+                    aria-expanded={sidebarOpen}
                 >
-                    <svg width="22" height="22" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-                        <rect width="28" height="28" rx="8" fill="#0636a8" />
-                        <text x="5" y="20" fontFamily="Sora, sans-serif" fontWeight="700" fontSize="14" fill="white">A.</text>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
                     </svg>
-                    <span className="font-display text-sm font-bold tracking-tight">
-                        Admin
-                    </span>
-                </Link>
+                </button>
 
-                {/* Health indicator */}
-                <span className="hidden items-center gap-1.5 rounded-full border border-emerald-800 bg-emerald-950 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 sm:inline-flex">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
-                    Sistema operativo
-                </span>
+                <Link to="/admin" className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-700 text-white shadow-sm shadow-primary-700/30">
+                        <span className="font-display text-lg font-bold">A</span>
+                    </div>
+                    <div className="leading-tight">
+                        <p className="font-display text-base font-bold text-white">Consola admin</p>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                            {user?.email || 'Operación de plataforma'}
+                        </p>
+                    </div>
+                </Link>
 
                 <div className="flex-1" />
 
-                {/* Operator identity */}
-                <span className="hidden text-[11px] text-slate-500 sm:block">
-                    {user?.email ?? 'Administrador'}
+                <span className="hidden rounded-full border border-emerald-900 bg-emerald-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-400 md:inline-flex">
+                    Sistema operativo
                 </span>
-
-                {/* Exit to main site */}
-                <Link
-                    to="/"
-                    className="text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                    ← Salir
+                <Link to="/" className="btn-ghost hidden text-slate-200 md:inline-flex">
+                    Sitio público
                 </Link>
-
-                <button
-                    onClick={handleLogout}
-                    className="text-xs font-semibold text-slate-600 hover:text-red-400 transition-colors"
-                    aria-label="Cerrar sesión"
-                >
-                    Logout
+                <button type="button" onClick={handleLogout} className="btn-ghost text-slate-200">
+                    Salir
                 </button>
             </header>
 
-            {/* ── Body: Nav lateral + Content ──────────────────── */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="app-shell-body">
+                {sidebarOpen ? (
+                    <button
+                        type="button"
+                        className="fixed inset-0 z-30 bg-slate-950/50 lg:hidden"
+                        aria-label="Cerrar panel lateral"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                ) : null}
 
-                {/* Sidebar admin — más estrecha, más funcional */}
                 <aside
-                    className="hidden w-52 shrink-0 flex-col border-r border-slate-700/60 lg:flex"
-                    style={{ background: '#0f172a' }}
+                    className={`console-shell-sidebar fixed inset-y-14 left-0 z-40 w-[320px] max-w-[calc(100vw-2rem)] -translate-x-full px-4 py-4 transition-transform lg:static lg:z-auto lg:w-[288px] lg:translate-x-0 ${
+                        sidebarOpen ? 'translate-x-0' : ''
+                    }`}
                 >
-                    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-3" aria-label="Menú de administración">
-                        {adminNav.map(item => (
-                            <NavLink
+                    <div className="shell-sidebar-card shell-sidebar-card--admin">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                            Modo consola
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-white">
+                            Moderación, catálogo y observabilidad
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-slate-300">
+                            La prioridad aquí es operar la plataforma con densidad compacta y navegación estable, no parecer una landing.
+                        </p>
+                    </div>
+
+                    <nav className="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Menú de administración">
+                        {navItems.map((item) => (
+                            <Link
                                 key={item.to}
                                 to={item.to}
-                                end={item.end}
-                                className={({ isActive }) =>
-                                    `flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
-                                        isActive
-                                            ? 'bg-slate-700 text-white'
-                                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                                    }`
-                                }
+                                className={item.active ? 'console-nav-link console-nav-link-active' : 'console-nav-link'}
+                                onClick={() => setSidebarOpen(false)}
                             >
-                                {item.icon}
-                                <span>{item.label}</span>
-                            </NavLink>
+                                <span className="mt-0.5">{item.icon}</span>
+                                <span className="min-w-0">
+                                    <span className="block text-sm font-semibold">{item.label}</span>
+                                    <span className="mt-0.5 block text-xs leading-5 text-slate-400">
+                                        {item.description}
+                                    </span>
+                                </span>
+                            </Link>
                         ))}
                     </nav>
                 </aside>
 
-                {/* Content area — fondo ligeramente más claro que el shell */}
-                <main
-                    className="flex flex-1 flex-col overflow-y-auto"
-                    id="admin-main-content"
-                    style={{ background: '#0f1929' }}
-                >
+                <main className="app-content min-w-0" style={{ background: '#020617' }}>
                     <Outlet />
                 </main>
             </div>

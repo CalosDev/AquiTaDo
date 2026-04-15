@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { businessApi } from '../api/endpoints';
 import { getRoleCapabilities } from '../auth/capabilities';
@@ -15,20 +15,11 @@ interface BeforeInstallPromptEvent extends Event {
     }>;
 }
 
-function roleBadgeLabel(role: string | undefined): string {
-    if (role === 'ADMIN') {
-        return 'Admin';
-    }
-    if (role === 'BUSINESS_OWNER') {
-        return 'Negocio';
-    }
-    return 'Usuario';
-}
-
 function isPathActive(pathname: string, target: string): boolean {
     if (target === '/') {
         return pathname === '/';
     }
+
     return pathname === target || pathname.startsWith(`${target}/`);
 }
 
@@ -46,7 +37,7 @@ export function Navbar() {
     const canRegisterBusiness = roleCapabilities.canRegisterBusiness;
     const organizationName = activeOrganization?.name?.trim() ?? '';
     const firstName = user?.name?.split(' ')[0] ?? 'Cuenta';
-    const navBootstrapping = loading;
+
     const businessesActive = location.pathname === '/businesses'
         || location.pathname.startsWith('/businesses/')
         || location.pathname.startsWith('/negocios/');
@@ -55,11 +46,55 @@ export function Navbar() {
     const securityActive = isPathActive(location.pathname, '/security');
     const profileActive = isPathActive(location.pathname, '/profile');
 
-    const desktopNavClass = (isActive: boolean) => (isActive ? 'nav-link nav-link-active' : 'nav-link');
-    const mobileNavClass = (isActive: boolean) => (
-        `touch-target block rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${isActive
-            ? 'bg-primary-50 text-primary-700'
-            : 'text-slate-700 hover:bg-primary-50'}`
+    const primaryLinks = useMemo(
+        () => [
+            {
+                label: 'Negocios',
+                to: '/businesses',
+                active: businessesActive,
+                prefetch: () => {
+                    preloadRouteChunk('/businesses');
+                    businessApi.prefetchDiscoveryLanding();
+                },
+            },
+            ...(!isAuthenticated
+                ? [{
+                    label: 'Nosotros',
+                    to: '/about',
+                    active: aboutActive,
+                    prefetch: () => preloadRouteChunk('/about'),
+                }]
+                : []),
+        ],
+        [aboutActive, businessesActive, isAuthenticated],
+    );
+
+    const authenticatedLinks = useMemo(
+        () => (isAuthenticated
+            ? [
+                {
+                    label: roleHomeLabel,
+                    to: roleHomePath,
+                    active: roleHomeActive,
+                    prefetch: () => preloadRouteChunk(roleHomePath),
+                },
+                {
+                    label: 'Perfil',
+                    to: '/profile',
+                    active: profileActive,
+                    prefetch: () => preloadRouteChunk('/profile'),
+                },
+                ...(user?.role === 'ADMIN'
+                    ? [{
+                        label: 'Seguridad',
+                        to: '/security',
+                        active: securityActive,
+                        prefetch: () => preloadRouteChunk('/security'),
+                    }]
+                    : []),
+            ]
+            : []),
+        [isAuthenticated, profileActive, roleHomeActive, roleHomeLabel, roleHomePath, securityActive, user?.role],
     );
 
     const handleLogout = () => {
@@ -131,10 +166,12 @@ export function Navbar() {
             ) => number;
             cancelIdleCallback?: (handle: number) => void;
         };
+
         if (typeof withIdleCallback.requestIdleCallback === 'function') {
             const idleId = withIdleCallback.requestIdleCallback(() => {
                 schedulePrefetch();
             }, { timeout: prefetchMode === 'minimal' ? 2200 : 1500 });
+
             return () => {
                 if (typeof withIdleCallback.cancelIdleCallback === 'function') {
                     withIdleCallback.cancelIdleCallback(idleId);
@@ -148,234 +185,130 @@ export function Navbar() {
 
     useEffect(() => {
         setMenuOpen(false);
-    }, [location.pathname]);
+    }, [location.pathname, location.search]);
 
     return (
-        <header className="sticky top-0 z-50 overflow-x-clip">
-            <div className="hidden xl:block border-b border-primary-100/70 bg-white/88 backdrop-blur-md">
-                <div className="container-full-shell flex items-center justify-between py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    <div className="flex items-center gap-3">
-                        <span className="chip !px-2.5 !py-0.5 !text-[10px] !shadow-none">Hecho en RD</span>
-                        <span>Discovery local de negocios en RD</span>
-                    </div>
-                    <span className="text-primary-700">Santo Domingo, Republica Dominicana</span>
-                </div>
-            </div>
-
+        <header className="sticky top-0 z-50">
             <nav className="nav-shell">
                 <div className="container-full-shell">
-                    <div className="flex h-16 items-center justify-between gap-4">
-                        <Link to="/" className="group inline-flex shrink-0 items-center gap-3">
-                            <div className="relative h-10 w-10 overflow-hidden rounded-2xl border border-primary-200 bg-white shadow-md shadow-primary-200/60">
-                                <div className="absolute inset-y-0 left-0 w-1/2 bg-primary-700"></div>
-                                <div className="absolute inset-y-0 right-0 w-1/2 bg-accent-600"></div>
-                                <span className="absolute inset-0 flex items-center justify-center font-display text-lg font-bold text-white">A</span>
+                    <div className="flex min-h-16 items-center justify-between gap-4 py-3">
+                        <Link to="/" className="inline-flex shrink-0 items-center gap-3">
+                            <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-primary-700 shadow-sm shadow-primary-700/25">
+                                <span className="font-display text-lg font-bold text-white">A</span>
                             </div>
                             <div className="leading-tight">
                                 <p className="font-display text-xl font-bold text-slate-900">
                                     Aqui<span className="text-accent-600">Ta</span>.do
                                 </p>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                    Negocios locales en RD
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Discovery local en RD
                                 </p>
                             </div>
                         </Link>
 
-                        <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 xl:flex 2xl:gap-4">
-                            {navBootstrapping ? (
-                                <div className="flex min-w-0 items-center justify-end gap-3">
-                                    <div className="nav-cluster flex items-center gap-3 px-4 py-2">
-                                        <span className="h-4 w-20 animate-pulse rounded-full bg-slate-100" />
-                                        <span className="h-4 w-16 animate-pulse rounded-full bg-slate-100" />
-                                        <span className="h-4 w-20 animate-pulse rounded-full bg-slate-100" />
+                        <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex">
+                            {!loading ? (
+                                <>
+                                    <div className="nav-cluster flex min-w-0 items-center gap-4 px-4">
+                                        {primaryLinks.map((link) => (
+                                            <Link
+                                                key={link.to}
+                                                to={link.to}
+                                                className={link.active ? 'nav-link nav-link-active' : 'nav-link'}
+                                                aria-current={link.active ? 'page' : undefined}
+                                                onMouseEnter={link.prefetch}
+                                                onFocus={link.prefetch}
+                                            >
+                                                {link.label}
+                                            </Link>
+                                        ))}
+                                        {authenticatedLinks.map((link) => (
+                                            <Link
+                                                key={link.to}
+                                                to={link.to}
+                                                className={link.active ? 'nav-link nav-link-active' : 'nav-link'}
+                                                aria-current={link.active ? 'page' : undefined}
+                                                onMouseEnter={link.prefetch}
+                                                onFocus={link.prefetch}
+                                            >
+                                                {link.label}
+                                            </Link>
+                                        ))}
                                     </div>
-                                    <div className="h-10 w-28 animate-pulse rounded-full border border-slate-200 bg-white/90" />
-                                    <div className="h-10 w-36 animate-pulse rounded-full bg-primary-100/80" />
-                                </div>
-                            ) : (
-                                <>
-                            <div className="nav-cluster flex min-w-0 items-center gap-4">
-                                <Link
-                                    to="/businesses"
-                                    className={desktopNavClass(businessesActive)}
-                                    aria-current={businessesActive ? 'page' : undefined}
-                                    onMouseEnter={() => {
-                                        preloadRouteChunk('/businesses');
-                                        businessApi.prefetchDiscoveryLanding();
-                                    }}
-                                    onFocus={() => {
-                                        preloadRouteChunk('/businesses');
-                                        businessApi.prefetchDiscoveryLanding();
-                                    }}
-                                >
-                                    Negocios
-                                </Link>
-                                {!isAuthenticated && (
-                                    <Link
-                                        to="/about"
-                                        className={desktopNavClass(aboutActive)}
-                                        aria-current={aboutActive ? 'page' : undefined}
-                                        onMouseEnter={() => preloadRouteChunk('/about')}
-                                        onFocus={() => preloadRouteChunk('/about')}
-                                    >
-                                        Nosotros
-                                    </Link>
-                                )}
-                                {isAuthenticated ? (
-                                    <>
-                                        <Link
-                                            to={roleHomePath}
-                                            className={desktopNavClass(roleHomeActive)}
-                                            aria-current={roleHomeActive ? 'page' : undefined}
-                                            onMouseEnter={() => preloadRouteChunk(roleHomePath)}
-                                            onFocus={() => preloadRouteChunk(roleHomePath)}
-                                        >
-                                            {roleHomeLabel}
-                                        </Link>
-                                        {user?.role === 'ADMIN' && (
-                                            <Link
-                                                to="/security"
-                                                className={desktopNavClass(securityActive)}
-                                                aria-current={securityActive ? 'page' : undefined}
-                                                onMouseEnter={() => preloadRouteChunk('/security')}
-                                                onFocus={() => preloadRouteChunk('/security')}
-                                            >
-                                                Seguridad
-                                            </Link>
-                                        )}
-                                        <Link
-                                            to="/profile"
-                                            className={desktopNavClass(profileActive)}
-                                            aria-current={profileActive ? 'page' : undefined}
-                                            onMouseEnter={() => preloadRouteChunk('/profile')}
-                                            onFocus={() => preloadRouteChunk('/profile')}
-                                        >
-                                            Perfil
-                                        </Link>
-                                    </>
-                                ) : null}
-                            </div>
 
-                            {installPromptEvent && (
-                                <button type="button" className="btn-secondary text-sm !rounded-full" onClick={() => void handleInstallApp()}>
-                                    Instalar app
-                                </button>
-                            )}
-
-                            {isAuthenticated ? (
-                                <>
-                                    {canRegisterBusiness && (
-                                        <Link
-                                            to="/register-business"
-                                            className="btn-accent shrink-0 whitespace-nowrap !px-5 !py-2.5 text-sm"
-                                            onMouseEnter={() => preloadRouteChunk('/register-business')}
-                                            onFocus={() => preloadRouteChunk('/register-business')}
-                                        >
-                                            <span className="xl:hidden">+ Negocio</span>
-                                            <span className="hidden xl:inline 2xl:hidden">+ Registrar</span>
-                                            <span className="hidden 2xl:inline">+ Registrar Negocio</span>
-                                        </Link>
-                                    )}
-                                    <div className="nav-cluster flex min-w-0 shrink-0 items-center gap-3">
-                                        <span className="chip hidden shrink-0 whitespace-nowrap !py-1 2xl:inline-flex">
-                                            {roleBadgeLabel(user?.role)}
-                                        </span>
-                                        <div className="min-w-0">
-                                            <Link
-                                                to="/profile"
-                                                className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary-700"
-                                                onMouseEnter={() => preloadRouteChunk('/profile')}
-                                                onFocus={() => preloadRouteChunk('/profile')}
-                                            >
-                                                Hola, {firstName}
-                                            </Link>
-                                            <p
-                                                className={`hidden max-w-[170px] truncate text-[11px] leading-tight 2xl:block ${
-                                                    organizationName ? 'text-slate-500' : 'text-transparent'
-                                                }`}
-                                                title={organizationName || undefined}
-                                            >
-                                                {organizationName || 'Organizacion activa'}
-                                            </p>
-                                        </div>
+                                    {installPromptEvent ? (
                                         <button
                                             type="button"
-                                            onClick={handleLogout}
-                                            className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition-colors hover:border-accent-300 hover:text-accent-700 whitespace-nowrap"
+                                            className="btn-secondary text-sm"
+                                            onClick={() => void handleInstallApp()}
                                         >
-                                            Salir
+                                            Instalar app
                                         </button>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="nav-cluster flex items-center gap-2">
-                                    <Link
-                                        to="/login"
-                                        className="btn-secondary text-sm !rounded-full"
-                                        onMouseEnter={() => preloadRouteChunk('/login')}
-                                        onFocus={() => preloadRouteChunk('/login')}
-                                    >
-                                        Iniciar Sesión
-                                    </Link>
-                                    <Link
-                                        to="/register"
-                                        className="btn-primary text-sm !rounded-full"
-                                        onMouseEnter={() => preloadRouteChunk('/register')}
-                                        onFocus={() => preloadRouteChunk('/register')}
-                                    >
-                                        Crear Cuenta
-                                    </Link>
-                                </div>
-                            )}
-                                </>
-                            )}
-                        </div>
+                                    ) : null}
 
-                        <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 lg:flex xl:hidden">
-                            {navBootstrapping ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="h-10 w-20 animate-pulse rounded-full border border-slate-200 bg-white/90" />
-                                    <div className="h-10 w-24 animate-pulse rounded-full border border-slate-200 bg-white/90" />
-                                </div>
-                            ) : (
-                                <>
-                                    <Link
-                                        to="/businesses"
-                                        className={desktopNavClass(businessesActive)}
-                                        aria-current={businessesActive ? 'page' : undefined}
-                                        onMouseEnter={() => preloadRouteChunk('/businesses')}
-                                        onFocus={() => preloadRouteChunk('/businesses')}
-                                    >
-                                        Negocios
-                                    </Link>
-                                    {isAuthenticated && (
-                                        <Link
-                                            to={roleHomePath}
-                                            className={desktopNavClass(roleHomeActive)}
-                                            aria-current={roleHomeActive ? 'page' : undefined}
-                                            onMouseEnter={() => preloadRouteChunk(roleHomePath)}
-                                            onFocus={() => preloadRouteChunk(roleHomePath)}
-                                        >
-                                            {roleHomeLabel}
-                                        </Link>
-                                    )}
-                                    {canRegisterBusiness && (
-                                        <Link
-                                            to="/register-business"
-                                            className="btn-accent !px-4 !py-2 text-sm whitespace-nowrap"
-                                            onMouseEnter={() => preloadRouteChunk('/register-business')}
-                                            onFocus={() => preloadRouteChunk('/register-business')}
-                                        >
-                                            + Negocio
-                                        </Link>
+                                    {isAuthenticated ? (
+                                        <>
+                                            {canRegisterBusiness ? (
+                                                <Link
+                                                    to="/register-business"
+                                                    className="btn-primary whitespace-nowrap"
+                                                    onMouseEnter={() => preloadRouteChunk('/register-business')}
+                                                    onFocus={() => preloadRouteChunk('/register-business')}
+                                                >
+                                                    Registrar negocio
+                                                </Link>
+                                            ) : null}
+
+                                            <div className="nav-cluster flex min-w-0 items-center gap-3 px-3">
+                                                <div className="hidden text-right xl:block">
+                                                    <p className="text-sm font-semibold text-slate-800">
+                                                        {firstName}
+                                                    </p>
+                                                    <p className="max-w-[180px] truncate text-[11px] text-slate-500">
+                                                        {organizationName || roleHomeLabel}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLogout}
+                                                    className="btn-ghost whitespace-nowrap"
+                                                >
+                                                    Salir
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <Link
+                                                to="/login"
+                                                className="btn-secondary text-sm"
+                                                onMouseEnter={() => preloadRouteChunk('/login')}
+                                                onFocus={() => preloadRouteChunk('/login')}
+                                            >
+                                                Iniciar sesión
+                                            </Link>
+                                            <Link
+                                                to="/register"
+                                                className="btn-primary text-sm"
+                                                onMouseEnter={() => preloadRouteChunk('/register')}
+                                                onFocus={() => preloadRouteChunk('/register')}
+                                            >
+                                                Crear cuenta
+                                            </Link>
+                                        </div>
                                     )}
                                 </>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-44 animate-pulse rounded-full bg-slate-100" />
+                                    <div className="h-10 w-32 animate-pulse rounded-full bg-slate-100" />
+                                </div>
                             )}
                         </div>
 
                         <button
                             type="button"
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-700 xl:hidden"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 lg:hidden"
                             onClick={() => setMenuOpen((previous) => !previous)}
                             aria-label={menuOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
                             aria-expanded={menuOpen}
@@ -391,32 +324,28 @@ export function Navbar() {
                         </button>
                     </div>
 
-                    {menuOpen && (
-                        <div id="mobile-main-menu" className="animate-slide-down pb-4 pt-2 xl:hidden">
-                            <div className="surface-panel p-2 shadow-xl shadow-primary-950/8">
-                                <Link
-                                    to="/businesses"
-                                    className={mobileNavClass(businessesActive)}
-                                    aria-current={businessesActive ? 'page' : undefined}
-                                    onMouseEnter={() => preloadRouteChunk('/businesses')}
-                                    onFocus={() => preloadRouteChunk('/businesses')}
-                                    onClick={() => setMenuOpen(false)}
-                                >
-                                    Negocios
-                                </Link>
-                                {!isAuthenticated && (
+                    {menuOpen ? (
+                        <div id="mobile-main-menu" className="pb-4 lg:hidden">
+                            <div className="surface-panel p-2">
+                                {[...primaryLinks, ...authenticatedLinks].map((link) => (
                                     <Link
-                                        to="/about"
-                                        className={`mt-1 ${mobileNavClass(aboutActive)}`}
-                                        aria-current={aboutActive ? 'page' : undefined}
-                                        onMouseEnter={() => preloadRouteChunk('/about')}
-                                        onFocus={() => preloadRouteChunk('/about')}
+                                        key={link.to}
+                                        to={link.to}
+                                        className={`touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                                            link.active
+                                                ? 'bg-primary-50 text-primary-700'
+                                                : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                        aria-current={link.active ? 'page' : undefined}
+                                        onMouseEnter={link.prefetch}
+                                        onFocus={link.prefetch}
                                         onClick={() => setMenuOpen(false)}
                                     >
-                                        Nosotros
+                                        {link.label}
                                     </Link>
-                                )}
-                                {installPromptEvent && (
+                                ))}
+
+                                {installPromptEvent ? (
                                     <button
                                         type="button"
                                         className="touch-target mt-1 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-primary-700 hover:bg-primary-50"
@@ -427,11 +356,11 @@ export function Navbar() {
                                     >
                                         Instalar app
                                     </button>
-                                )}
+                                ) : null}
 
                                 {isAuthenticated ? (
                                     <>
-                                        {canRegisterBusiness && (
+                                        {canRegisterBusiness ? (
                                             <Link
                                                 to="/register-business"
                                                 className="touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold text-accent-700 hover:bg-accent-50"
@@ -439,48 +368,16 @@ export function Navbar() {
                                                 onFocus={() => preloadRouteChunk('/register-business')}
                                                 onClick={() => setMenuOpen(false)}
                                             >
-                                                + Registrar Negocio
+                                                Registrar negocio
                                             </Link>
-                                        )}
-                                        <Link
-                                            to={roleHomePath}
-                                            className={`mt-1 ${mobileNavClass(roleHomeActive)}`}
-                                            aria-current={roleHomeActive ? 'page' : undefined}
-                                            onMouseEnter={() => preloadRouteChunk(roleHomePath)}
-                                            onFocus={() => preloadRouteChunk(roleHomePath)}
-                                            onClick={() => setMenuOpen(false)}
-                                        >
-                                            {roleHomeLabel}
-                                        </Link>
-                                        {user?.role === 'ADMIN' && (
-                                            <Link
-                                                to="/security"
-                                                className={`mt-1 ${mobileNavClass(securityActive)}`}
-                                                aria-current={securityActive ? 'page' : undefined}
-                                                onMouseEnter={() => preloadRouteChunk('/security')}
-                                                onFocus={() => preloadRouteChunk('/security')}
-                                                onClick={() => setMenuOpen(false)}
-                                            >
-                                                Seguridad
-                                            </Link>
-                                        )}
-                                        <Link
-                                            to="/profile"
-                                            className={`mt-1 ${mobileNavClass(profileActive)}`}
-                                            aria-current={profileActive ? 'page' : undefined}
-                                            onMouseEnter={() => preloadRouteChunk('/profile')}
-                                            onFocus={() => preloadRouteChunk('/profile')}
-                                            onClick={() => setMenuOpen(false)}
-                                        >
-                                            Perfil
-                                        </Link>
+                                        ) : null}
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 handleLogout();
                                                 setMenuOpen(false);
                                             }}
-                                            className="touch-target mt-1 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-accent-700 hover:bg-accent-50"
+                                            className="touch-target mt-1 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
                                         >
                                             Salir
                                         </button>
@@ -489,32 +386,37 @@ export function Navbar() {
                                     <>
                                         <Link
                                             to="/login"
-                                            className={`mt-1 ${mobileNavClass(isPathActive(location.pathname, '/login'))}`}
-                                            aria-current={isPathActive(location.pathname, '/login') ? 'page' : undefined}
+                                            className={`touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                                                isPathActive(location.pathname, '/login')
+                                                    ? 'bg-primary-50 text-primary-700'
+                                                    : 'text-slate-700 hover:bg-slate-50'
+                                            }`}
                                             onMouseEnter={() => preloadRouteChunk('/login')}
                                             onFocus={() => preloadRouteChunk('/login')}
                                             onClick={() => setMenuOpen(false)}
                                         >
-                                            Iniciar Sesión
+                                            Iniciar sesión
                                         </Link>
                                         <Link
                                             to="/register"
-                                            className={`mt-1 ${mobileNavClass(isPathActive(location.pathname, '/register'))}`}
-                                            aria-current={isPathActive(location.pathname, '/register') ? 'page' : undefined}
+                                            className={`touch-target mt-1 block rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                                                isPathActive(location.pathname, '/register')
+                                                    ? 'bg-primary-50 text-primary-700'
+                                                    : 'text-slate-700 hover:bg-slate-50'
+                                            }`}
                                             onMouseEnter={() => preloadRouteChunk('/register')}
                                             onFocus={() => preloadRouteChunk('/register')}
                                             onClick={() => setMenuOpen(false)}
                                         >
-                                            Crear Cuenta
+                                            Crear cuenta
                                         </Link>
                                     </>
                                 )}
                             </div>
                         </div>
-                    )}
+                    ) : null}
                 </div>
             </nav>
         </header>
     );
 }
-

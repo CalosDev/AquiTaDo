@@ -3,7 +3,7 @@ import { bookingsApi, checkinsApi, messagingApi, paymentsApi } from '../../api/e
 import { getApiErrorMessage } from '../../api/error';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
-import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
+import { formatCurrencyDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
 
 type BookingStatus = 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELED' | 'NO_SHOW';
 type ConversationStatus = 'OPEN' | 'CLOSED' | 'CONVERTED';

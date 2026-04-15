@@ -1,11 +1,11 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { analyticsApi, businessApi, verificationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useOrganization } from '../context/useOrganization';
 import { useTimedMessage } from '../hooks/useTimedMessage';
-import { SummaryCard, SectionCard, EmptyState, ErrorState } from '../components/ui';
+import { SummaryCard, SectionCard, EmptyState } from '../components/ui';
 
 const VerificationWorkspace = lazy(async () => ({
     default: (await import('./dashboard-business/VerificationWorkspace')).VerificationWorkspace,
@@ -167,7 +167,47 @@ const WORKSPACE_TABS: { id: OwnerWorkspaceId; label: string }[] = [
 ];
 
 // ── Componente principal ──────────────────────────────────
+function isOwnerWorkspaceId(value: string | null): value is OwnerWorkspaceId {
+    return WORKSPACE_TABS.some((tab) => tab.id === value);
+}
+
+function readWorkspace(searchParams: URLSearchParams): OwnerWorkspaceId {
+    const workspace = searchParams.get('workspace');
+    return isOwnerWorkspaceId(workspace) ? workspace : 'overview';
+}
+
+function workspaceSummary(workspace: OwnerWorkspaceId): { label: string; description: string } {
+    switch (workspace) {
+        case 'operations':
+            return {
+                label: 'Operacion diaria',
+                description: 'Monitorea reservas, conversaciones y atencion activa sin perder el negocio seleccionado.',
+            };
+        case 'growth':
+            return {
+                label: 'Crecimiento',
+                description: 'Revisa campanas, promociones y senales de demanda con densidad compacta y acciones claras.',
+            };
+        case 'billing':
+            return {
+                label: 'Facturacion',
+                description: 'Manten plan, limites y cobros en un bloque mas sobrio y facil de auditar.',
+            };
+        case 'organization':
+            return {
+                label: 'Organizacion',
+                description: 'Administra miembros, ownership y estructura tenant desde un mismo contexto.',
+            };
+        default:
+            return {
+                label: 'Resumen ejecutivo',
+                description: 'Prioriza claim, verificacion y salud del perfil antes de bajar a la operacion detallada.',
+            };
+    }
+}
+
 export function DashboardBusiness() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const {
         activeOrganization,
         activeOrganizationId,
@@ -180,7 +220,7 @@ export function DashboardBusiness() {
     const [verificationLoading, setVerificationLoading] = useState(false);
     const [errorMessage, setErrorMessage]   = useState('');
     const [successMessage, setSuccessMessage] = useState('');
-    const [activeWorkspace, setActiveWorkspace] = useState<OwnerWorkspaceId>('overview');
+    const activeWorkspace = readWorkspace(searchParams);
 
     useTimedMessage(errorMessage, setErrorMessage, 6500);
     useTimedMessage(successMessage, setSuccessMessage, 4500);
@@ -219,12 +259,19 @@ export function DashboardBusiness() {
         () => businesses.filter((b) => b.openNow).length,
         [businesses],
     );
+    const activeWorkspaceMeta = useMemo(
+        () => workspaceSummary(activeWorkspace),
+        [activeWorkspace],
+    );
     const showVerificationSkeleton =
         Boolean(selectedBusinessId) &&
         verificationLoading &&
         verificationLoadedBusinessId !== selectedBusinessId;
     const needsFirstBusinessSetup =
         !organizationLoading && !activeOrganizationId && !organizations.length;
+    const selectedBusinessPublicPath = selectedBusiness
+        ? `/businesses/${selectedBusiness.slug || selectedBusiness.id}`
+        : null;
 
     // ── Carga de datos ────────────────────────────────────
     const loadClaimRequests = useCallback(async () => {
@@ -324,10 +371,24 @@ export function DashboardBusiness() {
     }, [activeOrganizationId, loadVerificationData, selectedBusinessId]);
 
     useEffect(() => {
-        if (!activeOrganizationId && activeWorkspace !== 'overview') setActiveWorkspace('overview');
-    }, [activeOrganizationId, activeWorkspace]);
+        if (!activeOrganizationId && activeWorkspace !== 'overview') {
+            const nextSearchParams = new URLSearchParams(searchParams);
+            nextSearchParams.delete('workspace');
+            setSearchParams(nextSearchParams, { replace: true });
+        }
+    }, [activeOrganizationId, activeWorkspace, searchParams, setSearchParams]);
 
     // ── Handlers ─────────────────────────────────────────
+    const handleWorkspaceChange = useCallback((workspace: OwnerWorkspaceId) => {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        if (workspace === 'overview') {
+            nextSearchParams.delete('workspace');
+        } else {
+            nextSearchParams.set('workspace', workspace);
+        }
+        setSearchParams(nextSearchParams, { replace: true });
+    }, [searchParams, setSearchParams]);
+
     const handleUploadDocument = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedBusinessId) { setErrorMessage('Selecciona un negocio antes de subir documentos'); return; }
@@ -429,25 +490,41 @@ export function DashboardBusiness() {
 
             {/* ── Page Header ───────────────────────────── */}
             <div className="app-page-header">
-                <div>
+                <div className="min-w-0">
+                    <p className="page-kicker">Dashboard negocio</p>
                     <h1 className="app-page-header__title">
-                        {activeOrganization?.name ?? 'Mi negocio'}
+                        {selectedBusiness?.name ?? activeOrganization?.name ?? 'Mi negocio'}
                     </h1>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                        {businesses.length} negocio{businesses.length !== 1 ? 's' : ''} gestionados
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                        {activeWorkspaceMeta.description}
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {activeOrganization?.name ? (
+                            <span className="chip !bg-white !text-slate-700">
+                                Organizacion activa: {activeOrganization.name}
+                            </span>
+                        ) : null}
+                        {selectedBusiness ? (
+                            <span className="chip !bg-white !text-slate-700">
+                                Perfil: {selectedBusiness.profileCompletenessScore ?? 0}% completo
+                            </span>
+                        ) : null}
+                        <span className="chip !bg-white !text-slate-700">
+                            {businesses.length} negocio{businesses.length !== 1 ? 's' : ''} gestionados
+                        </span>
+                    </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                    {businesses.length > 0 && selectedBusiness && (
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {selectedBusinessPublicPath ? (
                         <Link
-                            to={`/businesses/${selectedBusiness.slug}`}
+                            to={selectedBusinessPublicPath}
                             className="btn-ghost text-xs"
                             target="_blank"
                             rel="noopener noreferrer"
                         >
                             Ver ficha pública ↗
                         </Link>
-                    )}
+                    ) : null}
                     <Link to="/register-business" className="btn-primary text-xs px-4 py-2">
                         + Negocio
                     </Link>
@@ -573,27 +650,62 @@ export function DashboardBusiness() {
 
             {/* ═══ Tabs de workspace ═══ */}
             {activeOrganizationId && (
-                <div className="flex gap-1 overflow-x-auto border-b border-slate-100 pb-0" role="tablist" aria-label="Áreas de trabajo">
-                    {WORKSPACE_TABS.map((tab) => {
-                        const isActive = activeWorkspace === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                role="tab"
-                                type="button"
-                                aria-selected={isActive}
-                                onClick={() => setActiveWorkspace(tab.id)}
-                                className={`shrink-0 border-b-2 px-4 py-2.5 text-xs font-semibold transition-colors ${
-                                    isActive
-                                        ? 'border-primary-600 text-primary-700'
-                                        : 'border-transparent text-slate-500 hover:text-slate-700'
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </div>
+                <section className="page-section">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <p className="page-kicker">{activeWorkspaceMeta.label}</p>
+                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                                Cambia de workspace sin salir del contexto del negocio actual. El shell y la URL quedan alineados.
+                            </p>
+                        </div>
+                        {selectedBusiness ? (
+                            <div className="grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Claim</p>
+                                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                                        {selectedBusiness.claimStatus === 'CLAIMED'
+                                            ? 'Activo'
+                                            : selectedBusiness.claimStatus === 'PENDING_CLAIM'
+                                                ? 'En revisión'
+                                                : 'Pendiente'}
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Verificación</p>
+                                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                                        {verificationStatus ? statusLabel(verificationStatus.verificationStatus) : 'Sin enviar'}
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Salud perfil</p>
+                                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                                        {selectedBusiness.profileCompletenessScore ?? 0}% completo
+                                    </p>
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="workspace-strip mt-5" role="tablist" aria-label="Áreas de trabajo">
+                        {WORKSPACE_TABS.map((tab) => {
+                            const isActive = activeWorkspace === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    role="tab"
+                                    type="button"
+                                    aria-selected={isActive}
+                                    onClick={() => handleWorkspaceChange(tab.id)}
+                                    className={`workspace-strip__button shrink-0 ${
+                                        isActive ? 'workspace-strip__button--active' : ''
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </section>
             )}
 
             {/* ═══ FILA 2: Operación diaria ═══ */}
@@ -605,7 +717,11 @@ export function DashboardBusiness() {
                             body="Cuando inicies o recibas un claim de negocio, aparecerá aquí."
                         />
                     ) : (
-                        <SectionCard title="Claims recientes" density="compact">
+                        <SectionCard
+                            title="Claims recientes"
+                            description={`${claimSummary.PENDING ?? 0} pendientes y ${claimSummary.UNDER_REVIEW ?? 0} en revision`}
+                            density="compact"
+                        >
                             <div className="card-list">
                                 {claimRequests.slice(0, 5).map((claim) => (
                                     <div key={claim.id} className="card-list__item">

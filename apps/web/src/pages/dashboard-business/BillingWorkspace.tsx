@@ -283,7 +283,7 @@ function resolveExportFileName(
         return fallback;
     }
 
-    const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
+    const match = disposition.match(/filename="?([^";]+)"?/i);
     return match?.[1] || fallback;
 }
 

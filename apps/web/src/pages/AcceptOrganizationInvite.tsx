@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { organizationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
@@ -21,7 +21,7 @@ export function AcceptOrganizationInvite() {
     useTimedMessage(errorMessage, setErrorMessage, 6500);
     useTimedMessage(successMessage, setSuccessMessage, 4500);
 
-    const acceptInvite = async (inviteToken: string) => {
+    const acceptInvite = useCallback(async (inviteToken: string) => {
         setSubmitting(true);
         setErrorMessage('');
         setSuccessMessage('');
@@ -40,14 +40,14 @@ export function AcceptOrganizationInvite() {
         } finally {
             setSubmitting(false);
         }
-    };
+    }, [refreshOrganizations, refreshProfile]);
 
     useEffect(() => {
         if (!initialToken) {
             return;
         }
         void acceptInvite(initialToken);
-    }, [initialToken]);
+    }, [acceptInvite, initialToken]);
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();

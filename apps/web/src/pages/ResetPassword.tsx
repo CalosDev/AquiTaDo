@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
+import { AuthPageShell } from '../components/auth/AuthPageShell';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -68,16 +69,25 @@ export function ResetPassword() {
     };
 
     return (
-        <div className="auth-stage flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
-            <div className="container-sm w-full max-w-md">
-                <div className="card-form">
-                    <div className="mb-8 text-center">
-                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-2xl font-bold text-white shadow-lg shadow-slate-500/30">
-                            A
-                        </div>
-                        <h2 className="font-display text-2xl font-bold text-slate-900">Nueva contraseña</h2>
-                        <p className="mt-2 text-sm text-slate-500">Define una clave nueva para volver a entrar</p>
-                    </div>
+        <AuthPageShell
+            eyebrow="Nueva clave"
+            title="Define una contraseña nueva"
+            description="Restablece tu acceso con una clave nueva. La pantalla se concentra en validación, seguridad y salida clara."
+            asideTitle="Restablecimiento limpio y directo"
+            asideBody="Cuando el enlace es válido, la pantalla te deja completar la tarea sin pasos adicionales ni bloques que compitan con el formulario."
+            asidePoints={[
+                'Validación de token antes de enviar.',
+                'Contraseña con reglas mínimas claras.',
+                'Retorno directo al login cuando termina.',
+            ]}
+            footer={(
+                <p className="text-center">
+                    <Link to="/forgot-password" className="font-semibold text-primary-700 hover:text-primary-800">
+                        Solicitar un nuevo enlace
+                    </Link>
+                </p>
+            )}
+        >
             <PageFeedbackStack
                 items={[
                     {
@@ -90,8 +100,8 @@ export function ResetPassword() {
             />
 
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label htmlFor="reset-password-new" className="mb-1 block text-sm font-medium text-slate-700">
+                <div className="space-y-1.5">
+                    <label htmlFor="reset-password-new" className="text-sm font-semibold text-slate-700">
                         Nueva contraseña
                     </label>
                     <input
@@ -107,8 +117,8 @@ export function ResetPassword() {
                     />
                 </div>
 
-                <div>
-                    <label htmlFor="reset-password-confirm" className="mb-1 block text-sm font-medium text-slate-700">
+                <div className="space-y-1.5">
+                    <label htmlFor="reset-password-confirm" className="text-sm font-semibold text-slate-700">
                         Confirmar nueva contraseña
                     </label>
                     <input
@@ -128,14 +138,6 @@ export function ResetPassword() {
                     {loading ? 'Guardando...' : 'Restablecer contraseña'}
                 </button>
             </form>
-
-            <p className="mt-6 text-center text-sm text-slate-500">
-                <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-700">
-                    Solicitar un nuevo enlace
-                </Link>
-            </p>
-          </div>
-        </div>
-      </div>
+        </AuthPageShell>
     );
 }

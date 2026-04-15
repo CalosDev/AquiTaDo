@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import {
     analyticsApi,
@@ -38,6 +39,50 @@ const VerificationQueueSection = lazy(async () => ({
 const ObservabilityWorkspace = lazy(async () => ({
     default: (await import('./admin-dashboard/ObservabilityWorkspace')).ObservabilityWorkspace,
 }));
+
+type AdminTabId = 'businesses' | 'categories' | 'catalog' | 'verification' | 'observability';
+
+const ADMIN_TABS: Array<{ key: AdminTabId; label: string; icon: string; description: string }> = [
+    {
+        key: 'businesses',
+        label: 'Negocios',
+        icon: 'N',
+        description: 'Vista general de fichas, estados y acciones administrativas.',
+    },
+    {
+        key: 'categories',
+        label: 'Categorias',
+        icon: 'C',
+        description: 'Taxonomia, relaciones padre-hijo y limpieza del catalogo.',
+    },
+    {
+        key: 'catalog',
+        label: 'Catalogo',
+        icon: 'Q',
+        description: 'Claims, duplicados, ownership y calidad operacional del directorio.',
+    },
+    {
+        key: 'verification',
+        label: 'KYC + Data Layer',
+        icon: 'K',
+        description: 'Colas de verificacion, moderacion y reportes de mercado.',
+    },
+    {
+        key: 'observability',
+        label: 'Observabilidad',
+        icon: 'O',
+        description: 'Salud del frontend, metricas operativas y visibilidad de incidentes.',
+    },
+];
+
+function isAdminTabId(value: string | null): value is AdminTabId {
+    return ADMIN_TABS.some((tab) => tab.key === value);
+}
+
+function readAdminTab(searchParams: URLSearchParams): AdminTabId {
+    const tab = searchParams.get('tab');
+    return isAdminTabId(tab) ? tab : 'businesses';
+}
 
 interface Business {
     id: string;
@@ -496,6 +541,7 @@ function LazyAdminPanelFallback({ label }: { label: string }) {
 }
 
 export function AdminDashboard() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
@@ -535,7 +581,7 @@ export function AdminDashboard() {
     const [duplicatePrimarySelection, setDuplicatePrimarySelection] = useState<Record<string, string>>({});
     const [creatingCatalogBusiness, setCreatingCatalogBusiness] = useState(false);
     const [catalogBusinessForm, setCatalogBusinessForm] = useState<CatalogBusinessForm>(EMPTY_CATALOG_FORM);
-    const [activeTab, setActiveTab] = useState<'businesses' | 'categories' | 'catalog' | 'verification' | 'observability'>('businesses');
+    const activeTab = readAdminTab(searchParams);
     const [businessSearch, setBusinessSearch] = useState('');
     const [businessStatusFilter, setBusinessStatusFilter] = useState<'ALL' | 'VERIFIED' | 'PENDING' | 'SUSPENDED' | 'REJECTED'>('ALL');
     const [loading, setLoading] = useState(true);
@@ -686,6 +732,19 @@ export function AdminDashboard() {
         () => categories.filter((category) => !category.parentId),
         [categories],
     );
+    const activeTabMeta = useMemo(
+        () => ADMIN_TABS.find((tab) => tab.key === activeTab) ?? ADMIN_TABS[0],
+        [activeTab],
+    );
+    const handleActiveTabChange = useCallback((nextTab: AdminTabId) => {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        if (nextTab === 'businesses') {
+            nextSearchParams.delete('tab');
+        } else {
+            nextSearchParams.set('tab', nextTab);
+        }
+        setSearchParams(nextSearchParams, { replace: true });
+    }, [searchParams, setSearchParams]);
 
     const loadData = useCallback(async () => {
         setErrorMessage('');
@@ -1499,7 +1558,7 @@ export function AdminDashboard() {
     ] as const;
 
     return (
-        <div className="container-xl py-8 pb-28 animate-fade-in">
+        <div className="app-page-inner animate-fade-in">
             <PageFeedbackStack
                 items={[
                     { id: 'admin-dashboard-error', tone: 'danger', text: errorMessage },
@@ -1507,10 +1566,10 @@ export function AdminDashboard() {
                 ]}
             />
             
-            <section className="role-hero role-hero-admin mb-8">
+            <section className="console-section console-section--dark" aria-label={activeTabMeta.description}>
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-200 font-semibold">Panel Admin</p>
                 <h1 className="font-display text-3xl font-bold text-white mt-2">Control de plataforma</h1>
-                <p className="text-slate-200 mt-2 max-w-2xl">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
                     Gestión de negocios, categorías, moderación de contenido y salud operativa.
                 </p>
 
@@ -1538,20 +1597,22 @@ export function AdminDashboard() {
                 Gestión de negocios, categorías, moderación y observabilidad en un solo panel.
             </p>
 
-            <div className="flex flex-wrap gap-2 mb-6">
+            <div className="workspace-strip border border-slate-800 bg-slate-950/70 p-2 shadow-none">
                 {tabs.map((tab) => (
                     <button
                         type="button"
                         key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
+                        onClick={() => handleActiveTabChange(tab.key)}
                         aria-current={activeTab === tab.key ? 'page' : undefined}
-                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-medium transition-all ${
                             activeTab === tab.key
-                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                                : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-400 hover:text-primary-700'
+                                ? 'bg-slate-100 text-slate-950'
+                                : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                         }`}
                     >
-                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-black/10 text-[11px] font-semibold">
+                        <span className={`inline-flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-semibold ${
+                            activeTab === tab.key ? 'bg-slate-900/10' : 'bg-white/10'
+                        }`}>
                             {tab.icon}
                         </span>
                         {tab.label}

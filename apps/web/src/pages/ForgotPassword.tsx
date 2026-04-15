@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
+import { AuthPageShell } from '../components/auth/AuthPageShell';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -42,16 +43,25 @@ export function ForgotPassword() {
     };
 
     return (
-        <div className="auth-stage flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
-            <div className="container-sm w-full max-w-md">
-                <div className="card-form">
-                    <div className="mb-8 text-center">
-                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-2xl font-bold text-white shadow-lg shadow-slate-500/30">
-                            A
-                        </div>
-                        <h2 className="font-display text-2xl font-bold text-slate-900">Recuperar acceso</h2>
-                        <p className="mt-2 text-sm text-slate-500">Te enviaremos un enlace para volver a entrar</p>
-                    </div>
+        <AuthPageShell
+            eyebrow="Recuperación"
+            title="Recupera tu acceso"
+            description="Entra tu correo y te enviaremos el siguiente paso sin mezclar la tarea con mensajes innecesarios."
+            asideTitle="Un flujo corto para una tarea sensible"
+            asideBody="Estas pantallas se mantuvieron simples a propósito: una decisión, un formulario y una salida clara."
+            asidePoints={[
+                'Una sola acción principal por pantalla.',
+                'Estados de éxito y error bien visibles.',
+                'Regreso directo al acceso cuando termine el flujo.',
+            ]}
+            footer={(
+                <p className="text-center">
+                    <Link to="/login" className="font-semibold text-primary-700 hover:text-primary-800">
+                        Volver a iniciar sesión
+                    </Link>
+                </p>
+            )}
+        >
             <PageFeedbackStack
                 items={[
                     { id: 'forgot-password-error', tone: 'danger', text: errorMessage },
@@ -60,8 +70,8 @@ export function ForgotPassword() {
             />
 
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label htmlFor="forgot-password-email" className="mb-1 block text-sm font-medium text-slate-700">
+                <div className="space-y-1.5">
+                    <label htmlFor="forgot-password-email" className="text-sm font-semibold text-slate-700">
                         Correo electrónico
                     </label>
                     <input
@@ -80,14 +90,6 @@ export function ForgotPassword() {
                     {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
                 </button>
             </form>
-
-            <p className="mt-6 text-center text-sm text-slate-500">
-                <Link to="/login" className="font-medium text-primary-600 hover:text-primary-700">
-                    Volver a iniciar sesión
-                </Link>
-            </p>
-          </div>
-        </div>
-      </div>
+        </AuthPageShell>
     );
 }

@@ -263,6 +263,21 @@ export function BusinessesList() {
         }
         return 'Negocios';
     }, [activeCategory, activeCity, activeIntent, activeProvince]);
+    const listingDescription = useMemo(() => {
+        if (activeIntent) {
+            return `${activeIntent.description} Contacta por WhatsApp o telefono desde AquiTa.do.`;
+        }
+        if (activeCategory && activeProvince) {
+            return `Descubre ${activeCategoryDisplayName.toLowerCase()} en ${activeProvince.name}. Compara opciones locales y decide mas rapido.`;
+        }
+        if (activeCategory) {
+            return `Explora ${activeCategoryDisplayName.toLowerCase()} en Republica Dominicana con filtros claros y resultados escaneables.`;
+        }
+        if (activeProvince) {
+            return `Encuentra negocios locales en ${activeProvince.name} con rutas, reseñas y canales de contacto visibles.`;
+        }
+        return 'Explora negocios locales en Republica Dominicana con una experiencia de discovery mas utilitaria y consistente.';
+    }, [activeCategory, activeCategoryDisplayName, activeIntent, activeProvince]);
     const activeFilterChips = useMemo(() => {
         const chips: string[] = [];
         if (currentSearch) chips.push(`Busqueda: ${currentSearch}`);
@@ -945,7 +960,7 @@ export function BusinessesList() {
 
     
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+        <div className="page-shell py-8 md:py-10">
             <PageFeedbackStack
                 items={
                     loadError
@@ -960,9 +975,23 @@ export function BusinessesList() {
                 }
             />
 
-            <h1 className="sr-only">{listingHeading}</h1>
+            <section className="page-section">
+                <p className="page-kicker">Discovery publico</p>
+                <h1 className="page-heading">{listingHeading}</h1>
+                <p className="page-copy">{listingDescription}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="chip !bg-white !text-slate-700">{resultsCountLabel}</span>
+                    {activeFilterChips.length > 0 ? (
+                        <span className="chip !bg-white !text-slate-700">{activeFilterChips.length} filtros activos</span>
+                    ) : null}
+                    {activeProvince ? (
+                        <span className="chip !bg-white !text-slate-700">Provincia: {activeProvince.name}</span>
+                    ) : null}
+                </div>
+            </section>
 
             <ListingControlsBar
+                activeFilterCount={activeFilterChips.length}
                 currentProvince={currentProvince}
                 currentView={currentView}
                 filtersOpen={filtersOpen}
@@ -980,7 +1009,7 @@ export function BusinessesList() {
                 totalVisibleResults={sortedBusinesses.length}
             />
 
-            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <div className="discovery-layout">
                 <FiltersSidebar
                     activeFilterChips={activeFilterChips}
                     categoryOptions={categoryOptions}
@@ -1002,6 +1031,22 @@ export function BusinessesList() {
                 />
 
                 <div className="min-w-0">
+                    <div className="results-toolbar mb-4">
+                        <div>
+                            <p className="page-kicker">Resultados</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">{pageSummary || listingDescription}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {activeCategoryDisplayName ? (
+                                <span className="chip !bg-white !text-slate-700">{activeCategoryDisplayName}</span>
+                            ) : null}
+                            {currentView === 'map' ? (
+                                <span className="chip !bg-white !text-slate-700">Vista sincronizada con mapa</span>
+                            ) : (
+                                <span className="chip !bg-white !text-slate-700">Vista lista</span>
+                            )}
+                        </div>
+                    </div>
                     {shouldShowInitialLoading ? (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
+import { AuthPageShell } from '../components/auth/AuthPageShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -109,45 +110,54 @@ export function Login() {
     };
 
     return (
-        <div className="auth-stage flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
-            <div className="container-sm w-full max-w-md">
-                <div className="card-form">
-                    <div className="mb-8 text-center">
-                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600 text-2xl font-bold text-white shadow-lg shadow-primary-500/30">
-                            A
-                        </div>
-                        <h2 className="font-display text-2xl font-bold text-slate-900">Sign in to your account</h2>
-                        <p className="mt-2 text-sm text-slate-500">Welcome back to AquiTa.do</p>
-                    </div>
+        <AuthPageShell
+            eyebrow="Acceso"
+            title="Entra a tu cuenta"
+            description="Accede rápido a discovery, operación SaaS o administración según tu rol, sin ruido visual ni pasos innecesarios."
+            asideTitle="Todo el producto, desde el mismo acceso"
+            asideBody="El login ya no se siente como una landing. La prioridad es ubicarte rápido en tu área de trabajo y mostrar solo lo esencial."
+            asidePoints={[
+                'Acceso con correo o Google, según disponibilidad.',
+                'Segundo factor solo cuando de verdad aplica.',
+                'Recuperación de acceso clara y sin fricción visual.',
+            ]}
+            footer={(
+                <p className="text-center">
+                    ¿No tienes cuenta?{' '}
+                    <Link to="/register" className="font-semibold text-primary-700 hover:text-primary-800">
+                        Crear cuenta
+                    </Link>
+                </p>
+            )}
+        >
+            <PageFeedbackStack
+                items={[
+                    { id: 'login-notice', tone: 'success', text: noticeMessage },
+                    { id: 'login-error', tone: 'danger', text: error },
+                ]}
+            />
 
-                    <PageFeedbackStack
-                        items={[
-                            { id: 'login-notice', tone: 'success', text: noticeMessage },
-                            { id: 'login-error', tone: 'danger', text: error },
-                        ]}
+            {googleClientId ? (
+                <div className="space-y-4">
+                    <GoogleIdentityButton
+                        clientId={googleClientId}
+                        text="signin_with"
+                        disabled={loading || Boolean(pendingGoogleIdToken)}
+                        onCredential={handleGoogleCredential}
                     />
+                    <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        <div className="h-px flex-1 bg-slate-200"></div>
+                        <span>o usa correo</span>
+                        <div className="h-px flex-1 bg-slate-200"></div>
+                    </div>
+                </div>
+            ) : null}
 
-                    {googleClientId && (
-                        <div className="mb-6 space-y-4">
-                            <GoogleIdentityButton
-                                clientId={googleClientId}
-                                text="signin_with"
-                                disabled={loading || Boolean(pendingGoogleIdToken)}
-                                onCredential={handleGoogleCredential}
-                            />
-                            <div className="flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
-                                <div className="h-px flex-1 bg-slate-200"></div>
-                                <span>or</span>
-                                <div className="h-px flex-1 bg-slate-200"></div>
-                            </div>
-                        </div>
-                    )}
-
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                {!pendingGoogleIdToken && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {!pendingGoogleIdToken ? (
                     <>
-                        <div>
-                            <label htmlFor="login-email" className="mb-1 block text-sm font-medium text-slate-700">
+                        <div className="space-y-1.5">
+                            <label htmlFor="login-email" className="text-sm font-semibold text-slate-700">
                                 Correo electrónico
                             </label>
                             <input
@@ -163,13 +173,16 @@ export function Login() {
                             />
                         </div>
 
-                        <div>
-                            <div className="mb-1 flex items-center justify-between gap-3">
-                                <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between gap-3">
+                                <label htmlFor="login-password" className="text-sm font-semibold text-slate-700">
                                     Contraseña
                                 </label>
-                                <Link to="/forgot-password" className="text-xs font-medium text-primary-600 hover:text-primary-700">
-                                    Olvidé mi contraseña
+                                <Link
+                                    to="/forgot-password"
+                                    className="text-xs font-semibold text-primary-700 hover:text-primary-800"
+                                >
+                                    Recuperar acceso
                                 </Link>
                             </div>
                             <input
@@ -181,18 +194,16 @@ export function Login() {
                                 value={formData.password}
                                 onChange={(event) => setFormData({ ...formData, password: event.target.value })}
                                 className="input-field"
-                                placeholder="********"
+                                placeholder="Tu contraseña"
                             />
                         </div>
                     </>
-                )}
-
-                {pendingGoogleIdToken && (
-                    <div className="alert-warning space-y-3">
-                        <p>Tu cuenta requiere un segundo factor. Introduce el código 2FA para completar el acceso con Google.</p>
+                ) : (
+                    <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+                        <p>Tu cuenta necesita un segundo factor para completar el acceso con Google.</p>
                         <button
                             type="button"
-                            className="text-xs font-semibold text-amber-900 hover:text-amber-950"
+                            className="mt-3 text-xs font-semibold text-amber-900 underline decoration-amber-300 underline-offset-4"
                             onClick={() => {
                                 setPendingGoogleIdToken('');
                                 setRequiresTwoFactor(false);
@@ -205,10 +216,10 @@ export function Login() {
                     </div>
                 )}
 
-                {requiresTwoFactor && (
-                    <div>
-                        <label htmlFor="login-2fa" className="mb-1 block text-sm font-medium text-slate-700">
-                        Código 2FA (6 dígitos)
+                {requiresTwoFactor ? (
+                    <div className="space-y-1.5">
+                        <label htmlFor="login-2fa" className="text-sm font-semibold text-slate-700">
+                            Código 2FA
                         </label>
                         <input
                             id="login-2fa"
@@ -229,21 +240,12 @@ export function Login() {
                             placeholder="123456"
                         />
                     </div>
-                )}
+                ) : null}
 
-                        <button type="submit" disabled={loading} className="btn-primary w-full">
-                            {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
-                        </button>
-                    </form>
-
-                    <p className="mt-6 text-center text-sm text-slate-500">
-                        ¿No tienes cuenta?{' '}
-                        <Link to="/register" className="font-medium text-primary-600 hover:text-primary-700">
-                            Regístrate
-                        </Link>
-                    </p>
-                </div>
-            </div>
-        </div>
+                <button type="submit" disabled={loading} className="btn-primary w-full">
+                    {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
+                </button>
+            </form>
+        </AuthPageShell>
     );
 }
