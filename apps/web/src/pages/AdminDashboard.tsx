@@ -1567,9 +1567,9 @@ export function AdminDashboard() {
             />
             
             <section className="console-section console-section--dark" aria-label={activeTabMeta.description}>
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-200 font-semibold">Panel Admin</p>
-                <h1 className="font-display text-3xl font-bold text-white mt-2">Control de plataforma</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Panel Admin</p>
+                <h1 className="mt-2 font-display text-3xl font-bold text-slate-950">Control de plataforma</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                     Gestión de negocios, categorías, moderación de contenido y salud operativa.
                 </p>
 
@@ -1593,11 +1593,11 @@ export function AdminDashboard() {
                 </div>
             </section>
 
-            <p className="text-gray-500 mb-8">
+            <p className="mb-8 text-slate-600">
                 Gestión de negocios, categorías, moderación y observabilidad en un solo panel.
             </p>
 
-            <div className="workspace-strip border border-slate-800 bg-slate-950/70 p-2 shadow-none">
+            <div className="workspace-strip border border-slate-200 bg-white/88 p-2 shadow-sm shadow-slate-900/5">
                 {tabs.map((tab) => (
                     <button
                         type="button"
@@ -1606,12 +1606,12 @@ export function AdminDashboard() {
                         aria-current={activeTab === tab.key ? 'page' : undefined}
                         className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-medium transition-all ${
                             activeTab === tab.key
-                                ? 'bg-slate-100 text-slate-950'
-                                : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+                                ? 'bg-primary-700 text-white shadow-sm shadow-primary-700/30'
+                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                     >
                         <span className={`inline-flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-semibold ${
-                            activeTab === tab.key ? 'bg-slate-900/10' : 'bg-white/10'
+                            activeTab === tab.key ? 'bg-white/16 text-white' : 'bg-slate-100 text-slate-600'
                         }`}>
                             {tab.icon}
                         </span>

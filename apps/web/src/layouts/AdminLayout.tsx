@@ -119,15 +119,15 @@ export function AdminLayout() {
     };
 
     return (
-        <div className="app-shell density-compact" style={{ background: '#020617' }}>
+        <div className="app-shell density-compact">
             <a href="#main-content" className="skip-link">
                 Saltar al contenido principal
             </a>
-            <header className="app-topbar border-slate-800/80 bg-slate-950/92 text-slate-100">
+            <header className="app-topbar border-slate-200/90 bg-white/88 text-slate-900">
                 <button
                     type="button"
                     onClick={() => setSidebarOpen((current) => !current)}
-                    className="btn-ghost h-11 w-11 p-0 text-slate-200 lg:hidden"
+                    className="btn-ghost h-11 w-11 p-0 text-slate-700 lg:hidden"
                     aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
                     aria-expanded={sidebarOpen}
                     aria-controls="admin-shell-sidebar"
@@ -144,8 +144,8 @@ export function AdminLayout() {
                         <span className="font-display text-lg font-bold">A</span>
                     </div>
                     <div className="leading-tight">
-                        <p className="font-display text-base font-bold text-white">Consola admin</p>
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                        <p className="font-display text-base font-bold text-slate-950">Consola admin</p>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
                             {user?.email || 'Operación de plataforma'}
                         </p>
                     </div>
@@ -153,13 +153,13 @@ export function AdminLayout() {
 
                 <div className="flex-1" />
 
-                <span className="hidden rounded-full border border-emerald-900 bg-emerald-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-400 md:inline-flex">
+                <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700 md:inline-flex">
                     Sistema operativo
                 </span>
-                <Link to="/" className="btn-ghost hidden text-slate-200 md:inline-flex">
+                <Link to="/" className="btn-ghost hidden text-slate-700 md:inline-flex">
                     Sitio público
                 </Link>
-                <button type="button" onClick={handleLogout} className="btn-ghost text-slate-200">
+                <button type="button" onClick={handleLogout} className="btn-ghost text-slate-700">
                     Salir
                 </button>
             </header>
@@ -212,7 +212,7 @@ export function AdminLayout() {
                     </nav>
                 </aside>
 
-                <main id="main-content" tabIndex={-1} className="app-content min-w-0" style={{ background: '#020617' }}>
+                <main id="main-content" tabIndex={-1} className="app-content min-w-0">
                     <Outlet />
                 </main>
             </div>
