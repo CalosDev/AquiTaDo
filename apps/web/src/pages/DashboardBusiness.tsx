@@ -5,6 +5,7 @@ import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useOrganization } from '../context/useOrganization';
 import { useTimedMessage } from '../hooks/useTimedMessage';
+import { formatDateTimeDo } from '../lib/market';
 import { SummaryCard, SectionCard, EmptyState } from '../components/ui';
 
 const VerificationWorkspace = lazy(async () => ({
@@ -144,6 +145,24 @@ function claimStatusClass(status?: MyClaimRequestItem['status']): string {
     }
 }
 
+function businessClaimStatusLabel(status?: BusinessItem['claimStatus']): string {
+    switch (status) {
+        case 'CLAIMED': return 'Reclamado';
+        case 'PENDING_CLAIM': return 'En revision';
+        case 'SUSPENDED': return 'Suspendido';
+        default: return 'Sin reclamar';
+    }
+}
+
+function businessClaimStatusClass(status?: BusinessItem['claimStatus']): string {
+    switch (status) {
+        case 'CLAIMED': return 'bg-emerald-100 text-emerald-700';
+        case 'PENDING_CLAIM': return 'bg-amber-100 text-amber-700';
+        case 'SUSPENDED': return 'bg-slate-200 text-slate-600';
+        default: return 'bg-slate-100 text-slate-600';
+    }
+}
+
 // ── Skeleton de workspace ─────────────────────────────────
 function WorkspaceSkeleton() {
     return (
@@ -254,6 +273,31 @@ export function DashboardBusiness() {
     const activeClaimRequests = useMemo(
         () => claimRequests.filter((r) => r.status === 'PENDING' || r.status === 'UNDER_REVIEW'),
         [claimRequests],
+    );
+    const selectedBusinessClaimRequests = useMemo(
+        () =>
+            claimRequests
+                .filter((claimRequest) => claimRequest.business.id === selectedBusinessId)
+                .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
+        [claimRequests, selectedBusinessId],
+    );
+    const latestSelectedClaimRequest = selectedBusinessClaimRequests[0] || null;
+    const documentSummary = useMemo(
+        () => documents.reduce(
+            (summary, document) => {
+                summary.total += 1;
+                if (document.status === 'APPROVED') {
+                    summary.approved += 1;
+                } else if (document.status === 'REJECTED') {
+                    summary.rejected += 1;
+                } else {
+                    summary.pending += 1;
+                }
+                return summary;
+            },
+            { total: 0, approved: 0, pending: 0, rejected: 0 },
+        ),
+        [documents],
     );
     const openNowCount = useMemo(
         () => businesses.filter((b) => b.openNow).length,
@@ -558,7 +602,168 @@ export function DashboardBusiness() {
             </section>
 
             {/* Estado del negocio seleccionado (claim + verificación + salud) */}
-            {selectedBusiness && (
+            {selectedBusiness && activeWorkspace === 'overview' && (
+                <section aria-label="Control de claim y readiness">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+                        <SectionCard
+                            title="Control de claim"
+                            description="Estado actual primero, luego checklist y por ultimo historial reciente."
+                            density="compact"
+                            actions={(
+                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${businessClaimStatusClass(selectedBusiness.claimStatus)}`}>
+                                    {businessClaimStatusLabel(selectedBusiness.claimStatus)}
+                                </span>
+                            )}
+                        >
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Estado actual</p>
+                                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                                        {selectedBusiness.claimStatus === 'CLAIMED'
+                                            ? 'La organizacion ya opera este negocio.'
+                                            : selectedBusiness.claimStatus === 'PENDING_CLAIM'
+                                                ? 'Hay una solicitud activa esperando decision.'
+                                                : 'Todavia falta completar el control del claim.'}
+                                    </p>
+                                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                                        {latestSelectedClaimRequest
+                                            ? `Ultimo movimiento: ${claimStatusLabel(latestSelectedClaimRequest.status).toLowerCase()} por ${latestSelectedClaimRequest.evidenceType.toLowerCase().replace('_', ' ')}.`
+                                            : 'Todavia no hay solicitudes recientes asociadas a este negocio en el dashboard.'}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Checklist minimo</p>
+                                    <div className="mt-3 space-y-2">
+                                        {[
+                                            {
+                                                label: 'Negocio vinculado',
+                                                detail: selectedBusiness.claimStatus === 'CLAIMED'
+                                                    ? 'Ownership confirmado para esta organizacion.'
+                                                    : 'Aun falta confirmar el ownership.',
+                                                done: selectedBusiness.claimStatus === 'CLAIMED',
+                                            },
+                                            {
+                                                label: 'Solicitud en curso',
+                                                detail: latestSelectedClaimRequest
+                                                    ? `${claimStatusLabel(latestSelectedClaimRequest.status)} en el expediente mas reciente.`
+                                                    : 'No hay solicitudes activas en este momento.',
+                                                done: Boolean(latestSelectedClaimRequest),
+                                            },
+                                            {
+                                                label: 'Perfil base listo',
+                                                detail: (selectedBusiness.profileCompletenessScore ?? 0) >= 80
+                                                    ? 'La ficha tiene contexto suficiente para seguir con verificacion.'
+                                                    : 'Completa campos base antes de escalar procesos sensibles.',
+                                                done: (selectedBusiness.profileCompletenessScore ?? 0) >= 80,
+                                            },
+                                        ].map((item) => (
+                                            <div key={item.label} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                                <span
+                                                    className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                                                        item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                                    }`}
+                                                >
+                                                    {item.done ? 'OK' : '!'}
+                                                </span>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                                                    <p className="mt-1 text-xs leading-5 text-slate-600">{item.detail}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {selectedBusinessClaimRequests.length > 0 ? (
+                                <div className="card-list mt-4">
+                                    <div className="card-list__header">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Historial reciente</p>
+                                        <p className="text-xs text-slate-500">{selectedBusinessClaimRequests.length} eventos</p>
+                                    </div>
+                                    {selectedBusinessClaimRequests.slice(0, 3).map((claim) => (
+                                        <div key={claim.id} className="card-list__item items-start justify-between">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-medium text-slate-900">{claimStatusLabel(claim.status)}</p>
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    Evidencia {claim.evidenceType.toLowerCase().replace('_', ' ')} · {formatDateTimeDo(claim.createdAt)}
+                                                </p>
+                                            </div>
+                                            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${claimStatusClass(claim.status)}`}>
+                                                {claimStatusLabel(claim.status)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <EmptyState
+                                    title="Sin eventos recientes"
+                                    body="Cuando este negocio tenga un nuevo movimiento de claim, aparecera aqui con trazabilidad compacta."
+                                    className="mt-4"
+                                />
+                            )}
+                        </SectionCard>
+
+                        <SectionCard
+                            title="Readiness de verificacion"
+                            description="Estado primero, luego evidencia y solo despues solicitud formal."
+                            density="compact"
+                            actions={(
+                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusChipClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
+                                    {statusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
+                                </span>
+                            )}
+                        >
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Documentos</p>
+                                    <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{documentSummary.total}</p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        {documentSummary.approved} aprobados · {documentSummary.pending} pendientes · {documentSummary.rejected} rechazados
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Perfil util</p>
+                                    <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                                        {selectedBusiness.profileCompletenessScore ?? 0}%
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        {(selectedBusiness.profileCompletenessScore ?? 0) >= 80
+                                            ? 'Base suficiente para enviar un expediente claro.'
+                                            : 'Conviene completar la ficha antes de enviar mas evidencia.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Siguiente paso sugerido</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-900">
+                                    {verificationStatus?.verified
+                                        ? 'Mantener el expediente limpio y responder si el equipo solicita contexto adicional.'
+                                        : documentSummary.total === 0
+                                            ? 'Empieza cargando evidencia basica antes de solicitar revision.'
+                                            : verificationStatus?.verificationSubmittedAt
+                                                ? 'El expediente ya fue enviado. Ahora conviene esperar revision o responder observaciones.'
+                                                : 'El expediente ya tiene evidencia. Puedes pasar a solicitud de revision.'}
+                                </p>
+                                {selectedBusiness.missingCoreFields && selectedBusiness.missingCoreFields.length > 0 ? (
+                                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                                        Faltan campos base: {selectedBusiness.missingCoreFields.slice(0, 3).join(', ')}
+                                        {selectedBusiness.missingCoreFields.length > 3 ? ` +${selectedBusiness.missingCoreFields.length - 3}` : ''}
+                                    </p>
+                                ) : (
+                                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                                        La ficha ya tiene cobertura minima para seguir con procesos de compliance.
+                                    </p>
+                                )}
+                            </div>
+                        </SectionCard>
+                    </div>
+                </section>
+            )}
+
+            {selectedBusiness && activeWorkspace !== 'overview' && (
                 <section aria-label="Estado del negocio activo">
                     <div className="grid gap-3 md:grid-cols-3">
                         {/* Claim */}

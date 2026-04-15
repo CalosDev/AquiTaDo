@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react';
+import { EmptyState, SectionCard } from '../../components/ui';
 import { formatDateTimeDo } from '../../lib/market';
 
 type VerificationToneStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED' | 'APPROVED';
@@ -51,6 +52,25 @@ interface VerificationWorkspaceProps {
     getStatusLabel: (status: VerificationToneStatus | 'PENDING' | 'REJECTED') => string;
 }
 
+function getStatusNarrative(status: VerificationToneStatus): string {
+    switch (status) {
+        case 'VERIFIED':
+            return 'El negocio ya paso la verificacion documental y el expediente debe mantenerse limpio.';
+        case 'PENDING':
+            return 'El expediente ya fue enviado. Ahora toca esperar decision o responder observaciones.';
+        case 'REJECTED':
+            return 'Hay observaciones pendientes. Revisa el motivo, corrige evidencia y vuelve a enviar.';
+        case 'SUSPENDED':
+            return 'La verificacion esta suspendida y requiere revision manual antes de continuar.';
+        default:
+            return 'Todavia no se ha consolidado un expediente suficiente para solicitar revision.';
+    }
+}
+
+function getDocumentTypeLabel(documentType: string): string {
+    return DOCUMENT_TYPE_OPTIONS.find((option) => option.value === documentType)?.label || documentType;
+}
+
 export function VerificationWorkspace({
     selectedBusiness,
     selectedBusinessId,
@@ -69,15 +89,104 @@ export function VerificationWorkspace({
     getStatusClass,
     getStatusLabel,
 }: VerificationWorkspaceProps) {
+    const currentStatus = verificationStatus?.verificationStatus || 'UNVERIFIED';
+    const documentSummary = documents.reduce(
+        (summary, document) => {
+            summary.total += 1;
+            if (document.status === 'APPROVED') {
+                summary.approved += 1;
+            } else if (document.status === 'REJECTED') {
+                summary.rejected += 1;
+            } else {
+                summary.pending += 1;
+            }
+            return summary;
+        },
+        { total: 0, approved: 0, pending: 0, rejected: 0 },
+    );
+
+    const checklistItems = [
+        {
+            label: 'Negocio activo',
+            detail: selectedBusiness ? selectedBusiness.name : 'Selecciona un negocio antes de mover evidencia.',
+            done: Boolean(selectedBusinessId),
+        },
+        {
+            label: 'Evidencia cargada',
+            detail: documentSummary.total > 0
+                ? `${documentSummary.total} documento(s) en el expediente actual.`
+                : 'Sube por lo menos un documento legible antes de pedir revision.',
+            done: documentSummary.total > 0,
+        },
+        {
+            label: 'Revision formal enviada',
+            detail: verificationStatus?.verificationSubmittedAt
+                ? `Enviada el ${formatDateTimeDo(verificationStatus.verificationSubmittedAt)}.`
+                : 'Todavia no se ha enviado solicitud formal al equipo de verificacion.',
+            done: Boolean(verificationStatus?.verificationSubmittedAt),
+        },
+        {
+            label: 'Resultado final',
+            detail: verificationStatus?.verified
+                ? 'El negocio ya aparece como verificado.'
+                : 'Aun no hay una aprobacion final para este negocio.',
+            done: Boolean(verificationStatus?.verified),
+        },
+    ];
+
+    if (showVerificationSkeleton) {
+        return (
+            <article className="section-shell p-6 lg:col-span-2 space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-2">
+                        <div className="h-3 w-28 animate-pulse rounded-full bg-slate-100" />
+                        <div className="h-7 w-64 animate-pulse rounded-full bg-slate-100" />
+                    </div>
+                    <div className="h-8 w-28 animate-pulse rounded-full bg-slate-100" />
+                </div>
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(320px,0.94fr)]">
+                    <div className="card-section density-compact space-y-3">
+                        <div className="h-5 w-40 animate-pulse rounded-full bg-slate-100" />
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            {Array.from({ length: 3 }).map((_, index) => (
+                                <div key={index} className="h-24 animate-pulse rounded-2xl bg-slate-50" />
+                            ))}
+                        </div>
+                        <div className="h-16 animate-pulse rounded-2xl bg-slate-50" />
+                    </div>
+                    <div className="space-y-4">
+                        <div className="card-filter density-compact space-y-3">
+                            <div className="h-5 w-36 animate-pulse rounded-full bg-slate-100" />
+                            {Array.from({ length: 4 }).map((_, index) => (
+                                <div key={index} className="h-14 animate-pulse rounded-2xl bg-white" />
+                            ))}
+                        </div>
+                        <div className="card-form density-compact space-y-3">
+                            <div className="h-5 w-40 animate-pulse rounded-full bg-slate-100" />
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <div className="h-11 animate-pulse rounded-2xl bg-slate-50" />
+                                <div className="h-11 animate-pulse rounded-2xl bg-slate-50" />
+                            </div>
+                            <div className="h-10 w-36 animate-pulse rounded-2xl bg-slate-100" />
+                        </div>
+                    </div>
+                </div>
+            </article>
+        );
+    }
+
     return (
-        <article className="section-shell p-6 lg:col-span-2 space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+        <article className="section-shell p-6 lg:col-span-2 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Compliance</p>
                     <h2 className="font-display text-xl font-bold text-slate-900">Verificacion documental</h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                        Ordena el flujo en cuatro pasos: estado actual, requisitos, evidencia y solicitud de revision.
+                    </p>
                 </div>
-                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getStatusClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
-                    {getStatusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
+                <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClass(currentStatus)}`}>
+                    {getStatusLabel(currentStatus)}
                 </span>
             </div>
 
@@ -89,134 +198,226 @@ export function VerificationWorkspace({
                 <p className="text-sm text-slate-500">Selecciona un negocio para gestionar su verificacion.</p>
             )}
 
-            <div className="min-h-[6.5rem] space-y-2">
-                {showVerificationSkeleton ? (
-                    <>
-                        <div className="h-4 w-48 animate-pulse rounded-lg bg-slate-100" />
-                        <div className="h-4 w-56 animate-pulse rounded-lg bg-slate-100" />
-                        <div className="h-11 w-full animate-pulse rounded-xl bg-amber-50" />
-                    </>
-                ) : (
-                    <>
-                        {verificationStatus?.verificationSubmittedAt && (
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(320px,0.94fr)]">
+                <SectionCard
+                    title="Estado actual"
+                    description={getStatusNarrative(currentStatus)}
+                    density="compact"
+                    actions={(
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getStatusClass(currentStatus)}`}>
+                            {getStatusLabel(currentStatus)}
+                        </span>
+                    )}
+                >
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Documentos</p>
+                            <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{documentSummary.total}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {documentSummary.approved} aprobados · {documentSummary.pending} pendientes
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Envio formal</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">
+                                {verificationStatus?.verificationSubmittedAt ? 'Enviado' : 'Sin enviar'}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {verificationStatus?.verificationSubmittedAt
+                                    ? formatDateTimeDo(verificationStatus.verificationSubmittedAt)
+                                    : 'Todavia no se ha solicitado revision'}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Ultima decision</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">
+                                {verificationStatus?.verificationReviewedAt ? 'Revisado' : 'Sin decision'}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {verificationStatus?.verificationReviewedAt
+                                    ? formatDateTimeDo(verificationStatus.verificationReviewedAt)
+                                    : 'Aun no hay respuesta del equipo'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Lectura del expediente</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-700">
+                                {verificationStatus?.verified
+                                    ? 'El negocio ya cuenta con sello de confianza. Solo conserva evidencia actualizada.'
+                                    : documentSummary.rejected > 0
+                                        ? 'Hay evidencia rechazada. Corrige el motivo antes de seguir cargando documentos al azar.'
+                                        : documentSummary.total > 0
+                                            ? 'El expediente ya tiene base documental. Asegura contexto y envia revision cuando este completo.'
+                                            : 'Empieza por documentos base del negocio y del responsable antes de pedir revision.'}
+                            </p>
+                        </div>
+
+                        {verificationStatus?.verificationNotes ? (
+                            <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Observacion del equipo</p>
+                                <p className="mt-2 text-sm leading-6 text-amber-900">{verificationStatus.verificationNotes}</p>
+                            </div>
+                        ) : null}
+                    </div>
+                </SectionCard>
+
+                <div className="space-y-4">
+                    <div className="card-filter density-compact space-y-3">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-900">Checklist de requisitos</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">
+                                No mezcles todo en un solo bloque: valida contexto, evidencia y envio formal por separado.
+                            </p>
+                        </div>
+                        {checklistItems.map((item) => (
+                            <div key={item.label} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                                <span
+                                    className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                                        item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                    }`}
+                                >
+                                    {item.done ? 'OK' : '!'}
+                                </span>
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                                    <p className="mt-1 text-xs leading-5 text-slate-600">{item.detail}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <form onSubmit={onUploadDocument} className="card-form density-compact space-y-4">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-900">Subir evidencia</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">
+                                Usa solo documentos legibles y tipados correctamente para no contaminar la revision.
+                            </p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <label className="card-form__group">
+                                <span className="card-form__label">Tipo de documento</span>
+                                <select
+                                    className="input-field"
+                                    value={documentType}
+                                    onChange={(event) => onDocumentTypeChange(event.target.value)}
+                                    disabled={!selectedBusinessId || saving}
+                                >
+                                    {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="card-form__group">
+                                <span className="card-form__label">Archivo</span>
+                                <input
+                                    type="file"
+                                    className="input-field"
+                                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                    onChange={(event) => onFileChange(event.target.files?.[0] || null)}
+                                    disabled={!selectedBusinessId || saving}
+                                />
+                            </label>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button type="submit" className="btn-primary text-sm" disabled={!selectedBusinessId || !hasSelectedFile || saving}>
+                                {saving ? 'Subiendo...' : 'Subir documento'}
+                            </button>
                             <p className="text-xs text-slate-500">
-                                Enviado: {formatDateTimeDo(verificationStatus.verificationSubmittedAt)}.
+                                PDF o imagen clara. El documento queda ligado al negocio activo.
                             </p>
-                        )}
-                        {verificationStatus?.verificationReviewedAt && (
-                            <p className="text-xs text-slate-500">
-                                Revisado: {formatDateTimeDo(verificationStatus.verificationReviewedAt)}.
-                            </p>
-                        )}
-                        {verificationStatus?.verificationNotes && (
-                            <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                                Nota: {verificationStatus.verificationNotes}
-                            </p>
-                        )}
-                    </>
-                )}
+                        </div>
+                    </form>
+                </div>
             </div>
 
-            {showVerificationSkeleton ? (
-                <>
-                    <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 min-h-[10.75rem]">
-                        <div className="h-5 w-36 animate-pulse rounded-lg bg-slate-100" />
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            <div className="h-11 animate-pulse rounded-xl bg-white" />
-                            <div className="h-11 animate-pulse rounded-xl bg-white" />
-                        </div>
-                        <div className="h-10 w-36 animate-pulse rounded-xl bg-primary-100/60" />
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+                <div className="card-form density-compact space-y-4">
+                    <div>
+                        <p className="text-sm font-semibold text-slate-900">Solicitar revision</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                            Hazlo solo cuando el expediente tenga contexto suficiente. El objetivo es revisar, no adivinar.
+                        </p>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-3 min-h-[9.75rem]">
-                        <div className="h-5 w-48 animate-pulse rounded-lg bg-slate-100" />
-                        <div className="h-24 animate-pulse rounded-xl bg-white" />
-                        <div className="h-10 w-44 animate-pulse rounded-xl bg-slate-200/80" />
-                    </div>
-
-                    <div className="rounded-xl border border-gray-100 p-4 min-h-[8.5rem]">
-                        <div className="h-5 w-40 animate-pulse rounded-lg bg-slate-100" />
-                        <div className="mt-4 space-y-2">
-                            <div className="h-16 animate-pulse rounded-xl bg-slate-50" />
-                            <div className="h-16 animate-pulse rounded-xl bg-slate-50" />
-                        </div>
-                    </div>
-                </>
-            ) : (
-                <>
-                    <form onSubmit={onUploadDocument} className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 min-h-[10.75rem]">
-                        <h3 className="font-semibold text-slate-900">Subir documento</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <select
-                                className="input-field"
-                                value={documentType}
-                                onChange={(event) => onDocumentTypeChange(event.target.value)}
-                                disabled={!selectedBusinessId || saving}
-                            >
-                                {DOCUMENT_TYPE_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                            </select>
-                            <input
-                                type="file"
-                                className="input-field"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp"
-                                onChange={(event) => onFileChange(event.target.files?.[0] || null)}
-                                disabled={!selectedBusinessId || saving}
-                            />
-                        </div>
-                        <button type="submit" className="btn-primary text-sm" disabled={!selectedBusinessId || !hasSelectedFile || saving}>
-                            {saving ? 'Subiendo...' : 'Subir documento'}
-                        </button>
-                    </form>
-
-                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-3 min-h-[9.75rem]">
-                        <h3 className="font-semibold text-slate-900">Enviar solicitud de revision</h3>
+                    <label className="card-form__group">
+                        <span className="card-form__label">Notas para el equipo</span>
                         <textarea
                             className="input-field text-sm"
-                            rows={3}
-                            placeholder="Notas para el equipo de verificacion (opcional)"
+                            rows={4}
+                            placeholder="Resume contexto operativo, ownership o aclaraciones utiles para la revision."
                             value={verificationNotes}
                             onChange={(event) => onVerificationNotesChange(event.target.value)}
                             disabled={!selectedBusinessId || saving}
                         />
+                    </label>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Antes de enviar</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-700">
+                            {documentSummary.total === 0
+                                ? 'Todavia no hay evidencia cargada. El siguiente paso correcto es subir documentos.'
+                                : verificationStatus?.verificationSubmittedAt
+                                    ? 'Ya existe una solicitud formal. Envia una nueva solo si hubo correccion de expediente.'
+                                    : 'El expediente ya tiene base documental. Si el contexto esta claro, puedes pasar a revision.'}
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
                         <button
                             type="button"
                             className="btn-secondary text-sm"
                             onClick={onSubmitBusinessVerification}
-                            disabled={!selectedBusinessId || saving}
+                            disabled={!selectedBusinessId || saving || documentSummary.total === 0}
                         >
                             {saving ? 'Enviando...' : 'Solicitar verificacion'}
                         </button>
+                        <p className="text-xs text-slate-500">
+                            {documentSummary.total > 0
+                                ? 'El equipo vera los documentos cargados y estas notas como paquete unificado.'
+                                : 'Primero se necesita al menos un documento para poder solicitar revision.'}
+                        </p>
                     </div>
+                </div>
 
-                    <div className="rounded-xl border border-gray-100 p-4 min-h-[8.5rem]">
-                        <h3 className="font-semibold text-gray-900 mb-3">Historial de documentos</h3>
-                        {documents.length === 0 ? (
-                            <p className="text-sm text-gray-500">Todavia no has subido documentos.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {documents.map((document) => (
-                                    <div key={document.id} className="rounded-lg border border-gray-100 px-3 py-2">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <p className="text-sm font-medium text-gray-900">{document.documentType}</p>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusClass(document.status)}`}>
-                                                {getStatusLabel(document.status)}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1">
+                <SectionCard
+                    title="Historial documental"
+                    description="Evidencia subida, estado y motivos de rechazo en un solo listado."
+                    density="compact"
+                >
+                    {documents.length === 0 ? (
+                        <EmptyState
+                            title="Todavia no hay documentos"
+                            body="Cuando cargues evidencia, el historial aparecera aqui con su estado y trazabilidad."
+                        />
+                    ) : (
+                        <div className="card-list">
+                            <div className="card-list__header">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Expediente actual</p>
+                                <p className="text-xs text-slate-500">{documents.length} documento(s)</p>
+                            </div>
+                            {documents.map((document) => (
+                                <div key={document.id} className="card-list__item items-start justify-between">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-slate-900">{getDocumentTypeLabel(document.documentType)}</p>
+                                        <p className="mt-1 text-xs text-slate-500">
                                             Subido: {formatDateTimeDo(document.submittedAt)}
                                         </p>
-                                        {document.rejectionReason && (
-                                            <p className="text-xs text-red-700 mt-1">Motivo: {document.rejectionReason}</p>
-                                        )}
+                                        {document.rejectionReason ? (
+                                            <p className="mt-2 text-xs leading-5 text-red-700">Motivo: {document.rejectionReason}</p>
+                                        ) : null}
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </>
-            )}
+                                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${getStatusClass(document.status)}`}>
+                                        {getStatusLabel(document.status)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </SectionCard>
+            </div>
         </article>
     );
 }

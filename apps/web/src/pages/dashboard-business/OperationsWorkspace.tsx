@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bookingsApi, messagingApi, whatsappApi } from '../../api/endpoints';
 import { getApiErrorMessage } from '../../api/error';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
+import { EmptyState, SectionCard, SummaryCard } from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo } from '../../lib/market';
 
@@ -441,6 +442,22 @@ export function OperationsWorkspace({
         () => conversations.data.find((conversation) => conversation.id === selectedConversationId) || null,
         [conversations.data, selectedConversationId],
     );
+    const pendingBookingsCount = useMemo(
+        () => bookings.data.filter((booking) => booking.status === 'PENDING').length,
+        [bookings.data],
+    );
+    const pendingTransactionsCount = useMemo(
+        () => transactions.data.filter((transaction) => transaction.status === 'PENDING').length,
+        [transactions.data],
+    );
+    const openConversationCount = useMemo(
+        () => conversations.data.filter((conversation) => conversation.status === 'OPEN').length,
+        [conversations.data],
+    );
+    const activeWhatsAppCount = useMemo(
+        () => whatsAppConversations.data.filter((conversation) => conversation.status === 'OPEN' || conversation.status === 'ESCALATED').length,
+        [whatsAppConversations.data],
+    );
 
     const syncBookingDraft = useCallback((booking: OwnerBooking | null) => {
         if (!booking) {
@@ -832,27 +849,58 @@ export function OperationsWorkspace({
                 </button>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <SummaryCard
+                    label="Reservas en cola"
+                    value={pendingBookingsCount}
+                    delta={`${bookings.total} en el filtro activo`}
+                />
+                <SummaryCard
+                    label="Transacciones pendientes"
+                    value={pendingTransactionsCount}
+                    delta={`${transactions.total} movimientos observados`}
+                />
+                <SummaryCard
+                    label="Inbox abierto"
+                    value={openConversationCount}
+                    delta={`${conversations.total} conversaciones activas`}
+                />
+                <SummaryCard
+                    label="WhatsApp activo"
+                    value={activeWhatsAppCount}
+                    delta={`${whatsAppConversations.total} hilos sincronizados`}
+                />
+            </div>
+
             <div className="flex flex-wrap gap-2.5">
-                <span className="chip">Reservas: {bookings.total}</span>
-                <span className="chip">Conversaciones: {conversations.total}</span>
-                <span className="chip">WhatsApp: {whatsAppConversations.total}</span>
                 {selectedConversationSummary ? (
                     <span className={`chip ${getConversationTone(selectedConversationSummary.status)}`}>
                         Conversacion activa: {getConversationLabel(selectedConversationSummary.status)}
                     </span>
                 ) : null}
+                {selectedBooking ? (
+                    <span className={`chip ${getBookingStatusTone(selectedBooking.status)}`}>
+                        Reserva seleccionada: {getBookingStatusLabel(selectedBooking.status)}
+                    </span>
+                ) : null}
+                {selectedConversationSummary?.convertedBooking ? (
+                    <span className="chip">
+                        Lead convertido a reserva
+                    </span>
+                ) : null}
+                {refreshing ? (
+                    <span className="chip">Sincronizando cambios...</span>
+                ) : null}
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)]">
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h3 className="font-display text-lg font-semibold text-slate-900">Reservas recientes</h3>
-                            <p className="mt-1 text-sm text-slate-600">
-                                Filtra por negocio o estado y actualiza la reserva seleccionada.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
+                <SectionCard
+                    title="Reservas recientes"
+                    description="Filtros arriba, cola a la izquierda y edicion rapida al lado para no mezclar roles."
+                    density="compact"
+                >
+                    <div className="card-filter density-compact mb-4">
+                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                             <select
                                 className="input-field min-w-[11rem]"
                                 value={bookingBusinessId}
@@ -885,139 +933,148 @@ export function OperationsWorkspace({
                         </div>
                     </div>
 
-                    {bookings.data.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            {bookings.data.map((booking) => (
-                                <button
-                                    key={booking.id}
-                                    type="button"
-                                    className={`rounded-2xl border px-4 py-4 text-left transition-all ${
-                                        booking.id === selectedBookingId
-                                            ? 'border-primary-300 bg-primary-50 shadow-sm'
-                                            : 'border-slate-200 bg-slate-50/70 hover:border-primary-100 hover:bg-white'
-                                    }`}
-                                    onClick={() => setSelectedBookingId(booking.id)}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-medium text-slate-900">{booking.business.name}</p>
-                                            <p className="mt-1 text-xs text-slate-500">
-                                                {booking.user?.name || 'Cliente'} - {formatDateTimeDo(booking.scheduledFor)}
-                                            </p>
-                                        </div>
-                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingStatusTone(booking.status)}`}>
-                                            {getBookingStatusLabel(booking.status)}
-                                        </span>
-                                    </div>
-                                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-                                        <span className="rounded-full bg-white px-2.5 py-1">
-                                            Cotizado: {formatCurrencyDo(booking.quotedAmount ?? 0, booking.currency)}
-                                        </span>
-                                        <span className="rounded-full bg-white px-2.5 py-1">
-                                            Deposito: {formatCurrencyDo(booking.depositAmount ?? 0, booking.currency)}
-                                        </span>
-                                        {booking.partySize ? (
-                                            <span className="rounded-full bg-white px-2.5 py-1">
-                                                Party: {booking.partySize}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-slate-500">Todavia no hay reservas que coincidan con este filtro.</p>
-                    )}
-
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <h4 className="font-medium text-slate-900">Edicion rapida de reserva</h4>
-                                <p className="mt-1 text-sm text-slate-600">
-                                    {selectedBooking
-                                        ? `${selectedBooking.business.name} - ${selectedBooking.user?.name || 'Cliente'}`
-                                        : 'Selecciona una reserva para editarla'}
-                                </p>
-                            </div>
-                            {selectedBooking ? (
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingStatusTone(selectedBooking.status)}`}>
-                                    {getBookingStatusLabel(selectedBooking.status)}
-                                </span>
-                            ) : null}
-                        </div>
-
-                        {selectedBooking ? (
-                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                                <select
-                                    className="input-field"
-                                    value={bookingDraft.status}
-                                    onChange={(event) => setBookingDraft((current) => ({
-                                        ...current,
-                                        status: event.target.value as BookingStatus,
-                                    }))}
-                                >
-                                    <option value="PENDING">Pendiente</option>
-                                    <option value="CONFIRMED">Confirmada</option>
-                                    <option value="COMPLETED">Completada</option>
-                                    <option value="CANCELED">Cancelada</option>
-                                    <option value="NO_SHOW">No asistio</option>
-                                </select>
-                                <input
-                                    className="input-field"
-                                    inputMode="decimal"
-                                    placeholder="Monto cotizado"
-                                    value={bookingDraft.quotedAmount}
-                                    onChange={(event) => setBookingDraft((current) => ({
-                                        ...current,
-                                        quotedAmount: event.target.value,
-                                    }))}
-                                />
-                                <input
-                                    className="input-field"
-                                    inputMode="decimal"
-                                    placeholder="Deposito"
-                                    value={bookingDraft.depositAmount}
-                                    onChange={(event) => setBookingDraft((current) => ({
-                                        ...current,
-                                        depositAmount: event.target.value,
-                                    }))}
-                                />
-                                <textarea
-                                    className="input-field md:col-span-2"
-                                    rows={3}
-                                    placeholder="Notas internas o para la reserva"
-                                    value={bookingDraft.notes}
-                                    onChange={(event) => setBookingDraft((current) => ({
-                                        ...current,
-                                        notes: event.target.value,
-                                    }))}
-                                />
-                                <div className="md:col-span-2 flex flex-wrap gap-3">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)]">
+                        {bookings.data.length > 0 ? (
+                            <div className="card-list">
+                                <div className="card-list__header">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Cola de reservas</p>
+                                    <p className="text-xs text-slate-500">{bookings.total} en el filtro</p>
+                                </div>
+                                {bookings.data.map((booking) => (
                                     <button
+                                        key={booking.id}
                                         type="button"
-                                        className="btn-primary text-sm"
-                                        onClick={() => void handleUpdateBooking()}
-                                        disabled={actionKey === `booking:${selectedBooking.id}`}
+                                        className={`card-list__item w-full flex-col items-start text-left ${
+                                            booking.id === selectedBookingId ? 'card-list__item--active' : ''
+                                        }`}
+                                        onClick={() => setSelectedBookingId(booking.id)}
                                     >
-                                        {actionKey === `booking:${selectedBooking.id}` ? 'Guardando...' : 'Guardar reserva'}
+                                        <div className="flex w-full items-start justify-between gap-3">
+                                            <div>
+                                                <p className="font-medium text-slate-900">{booking.business.name}</p>
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    {booking.user?.name || 'Cliente'} - {formatDateTimeDo(booking.scheduledFor)}
+                                                </p>
+                                            </div>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingStatusTone(booking.status)}`}>
+                                                {getBookingStatusLabel(booking.status)}
+                                            </span>
+                                        </div>
+                                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                            <span className="rounded-full bg-white px-2.5 py-1">
+                                                Cotizado: {formatCurrencyDo(booking.quotedAmount ?? 0, booking.currency)}
+                                            </span>
+                                            <span className="rounded-full bg-white px-2.5 py-1">
+                                                Deposito: {formatCurrencyDo(booking.depositAmount ?? 0, booking.currency)}
+                                            </span>
+                                            {booking.partySize ? (
+                                                <span className="rounded-full bg-white px-2.5 py-1">
+                                                    Party: {booking.partySize}
+                                                </span>
+                                            ) : null}
+                                        </div>
                                     </button>
-                                    <p className="text-sm text-slate-500">
-                                        Programada para {formatDateTimeDo(selectedBooking.scheduledFor)}
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                title="Sin reservas en este filtro"
+                                body="Ajusta negocio o estado para volver a poblar la cola operativa."
+                            />
+                        )}
+
+                        <div className="card-form density-compact space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">Edicion rapida de reserva</p>
+                                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                                        {selectedBooking
+                                            ? `${selectedBooking.business.name} - ${selectedBooking.user?.name || 'Cliente'}`
+                                            : 'Selecciona una reserva para editarla sin perder el contexto de la cola.'}
                                     </p>
                                 </div>
+                                {selectedBooking ? (
+                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingStatusTone(selectedBooking.status)}`}>
+                                        {getBookingStatusLabel(selectedBooking.status)}
+                                    </span>
+                                ) : null}
                             </div>
-                        ) : null}
-                    </div>
-                </article>
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h3 className="font-display text-lg font-semibold text-slate-900">Transacciones de reservas</h3>
-                            <p className="mt-1 text-sm text-slate-600">
-                                Visibilidad rapida del flujo cobrado, pendiente o fallido.
-                            </p>
+                            {selectedBooking ? (
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <select
+                                        className="input-field"
+                                        value={bookingDraft.status}
+                                        onChange={(event) => setBookingDraft((current) => ({
+                                            ...current,
+                                            status: event.target.value as BookingStatus,
+                                        }))}
+                                    >
+                                        <option value="PENDING">Pendiente</option>
+                                        <option value="CONFIRMED">Confirmada</option>
+                                        <option value="COMPLETED">Completada</option>
+                                        <option value="CANCELED">Cancelada</option>
+                                        <option value="NO_SHOW">No asistio</option>
+                                    </select>
+                                    <input
+                                        className="input-field"
+                                        inputMode="decimal"
+                                        placeholder="Monto cotizado"
+                                        value={bookingDraft.quotedAmount}
+                                        onChange={(event) => setBookingDraft((current) => ({
+                                            ...current,
+                                            quotedAmount: event.target.value,
+                                        }))}
+                                    />
+                                    <input
+                                        className="input-field"
+                                        inputMode="decimal"
+                                        placeholder="Deposito"
+                                        value={bookingDraft.depositAmount}
+                                        onChange={(event) => setBookingDraft((current) => ({
+                                            ...current,
+                                            depositAmount: event.target.value,
+                                        }))}
+                                    />
+                                    <textarea
+                                        className="input-field md:col-span-2"
+                                        rows={3}
+                                        placeholder="Notas internas o para la reserva"
+                                        value={bookingDraft.notes}
+                                        onChange={(event) => setBookingDraft((current) => ({
+                                            ...current,
+                                            notes: event.target.value,
+                                        }))}
+                                    />
+                                    <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+                                        <button
+                                            type="button"
+                                            className="btn-primary text-sm"
+                                            onClick={() => void handleUpdateBooking()}
+                                            disabled={actionKey === `booking:${selectedBooking.id}`}
+                                        >
+                                            {actionKey === `booking:${selectedBooking.id}` ? 'Guardando...' : 'Guardar reserva'}
+                                        </button>
+                                        <p className="text-sm text-slate-500">
+                                            Programada para {formatDateTimeDo(selectedBooking.scheduledFor)}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <EmptyState
+                                    title="Sin reserva seleccionada"
+                                    body="Selecciona un item de la cola para editar estado, monto o notas."
+                                />
+                            )}
                         </div>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    title="Transacciones de reservas"
+                    description="Visibilidad rapida del flujo cobrado, pendiente o fallido."
+                    density="compact"
+                    actions={(
                         <select
                             className="input-field min-w-[10rem]"
                             value={transactionStatusFilter}
@@ -1029,40 +1086,45 @@ export function OperationsWorkspace({
                             <option value="FAILED">Fallido</option>
                             <option value="CANCELED">Cancelado</option>
                         </select>
-                    </div>
-
+                    )}
+                >
                     {transactions.data.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="card-list">
+                            <div className="card-list__header">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Flujo financiero</p>
+                                <p className="text-xs text-slate-500">{transactions.total} movimientos</p>
+                            </div>
                             {transactions.data.map((transaction) => (
-                                <div key={transaction.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-medium text-slate-900">{transaction.business.name}</p>
-                                            <p className="mt-1 text-xs text-slate-500">
-                                                {transaction.buyerUser?.name || 'Cliente'} - {formatDateTimeDo(transaction.createdAt)}
-                                            </p>
+                                <div key={transaction.id} className="card-list__item items-start justify-between">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-medium text-slate-900">{transaction.business.name}</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {transaction.buyerUser?.name || 'Cliente'} - {formatDateTimeDo(transaction.createdAt)}
+                                        </p>
+                                        <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-700 md:grid-cols-3">
+                                            <p>Bruto: {formatCurrencyDo(transaction.grossAmount, transaction.currency)}</p>
+                                            <p>Fee: {formatCurrencyDo(transaction.platformFeeAmount, transaction.currency)}</p>
+                                            <p>Neto: {formatCurrencyDo(transaction.netAmount, transaction.currency)}</p>
                                         </div>
-                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getTransactionTone(transaction.status)}`}>
-                                            {getTransactionLabel(transaction.status)}
-                                        </span>
-                                    </div>
-                                    <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-700">
-                                        <p>Bruto: {formatCurrencyDo(transaction.grossAmount, transaction.currency)}</p>
-                                        <p>Fee: {formatCurrencyDo(transaction.platformFeeAmount, transaction.currency)}</p>
-                                        <p>Neto: {formatCurrencyDo(transaction.netAmount, transaction.currency)}</p>
                                         {transaction.booking ? (
-                                            <p>
+                                            <p className="mt-2 text-xs text-slate-500">
                                                 Reserva: {getBookingStatusLabel(transaction.booking.status)} - {formatDateDo(transaction.booking.scheduledFor)}
                                             </p>
                                         ) : null}
                                     </div>
+                                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${getTransactionTone(transaction.status)}`}>
+                                        {getTransactionLabel(transaction.status)}
+                                    </span>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <p className="text-sm text-slate-500">Todavia no hay transacciones con este filtro.</p>
+                        <EmptyState
+                            title="Sin transacciones en este filtro"
+                            body="Cuando haya cobros o intentos de pago, apareceran aqui con su estado."
+                        />
                     )}
-                </article>
+                </SectionCard>
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.4fr)]">
@@ -1076,62 +1138,66 @@ export function OperationsWorkspace({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3">
-                        <select
-                            className="input-field"
-                            value={conversationBusinessId}
-                            onChange={(event) => setConversationBusinessId(event.target.value)}
-                        >
-                            <option value="">Todo el portafolio</option>
-                            {businesses.map((business) => (
-                                <option key={business.id} value={business.id}>{business.name}</option>
-                            ))}
-                        </select>
-                        <select
-                            className="input-field"
-                            value={conversationStatusFilter}
-                            onChange={(event) => setConversationStatusFilter(event.target.value as '' | ConversationStatus)}
-                        >
-                            <option value="">Todos los estados</option>
-                            <option value="OPEN">Abierta</option>
-                            <option value="CLOSED">Cerrada</option>
-                            <option value="CONVERTED">Convertida</option>
-                        </select>
-                        <div className="flex gap-2">
-                            <input
+                    <div className="card-filter density-compact">
+                        <div className="grid grid-cols-1 gap-3">
+                            <select
                                 className="input-field"
-                                placeholder="Buscar por asunto, negocio o cliente"
-                                value={conversationSearchInput}
-                                onChange={(event) => setConversationSearchInput(event.target.value)}
-                            />
-                            <button
-                                type="button"
-                                className="btn-secondary text-sm"
-                                onClick={() => {
-                                    setAppliedConversationSearch(conversationSearchInput.trim());
-                                }}
+                                value={conversationBusinessId}
+                                onChange={(event) => setConversationBusinessId(event.target.value)}
                             >
-                                Buscar
-                            </button>
+                                <option value="">Todo el portafolio</option>
+                                {businesses.map((business) => (
+                                    <option key={business.id} value={business.id}>{business.name}</option>
+                                ))}
+                            </select>
+                            <select
+                                className="input-field"
+                                value={conversationStatusFilter}
+                                onChange={(event) => setConversationStatusFilter(event.target.value as '' | ConversationStatus)}
+                            >
+                                <option value="">Todos los estados</option>
+                                <option value="OPEN">Abierta</option>
+                                <option value="CLOSED">Cerrada</option>
+                                <option value="CONVERTED">Convertida</option>
+                            </select>
+                            <div className="flex gap-2">
+                                <input
+                                    className="input-field"
+                                    placeholder="Buscar por asunto, negocio o cliente"
+                                    value={conversationSearchInput}
+                                    onChange={(event) => setConversationSearchInput(event.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    className="btn-secondary text-sm"
+                                    onClick={() => {
+                                        setAppliedConversationSearch(conversationSearchInput.trim());
+                                    }}
+                                >
+                                    Buscar
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     {conversations.data.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="card-list">
+                            <div className="card-list__header">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Cola de conversaciones</p>
+                                <p className="text-xs text-slate-500">{conversations.total} conversaciones</p>
+                            </div>
                             {conversations.data.map((conversation) => {
                                 const lastMessage = conversation.messages[0];
                                 return (
                                     <button
                                         key={conversation.id}
                                         type="button"
-                                        className={`w-full rounded-2xl border px-4 py-4 text-left transition-all ${
-                                            conversation.id === selectedConversationId
-                                                ? 'border-primary-300 bg-primary-50 shadow-sm'
-                                                : 'border-slate-200 bg-slate-50/70 hover:border-primary-100 hover:bg-white'
+                                        className={`card-list__item w-full flex-col items-start text-left ${
+                                            conversation.id === selectedConversationId ? 'card-list__item--active' : ''
                                         }`}
                                         onClick={() => setSelectedConversationId(conversation.id)}
                                     >
-                                        <div className="flex items-start justify-between gap-3">
+                                        <div className="flex w-full items-start justify-between gap-3">
                                             <div>
                                                 <p className="font-medium text-slate-900">{conversation.business.name}</p>
                                                 <p className="mt-1 text-xs text-slate-500">
@@ -1160,7 +1226,10 @@ export function OperationsWorkspace({
                             })}
                         </div>
                     ) : (
-                        <p className="text-sm text-slate-500">Todavia no hay conversaciones con este filtro.</p>
+                        <EmptyState
+                            title="Sin conversaciones en este filtro"
+                            body="Cuando entre nueva demanda por AquiTa.do, aparecera aqui como una cola operativa."
+                        />
                     )}
                 </article>
 
@@ -1205,19 +1274,19 @@ export function OperationsWorkspace({
                                 </p>
                             </div>
 
-                            <div className="max-h-[22rem] space-y-3 overflow-y-auto pr-1">
+                            <div className="card-list max-h-[22rem] overflow-y-auto pr-1">
                                 {conversationThread.messages.map((message) => (
                                     <div
                                         key={message.id}
-                                        className={`rounded-2xl px-4 py-3 ${
+                                        className={`card-list__item flex-col items-start ${
                                             message.senderRole === 'CUSTOMER'
-                                                ? 'border border-slate-200 bg-slate-50/70'
+                                                ? 'bg-slate-50/70'
                                                 : message.senderRole === 'SYSTEM'
-                                                    ? 'border border-blue-100 bg-blue-50/60'
-                                                    : 'border border-primary-100 bg-primary-50/60'
+                                                    ? 'bg-blue-50/60'
+                                                    : 'bg-primary-50/60'
                                         }`}
                                     >
-                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex w-full flex-wrap items-center justify-between gap-3">
                                             <p className="text-sm font-semibold text-slate-900">
                                                 {getMessageSenderLabel(message.senderRole)}
                                                 {message.senderUser?.name ? ` - ${message.senderUser.name}` : ''}
@@ -1351,7 +1420,10 @@ export function OperationsWorkspace({
                             </div>
                         </>
                     ) : (
-                        <p className="text-sm text-slate-500">Selecciona una conversacion para ver su hilo y responder.</p>
+                        <EmptyState
+                            title="Sin hilo seleccionado"
+                            body="Selecciona una conversacion de la cola para responder, cambiar estado o convertirla en reserva."
+                        />
                     )}
                 </article>
             </div>
@@ -1364,24 +1436,26 @@ export function OperationsWorkspace({
                             Supervisa el canal entrante, controla escalamiento y auto-respuesta.
                         </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        <select
-                            className="input-field min-w-[10rem]"
-                            value={whatsAppStatusFilter}
-                            onChange={(event) => setWhatsAppStatusFilter(event.target.value as '' | WhatsAppStatus)}
-                        >
-                            <option value="">Todos los estados</option>
-                            <option value="OPEN">Abierta</option>
-                            <option value="ESCALATED">Escalada</option>
-                            <option value="CLOSED">Cerrada</option>
-                        </select>
-                        <button
-                            type="button"
-                            className="btn-secondary text-sm"
-                            onClick={() => void loadWhatsAppArea()}
-                        >
-                            Aplicar
-                        </button>
+                    <div className="card-filter density-compact">
+                        <div className="flex flex-wrap gap-2">
+                            <select
+                                className="input-field min-w-[10rem]"
+                                value={whatsAppStatusFilter}
+                                onChange={(event) => setWhatsAppStatusFilter(event.target.value as '' | WhatsAppStatus)}
+                            >
+                                <option value="">Todos los estados</option>
+                                <option value="OPEN">Abierta</option>
+                                <option value="ESCALATED">Escalada</option>
+                                <option value="CLOSED">Cerrada</option>
+                            </select>
+                            <button
+                                type="button"
+                                className="btn-secondary text-sm"
+                                onClick={() => void loadWhatsAppArea()}
+                            >
+                                Aplicar
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1459,7 +1533,10 @@ export function OperationsWorkspace({
                         })}
                     </div>
                 ) : (
-                    <p className="text-sm text-slate-500">Todavia no hay conversaciones de WhatsApp en este filtro.</p>
+                    <EmptyState
+                        title="Sin conversaciones de WhatsApp"
+                        body="Cuando el canal tenga actividad, veras aqui el estado, el ultimo mensaje y sus controles."
+                    />
                 )}
             </article>
         </section>
