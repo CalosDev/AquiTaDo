@@ -399,13 +399,16 @@ export function Home() {
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20">
                     <div className="grid gap-8 xl:gap-10 lg:grid-cols-12 lg:items-center">
                         <div className="lg:col-span-7">
-                            <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-blue-100">
-                                <span className="h-2 w-2 rounded-full bg-red-300"></span>
+                            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 backdrop-blur-md px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100/90 shadow-sm shadow-blue-900/10">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-2 rounded-full bg-accent-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
+                                </span>
                                 Ecosistema local dominicano
                             </div>
-                            <h1 className="mt-5 font-display text-4xl sm:text-5xl xl:text-6xl font-extrabold leading-tight text-white">
-                                Descubre negocios reales
-                                <span className="block text-accent-300">por zona, categoría y confianza en RD</span>
+                            <h1 className="mt-6 font-display text-4xl sm:text-5xl xl:text-7xl font-black leading-[1.1] tracking-tight text-white">
+                                Descubre negocios <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">reales</span>
+                                <span className="block mt-2 text-accent-300 drop-shadow-sm">por zona, categoría y confianza en RD</span>
                             </h1>
                             <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-blue-100">
                                 AquiTa.do te ayuda a encontrar negocios locales útiles, comparables y confiables en República Dominicana,
@@ -430,28 +433,36 @@ export function Home() {
                                 </Link>
                             </div>
 
-                            <form onSubmit={handleSearch} className="mt-7 max-w-3xl">
-                                <div className="hero-glass-card p-2 md:p-3">
-                                    <div className="flex flex-col gap-2 md:flex-row">
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(event) => setSearchQuery(event.target.value)}
-                                            placeholder="Busca restaurantes, colmados, salones, farmacias..."
-                                            aria-label="Buscar negocios"
-                                            className="input-field flex-1 !border-white/50 !bg-white text-sm md:text-base"
-                                        />
-                                        <button type="submit" className="btn-accent whitespace-nowrap">
+                            <form onSubmit={handleSearch} className="mt-8 max-w-3xl">
+                                <div className="hero-glass-card p-2.5 md:p-4 bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl shadow-blue-900/20 rounded-[2rem]">
+                                    <div className="flex flex-col gap-3 md:flex-row">
+                                        <div className="relative flex-1">
+                                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                </svg>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={searchQuery}
+                                                onChange={(event) => setSearchQuery(event.target.value)}
+                                                placeholder="Busca restaurantes, colmados, salones..."
+                                                aria-label="Buscar negocios"
+                                                className="input-field w-full pl-12 !rounded-2xl !border-transparent !bg-white/95 !shadow-inner text-sm md:text-base focus:!bg-white transition-all"
+                                            />
+                                        </div>
+                                        <button type="submit" className="btn-accent !rounded-2xl !px-8 !py-3.5 shadow-lg shadow-accent-600/30 whitespace-nowrap font-bold">
                                             Buscar ahora
                                         </button>
                                     </div>
-                                    <div className="mt-2 flex flex-wrap gap-2 px-1">
-                                        {['Comida criolla', 'Farmacia 24h', 'Taller automotriz'].map((preset) => (
+                                    <div className="mt-3 flex flex-wrap gap-2 px-1">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200/80 mr-1 self-center">Sugerencias:</span>
+                                        {['Comida criolla', 'Farmacia 24h', 'Taller'].map((preset) => (
                                             <button
                                                 key={preset}
                                                 type="button"
                                                 onClick={() => setSearchQuery(preset)}
-                                                className="rounded-full border border-white/35 bg-white/12 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                                                className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-white/90 transition-all hover:bg-white/15 hover:border-white/30 active:scale-95"
                                             >
                                                 {preset}
                                             </button>
