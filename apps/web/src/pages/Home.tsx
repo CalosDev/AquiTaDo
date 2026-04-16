@@ -10,7 +10,7 @@ import { formatPublicCategoryName } from '../lib/categoryLabel';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { useNearViewport } from '../hooks/useNearViewport';
 import { preloadRouteChunk } from '../routes/preload';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, SkeletonLoader, TrustScore, VerificationBadge } from '../components/ui';
 interface Category {
     id: string;
     name: string;
@@ -505,21 +505,9 @@ export function Home() {
                                 </div>
 
                                 <div className="mt-5 space-y-3">
-                                    {loading ? Array.from({ length: 4 }).map((_, index) => (
-                                        <div
-                                            key={`radar-skeleton-${index}`}
-                                            className="hero-radar-item !cursor-default !justify-between"
-                                            aria-hidden="true"
-                                        >
-                                            <div className="flex min-w-0 items-center gap-3">
-                                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold text-white/70">
-                                                    {index + 1}
-                                                </span>
-                                                <span className="h-3.5 w-32 rounded-full bg-white/20"></span>
-                                            </div>
-                                            <span className="h-3.5 w-12 rounded-full bg-white/15"></span>
-                                        </div>
-                                    )) : topRadarCategories.length > 0 ? topRadarCategories.map((category, index) => (
+                                    {loading ? (
+                                        <SkeletonLoader variant="radar-item" count={4} />
+                                    ) : topRadarCategories.length > 0 ? topRadarCategories.map((category, index) => (
                                         <Link
                                             key={category.id}
                                             to={category.slug ? `/negocios/categoria/${category.slug}` : `/businesses?categoryId=${category.id}`}
@@ -718,21 +706,11 @@ export function Home() {
 
                     {!rankingsSectionVisible ? (
                         <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            {Array.from({ length: 4 }).map((_, index) => (
-                                <div key={`ranking-placeholder-${index}`} className="panel-premium p-4">
-                                    <div className="h-4 w-32 rounded bg-gray-100 animate-pulse"></div>
-                                    <div className="mt-2 h-3 w-56 rounded bg-gray-100 animate-pulse"></div>
-                                </div>
-                            ))}
+                            <SkeletonLoader variant="list-item" count={4} />
                         </div>
                     ) : rankingsLoading ? (
                         <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            {Array.from({ length: 4 }).map((_, index) => (
-                                <div key={index} className="panel-premium p-4">
-                                    <div className="h-4 w-32 rounded bg-gray-100 animate-pulse"></div>
-                                    <div className="mt-2 h-3 w-56 rounded bg-gray-100 animate-pulse"></div>
-                                </div>
-                            ))}
+                            <SkeletonLoader variant="list-item" count={4} />
                         </div>
                     ) : rankings.length === 0 ? (
                         <div className="mt-5">
@@ -759,16 +737,19 @@ export function Home() {
                                             <p className="text-xs text-slate-500">
                                                 {item.city?.name || item.province?.name || 'República Dominicana'}
                                             </p>
+                                            <div className="mt-2">
+                                                <VerificationBadge status={item.verified ? 'verified' : 'unverified'} size="sm" />
+                                            </div>
                                         </div>
-                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${reputationTierClass(item.reputation.tier)}`}>
-                                            {reputationTierLabel(item.reputation.tier)}
-                                        </span>
+                                        <div className="flex flex-col items-end gap-2">
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${reputationTierClass(item.reputation.tier)}`}>
+                                                {reputationTierLabel(item.reputation.tier)}
+                                            </span>
+                                            <TrustScore score={item.reputation.score} showLabel={false} size="sm" />
+                                        </div>
                                     </div>
                                     <div className="mt-3 flex items-center gap-4 text-xs text-slate-600">
-                                        <span className="font-semibold text-slate-800">Score {item.reputation.score.toFixed(1)}</span>
-                                        <span>
-                                            Rating {item.reputation.averageRating > 0 ? item.reputation.averageRating.toFixed(1) : '0.0'}
-                                        </span>
+                                        <span className="font-semibold text-slate-800">Rating {item.reputation.averageRating > 0 ? item.reputation.averageRating.toFixed(1) : '0.0'}</span>
                                         <span>{item.reputation.reviewCount} reseñas</span>
                                     </div>
                                 </Link>
@@ -796,21 +777,7 @@ export function Home() {
 
                 {loading ? (
                     <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                        {Array.from({ length: 3 }).map((_, index) => (
-                            <div
-                                key={`recent-business-skeleton-${index}`}
-                                className="listing-card overflow-hidden p-0"
-                                aria-hidden="true"
-                            >
-                                <div className="listing-card-media h-48 animate-pulse bg-slate-100"></div>
-                                <div className="space-y-3 p-5">
-                                    <div className="h-6 w-2/3 rounded-full bg-slate-100"></div>
-                                    <div className="h-3.5 w-1/2 rounded-full bg-slate-100"></div>
-                                    <div className="h-3.5 w-full rounded-full bg-slate-100"></div>
-                                    <div className="h-3.5 w-5/6 rounded-full bg-slate-100"></div>
-                                </div>
-                            </div>
-                        ))}
+                        <SkeletonLoader variant="card" count={3} />
                     </div>
                 ) : recentBusinesses.length === 0 ? (
                     <div className="mt-6 p-6">

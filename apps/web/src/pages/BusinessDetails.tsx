@@ -4,7 +4,7 @@ import { getApiErrorMessage } from '../api/error';
 import { analyticsApi, bookingsApi, businessApi, checkinsApi, favoritesApi, messagingApi, promotionsApi, reputationApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
-import { ActionBar, EmptyStateCard, InlineNotice, PublicPageShell } from '../components/ui';
+import { ActionBar, EmptyStateCard, InlineNotice, PublicPageShell, SkeletonLoader } from '../components/ui';
 import { useNearViewport } from '../hooks/useNearViewport';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
@@ -1191,13 +1191,7 @@ export function BusinessDetails() {
                         <div className="panel-premium px-6 py-5">
                             <div className="h-5 w-44 rounded-full bg-slate-100"></div>
                             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                {Array.from({ length: 4 }).map((_, index) => (
-                                    <div key={`business-details-skeleton-${index}`} className="rounded-2xl border border-slate-200 p-4">
-                                        <div className="h-4 w-1/2 rounded-full bg-slate-100"></div>
-                                        <div className="mt-3 h-3.5 w-full rounded-full bg-slate-100"></div>
-                                        <div className="mt-2 h-3.5 w-4/5 rounded-full bg-slate-100"></div>
-                                    </div>
-                                ))}
+                                <SkeletonLoader variant="details-item" count={4} />
                             </div>
                         </div>
                     </div>
@@ -1213,9 +1207,7 @@ export function BusinessDetails() {
                         <div className="panel-premium px-5 py-6">
                             <div className="h-5 w-40 rounded-full bg-slate-100"></div>
                             <div className="mt-4 space-y-3">
-                                {Array.from({ length: 5 }).map((_, index) => (
-                                    <div key={`sidebar-skeleton-${index}`} className="h-4 w-full rounded-full bg-slate-100"></div>
-                                ))}
+                                <SkeletonLoader variant="text-line" count={5} />
                             </div>
                         </div>
                     </div>

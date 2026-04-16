@@ -12,6 +12,7 @@ import {
     InlineNotice,
     PageIntroCompact,
     PublicPageShell,
+    SkeletonLoader,
 } from '../components/ui';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { businessPriceRangeLabel } from '../lib/businessProfile';
@@ -1187,16 +1188,7 @@ export function BusinessesList() {
 
                             {showSponsoredAds && sponsoredPlacementsLoading && sponsoredPlacements.length === 0 ? (
                                 <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                    {Array.from({ length: 3 }).map((_, index) => (
-                                        <div
-                                            key={`sponsored-skeleton-${index}`}
-                                            className="rounded-2xl border border-slate-200 bg-white p-4"
-                                        >
-                                            <div className="h-3 w-24 rounded-full bg-slate-100 animate-pulse" />
-                                            <div className="mt-3 h-5 w-2/3 rounded-full bg-slate-100 animate-pulse" />
-                                            <div className="mt-2 h-4 w-3/4 rounded-full bg-slate-100 animate-pulse" />
-                                        </div>
-                                    ))}
+                                    <SkeletonLoader variant="sponsored-card" count={3} />
                                 </div>
                             ) : null}
 
