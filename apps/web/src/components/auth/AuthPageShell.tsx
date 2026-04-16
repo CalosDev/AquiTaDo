@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { FormPageLayout, PageShell } from '../ui';
 
 interface AuthPageShellProps {
     eyebrow: string;
@@ -22,7 +23,7 @@ export function AuthPageShell({
     footer,
 }: AuthPageShellProps) {
     return (
-        <div className="container-xl flex flex-1 items-center py-6 md:py-10">
+        <PageShell className="flex flex-1 items-center py-6 md:py-10" width="wide">
             <div className="auth-grid w-full">
                 <aside className="auth-aside-card">
                     <div>
@@ -59,24 +60,16 @@ export function AuthPageShell({
                     </div>
                 </aside>
 
-                <section className="auth-form-card">
-                    <header className="mb-6">
-                        <p className="page-kicker">{eyebrow}</p>
-                        <h2 className="page-heading">{title}</h2>
-                        <p className="page-copy">{description}</p>
-                    </header>
-
-                    <div className="space-y-5">
-                        {children}
-                    </div>
-
-                    {footer ? (
-                        <div className="mt-6 border-t border-slate-200 pt-5 text-sm text-slate-500">
-                            {footer}
-                        </div>
-                    ) : null}
-                </section>
+                <FormPageLayout
+                    eyebrow={eyebrow}
+                    title={title}
+                    description={description}
+                    footer={footer}
+                    className="auth-form-card"
+                >
+                    {children}
+                </FormPageLayout>
             </div>
-        </div>
+        </PageShell>
     );
 }

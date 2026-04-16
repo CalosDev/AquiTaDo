@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../api/error';
 import { analyticsApi, bookingsApi, businessApi, checkinsApi, favoritesApi, messagingApi, promotionsApi, reputationApi, reviewApi, whatsappApi } from '../api/endpoints';
 import { useAuth } from '../context/useAuth';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { ActionBar, EmptyStateCard, InlineNotice, PublicPageShell } from '../components/ui';
 import { useNearViewport } from '../hooks/useNearViewport';
 import { getOrAssignExperimentVariant } from '../lib/abTesting';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
@@ -1164,8 +1165,8 @@ export function BusinessDetails() {
 
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 lg:pb-8" aria-busy="true">
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <PublicPageShell width="wide" className="py-8 pb-28 lg:pb-8">
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3" aria-busy="true">
                     <div className="space-y-6 lg:col-span-2" aria-hidden="true">
                         <div className="panel-premium overflow-hidden">
                             <div className="h-[320px] animate-pulse bg-slate-100 md:h-[380px]"></div>
@@ -1219,28 +1220,40 @@ export function BusinessDetails() {
                         </div>
                     </div>
                 </div>
-            </div>
+            </PublicPageShell>
         );
     }
 
     if (!business) {
         return (
-            <div className="container-lg py-20 text-center space-y-4">
-                <p className="text-5xl">:(</p>
-                <h2 className="text-2xl font-bold text-gray-900">Negocio no encontrado</h2>
-                {errorMessage && (
-                    <p className="text-sm text-red-600">{errorMessage}</p>
-                )}
-            </div>
+            <PublicPageShell width="wide" className="py-16 pb-28 lg:pb-8">
+                <EmptyStateCard
+                    title="Negocio no encontrado"
+                    body={errorMessage || 'No pudimos encontrar esta ficha. Puede haber cambiado de ruta o ya no estar disponible.'}
+                    action={(
+                        <ActionBar className="justify-center">
+                            <Link to="/businesses" className="btn-primary text-sm">
+                                Volver al directorio
+                            </Link>
+                            <Link to="/" className="btn-secondary text-sm">
+                                Ir al inicio
+                            </Link>
+                        </ActionBar>
+                    )}
+                />
+            </PublicPageShell>
         );
     }
 
     return (
-        <div className="container-lg py-8 pb-28 lg:pb-8 animate-fade-in">
+        <PublicPageShell width="wide" className="py-8 pb-28 lg:pb-8 animate-fade-in">
             {errorMessage && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errorMessage}
-                </div>
+                <InlineNotice
+                    className="mb-4"
+                    tone="danger"
+                    title="No pudimos actualizar todo el perfil"
+                    body={errorMessage}
+                />
             )}
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
                 {/* Main Content */}
@@ -1878,7 +1891,7 @@ export function BusinessDetails() {
                 onOpenWhatsApp={openWhatsApp}
                 onPhoneClick={handlePhoneClick}
             />
-        </div>
+        </PublicPageShell>
     );
 }
 

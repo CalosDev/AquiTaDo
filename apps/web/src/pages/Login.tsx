@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { AuthPageShell } from '../components/auth/AuthPageShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
+import { FieldHint, InlineNotice, StickyFormActions } from '../components/ui';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
 import { useTimedMessage } from '../hooks/useTimedMessage';
@@ -199,11 +200,13 @@ export function Login() {
                         </div>
                     </>
                 ) : (
-                    <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-                        <p>Tu cuenta necesita un segundo factor para completar el acceso con Google.</p>
+                    <InlineNotice
+                        tone="warning"
+                        body="Tu cuenta necesita un segundo factor para completar el acceso con Google."
+                        action={(
                         <button
                             type="button"
-                            className="mt-3 text-xs font-semibold text-amber-900 underline decoration-amber-300 underline-offset-4"
+                            className="text-xs font-semibold text-amber-900 underline decoration-amber-300 underline-offset-4"
                             onClick={() => {
                                 setPendingGoogleIdToken('');
                                 setRequiresTwoFactor(false);
@@ -213,7 +216,8 @@ export function Login() {
                         >
                             Volver al acceso con correo y contraseña
                         </button>
-                    </div>
+                        )}
+                    />
                 )}
 
                 {requiresTwoFactor ? (
@@ -239,12 +243,15 @@ export function Login() {
                             className="input-field"
                             placeholder="123456"
                         />
+                        <FieldHint>Introduce el código de seis dígitos generado por tu app de autenticación.</FieldHint>
                     </div>
                 ) : null}
 
-                <button type="submit" disabled={loading} className="btn-primary w-full">
-                    {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
-                </button>
+                <StickyFormActions>
+                    <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto">
+                        {loading ? 'Ingresando...' : pendingGoogleIdToken ? 'Confirmar acceso con Google' : 'Iniciar sesión'}
+                    </button>
+                </StickyFormActions>
             </form>
         </AuthPageShell>
     );

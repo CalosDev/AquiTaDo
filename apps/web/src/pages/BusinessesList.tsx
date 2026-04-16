@@ -5,7 +5,14 @@ import { adsApi, analyticsApi, businessApi, categoryApi, favoritesApi, locationA
 import { OptimizedImage } from '../components/OptimizedImage';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useAuth } from '../context/useAuth';
-import { EmptyState } from '../components/ui';
+import {
+    ActionBar,
+    AppCard,
+    EmptyStateCard,
+    InlineNotice,
+    PageIntroCompact,
+    PublicPageShell,
+} from '../components/ui';
 import { getOrCreateSessionId, getOrCreateVisitorId } from '../lib/clientContext';
 import { businessPriceRangeLabel } from '../lib/businessProfile';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
@@ -960,7 +967,7 @@ export function BusinessesList() {
 
     
     return (
-        <div className="page-shell py-8 md:py-10">
+        <PublicPageShell className="py-8 md:py-10">
             <PageFeedbackStack
                 items={
                     loadError
@@ -976,18 +983,22 @@ export function BusinessesList() {
             />
 
             <section className="page-section">
-                <p className="page-kicker">Discovery publico</p>
-                <h1 className="page-heading">{listingHeading}</h1>
-                <p className="page-copy">{listingDescription}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="chip !bg-white !text-slate-700">{resultsCountLabel}</span>
-                    {activeFilterChips.length > 0 ? (
-                        <span className="chip !bg-white !text-slate-700">{activeFilterChips.length} filtros activos</span>
-                    ) : null}
-                    {activeProvince ? (
-                        <span className="chip !bg-white !text-slate-700">Provincia: {activeProvince.name}</span>
-                    ) : null}
-                </div>
+                <PageIntroCompact
+                    eyebrow="Discovery público"
+                    title={listingHeading}
+                    description={listingDescription}
+                    actions={(
+                        <ActionBar>
+                            <span className="chip !bg-white !text-slate-700">{resultsCountLabel}</span>
+                            {activeFilterChips.length > 0 ? (
+                                <span className="chip !bg-white !text-slate-700">{activeFilterChips.length} filtros activos</span>
+                            ) : null}
+                            {activeProvince ? (
+                                <span className="chip !bg-white !text-slate-700">Provincia: {activeProvince.name}</span>
+                            ) : null}
+                        </ActionBar>
+                    )}
+                />
             </section>
 
             <ListingControlsBar
@@ -1032,22 +1043,25 @@ export function BusinessesList() {
                 />
 
                 <div className="min-w-0">
-                    <div className="results-toolbar mb-4">
-                        <div>
-                            <p className="page-kicker">Resultados</p>
-                            <p className="mt-2 text-sm leading-6 text-slate-600">{pageSummary || listingDescription}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {activeCategoryDisplayName ? (
-                                <span className="chip !bg-white !text-slate-700">{activeCategoryDisplayName}</span>
-                            ) : null}
-                            {currentView === 'map' ? (
-                                <span className="chip !bg-white !text-slate-700">Vista sincronizada con mapa</span>
-                            ) : (
-                                <span className="chip !bg-white !text-slate-700">Vista lista</span>
+                    <AppCard className="mb-4">
+                        <PageIntroCompact
+                            eyebrow="Resultados"
+                            title="Directorio listo para explorar"
+                            description={pageSummary || listingDescription}
+                            actions={(
+                                <ActionBar>
+                                    {activeCategoryDisplayName ? (
+                                        <span className="chip !bg-white !text-slate-700">{activeCategoryDisplayName}</span>
+                                    ) : null}
+                                    {currentView === 'map' ? (
+                                        <span className="chip !bg-white !text-slate-700">Vista sincronizada con mapa</span>
+                                    ) : (
+                                        <span className="chip !bg-white !text-slate-700">Vista lista</span>
+                                    )}
+                                </ActionBar>
                             )}
-                        </div>
-                    </div>
+                        />
+                    </AppCard>
                     {shouldShowInitialLoading ? (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1088,54 +1102,59 @@ export function BusinessesList() {
                             </div>
                         </div>
                     ) : loadError && businesses.length === 0 ? (
-                        <div className="rounded-[1.75rem] border border-accent-100 bg-white p-6 shadow-[0_28px_80px_-42px_rgba(15,23,42,0.28)] sm:p-8">
-                            <div className="max-w-2xl">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-500">
-                                    {loadErrorType === 'timeout' ? 'Servicio despertando' : 'No pudimos completar la carga'}
-                                </p>
-                                <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-slate-900">
-                                    {loadErrorType === 'timeout'
-                                        ? 'La carga está tardando más de lo normal'
-                                        : 'Hubo un problema al traer los negocios'}
-                                </h2>
-                                <p className="mt-2 max-w-xl text-sm text-slate-600">
-                                    {loadErrorType === 'timeout'
-                                        ? 'Estamos reintentando cuando el servicio tarda en responder. Puedes volver a intentar sin perder tus filtros.'
-                                        : 'Revisa tu conexión o vuelve a intentarlo en unos segundos. Mientras tanto, tu contexto de búsqueda se mantiene.'}
-                                </p>
-                            </div>
+                        <AppCard
+                            title={loadErrorType === 'timeout' ? 'La carga está tardando más de lo normal' : 'Hubo un problema al traer los negocios'}
+                            description={
+                                loadErrorType === 'timeout'
+                                    ? 'Estamos reintentando cuando el servicio tarda en responder. Puedes volver a intentar sin perder tus filtros.'
+                                    : 'Revisa tu conexión o vuelve a intentarlo en unos segundos. Mientras tanto, tu contexto de búsqueda se mantiene.'
+                            }
+                            className="sm:p-8"
+                        >
+                            <InlineNotice
+                                tone={loadErrorType === 'timeout' ? 'warning' : 'danger'}
+                                title={loadErrorType === 'timeout' ? 'Servicio despertando' : 'No pudimos completar la carga'}
+                                body={loadError}
+                            />
 
-                            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                            <ActionBar className="mt-5">
                                 <button
                                     type="button"
                                     onClick={() => void loadBusinesses()}
-                                    className="inline-flex items-center justify-center rounded-2xl bg-primary-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-800"
+                                    className="btn-primary text-sm"
                                 >
                                     Reintentar carga
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleClearFilters}
-                                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                                    className="btn-secondary text-sm"
                                 >
                                     Limpiar filtros
                                 </button>
-                            </div>
-                        </div>
+                            </ActionBar>
+                        </AppCard>
                     ) : sortedBusinesses.length > 0 ? (
                         <>
                             {isRefreshingResults ? (
-                                <div className="mb-4 rounded-2xl border border-primary-100 bg-primary-50/80 px-4 py-3 text-sm text-primary-700 shadow-sm">
-                                    Actualizando resultados sin perder el contexto actual...
-                                </div>
+                                <InlineNotice
+                                    className="mb-4"
+                                    title="Actualizando resultados"
+                                    body="Estamos refrescando el listado sin borrar el contexto actual."
+                                />
                             ) : null}
 
                             {loadError ? (
-                                <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-                                    {loadErrorType === 'timeout'
-                                        ? 'La actualizacion tardó más de lo normal. Te dejamos los últimos resultados visibles mientras reintentas.'
-                                        : loadError}
-                                </div>
+                                <InlineNotice
+                                    className="mb-4"
+                                    tone={loadErrorType === 'timeout' ? 'warning' : 'danger'}
+                                    title={loadErrorType === 'timeout' ? 'Seguimos mostrando la última carga útil' : 'La actualización no pudo completarse'}
+                                    body={
+                                        loadErrorType === 'timeout'
+                                            ? 'La actualización tardó más de lo normal. Dejamos visibles los últimos resultados mientras reintentas.'
+                                            : loadError
+                                    }
+                                />
                             ) : null}
 
                             {showSponsoredAds && sponsoredPlacements.length > 0 ? (
@@ -1182,7 +1201,7 @@ export function BusinessesList() {
                             ) : null}
 
                             {currentView === 'map' ? (
-                                <div className="discovery-callout mb-4 p-3">
+                                <AppCard className="mb-4 discovery-callout">
                                     <div className="mb-3 flex flex-col gap-3 border-b border-slate-100 pb-3 md:flex-row md:items-center md:justify-between">
                                         <div>
                                             <h2 className="text-sm font-semibold text-slate-900">Mapa sincronizado con el listado</h2>
@@ -1218,7 +1237,7 @@ export function BusinessesList() {
                                         emptyLabel="No hay coordenadas suficientes en esta página para dibujar el mapa todavía."
                                         />
                                     </Suspense>
-                                </div>
+                                </AppCard>
                             ) : null}
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1445,48 +1464,47 @@ export function BusinessesList() {
                             </div>
                         </>
                     ) : (
-                        <div className="py-16">
-                            <EmptyState
-                                title="No encontramos coincidencias con esta combinación"
-                                body="Ajusta uno o dos filtros, cambia la provincia o prueba una intención rápida para descubrir negocios cercanos."
-                                action={
-                                    <div className="mt-2 flex flex-col items-center gap-5">
-                                        <div className="flex flex-wrap items-center justify-center gap-3">
-                                            <button
-                                                type="button"
-                                                onClick={handleClearFilters}
-                                                className="btn-primary text-sm"
-                                            >
-                                                Limpiar filtros
-                                            </button>
-                                            {!isAuthenticated || isCustomerRole ? (
-                                                <Link to="/suggest-business" className="btn-secondary text-sm">
-                                                    Sugerir este negocio
-                                                </Link>
-                                            ) : null}
-                                            <Link to="/" className="btn-secondary text-sm">
-                                                Volver al inicio
+                        <EmptyStateCard
+                            className="py-10"
+                            title="No encontramos coincidencias con esta combinación"
+                            body="Ajusta uno o dos filtros, cambia la provincia o prueba una intención rápida para descubrir negocios cercanos."
+                            action={
+                                <div className="mt-2 flex flex-col items-center gap-5">
+                                    <div className="flex flex-wrap items-center justify-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={handleClearFilters}
+                                            className="btn-primary text-sm"
+                                        >
+                                            Limpiar filtros
+                                        </button>
+                                        {!isAuthenticated || isCustomerRole ? (
+                                            <Link to="/suggest-business" className="btn-secondary text-sm">
+                                                Sugerir este negocio
                                             </Link>
-                                        </div>
-                                        <div className="flex flex-wrap items-center justify-center gap-2">
-                                            {NO_RESULTS_SUGGESTIONS.map((suggestion) => (
-                                                <Link
-                                                    key={suggestion.to}
-                                                    to={suggestion.to}
-                                                    className="chip transition hover:!bg-primary-50 hover:!text-primary-700"
-                                                >
-                                                    {suggestion.label}
-                                                </Link>
-                                            ))}
-                                        </div>
+                                        ) : null}
+                                        <Link to="/" className="btn-secondary text-sm">
+                                            Volver al inicio
+                                        </Link>
                                     </div>
-                                }
-                            />
-                        </div>
+                                    <div className="flex flex-wrap items-center justify-center gap-2">
+                                        {NO_RESULTS_SUGGESTIONS.map((suggestion) => (
+                                            <Link
+                                                key={suggestion.to}
+                                                to={suggestion.to}
+                                                className="chip transition hover:!bg-primary-50 hover:!text-primary-700"
+                                            >
+                                                {suggestion.label}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            }
+                        />
                     )}
                 </div>
             </div>
-        </div>
+        </PublicPageShell>
     );
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { AuthPageShell } from '../components/auth/AuthPageShell';
+import { FieldHint, StickyFormActions } from '../components/ui';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -84,11 +85,14 @@ export function ForgotPassword() {
                         className="input-field"
                         placeholder="tu@correo.com"
                     />
+                    <FieldHint>Usa el correo con el que entras normalmente a AquiTa.do.</FieldHint>
                 </div>
 
-                <button type="submit" disabled={loading} className="btn-primary w-full">
-                    {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
-                </button>
+                <StickyFormActions>
+                    <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto">
+                        {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
+                    </button>
+                </StickyFormActions>
             </form>
         </AuthPageShell>
     );

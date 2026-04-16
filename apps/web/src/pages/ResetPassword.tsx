@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { AuthPageShell } from '../components/auth/AuthPageShell';
+import { FieldHint, StickyFormActions } from '../components/ui';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { trackGrowthEvent } from '../lib/growthTracking';
@@ -115,6 +116,7 @@ export function ResetPassword() {
                         className="input-field"
                         placeholder="Mínimo 8 caracteres, con letras y números"
                     />
+                    <FieldHint>Usa una clave nueva que combine letras y números para evitar rechazos al enviar.</FieldHint>
                 </div>
 
                 <div className="space-y-1.5">
@@ -134,9 +136,11 @@ export function ResetPassword() {
                     />
                 </div>
 
-                <button type="submit" disabled={loading || !token} className="btn-primary w-full">
-                    {loading ? 'Guardando...' : 'Restablecer contraseña'}
-                </button>
+                <StickyFormActions>
+                    <button type="submit" disabled={loading || !token} className="btn-primary w-full sm:w-auto">
+                        {loading ? 'Guardando...' : 'Restablecer contraseña'}
+                    </button>
+                </StickyFormActions>
             </form>
         </AuthPageShell>
     );

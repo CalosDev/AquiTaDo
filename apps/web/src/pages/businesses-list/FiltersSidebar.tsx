@@ -1,5 +1,6 @@
 import type { Category, City, Province, Sector } from './types';
 import { formatPublicCategoryIcon, formatPublicCategoryName } from '../../lib/categoryLabel';
+import { ActionBar, AppCard, InlineNotice } from '../../components/ui';
 
 interface FiltersSidebarProps {
     activeFilterChips: string[];
@@ -43,18 +44,12 @@ export function FiltersSidebar({
     sectors,
 }: FiltersSidebarProps) {
     const renderFiltersPanel = (panelId: string, titleId: string) => (
-        <div id={panelId} className="card-filter density-medium space-y-5">
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Filtros avanzados</p>
-                    <h2 id={titleId} className="mt-2 text-base font-semibold text-slate-900">
-                        Refina tu busqueda
-                    </h2>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                        Ajusta ubicacion, categoria y disponibilidad sin perder el contexto del listado.
-                    </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
+        <AppCard
+            title="Refina tu busqueda"
+            description="Ajusta ubicacion, categoria y disponibilidad sin perder el contexto del listado."
+            className="card-filter density-medium space-y-5"
+            actions={(
+                <ActionBar className="justify-end">
                     <button
                         type="button"
                         onClick={onClearFilters}
@@ -72,22 +67,28 @@ export function FiltersSidebar({
                             <path d="M6 18 18 6M6 6l12 12" />
                         </svg>
                     </button>
-                </div>
-            </div>
-
-            {activeFilterChips.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                    {activeFilterChips.map((chip) => (
-                        <span key={chip} className="chip !bg-white !text-slate-700">
-                            {chip}
-                        </span>
-                    ))}
-                </div>
-            ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-500">
-                    Todavia no has aplicado filtros avanzados.
-                </p>
+                </ActionBar>
             )}
+        >
+            <div id={panelId} aria-labelledby={titleId}>
+                <span id={titleId} className="sr-only">
+                    Refina tu busqueda
+                </span>
+
+                {activeFilterChips.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                        {activeFilterChips.map((chip) => (
+                            <span key={chip} className="chip !bg-white !text-slate-700">
+                                {chip}
+                            </span>
+                        ))}
+                    </div>
+                ) : (
+                    <InlineNotice
+                        body="Todavia no has aplicado filtros avanzados."
+                        className="mb-1"
+                    />
+                )}
 
             <section className="space-y-3">
                 <div>
@@ -222,7 +223,8 @@ export function FiltersSidebar({
                     </label>
                 </div>
             </section>
-        </div>
+            </div>
+        </AppCard>
     );
 
     return (

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { AuthPageShell } from '../components/auth/AuthPageShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
+import { FieldHint, InlineChoiceGroup, InlineNotice, StickyFormActions } from '../components/ui';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
 import { useTimedMessage } from '../hooks/useTimedMessage';
@@ -167,9 +168,9 @@ export function Register() {
                         disabled={loading}
                         onCredential={handleGoogleCredential}
                     />
-                    <p className="text-sm text-slate-500">
+                    <FieldHint>
                         Selecciona primero el tipo de cuenta y acepta los términos antes de continuar con Google.
-                    </p>
+                    </FieldHint>
                     <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                         <div className="h-px flex-1 bg-slate-200"></div>
                         <span>o completa el formulario</span>
@@ -228,59 +229,23 @@ export function Register() {
                     </div>
                 </div>
 
-                <fieldset className="space-y-3">
-                    <legend className="text-sm font-semibold text-slate-700">
-                        Tipo de cuenta
-                    </legend>
-                    <div className="grid gap-3 md:grid-cols-2">
-                        {ACCOUNT_TYPE_OPTIONS.map((option) => {
-                            const selected = formData.accountType === option.value;
-
-                            return (
-                                <label
-                                    key={option.value}
-                                    className={`rounded-[24px] border px-4 py-4 transition-colors ${
-                                        selected
-                                            ? 'border-primary-300 bg-primary-50'
-                                            : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <input
-                                        type="radio"
-                                        name="accountType"
-                                        value={option.value}
-                                        checked={selected}
-                                        onChange={() => setFormData({ ...formData, accountType: option.value })}
-                                        className="sr-only"
-                                    />
-                                    <div className="flex items-start gap-3">
-                                        <span
-                                            aria-hidden="true"
-                                            className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                                                selected ? 'border-primary-600 bg-primary-600' : 'border-slate-300 bg-white'
-                                            }`}
-                                        >
-                                            <span className={`h-2 w-2 rounded-full bg-white ${selected ? 'opacity-100' : 'opacity-0'}`} />
-                                        </span>
-                                        <div>
-                                            <p className="text-sm font-semibold text-slate-900">{option.title}</p>
-                                            <p className="mt-1 text-sm leading-6 text-slate-600">
-                                                {option.description}
-                                            </p>
-                                            <p className={`mt-2 text-xs font-semibold ${selected ? 'text-primary-700' : 'text-slate-500'}`}>
-                                                {option.support}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </label>
-                            );
-                        })}
-                    </div>
-                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-                        Las cuentas cliente no crean organización. La organización aparece cuando registras tu primer negocio
-                        o aceptas una invitación.
-                    </div>
-                </fieldset>
+                <InlineChoiceGroup
+                    name="accountType"
+                    value={formData.accountType}
+                    legend="Tipo de cuenta"
+                    options={ACCOUNT_TYPE_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: option.title,
+                        description: option.description,
+                        support: option.support,
+                    }))}
+                    onChange={(accountType) => setFormData({ ...formData, accountType })}
+                    hint={(
+                        <InlineNotice
+                            body="Las cuentas cliente no crean organización. La organización aparece cuando registras tu primer negocio o aceptas una invitación."
+                        />
+                    )}
+                />
 
                 <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-1.5">
@@ -338,9 +303,11 @@ export function Register() {
                     </span>
                 </label>
 
-                <button type="submit" disabled={loading} className="btn-primary w-full">
-                    {loading ? 'Creando cuenta...' : 'Crear cuenta'}
-                </button>
+                <StickyFormActions>
+                    <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto">
+                        {loading ? 'Creando cuenta...' : 'Crear cuenta'}
+                    </button>
+                </StickyFormActions>
             </form>
         </AuthPageShell>
     );

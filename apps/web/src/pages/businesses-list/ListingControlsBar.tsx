@@ -1,4 +1,5 @@
 import type { ListingViewMode, Province } from './types';
+import { FilterBar } from '../../components/ui';
 
 interface ListingControlsBarProps {
     activeFilterCount: number;
@@ -38,7 +39,7 @@ export function ListingControlsBar({
     totalVisibleResults,
 }: ListingControlsBarProps) {
     return (
-        <div className="results-toolbar">
+        <FilterBar className="results-toolbar">
             <div className="flex flex-1 flex-col gap-3 xl:flex-row xl:items-center">
                 <label className="relative flex-1">
                     <span className="sr-only">Buscar negocios</span>
@@ -154,6 +155,6 @@ export function ListingControlsBar({
                     </span>
                 ) : null}
             </div>
-        </div>
+        </FilterBar>
     );
 }

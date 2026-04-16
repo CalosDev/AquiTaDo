@@ -6,7 +6,15 @@ import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { useOrganization } from '../context/useOrganization';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 import { formatDateTimeDo } from '../lib/market';
-import { SummaryCard, SectionCard, EmptyState } from '../components/ui';
+import {
+    ActionBar,
+    AppCard,
+    EmptyState,
+    EmptyStateCard,
+    PageIntroCompact,
+    SectionCard,
+    SummaryCard,
+} from '../components/ui';
 
 const VerificationWorkspace = lazy(async () => ({
     default: (await import('./dashboard-business/VerificationWorkspace')).VerificationWorkspace,
@@ -500,10 +508,14 @@ export function DashboardBusiness() {
     if (needsFirstBusinessSetup) {
         return (
             <div className="app-page-inner density-cozy">
-                <div className="app-page-header">
-                    <h1 className="app-page-header__title">Panel del negocio</h1>
-                </div>
-                <EmptyState
+                <AppCard className="mb-6">
+                    <PageIntroCompact
+                        eyebrow="Dashboard negocio"
+                        title="Panel del negocio"
+                        description="Crea o unete a una organizacion para empezar a operar desde AquiTa.do con una sola estructura."
+                    />
+                </AppCard>
+                <EmptyStateCard
                     title="Aún no tienes una organización"
                     body="Crea o únete a una organización para gestionar tus negocios en AquiTa.do."
                     action={
@@ -533,7 +545,7 @@ export function DashboardBusiness() {
             />
 
             {/* ── Page Header ───────────────────────────── */}
-            <div className="app-page-header">
+            <AppCard className="app-page-header">
                 <div className="min-w-0">
                     <p className="page-kicker">Dashboard negocio</p>
                     <h1 className="app-page-header__title">
@@ -542,7 +554,7 @@ export function DashboardBusiness() {
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                         {activeWorkspaceMeta.description}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <ActionBar className="mt-3">
                         {activeOrganization?.name ? (
                             <span className="chip !bg-white !text-slate-700">
                                 Organizacion activa: {activeOrganization.name}
@@ -556,9 +568,9 @@ export function DashboardBusiness() {
                         <span className="chip !bg-white !text-slate-700">
                             {businesses.length} negocio{businesses.length !== 1 ? 's' : ''} gestionados
                         </span>
-                    </div>
+                    </ActionBar>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <ActionBar className="justify-end">
                     {selectedBusinessPublicPath ? (
                         <Link
                             to={selectedBusinessPublicPath}
@@ -572,8 +584,8 @@ export function DashboardBusiness() {
                     <Link to="/register-business" className="btn-primary text-xs px-4 py-2">
                         + Negocio
                     </Link>
-                </div>
-            </div>
+                </ActionBar>
+            </AppCard>
 
             {/* ═══ FILA 1: Contexto del negocio + estado rápido (§ 9.4) ═══ */}
             <section aria-label="Estado del negocio">
@@ -835,7 +847,11 @@ export function DashboardBusiness() {
             {/* ═══ Selector de negocio (si hay más de uno) ═══ */}
             {businesses.length > 1 && (
                 <section aria-label="Negocios gestionados">
-                    <div className="card-filter density-compact">
+                    <AppCard
+                        title="Negocio activo"
+                        description="Cambia el contexto del dashboard sin salir del workspace actual."
+                        className="card-filter density-compact"
+                    >
                         <label htmlFor="business-select" className="text-xs font-semibold text-slate-600 mb-2 block">
                             Negocio activo
                         </label>
@@ -849,7 +865,7 @@ export function DashboardBusiness() {
                                 <option key={b.id} value={b.id}>{b.name}</option>
                             ))}
                         </select>
-                    </div>
+                    </AppCard>
                 </section>
             )}
 
