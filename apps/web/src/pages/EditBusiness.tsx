@@ -5,6 +5,15 @@ import { getApiErrorMessage } from '../api/error';
 import { BusyButtonLabel } from '../components/BusyButtonLabel';
 import { OptimizedImage } from '../components/OptimizedImage';
 import {
+    ActionBar,
+    AppCard,
+    EmptyStateCard,
+    InlineNotice,
+    PageIntroCompact,
+    PageShell,
+    StickyFormActions,
+} from '../components/ui';
+import {
     BUSINESS_PRICE_RANGE_OPTIONS,
     businessPriceRangeLabel,
     mergeBusinessHours,
@@ -427,19 +436,15 @@ export function EditBusiness() {
 
     if (loading) {
         return (
-            <div className="page-shell max-w-5xl space-y-6">
-                <section className="role-hero role-hero-owner" aria-busy="true">
-                    <div className="h-4 w-28 rounded-full bg-white/20 animate-pulse"></div>
-                    <div className="mt-2 h-9 w-64 max-w-full rounded-2xl bg-white/20 animate-pulse"></div>
-                    <div className="mt-2 min-h-[3.5rem] max-w-2xl space-y-2">
-                        <div className="h-5 w-full rounded-xl bg-white/15 animate-pulse"></div>
-                        <div className="h-5 w-3/4 rounded-xl bg-white/10 animate-pulse"></div>
+            <PageShell width="wide" className="space-y-6">
+                <AppCard aria-busy="true">
+                    <div className="h-4 w-28 rounded-full bg-slate-100 animate-pulse"></div>
+                    <div className="mt-4 h-9 w-64 max-w-full rounded-2xl bg-slate-100 animate-pulse"></div>
+                    <div className="mt-4 min-h-[3.5rem] max-w-2xl space-y-2">
+                        <div className="h-5 w-full rounded-xl bg-slate-100 animate-pulse"></div>
+                        <div className="h-5 w-3/4 rounded-xl bg-slate-100 animate-pulse"></div>
                     </div>
-                    <div className="role-hero-actions" aria-hidden="true">
-                        <div className="role-hero-action-skeleton animate-pulse">Volver al panel</div>
-                        <div className="role-hero-action-skeleton animate-pulse">Ver perfil publico</div>
-                    </div>
-                </section>
+                </AppCard>
                 <div className="section-shell p-6 lg:p-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {Array.from({ length: 10 }).map((_, index) => (
@@ -450,67 +455,76 @@ export function EditBusiness() {
                         ))}
                     </div>
                 </div>
-            </div>
+            </PageShell>
         );
     }
 
     if (!business) {
         return (
-            <div className="page-shell max-w-5xl space-y-6">
-                <section className="role-hero role-hero-owner">
-                    <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
-                    <h1 className="font-display text-3xl font-bold text-white mt-2">Editar negocio</h1>
-                    <p className="text-blue-100 mt-2 max-w-2xl">
-                        Verifica que el negocio existe y que pertenece a tu organizacion.
-                    </p>
-                </section>
-                <div className="section-shell p-8">
-                    <h1 className="font-display text-2xl font-bold text-gray-900">No se pudo abrir esta edición</h1>
-                    <p className="text-gray-600 mt-2">
-                        Verifica que el negocio existe y que pertenece a tu organización.
-                    </p>
-                    {errorMessage && (
-                        <p className="mt-3 text-sm text-red-700">{errorMessage}</p>
+            <PageShell width="wide" className="space-y-6">
+                <AppCard>
+                    <PageIntroCompact
+                        eyebrow="Panel negocio"
+                        title="Editar negocio"
+                        description="Verifica que el negocio existe y que pertenece a tu organizacion."
+                    />
+                </AppCard>
+                <EmptyStateCard
+                    title="No se pudo abrir esta edicion"
+                    body={errorMessage || 'Verifica que el negocio existe y que pertenece a tu organizacion.'}
+                    action={(
+                        <ActionBar>
+                            <Link to="/dashboard" className="btn-primary">
+                                Volver al panel
+                            </Link>
+                            <Link to="/businesses" className="btn-secondary">
+                                Ir al directorio
+                            </Link>
+                        </ActionBar>
                     )}
-                    <div className="mt-6 flex flex-wrap gap-3">
-                        <Link to="/dashboard" className="btn-primary">Volver al panel</Link>
-                        <Link to="/businesses" className="btn-secondary">Ir al directorio</Link>
-                    </div>
-                </div>
-            </div>
+                />
+            </PageShell>
         );
     }
 
     return (
-        <div className="page-shell max-w-5xl space-y-6">
-            <section className="role-hero role-hero-owner">
-                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
-                <h1 className="font-display text-3xl font-bold text-white mt-2">Editar negocio</h1>
-                <p className="text-blue-100 mt-2 max-w-2xl min-h-[3.5rem]">
-                    Actualiza la información pública de tu negocio y mantén su perfil siempre al día.
-                </p>
+        <PageShell width="wide" className="space-y-6">
+            <AppCard>
+                <PageIntroCompact
+                    eyebrow="Panel negocio"
+                    title="Editar negocio"
+                    description="Actualiza la informacion publica del negocio y manten su perfil listo para discovery, claim y verificacion."
+                    actions={(
+                        <ActionBar>
+                            <Link to="/dashboard" className="btn-secondary">
+                                Volver al panel
+                            </Link>
+                            <Link to={`/businesses/${business.slug || business.id}`} className="btn-primary">
+                                Ver perfil publico
+                            </Link>
+                        </ActionBar>
+                    )}
+                />
+            </AppCard>
 
-                <div className="role-hero-actions">
-                    <Link to="/dashboard" className="btn-secondary role-hero-action">Volver al panel</Link>
-                    <Link to={`/businesses/${business.slug || business.id}`} className="btn-primary role-hero-action">
-                        Ver perfil público
-                    </Link>
-                </div>
-            </section>
+            {errorMessage ? (
+                <InlineNotice
+                    title="No pudimos guardar los cambios"
+                    body={errorMessage}
+                    tone="danger"
+                />
+            ) : null}
+            {successMessage ? (
+                <InlineNotice
+                    title="Cambios guardados"
+                    body={successMessage}
+                    tone="success"
+                />
+            ) : null}
 
-            {errorMessage && (
-                <section role="alert" aria-live="assertive" className="section-shell border border-red-100 bg-red-50 p-4">
-                    <p className="text-sm text-red-700">{errorMessage}</p>
-                </section>
-            )}
-            {successMessage && (
-                <section role="status" aria-live="polite" className="section-shell border border-primary-100 bg-primary-50 p-4">
-                    <p className="text-sm text-primary-700">{successMessage}</p>
-                </section>
-            )}
-
-            <form onSubmit={(event) => void handleSubmit(event)} className="section-shell p-6 lg:p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <AppCard>
+                <form onSubmit={(event) => void handleSubmit(event)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                         <label htmlFor="edit-business-name" className="text-sm font-medium text-gray-700 mb-1 block">
                             Nombre del negocio *
@@ -1042,15 +1056,16 @@ export function EditBusiness() {
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <StickyFormActions>
                     <button type="submit" className="btn-primary" disabled={saving}>
                         <BusyButtonLabel busy={saving} busyText="Guardando cambios..." idleText="Guardar cambios" />
                     </button>
                     <Link to="/dashboard" className="btn-secondary">
                         Cancelar
                     </Link>
-                </div>
+                </StickyFormActions>
             </form>
-        </div>
+        </AppCard>
+    </PageShell>
     );
 }

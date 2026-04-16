@@ -3,6 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../api/error';
 import { businessApi, categoryApi, featuresApi, locationApi, uploadApi } from '../api/endpoints';
 import { BusyButtonLabel } from '../components/BusyButtonLabel';
+import {
+    ActionBar,
+    AppCard,
+    InlineNotice,
+    MetricCard,
+    PageIntroCompact,
+    PageShell,
+    StickyFormActions,
+} from '../components/ui';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
 import { evaluateBusinessSubmissionGuidance } from '../lib/businessSubmissionGuidance';
@@ -1059,75 +1068,58 @@ export function RegisterBusiness() {
     };
 
     return (
-        <div className="page-shell max-w-5xl space-y-6">
-            <section className="role-hero role-hero-owner">
-                <p className="text-xs uppercase tracking-[0.16em] text-blue-100 font-semibold">Panel Negocio</p>
-                <h1 className="font-display text-3xl font-bold text-white mt-2">Registra tu negocio</h1>
-                <p className="text-blue-100 mt-2 max-w-2xl">
-                    Completa 4 pasos para publicar tu negocio con una presentacion clara y confiable.
-                </p>
-            </section>
-            <div className="section-shell p-6 sm:p-8">
-                <div className="mb-8 grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,340px)]">
-                    <div className="rounded-[28px] border border-primary-100 bg-gradient-to-br from-primary-50 via-white to-white p-5 sm:p-6">
-                        <div className="flex flex-wrap items-center gap-2">
+        <PageShell width="wide" className="space-y-6">
+            <AppCard>
+                <PageIntroCompact
+                    eyebrow="Panel negocio"
+                    title="Registra tu negocio"
+                    description="Completa 4 pasos para publicar tu negocio con una presentacion clara y confiable."
+                    actions={(
+                        <ActionBar>
                             <span className="chip">Registro guiado</span>
                             <span className="chip">Paso {currentStep} de {TOTAL_REGISTER_STEPS}</span>
-                        </div>
-                        <h2 className="mt-4 font-display text-3xl font-bold text-slate-900">
-                            {currentStepMeta.title}
-                        </h2>
-                        <p className="mt-2 text-sm text-slate-600 sm:text-base">
-                            {currentStepMeta.subtitle}. {currentStepUnlock.detail}
-                        </p>
-                        <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-600">
-                            <span className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white px-3 py-2 font-medium">
-                                Progreso {progressPercentage}%
-                            </span>
-                            <span className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white px-3 py-2 font-medium">
-                                {currentStepActionLabel}
-                            </span>
-                        </div>
-                    </div>
+                        </ActionBar>
+                    )}
+                />
+            </AppCard>
+            <div className="section-shell p-6 sm:p-8">
+                <div className="mb-8 grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,340px)]">
+                    <AppCard className="rounded-[28px] border-primary-100 bg-gradient-to-br from-primary-50 via-white to-white p-5 sm:p-6">
+                        <PageIntroCompact
+                            eyebrow="Paso actual"
+                            title={currentStepMeta.title}
+                            description={`${currentStepMeta.subtitle}. ${currentStepUnlock.detail}`}
+                            actions={(
+                                <ActionBar>
+                                    <span className="chip">Progreso {progressPercentage}%</span>
+                                    <span className="chip">{currentStepActionLabel}</span>
+                                </ActionBar>
+                            )}
+                        />
+                    </AppCard>
 
-                    <div className="rounded-[28px] border border-slate-200 bg-slate-950/[0.03] p-5">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Salud del onboarding
-                        </p>
+                    <AppCard
+                        title="Salud del onboarding"
+                        description="Senales rapidas para saber si la ficha ya tiene base suficiente para discovery y confianza."
+                        className="rounded-[28px] border-slate-200 bg-slate-950/[0.03] p-5"
+                    >
                         <div className="mt-4 grid grid-cols-2 gap-3">
-                            <div className="rounded-2xl border border-white bg-white px-4 py-4 shadow-sm">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                    Avance
-                                </p>
-                                <p className="mt-2 font-display text-3xl font-bold text-slate-900">{progressPercentage}%</p>
-                            </div>
-                            <div className="rounded-2xl border border-white bg-white px-4 py-4 shadow-sm">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                    Checks
-                                </p>
-                                <p className="mt-2 font-display text-3xl font-bold text-slate-900">{completedVisibilityChecks}</p>
-                            </div>
-                            <div className="rounded-2xl border border-white bg-white px-4 py-4 shadow-sm">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                    Pendientes
-                                </p>
-                                <p className="mt-2 font-display text-3xl font-bold text-amber-700">{remainingPublishNeeds.length}</p>
-                            </div>
-                            <div className="rounded-2xl border border-white bg-white px-4 py-4 shadow-sm">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                    Imagenes
-                                </p>
-                                <p className="mt-2 font-display text-3xl font-bold text-slate-900">{selectedImages.length}</p>
-                            </div>
+                            <MetricCard label="Avance" value={`${progressPercentage}%`} className="border border-white bg-white shadow-sm" />
+                            <MetricCard label="Checks" value={completedVisibilityChecks} className="border border-white bg-white shadow-sm" />
+                            <MetricCard label="Pendientes" value={remainingPublishNeeds.length} className="border border-white bg-white shadow-sm" />
+                            <MetricCard label="Imagenes" value={selectedImages.length} className="border border-white bg-white shadow-sm" />
                         </div>
-                    </div>
+                    </AppCard>
                 </div>
 
-                {error && (
-                    <div className="alert-danger mb-6">
-                        {error}
-                    </div>
-                )}
+                {error ? (
+                    <InlineNotice
+                        className="mb-6"
+                        tone="danger"
+                        title="No pudimos avanzar en este paso"
+                        body={error}
+                    />
+                ) : null}
 
                 {loadingData ? (
                     <div className="space-y-6" aria-busy="true">
@@ -1167,16 +1159,12 @@ export function RegisterBusiness() {
                     </div>
                 ) : (
                     <form onSubmit={(event) => void handleSubmit(event)} className="space-y-6">
-                        <div className="space-y-3">
+                        <AppCard
+                            title="Navegacion por pasos"
+                            description="Avanza solo cuando cada bloque tenga la informacion suficiente para discovery y confianza."
+                            className="space-y-3"
+                        >
                             <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                        Navegacion por pasos
-                                    </p>
-                                    <p className="mt-1 text-sm text-slate-600">
-                                        Avanza solo cuando cada bloque tenga la informacion suficiente para discovery y confianza.
-                                    </p>
-                                </div>
                                 <p className="text-sm font-semibold text-primary-700">
                                     {progressPercentage}% completado
                                 </p>
@@ -1207,16 +1195,15 @@ export function RegisterBusiness() {
                                     </button>
                                 ))}
                             </div>
-                        </div>
+                        </AppCard>
 
-                        <div className="rounded-2xl border border-gray-100 p-5">
-                            <div className="mb-4 rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Lo que desbloqueas en este paso</p>
-                                <h2 className="mt-1 text-lg font-semibold text-gray-900">{currentStepUnlock.title}</h2>
-                                <p className="mt-1 text-sm text-gray-600">{currentStepUnlock.detail}</p>
-                            </div>
+                        <AppCard
+                            title={currentStepUnlock.title}
+                            description={currentStepUnlock.detail}
+                            className="p-5"
+                        >
                             {renderStepBody()}
-                        </div>
+                        </AppCard>
 
                         <Suspense fallback={<RegisterStepSectionFallback rows={5} />}>
                             <PublicationGuidancePanel
@@ -1362,7 +1349,7 @@ export function RegisterBusiness() {
                             </div>
                         )}
 
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                        <StickyFormActions>
                             <button
                                 type="button"
                                 onClick={handlePreviousStep}
@@ -1384,10 +1371,10 @@ export function RegisterBusiness() {
                                     <BusyButtonLabel busy={loading} busyText="Registrando..." idleText={currentStepActionLabel} />
                                 </button>
                             </div>
-                        </div>
+                        </StickyFormActions>
                     </form>
                 )}
             </div>
-        </div>
+        </PageShell>
     );
 }
