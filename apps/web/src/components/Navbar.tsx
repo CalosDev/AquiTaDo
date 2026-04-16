@@ -192,15 +192,16 @@ export function Navbar() {
             <nav className="nav-shell">
                 <div className="container-full-shell">
                     <div className="flex min-h-16 items-center justify-between gap-4 py-3">
-                        <Link to="/" className="inline-flex shrink-0 items-center gap-3">
-                            <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-primary-700 shadow-sm shadow-primary-700/25">
-                                <span className="font-display text-lg font-bold text-white">A</span>
+                        <Link to="/" className="group inline-flex shrink-0 items-center gap-3 transition-transform hover:scale-[1.02]">
+                            <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-[1.25rem] bg-gradient-to-br from-primary-600 to-primary-800 shadow-lg shadow-primary-700/20 transition-all group-hover:shadow-primary-700/30 group-hover:rotate-3">
+                                <span className="font-display text-xl font-black text-white">A</span>
+                                <div className="absolute inset-0 bg-white/10 opacity-0 transition-opacity group-hover:opacity-100"></div>
                             </div>
                             <div className="leading-tight">
-                                <p className="font-display text-xl font-bold text-slate-900">
-                                    Aqui<span className="text-accent-600">Ta</span>.do
+                                <p className="font-display text-2xl font-black tracking-tight text-slate-900">
+                                    Aqui<span className="text-accent-600">Ta</span><span className="text-primary-700">.do</span>
                                 </p>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 group-hover:text-primary-600 transition-colors">
                                     Discovery local en RD
                                 </p>
                             </div>
@@ -209,12 +210,14 @@ export function Navbar() {
                         <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex">
                             {!loading ? (
                                 <>
-                                    <div className="nav-cluster flex min-w-0 items-center gap-4 px-4">
+                                    <div className="nav-cluster flex min-w-0 items-center gap-1.5 p-1.5 bg-slate-50/50 border-slate-200/60">
                                         {primaryLinks.map((link) => (
                                             <Link
                                                 key={link.to}
                                                 to={link.to}
-                                                className={link.active ? 'nav-link nav-link-active' : 'nav-link'}
+                                                className={link.active 
+                                                    ? 'px-4 py-2 rounded-full text-sm font-bold bg-white text-primary-700 shadow-sm border border-slate-200/50 transition-all' 
+                                                    : 'px-4 py-2 rounded-full text-sm font-semibold text-slate-500 hover:text-slate-900 hover:bg-white/50 transition-all'}
                                                 aria-current={link.active ? 'page' : undefined}
                                                 onMouseEnter={link.prefetch}
                                                 onFocus={link.prefetch}
