@@ -88,6 +88,16 @@ interface OrganizationAuditLog {
     metadata?: unknown;
 }
 
+interface OrganizationActivityItem {
+    id: string;
+    category: string;
+    categoryTone: string;
+    title: string;
+    description: string;
+    actorLabel: string;
+    createdAt: string;
+}
+
 interface PaginatedResponse<T> {
     data: T[];
     total: number;
@@ -394,6 +404,19 @@ function getSubscriptionLabel(status: OrganizationSubscriptionStatus): string {
     }
 }
 
+function getPlanLabel(plan: OrganizationPlan | string | null | undefined): string {
+    switch (plan) {
+        case 'FREE':
+            return 'Free';
+        case 'GROWTH':
+            return 'Growth';
+        case 'SCALE':
+            return 'Scale';
+        default:
+            return 'plan actual';
+    }
+}
+
 function getUsageLabel(key: string): string {
     switch (key) {
         case 'businesses':
@@ -437,15 +460,229 @@ function resolveManageableInviteRoles(actorRole?: OrganizationRole | null): Orga
     return [];
 }
 
-function stringifyMetadata(metadata: unknown): string {
-    if (!metadata || typeof metadata !== 'object') {
-        return '';
+function getActivityCategoryTone(category: OrganizationActivityItem['category']): string {
+    switch (category) {
+        case 'Equipo':
+            return 'bg-blue-100 text-blue-700';
+        case 'Plan':
+            return 'bg-amber-100 text-amber-800';
+        case 'Negocio':
+            return 'bg-primary-100 text-primary-700';
+        default:
+            return 'bg-slate-100 text-slate-700';
+    }
+}
+
+function asRecordValue(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null;
     }
 
-    try {
-        return JSON.stringify(metadata);
-    } catch {
-        return '';
+    return value as Record<string, unknown>;
+}
+
+function readMetadataString(metadata: Record<string, unknown> | null, key: string): string | null {
+    const value = metadata?.[key];
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function formatOrganizationActivity(log: OrganizationAuditLog): OrganizationActivityItem | null {
+    const metadata = asRecordValue(log.metadata);
+    const actorLabel = log.actorUser?.name || 'Sistema AquiTa.do';
+    const businessSlug = readMetadataString(metadata, 'businessSlug');
+    const businessLabel = businessSlug ? ` ${businessSlug}` : ' este negocio';
+
+    switch (log.action) {
+        case 'organization.created': {
+            const organizationName = readMetadataString(metadata, 'name');
+            return {
+                id: log.id,
+                category: 'Equipo',
+                categoryTone: getActivityCategoryTone('Equipo'),
+                title: 'Se creo la organizacion',
+                description: organizationName
+                    ? `El espacio de trabajo quedo listo como ${organizationName}.`
+                    : 'El espacio de trabajo quedo listo para empezar a operar.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        }
+        case 'organization.updated': {
+            const organizationName = readMetadataString(metadata, 'name');
+            return {
+                id: log.id,
+                category: 'Equipo',
+                categoryTone: getActivityCategoryTone('Equipo'),
+                title: 'Se actualizo la organizacion',
+                description: organizationName
+                    ? `Se ajusto la informacion general y ahora se muestra como ${organizationName}.`
+                    : 'Se actualizaron los datos generales de la organizacion.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        }
+        case 'organization.subscription.updated': {
+            const previousPlan = getPlanLabel(readMetadataString(metadata, 'previousPlan'));
+            const newPlan = getPlanLabel(readMetadataString(metadata, 'newPlan'));
+            const newStatus = readMetadataString(metadata, 'newStatus');
+            return {
+                id: log.id,
+                category: 'Plan',
+                categoryTone: getActivityCategoryTone('Plan'),
+                title: 'Se actualizo el plan',
+                description: newStatus
+                    ? `El plan paso de ${previousPlan} a ${newPlan} con estado ${getSubscriptionLabel(newStatus as OrganizationSubscriptionStatus).toLowerCase()}.`
+                    : `El plan paso de ${previousPlan} a ${newPlan}.`,
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        }
+        case 'organization.invite.created': {
+            const email = readMetadataString(metadata, 'email');
+            const role = readMetadataString(metadata, 'role');
+            return {
+                id: log.id,
+                category: 'Equipo',
+                categoryTone: getActivityCategoryTone('Equipo'),
+                title: 'Se envio una invitacion',
+                description: email
+                    ? `Se invito a ${email}${role ? ` como ${getRoleLabel(role as OrganizationRole).toLowerCase()}` : ''}.`
+                    : 'Se genero una nueva invitacion para sumar a alguien al equipo.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        }
+        case 'organization.invite.accepted': {
+            const membershipRole = readMetadataString(metadata, 'membershipRole');
+            return {
+                id: log.id,
+                category: 'Equipo',
+                categoryTone: getActivityCategoryTone('Equipo'),
+                title: 'Una invitacion fue aceptada',
+                description: membershipRole
+                    ? `La persona invitada ya se unio al equipo como ${getRoleLabel(membershipRole as OrganizationRole).toLowerCase()}.`
+                    : 'La persona invitada ya forma parte del equipo.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        }
+        case 'organization.member.role_updated': {
+            const role = readMetadataString(metadata, 'role');
+            return {
+                id: log.id,
+                category: 'Equipo',
+                categoryTone: getActivityCategoryTone('Equipo'),
+                title: 'Se actualizo un rol del equipo',
+                description: role
+                    ? `El miembro ahora tiene rol ${getRoleLabel(role as OrganizationRole).toLowerCase()}.`
+                    : 'Se ajusto el rol de un miembro del equipo.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        }
+        case 'organization.member.removed': {
+            const previousRole = readMetadataString(metadata, 'previousRole');
+            return {
+                id: log.id,
+                category: 'Equipo',
+                categoryTone: getActivityCategoryTone('Equipo'),
+                title: 'Se removio un miembro del equipo',
+                description: previousRole
+                    ? `La salida corresponde a un perfil ${getRoleLabel(previousRole as OrganizationRole).toLowerCase()}.`
+                    : 'Se removio un acceso del equipo activo.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        }
+        case 'business_claim_request.created':
+            return {
+                id: log.id,
+                category: 'Negocio',
+                categoryTone: getActivityCategoryTone('Negocio'),
+                title: 'Se envio una solicitud de reclamacion',
+                description: `Se registro una solicitud para reclamar${businessLabel}.`,
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        case 'business_claim_request.expired':
+            return {
+                id: log.id,
+                category: 'Negocio',
+                categoryTone: getActivityCategoryTone('Negocio'),
+                title: 'Vencio una solicitud de reclamacion',
+                description: `La solicitud para reclamar${businessLabel} expiro sin completarse.`,
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        case 'business_claim_request.reviewed': {
+            const status = readMetadataString(metadata, 'status');
+            const statusMessage = status === 'APPROVED'
+                ? 'fue aprobada'
+                : status === 'REJECTED'
+                    ? 'fue rechazada'
+                    : 'quedo en revision';
+            return {
+                id: log.id,
+                category: 'Negocio',
+                categoryTone: getActivityCategoryTone('Negocio'),
+                title: 'Se reviso una solicitud de reclamacion',
+                description: `La solicitud para reclamar${businessLabel} ${statusMessage}.`,
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        }
+        case 'business_ownership.revoked':
+            return {
+                id: log.id,
+                category: 'Negocio',
+                categoryTone: getActivityCategoryTone('Negocio'),
+                title: 'Se revoco un acceso de negocio',
+                description: `Se retiro la administracion asociada a${businessLabel}.`,
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        case 'business.catalog.mark_claimed':
+            return {
+                id: log.id,
+                category: 'Negocio',
+                categoryTone: getActivityCategoryTone('Negocio'),
+                title: 'Se asigno un negocio a la organizacion',
+                description: 'El negocio ya forma parte del portafolio administrado por este equipo.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        case 'business.catalog.unclaim':
+            return {
+                id: log.id,
+                category: 'Negocio',
+                categoryTone: getActivityCategoryTone('Negocio'),
+                title: 'Se desasigno un negocio del portafolio',
+                description: 'Ese negocio dejo de estar conectado a la organizacion actual.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        case 'business.deleted':
+            return {
+                id: log.id,
+                category: 'Negocio',
+                categoryTone: getActivityCategoryTone('Negocio'),
+                title: 'Se elimino un negocio',
+                description: 'Un negocio del portafolio fue eliminado del directorio activo.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        case 'REVIEW_MODERATION_UPDATED':
+            return {
+                id: log.id,
+                category: 'Negocio',
+                categoryTone: getActivityCategoryTone('Negocio'),
+                title: 'Se actualizo la moderacion de una resena',
+                description: 'AquiTa.do actualizo el estado de una resena vinculada al negocio.',
+                actorLabel,
+                createdAt: log.createdAt,
+            };
+        default:
+            return null;
     }
 }
 
@@ -570,6 +807,12 @@ export function OrganizationWorkspace({
             key in (usage?.limits || {}) || key in (usage?.usage || {}) || key in (usage?.remaining || {})
         ));
     }, [usage]);
+    const organizationActivity = useMemo(
+        () => auditLogs
+            .map((auditLog) => formatOrganizationActivity(auditLog))
+            .filter((activity): activity is OrganizationActivityItem => activity !== null),
+        [auditLogs],
+    );
 
     const loadOrganizationState = useCallback(async (options?: { silent?: boolean }) => {
         if (!activeOrganizationId) {
@@ -1035,7 +1278,7 @@ export function OrganizationWorkspace({
                 <SummaryCard
                     label="Equipo activo"
                     value={formatNumberDo(organization?._count?.members ?? members.length)}
-                    delta="Miembros con acceso al tenant actual"
+                    delta="Miembros con acceso a esta organizacion"
                 />
                 <SummaryCard
                     label="Invites pendientes"
@@ -1773,44 +2016,39 @@ export function OrganizationWorkspace({
             <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Auditoria</p>
-                        <h3 className="mt-1 text-lg font-semibold text-slate-900">Bitacora de la organizacion</h3>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Actividad</p>
+                        <h3 className="mt-1 text-lg font-semibold text-slate-900">Actividad reciente del equipo</h3>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Resume cambios de equipo, plan y portafolio sin exponer logs tecnicos ni payloads internos.
+                        </p>
                     </div>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        {auditLogs.length} eventos recientes
+                        {organizationActivity.length} eventos recientes
                     </span>
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-3 xl:grid-cols-2">
-                    {auditLogs.length > 0 ? auditLogs.map((auditLog) => {
-                        const metadataText = stringifyMetadata(auditLog.metadata);
+                    {organizationActivity.length > 0 ? organizationActivity.map((activity) => {
                         return (
-                            <article key={auditLog.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <article key={activity.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                        <p className="font-medium text-slate-900">{auditLog.action}</p>
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            {auditLog.targetType}
-                                            {auditLog.targetId ? ` | ${auditLog.targetId}` : ''}
-                                        </p>
+                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${activity.categoryTone}`}>
+                                            {activity.category}
+                                        </span>
+                                        <p className="mt-2 font-medium text-slate-900">{activity.title}</p>
                                     </div>
-                                    <p className="text-xs text-slate-500">{formatDateTimeDo(auditLog.createdAt)}</p>
+                                    <p className="text-xs text-slate-500">{formatDateTimeDo(activity.createdAt)}</p>
                                 </div>
-                                <p className="mt-3 text-sm text-slate-600">
-                                    {auditLog.actorUser?.name || 'Sistema'}
-                                    {auditLog.actorUser?.email ? ` | ${auditLog.actorUser.email}` : ''}
-                                </p>
-                                {metadataText ? (
-                                    <p className="mt-3 rounded-xl bg-white p-3 text-xs text-slate-500">
-                                        {metadataText.length > 240 ? `${metadataText.slice(0, 240)}...` : metadataText}
-                                    </p>
-                                ) : null}
+                                <p className="mt-3 text-sm text-slate-600">{activity.description}</p>
+                                <p className="mt-3 text-xs font-medium text-slate-500">{activity.actorLabel}</p>
                             </article>
                         );
                     }) : (
-                        <p className="text-sm text-slate-600">
-                            No hay eventos de auditoria para mostrar todavia.
-                        </p>
+                        <EmptyState
+                            title="Sin actividad reciente para mostrar"
+                            body="Cuando haya cambios de equipo, plan o portafolio, apareceran resumidos aqui sin detalles tecnicos."
+                        />
                     )}
                 </div>
             </article>

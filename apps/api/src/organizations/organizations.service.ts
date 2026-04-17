@@ -461,7 +461,14 @@ export class OrganizationsService {
         const boundedLimit = Math.min(Math.max(limit, 1), 200);
 
         return this.prisma.auditLog.findMany({
-            where: { organizationId },
+            where: {
+                organizationId,
+                NOT: {
+                    action: {
+                        startsWith: 'prisma.',
+                    },
+                },
+            },
             include: {
                 actorUser: {
                     select: {

@@ -23,13 +23,13 @@ export function PublicationGuidancePanel({
         }`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Guia de publicacion</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Revision final</p>
                     <h2 className="mt-1 text-lg font-semibold text-gray-900">
-                        Visibilidad {submissionGuidance.readinessLevel} · Score {submissionGuidance.readinessScore}
+                        Estado {submissionGuidance.readinessLevel} · Puntaje {submissionGuidance.readinessScore}
                     </h2>
                     <p className="mt-1 text-sm text-gray-600">
-                        {completedVisibilityChecks} de {submissionGuidance.visibilityChecks.length} checks listos
-                        {submissionGuidance.riskClusters.length > 0 ? ` - Riesgos: ${submissionGuidance.riskClusters.join(', ')}` : ''}
+                        {completedVisibilityChecks} de {submissionGuidance.visibilityChecks.length} puntos completos
+                        {submissionGuidance.riskClusters.length > 0 ? ` - Revisa: ${submissionGuidance.riskClusters.join(', ')}` : ''}
                     </p>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -37,7 +37,7 @@ export function PublicationGuidancePanel({
                         ? 'bg-red-100 text-red-700'
                         : 'bg-white text-gray-700'
                 }`}>
-                    Riesgo preventivo {submissionGuidance.preventiveScore}/100 - {submissionGuidance.preventiveSeverity}
+                    Alertas {submissionGuidance.preventiveScore}/100 - {submissionGuidance.preventiveSeverity}
                 </span>
             </div>
 
@@ -51,7 +51,7 @@ export function PublicationGuidancePanel({
                     </ul>
                 </div>
                 <div>
-                    <p className="text-sm font-medium text-gray-900">Checklist de visibilidad</p>
+                    <p className="text-sm font-medium text-gray-900">Checklist de publicacion</p>
                     <div className="mt-2 space-y-2">
                         {submissionGuidance.visibilityChecks.map((check) => (
                             <div key={check.label} className="rounded-xl bg-white/80 px-3 py-2">
@@ -67,7 +67,7 @@ export function PublicationGuidancePanel({
 
             {remainingPublishNeeds.length > 0 ? (
                 <div className="mt-4 rounded-xl bg-white/80 px-4 py-3">
-                    <p className="text-sm font-medium text-gray-900">Aun falta para publicar con buena calidad</p>
+                    <p className="text-sm font-medium text-gray-900">Todavia falta antes de publicar</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                         {remainingPublishNeeds.map((item) => (
                             <span key={item} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700">

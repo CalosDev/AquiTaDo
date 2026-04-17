@@ -165,7 +165,7 @@ export function evaluateBusinessSubmissionGuidance(
             label: 'Propuesta clara',
             passed: description.length >= 60,
             detail: description.length >= 60
-                ? 'La descripcion ya da contexto suficiente para discovery.'
+                ? 'La descripcion ya da suficiente contexto para entender el negocio.'
                 : 'Amplia la descripcion para explicar que vendes, donde operas y que te diferencia.',
         },
         {
@@ -179,7 +179,7 @@ export function evaluateBusinessSubmissionGuidance(
             label: 'Ubicacion util',
             passed: Boolean(input.address?.trim() && input.provinceId),
             detail: input.address?.trim() && input.provinceId
-                ? 'La base de ubicacion esta completa para geocodificacion y discovery local.'
+                ? 'La ubicacion ya esta clara para mostrar el negocio en la zona correcta.'
                 : 'Completa direccion y provincia para aparecer mejor en busquedas cercanas.',
         },
         {
@@ -267,7 +267,7 @@ export function evaluateBusinessSubmissionGuidance(
             if (signal.reason.includes('diversidad') || signal.reason.includes('repetitivo')) {
                 return 'Haz la descripcion mas especifica y menos repetitiva.';
             }
-            return 'Ajusta la ficha para reducir senales de spam antes de enviarla.';
+            return 'Revisa la ficha para que se vea clara y confiable antes de enviarla.';
         }),
         ...visibilityChecks.filter((item) => !item.passed).map((item) => item.detail),
     ]);

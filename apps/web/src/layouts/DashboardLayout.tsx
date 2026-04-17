@@ -13,7 +13,15 @@ interface NavItem {
     active: boolean;
 }
 
-function navIcon(path: 'home' | 'operations' | 'growth' | 'billing' | 'organization' | 'directory' | 'profile' | 'security' | 'suggest') {
+function navIcon(path: 'home' | 'verification' | 'operations' | 'growth' | 'billing' | 'organization' | 'directory' | 'profile' | 'security' | 'suggest') {
+    if (path === 'verification') {
+        return (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+                <path d="M12 3 5 6v6c0 5 3 7.5 7 9 4-1.5 7-4 7-9V6l-7-3Z" />
+                <path d="m9.5 12 1.8 1.8L15 10.2" />
+            </svg>
+        );
+    }
     if (path === 'operations') {
         return (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
@@ -106,9 +114,16 @@ export function DashboardLayout() {
                 {
                     label: 'Resumen',
                     to: '/dashboard',
-                    description: 'Estado general, claims y verificación.',
+                    description: 'Panorama general y prioridades del negocio.',
                     icon: navIcon('home'),
                     active: location.pathname === '/dashboard' && workspace === 'overview',
+                },
+                {
+                    label: 'Verificación',
+                    to: '/dashboard?workspace=verification',
+                    description: 'Documentos, revisión y sello del negocio.',
+                    icon: navIcon('verification'),
+                    active: location.pathname === '/dashboard' && workspace === 'verification',
                 },
                 {
                     label: 'Operación',
@@ -160,7 +175,7 @@ export function DashboardLayout() {
                 {
                     label: 'Panel admin',
                     to: '/admin',
-                    description: 'Moderación, catálogo y observabilidad.',
+                    description: 'Moderación, catálogo y estado del sistema.',
                     icon: navIcon('home'),
                     active: location.pathname === '/admin',
                 },
@@ -302,9 +317,9 @@ export function DashboardLayout() {
                         </p>
                         <p className="mt-1 text-sm leading-6 text-slate-600">
                             {capabilities.isBusinessOwner
-                                ? 'Shell compacto para operar, crecer y administrar sin bloques hero innecesarios.'
+                                ? 'Revisa tu negocio, atiende clientes y mantén la información al día desde un solo lugar.'
                                 : capabilities.isAdmin
-                                    ? 'Accede rápido a plataforma, seguridad y tu perfil desde un mismo shell.'
+                                    ? 'Accede rápido a plataforma, seguridad y tu perfil desde un mismo espacio.'
                                     : 'Explora, organiza favoritos y vuelve a tu actividad reciente sin perder contexto.'}
                         </p>
                     </div>

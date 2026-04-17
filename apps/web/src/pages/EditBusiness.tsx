@@ -493,7 +493,7 @@ export function EditBusiness() {
                 <PageIntroCompact
                     eyebrow="Panel negocio"
                     title="Editar negocio"
-                    description="Actualiza la informacion publica del negocio y manten su perfil listo para discovery, claim y verificacion."
+                    description="Actualiza la información pública del negocio y mantén su perfil claro, completo y fácil de encontrar."
                     actions={(
                         <ActionBar>
                             <Link to="/dashboard" className="btn-secondary">
@@ -821,9 +821,9 @@ export function EditBusiness() {
                 }`}>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h2 className="font-display text-lg font-semibold text-gray-900">Lectura preventiva y de visibilidad</h2>
+                            <h2 className="font-display text-lg font-semibold text-gray-900">Antes de publicar</h2>
                             <p className="text-sm text-gray-600">
-                                Esta vista replica senales visibles que suelen empujar la ficha a revision preventiva o bajar su calidad de discovery.
+                                Revisa si la ficha se entiende bien, si transmite confianza y si todavía hay algo importante por corregir.
                             </p>
                             {submissionGuidance.riskClusters.length > 0 ? (
                                 <div className="mt-2 flex flex-wrap gap-2">
@@ -836,9 +836,9 @@ export function EditBusiness() {
                             ) : null}
                         </div>
                         <div className="text-right">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Score de visibilidad</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Nivel actual</p>
                             <p className="text-xl font-semibold text-gray-900">{submissionGuidance.readinessScore}</p>
-                            <p className="mt-1 text-xs text-gray-500">Riesgo {submissionGuidance.preventiveSeverity}</p>
+                            <p className="mt-1 text-xs text-gray-500">Alertas {submissionGuidance.preventiveSeverity}</p>
                         </div>
                     </div>
 
@@ -858,19 +858,19 @@ export function EditBusiness() {
                         </div>
 
                         <div>
-                            <p className="text-sm font-medium text-gray-900">Riesgo preventivo {submissionGuidance.preventiveScore}/100</p>
+                            <p className="text-sm font-medium text-gray-900">Puntos a revisar</p>
                             {submissionGuidance.preventiveSignals.length > 0 ? (
                                 <div className="mt-2 space-y-2">
                                     {submissionGuidance.preventiveSignals.map((signal) => (
                                         <div key={signal.reason} className="rounded-lg bg-white/80 px-3 py-2">
                                             <p className="text-sm font-medium text-gray-900">{signal.reason}</p>
-                                            <p className="mt-1 text-xs text-gray-600">Peso estimado: {signal.points} puntos.</p>
+                                            <p className="mt-1 text-xs text-gray-600">Conviene ajustarlo antes de volver a publicar.</p>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
                                 <p className="mt-2 text-sm text-gray-600">
-                                    No se detectan senales locales fuertes de premoderacion en esta ficha.
+                                    No vemos alertas importantes en esta ficha.
                                 </p>
                             )}
 
@@ -889,7 +889,7 @@ export function EditBusiness() {
 
                     {submissionGuidance.missingCriticalFields.length > 0 ? (
                         <div className="mt-4 rounded-lg bg-white/80 px-3 py-2">
-                            <p className="text-sm font-medium text-gray-900">Faltantes visibles</p>
+                            <p className="text-sm font-medium text-gray-900">Todavía te falta</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {submissionGuidance.missingCriticalFields.map((item) => (
                                     <span key={item} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700">

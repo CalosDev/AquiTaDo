@@ -404,7 +404,7 @@ export function RegisterBusiness() {
                 return 'Debes seleccionar una provincia';
             }
             if (formData.cityId && sectors.length > 0 && !formData.sectorId) {
-                return 'Selecciona un sector para mejorar el discovery local';
+                return 'Selecciona un sector para ubicar mejor el negocio';
             }
         }
 
@@ -661,7 +661,7 @@ export function RegisterBusiness() {
                             placeholder="Describe claramente qué vendes, en qué zona operas y qué te diferencia"
                         />
                         <p className="mt-1 text-xs text-gray-500">
-                            Mientras mas clara sea la descripcion, mejor posicionara en resultados.
+                            Mientras mas clara sea la descripcion, mas facil sera entender el negocio.
                         </p>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                             <span className={`rounded-full px-2 py-0.5 ${
@@ -675,7 +675,7 @@ export function RegisterBusiness() {
                         </div>
                         {submissionGuidance.preventiveSignals.length > 0 ? (
                             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                                <p className="font-semibold">Riesgo preventivo detectado en la descripcion</p>
+                                <p className="font-semibold">Puntos a revisar en la descripcion</p>
                                 <ul className="mt-2 space-y-1">
                                     {submissionGuidance.preventiveSignals.map((signal) => (
                                         <li key={signal.reason}>
@@ -822,11 +822,11 @@ export function RegisterBusiness() {
                         Completa al menos WhatsApp, website o email para que la ficha sea util desde el primer dia.
                     </p>
                     <div className="sm:col-span-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-                        <p className="font-medium text-gray-900">Lectura rapida de contacto</p>
+                        <p className="font-medium text-gray-900">Resumen de contacto</p>
                         <p className="mt-1">
                             {formData.whatsapp.trim() || formData.phone.trim() || formData.website.trim() || formData.email.trim()
-                                ? 'Ya hay al menos un canal util para convertir desde discovery.'
-                                : 'Todavia no hay un canal estructurado visible; eso baja conversion y confianza inicial.'}
+                                ? 'Ya hay al menos un canal claro para recibir contactos.'
+                                : 'Todavia no hay un canal visible para que una persona te contacte con facilidad.'}
                         </p>
                     </div>
                 </div>
@@ -923,7 +923,7 @@ export function RegisterBusiness() {
                                 ))}
                             </select>
                             <p className="mt-1 text-xs text-gray-500">
-                                Esta granularidad mejora discovery por zona y resultados cercanos.
+                                Esto ayuda a ubicar mejor tu negocio por zona.
                             </p>
                         </div>
                     </div>
@@ -953,8 +953,8 @@ export function RegisterBusiness() {
                         <p className="font-medium text-gray-900">Checklist de ubicacion</p>
                         <p className="mt-1">
                             {formData.address.trim() && formData.provinceId
-                                ? 'La base minima para discovery local ya esta lista.'
-                                : 'Todavia falta direccion o provincia para una geocodificacion confiable.'}
+                                ? 'La ubicacion basica ya esta lista.'
+                                : 'Todavia falta direccion o provincia para ubicar bien el negocio.'}
                         </p>
                     </div>
                 </div>
@@ -1099,8 +1099,8 @@ export function RegisterBusiness() {
                     </AppCard>
 
                     <AppCard
-                        title="Salud del onboarding"
-                        description="Senales rapidas para saber si la ficha ya tiene base suficiente para discovery y confianza."
+                        title="Estado del registro"
+                        description="Revisa rapido si ya tienes lo necesario para publicar con buena presentacion."
                         className="rounded-[28px] border-slate-200 bg-slate-950/[0.03] p-5"
                     >
                         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -1161,7 +1161,7 @@ export function RegisterBusiness() {
                     <form onSubmit={(event) => void handleSubmit(event)} className="space-y-6">
                         <AppCard
                             title="Navegacion por pasos"
-                            description="Avanza solo cuando cada bloque tenga la informacion suficiente para discovery y confianza."
+                            description="Avanza cuando cada bloque tenga la informacion necesaria para publicar sin vacios."
                             className="space-y-3"
                         >
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1222,10 +1222,10 @@ export function RegisterBusiness() {
                                             Prechequeo de duplicados
                                         </p>
                                         <h3 className="mt-1 font-display text-2xl font-semibold text-slate-900">
-                                            Revisa si tu negocio ya existe en el catalogo
+                                            Revisa si tu negocio ya existe en el directorio
                                         </h3>
                                         <p className="mt-2 text-sm text-slate-700">
-                                            Antes de crear una nueva ficha, AquiTa.do busca coincidencias para que puedas reclamar un perfil existente y evitar duplicados.
+                                            Antes de crear una nueva ficha, AquiTa.do busca coincidencias para ayudarte a evitar negocios duplicados.
                                         </p>
                                         {duplicateSearchTerms.length > 0 ? (
                                             <p className="mt-2 text-xs text-slate-600">

@@ -101,7 +101,7 @@ interface MyClaimRequestItem {
     };
 }
 
-type OwnerWorkspaceId = 'overview' | 'operations' | 'growth' | 'billing' | 'organization';
+type OwnerWorkspaceId = 'overview' | 'verification' | 'operations' | 'growth' | 'billing' | 'organization';
 
 // ── Helpers ──────────────────────────────────────────────
 function asArray<T>(value: unknown): T[] {
@@ -187,6 +187,7 @@ function WorkspaceSkeleton() {
 // ── Tabs de workspace ─────────────────────────────────────
 const WORKSPACE_TABS: { id: OwnerWorkspaceId; label: string }[] = [
     { id: 'overview',      label: 'Resumen' },
+    { id: 'verification', label: 'Verificación' },
     { id: 'operations',   label: 'Operación' },
     { id: 'growth',       label: 'Crecimiento' },
     { id: 'billing',      label: 'Facturación' },
@@ -205,6 +206,11 @@ function readWorkspace(searchParams: URLSearchParams): OwnerWorkspaceId {
 
 function workspaceSummary(workspace: OwnerWorkspaceId): { label: string; description: string } {
     switch (workspace) {
+        case 'verification':
+            return {
+                label: 'Verificación',
+                description: 'Ordena documentos, envía la revisión y sigue el estado del sello del negocio sin mezclarlo con la operación diaria.',
+            };
         case 'operations':
             return {
                 label: 'Operacion diaria',
@@ -223,12 +229,12 @@ function workspaceSummary(workspace: OwnerWorkspaceId): { label: string; descrip
         case 'organization':
             return {
                 label: 'Organizacion',
-                description: 'Administra miembros, ownership y estructura tenant desde un mismo contexto.',
+                description: 'Administra miembros, invitaciones y ajustes del equipo desde un mismo contexto.',
             };
         default:
             return {
-                label: 'Resumen ejecutivo',
-                description: 'Prioriza claim, verificacion y salud del perfil antes de bajar a la operacion detallada.',
+                label: 'Resumen del negocio',
+                description: 'Mira el estado general y decide el siguiente paso sin cargar toda la operación en una sola vista.',
             };
     }
 }
@@ -323,6 +329,9 @@ export function DashboardBusiness() {
         !organizationLoading && !activeOrganizationId && !organizations.length;
     const selectedBusinessPublicPath = selectedBusiness
         ? `/businesses/${selectedBusiness.slug || selectedBusiness.id}`
+        : null;
+    const selectedBusinessEditPath = selectedBusiness
+        ? `/dashboard/businesses/${selectedBusiness.id}/edit`
         : null;
 
     // ── Carga de datos ────────────────────────────────────
@@ -557,7 +566,7 @@ export function DashboardBusiness() {
                     <ActionBar className="mt-3">
                         {activeOrganization?.name ? (
                             <span className="chip !bg-white !text-slate-700">
-                                Organizacion activa: {activeOrganization.name}
+                                Organizacion: {activeOrganization.name}
                             </span>
                         ) : null}
                         {selectedBusiness ? (
@@ -571,6 +580,11 @@ export function DashboardBusiness() {
                     </ActionBar>
                 </div>
                 <ActionBar className="justify-end">
+                    {selectedBusinessEditPath ? (
+                        <Link to={selectedBusinessEditPath} className="btn-secondary text-xs px-4 py-2">
+                            Editar perfil
+                        </Link>
+                    ) : null}
                     {selectedBusinessPublicPath ? (
                         <Link
                             to={selectedBusinessPublicPath}
@@ -591,22 +605,22 @@ export function DashboardBusiness() {
             <section aria-label="Estado del negocio">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <SummaryCard
-                        label="Vistas calificadas"
+                        label="Visitas al perfil"
                         value={(totals.views ?? 0).toLocaleString('es-DO')}
-                        delta="+12% vs mes pasado"
+                        delta="+12% vs periodo previo"
                     />
                     <SummaryCard
-                        label="Clicks a contacto"
+                        label="Contactos recibidos"
                         value={(totals.clicks ?? 0).toLocaleString('es-DO')}
-                        delta={`${activeClaimRequests.length} claims activos`}
+                        delta={`${activeClaimRequests.length} solicitudes abiertas`}
                     />
                     <SummaryCard
                         label="Conversión"
                         value={`${totals.conversionRate ?? 0}%`}
-                        delta={verificationStatus?.verified ? 'Perfil verificado' : 'Sin KYC completo'}
+                        delta={verificationStatus?.verified ? 'Sello activo' : 'Completar verificación'}
                     />
                     <SummaryCard
-                        label="Perfiles fuertes"
+                        label="Perfiles completos"
                         value={`${completeProfiles}`}
                         delta={`${openNowCount} abiertos ahora`}
                     />
@@ -618,8 +632,8 @@ export function DashboardBusiness() {
                 <section aria-label="Control de claim y readiness">
                     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
                         <SectionCard
-                            title="Control de claim"
-                            description="Estado actual primero, luego checklist y por ultimo historial reciente."
+                            title="Control del negocio"
+                            description="Confirma si el negocio ya está vinculado a tu organización y si queda algo pendiente."
                             density="compact"
                             actions={(
                                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${businessClaimStatusClass(selectedBusiness.claimStatus)}`}>
@@ -640,33 +654,33 @@ export function DashboardBusiness() {
                                     <p className="mt-2 text-sm leading-6 text-slate-600">
                                         {latestSelectedClaimRequest
                                             ? `Ultimo movimiento: ${claimStatusLabel(latestSelectedClaimRequest.status).toLowerCase()} por ${latestSelectedClaimRequest.evidenceType.toLowerCase().replace('_', ' ')}.`
-                                            : 'Todavia no hay solicitudes recientes asociadas a este negocio en el dashboard.'}
+                                            : 'No hay solicitudes recientes asociadas a este negocio.'}
                                     </p>
                                 </div>
 
                                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Checklist minimo</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Checklist rapido</p>
                                     <div className="mt-3 space-y-2">
                                         {[
                                             {
                                                 label: 'Negocio vinculado',
                                                 detail: selectedBusiness.claimStatus === 'CLAIMED'
-                                                    ? 'Ownership confirmado para esta organizacion.'
-                                                    : 'Aun falta confirmar el ownership.',
+                                                    ? 'Tu equipo ya tiene control de esta ficha.'
+                                                    : 'Todavia falta completar la vinculacion.',
                                                 done: selectedBusiness.claimStatus === 'CLAIMED',
                                             },
                                             {
-                                                label: 'Solicitud en curso',
+                                                label: 'Solicitud reciente',
                                                 detail: latestSelectedClaimRequest
-                                                    ? `${claimStatusLabel(latestSelectedClaimRequest.status)} en el expediente mas reciente.`
-                                                    : 'No hay solicitudes activas en este momento.',
+                                                    ? `${claimStatusLabel(latestSelectedClaimRequest.status)} en la ultima gestion registrada.`
+                                                    : 'No hay movimientos abiertos ahora mismo.',
                                                 done: Boolean(latestSelectedClaimRequest),
                                             },
                                             {
-                                                label: 'Perfil base listo',
+                                                label: 'Perfil listo',
                                                 detail: (selectedBusiness.profileCompletenessScore ?? 0) >= 80
                                                     ? 'La ficha tiene contexto suficiente para seguir con verificacion.'
-                                                    : 'Completa campos base antes de escalar procesos sensibles.',
+                                                    : 'Completa los campos principales antes de seguir.',
                                                 done: (selectedBusiness.profileCompletenessScore ?? 0) >= 80,
                                             },
                                         ].map((item) => (
@@ -691,8 +705,8 @@ export function DashboardBusiness() {
                             {selectedBusinessClaimRequests.length > 0 ? (
                                 <div className="card-list mt-4">
                                     <div className="card-list__header">
-                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Historial reciente</p>
-                                        <p className="text-xs text-slate-500">{selectedBusinessClaimRequests.length} eventos</p>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Movimientos recientes</p>
+                                        <p className="text-xs text-slate-500">{selectedBusinessClaimRequests.length} registro(s)</p>
                                     </div>
                                     {selectedBusinessClaimRequests.slice(0, 3).map((claim) => (
                                         <div key={claim.id} className="card-list__item items-start justify-between">
@@ -710,21 +724,26 @@ export function DashboardBusiness() {
                                 </div>
                             ) : (
                                 <EmptyState
-                                    title="Sin eventos recientes"
-                                    body="Cuando este negocio tenga un nuevo movimiento de claim, aparecera aqui con trazabilidad compacta."
+                                    title="Sin movimientos recientes"
+                                    body="Cuando este negocio tenga una nueva gestión, aparecerá aquí."
                                     className="mt-4"
                                 />
                             )}
                         </SectionCard>
 
                         <SectionCard
-                            title="Readiness de verificacion"
-                            description="Estado primero, luego evidencia y solo despues solicitud formal."
+                            title="Documentos y sello"
+                            description="Revisa si ya tienes base suficiente y entra a verificación solo cuando haga falta."
                             density="compact"
                             actions={(
-                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusChipClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
-                                    {statusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <Link to="/dashboard?workspace=verification" className="btn-secondary text-xs px-3 py-1.5">
+                                        Abrir verificación
+                                    </Link>
+                                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusChipClass(verificationStatus?.verificationStatus || 'UNVERIFIED')}`}>
+                                        {statusLabel(verificationStatus?.verificationStatus || 'UNVERIFIED')}
+                                    </span>
+                                </div>
                             )}
                         >
                             <div className="grid gap-3 sm:grid-cols-2">
@@ -736,14 +755,14 @@ export function DashboardBusiness() {
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Perfil util</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Perfil actual</p>
                                     <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
                                         {selectedBusiness.profileCompletenessScore ?? 0}%
                                     </p>
                                     <p className="mt-1 text-xs text-slate-500">
                                         {(selectedBusiness.profileCompletenessScore ?? 0) >= 80
-                                            ? 'Base suficiente para enviar un expediente claro.'
-                                            : 'Conviene completar la ficha antes de enviar mas evidencia.'}
+                                            ? 'Base suficiente para enviar una revision clara.'
+                                            : 'Conviene completar la ficha antes de enviar mas documentos.'}
                                     </p>
                                 </div>
                             </div>
@@ -752,21 +771,21 @@ export function DashboardBusiness() {
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Siguiente paso sugerido</p>
                                 <p className="mt-2 text-sm font-semibold text-slate-900">
                                     {verificationStatus?.verified
-                                        ? 'Mantener el expediente limpio y responder si el equipo solicita contexto adicional.'
+                                        ? 'Mantener los documentos actualizados y responder si el equipo pide aclaraciones.'
                                         : documentSummary.total === 0
-                                            ? 'Empieza cargando evidencia basica antes de solicitar revision.'
+                                            ? 'Empieza cargando los documentos principales antes de solicitar revisión.'
                                             : verificationStatus?.verificationSubmittedAt
-                                                ? 'El expediente ya fue enviado. Ahora conviene esperar revision o responder observaciones.'
-                                                : 'El expediente ya tiene evidencia. Puedes pasar a solicitud de revision.'}
+                                                ? 'La solicitud ya fue enviada. Ahora toca esperar respuesta o corregir observaciones.'
+                                                : 'Ya tienes base suficiente para pasar a la pantalla de verificación y pedir revisión.'}
                                 </p>
                                 {selectedBusiness.missingCoreFields && selectedBusiness.missingCoreFields.length > 0 ? (
                                     <p className="mt-2 text-xs leading-5 text-slate-500">
-                                        Faltan campos base: {selectedBusiness.missingCoreFields.slice(0, 3).join(', ')}
+                                        Todavía faltan datos por completar: {selectedBusiness.missingCoreFields.slice(0, 3).join(', ')}
                                         {selectedBusiness.missingCoreFields.length > 3 ? ` +${selectedBusiness.missingCoreFields.length - 3}` : ''}
                                     </p>
                                 ) : (
                                     <p className="mt-2 text-xs leading-5 text-slate-500">
-                                        La ficha ya tiene cobertura minima para seguir con procesos de compliance.
+                                        La ficha ya tiene la base mínima para seguir con tranquilidad.
                                     </p>
                                 )}
                             </div>
@@ -798,10 +817,10 @@ export function DashboardBusiness() {
                             </p>
                         </div>
 
-                        {/* Verificación KYC */}
+                        {/* Verificación */}
                         <div className="card-section density-compact">
                             <div className="card-section__header">
-                                <h3 className="card-section__title">Verificación KYC</h3>
+                                <h3 className="card-section__title">Verificación</h3>
                                 {verificationStatus && (
                                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusChipClass(verificationStatus.verificationStatus)}`}>
                                         {statusLabel(verificationStatus.verificationStatus)}
@@ -814,7 +833,7 @@ export function DashboardBusiness() {
                                 <p className="text-xs text-slate-500 leading-relaxed">
                                     {verificationStatus?.verified
                                         ? 'Identidad verificada. Tu negocio aparece como confiable.'
-                                        : 'Sube documentos de verificación para obtener el sello KYC.'}
+                                        : 'Sube tus documentos para solicitar el sello de confianza.'}
                                 </p>
                             )}
                         </div>
@@ -930,34 +949,62 @@ export function DashboardBusiness() {
             )}
 
             {/* ═══ FILA 2: Operación diaria ═══ */}
-            {activeWorkspace === 'overview' && (
-                <section aria-label="Resumen y claims">
-                    {claimRequests.length === 0 ? (
-                        <EmptyState
-                            title="Sin claims activos"
-                            body="Cuando inicies o recibas un claim de negocio, aparecerá aquí."
-                        />
-                    ) : (
-                        <SectionCard
-                            title="Claims recientes"
-                            description={`${claimSummary.PENDING ?? 0} pendientes y ${claimSummary.UNDER_REVIEW ?? 0} en revision`}
-                            density="compact"
+            {activeWorkspace === 'overview' && selectedBusiness && (
+                <section aria-label="Siguientes pasos">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <AppCard
+                            title="Completa tu perfil"
+                            description={(selectedBusiness.profileCompletenessScore ?? 0) >= 80
+                                ? 'Tu ficha ya tiene una presentación fuerte. Puedes retocar horarios, imágenes o categorías si hace falta.'
+                                : 'Todavía hay datos importantes por completar para que la ficha se vea clara y confiable.'}
                         >
-                            <div className="card-list">
-                                {claimRequests.slice(0, 5).map((claim) => (
-                                    <div key={claim.id} className="card-list__item">
-                                        <div className="flex-1 min-w-0">
-                                            <p className="truncate text-sm font-medium text-slate-800">{claim.business.name}</p>
-                                            <p className="text-xs text-slate-500">{claimStatusLabel(claim.status)}</p>
-                                        </div>
-                                        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${claimStatusClass(claim.status)}`}>
-                                            {claimStatusLabel(claim.status)}
-                                        </span>
+                            <div className="mt-4 space-y-3">
+                                {selectedBusiness.missingCoreFields && selectedBusiness.missingCoreFields.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedBusiness.missingCoreFields.slice(0, 4).map((field) => (
+                                            <span key={field} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                {field}
+                                            </span>
+                                        ))}
                                     </div>
-                                ))}
+                                ) : (
+                                    <p className="text-sm text-slate-600">No hay pendientes importantes en este momento.</p>
+                                )}
+                                {selectedBusinessEditPath ? (
+                                    <ActionBar>
+                                        <Link to={selectedBusinessEditPath} className="btn-primary text-sm">
+                                            Editar negocio
+                                        </Link>
+                                    </ActionBar>
+                                ) : null}
                             </div>
-                        </SectionCard>
-                    )}
+                        </AppCard>
+
+                        <AppCard
+                            title="Revisión y documentos"
+                            description={claimRequests.length > 0
+                                ? `${claimSummary.PENDING ?? 0} solicitudes pendientes y ${claimSummary.UNDER_REVIEW ?? 0} en revisión.`
+                                : 'Mantiene juntos documentos, solicitud de revisión y respuesta del equipo.'}
+                        >
+                            <div className="mt-4 space-y-3 text-sm text-slate-600">
+                                <p>
+                                    {documentSummary.total > 0
+                                        ? `${documentSummary.total} documento(s) cargado(s) para este negocio.`
+                                        : 'Todavía no hay documentos cargados para este negocio.'}
+                                </p>
+                                <p>
+                                    {verificationStatus?.verificationSubmittedAt
+                                        ? 'Ya existe una solicitud enviada. Revisa observaciones antes de volver a mandar algo.'
+                                        : 'Cuando termines de reunir los documentos, entra a verificación y envía la revisión.'}
+                                </p>
+                                <ActionBar>
+                                    <Link to="/dashboard?workspace=verification" className="btn-secondary text-sm">
+                                        Ir a verificación
+                                    </Link>
+                                </ActionBar>
+                            </div>
+                        </AppCard>
+                    </div>
                 </section>
             )}
 
@@ -1012,8 +1059,7 @@ export function DashboardBusiness() {
                 </section>
             )}
 
-            {/* Verificación — en overview si hay negocio seleccionado */}
-            {activeWorkspace === 'overview' && selectedBusinessId && activeOrganizationId && (
+            {activeWorkspace === 'verification' && selectedBusinessId && activeOrganizationId && (
                 <section aria-label="Verificación documental">
                     <Suspense fallback={<WorkspaceSkeleton />}>
                         <VerificationWorkspace

@@ -17,19 +17,19 @@ const STEP_PRIMARY_ACTION_LABEL: Record<RegisterStep, string> = {
 const STEP_UNLOCK_SUMMARY: Record<RegisterStep, { title: string; detail: string }> = {
     1: {
         title: 'Este paso define como se entiende tu negocio',
-        detail: 'Una propuesta clara mejora discovery y evita que la ficha parezca promocion vacia o spam.',
+        detail: 'Una propuesta clara ayuda a que la ficha se vea seria, util y facil de entender.',
     },
     2: {
-        title: 'Aqui dejas el canal que convierte',
-        detail: 'WhatsApp, telefono o website bien puestos reducen rebote y mejoran la utilidad de la ficha desde el dia uno.',
+        title: 'Aqui dejas tu mejor canal de contacto',
+        detail: 'WhatsApp, telefono o website bien puestos hacen que la ficha sirva desde el primer dia.',
     },
     3: {
         title: 'La ubicacion decide donde apareces',
-        detail: 'Direccion, provincia y ciudad alimentan geocodificacion, resultados cercanos y la vista de mapa.',
+        detail: 'Direccion, provincia y ciudad ayudan a ubicarte mejor en la zona correcta y en el mapa.',
     },
     4: {
-        title: 'Ahora cierras visibilidad y operacion',
-        detail: 'Categorias, horarios e imagenes empujan confianza y mejoran el filtro de discovery antes de publicar.',
+        title: 'Ahora dejas lista la presentacion final',
+        detail: 'Categorias, horarios e imagenes ayudan a que la ficha se vea completa y confiable antes de publicar.',
     },
 };
 
@@ -58,12 +58,12 @@ export function getRegisterStepTips(step: RegisterStep): string[] {
     }
     if (step === 3) {
         return [
-            'Direccion, provincia y ciudad mejoran discovery local y geocodificacion.',
-            'Mientras mas precisa la ubicacion, mejor responde lista/mapa.',
+            'Direccion, provincia y ciudad ayudan a que te encuentren mejor por zona.',
+            'Mientras mas precisa la ubicacion, mas facil sera ubicarte en lista y mapa.',
         ];
     }
     return [
-        'La categoria define donde apareces; los horarios alimentan filtros como "abierto ahora".',
-        'Antes de publicar, revisa el bloque de visibilidad y riesgo preventivo.',
+        'La categoria define donde apareces y los horarios ayudan a mostrar si estas abierto.',
+        'Antes de publicar, revisa el bloque final para corregir pendientes visibles.',
     ];
 }

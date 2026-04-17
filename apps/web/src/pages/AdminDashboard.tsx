@@ -63,15 +63,15 @@ const ADMIN_TABS: Array<{ key: AdminTabId; label: string; icon: string; descript
     },
     {
         key: 'verification',
-        label: 'KYC + Data Layer',
+        label: 'Verificacion',
         icon: 'K',
-        description: 'Colas de verificacion, moderacion y reportes de mercado.',
+        description: 'Revision documental, moderacion y seguimiento de casos.',
     },
     {
         key: 'observability',
-        label: 'Observabilidad',
+        label: 'Estado del sistema',
         icon: 'O',
-        description: 'Salud del frontend, metricas operativas y visibilidad de incidentes.',
+        description: 'Salud del frontend, metricas operativas e incidentes recientes.',
     },
 ];
 
@@ -1553,8 +1553,8 @@ export function AdminDashboard() {
         { key: 'businesses', label: 'Negocios', icon: 'N' },
         { key: 'categories', label: 'Categorías', icon: 'C' },
         { key: 'catalog', label: 'Catalogo', icon: 'Q' },
-        { key: 'verification', label: 'KYC + Data Layer', icon: 'K' },
-        { key: 'observability', label: 'Observabilidad', icon: 'O' },
+        { key: 'verification', label: 'Verificacion', icon: 'K' },
+        { key: 'observability', label: 'Estado del sistema', icon: 'O' },
     ] as const;
 
     return (
@@ -1570,7 +1570,7 @@ export function AdminDashboard() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Panel Admin</p>
                 <h1 className="mt-2 font-display text-3xl font-bold text-slate-950">Control de plataforma</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                    Gestión de negocios, categorías, moderación de contenido y salud operativa.
+                    Gestion de negocios, categorias, revision de contenido y salud operativa.
                 </p>
 
                 <div className="mt-5 role-kpi-grid !xl:grid-cols-4">
@@ -1594,7 +1594,7 @@ export function AdminDashboard() {
             </section>
 
             <p className="mb-8 text-slate-600">
-                Gestión de negocios, categorías, moderación y observabilidad en un solo panel.
+                Gestiona negocios, categorias, revisiones y estado del sistema en un solo panel.
             </p>
 
             <div className="workspace-strip border border-slate-200 bg-white/88 p-2 shadow-sm shadow-slate-900/5">
@@ -1623,7 +1623,7 @@ export function AdminDashboard() {
             {loading ? (
                 <PageBlockingLoader
                     label="Cargando operacion de plataforma"
-                    hint="Traemos negocios, moderacion, catalogo y observabilidad para que el panel entre ya consolidado."
+                    hint="Traemos negocios, revisiones, catalogo y estado del sistema para entrar con el panel completo."
                     className="py-12"
                 />
             ) : (
@@ -2280,7 +2280,7 @@ export function AdminDashboard() {
                                         <div>
                                             <h3 className="font-display font-semibold text-gray-900">Reclamaciones del catalogo</h3>
                                             <p className="mt-1 text-sm text-gray-600">
-                                                Aprueba, rechaza o mueve a revisión antes de activar herramientas tenant.
+                                                Aprueba, rechaza o mueve a revision antes de activar las herramientas del negocio.
                                             </p>
                                         </div>
                                         <select
@@ -2341,7 +2341,7 @@ export function AdminDashboard() {
                                                         className="btn-secondary text-sm"
                                                         onClick={() => void handleSelectOwnershipBusiness(claimRequest.business.id)}
                                                     >
-                                                        Ver ownership
+                                                        Ver historial
                                                     </button>
                                                 </div>
 
@@ -2422,9 +2422,9 @@ export function AdminDashboard() {
                                     <div className="card p-5">
                                         <div className="flex flex-wrap items-center justify-between gap-3">
                                             <div>
-                                                <h3 className="font-display font-semibold text-gray-900">Historial de ownership</h3>
+                                                <h3 className="font-display font-semibold text-gray-900">Historial de control</h3>
                                                 <p className="mt-1 text-sm text-gray-600">
-                                                    Revisa control histórico del negocio y suspende ownerships activos cuando corresponda.
+                                                    Revisa el control historico del negocio y suspende accesos activos cuando corresponda.
                                                 </p>
                                             </div>
                                             <select
@@ -3039,7 +3039,7 @@ export function AdminDashboard() {
 
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                    <h3 className="font-display font-semibold">Verificacion KYC pendiente</h3>
+                                    <h3 className="font-display font-semibold">Verificacion pendiente</h3>
                                     <button
                                         type="button"
                                         className="btn-secondary text-xs"

@@ -55,15 +55,15 @@ interface VerificationWorkspaceProps {
 function getStatusNarrative(status: VerificationToneStatus): string {
     switch (status) {
         case 'VERIFIED':
-            return 'El negocio ya paso la verificacion documental y el expediente debe mantenerse limpio.';
+            return 'El negocio ya fue aprobado. Solo debes mantener los documentos actualizados.';
         case 'PENDING':
-            return 'El expediente ya fue enviado. Ahora toca esperar decision o responder observaciones.';
+            return 'La solicitud ya fue enviada. Ahora toca esperar respuesta o corregir observaciones.';
         case 'REJECTED':
             return 'Hay observaciones pendientes. Revisa el motivo, corrige evidencia y vuelve a enviar.';
         case 'SUSPENDED':
-            return 'La verificacion esta suspendida y requiere revision manual antes de continuar.';
+            return 'La revisión está pausada y necesita atención manual antes de continuar.';
         default:
-            return 'Todavia no se ha consolidado un expediente suficiente para solicitar revision.';
+            return 'Todavía no hay suficiente información cargada para pedir la revisión.';
     }
 }
 
@@ -114,7 +114,7 @@ export function VerificationWorkspace({
         {
             label: 'Evidencia cargada',
             detail: documentSummary.total > 0
-                ? `${documentSummary.total} documento(s) en el expediente actual.`
+                ? `${documentSummary.total} documento(s) cargado(s) en esta revisión.`
                 : 'Sube por lo menos un documento legible antes de pedir revision.',
             done: documentSummary.total > 0,
         },
@@ -122,7 +122,7 @@ export function VerificationWorkspace({
             label: 'Revision formal enviada',
             detail: verificationStatus?.verificationSubmittedAt
                 ? `Enviada el ${formatDateTimeDo(verificationStatus.verificationSubmittedAt)}.`
-                : 'Todavia no se ha enviado solicitud formal al equipo de verificacion.',
+                : 'Todavía no se ha enviado la solicitud al equipo de revisión.',
             done: Boolean(verificationStatus?.verificationSubmittedAt),
         },
         {
@@ -179,10 +179,10 @@ export function VerificationWorkspace({
         <article className="section-shell p-6 lg:col-span-2 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Compliance</p>
-                    <h2 className="font-display text-xl font-bold text-slate-900">Verificacion documental</h2>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Verificación</p>
+                    <h2 className="font-display text-xl font-bold text-slate-900">Documentos del negocio</h2>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Ordena el flujo en cuatro pasos: estado actual, requisitos, evidencia y solicitud de revision.
+                        Revisa el estado, carga documentos claros y envía la solicitud cuando todo esté listo.
                     </p>
                 </div>
                 <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClass(currentStatus)}`}>
@@ -195,12 +195,12 @@ export function VerificationWorkspace({
                     Negocio seleccionado: <strong>{selectedBusiness.name}</strong>
                 </p>
             ) : (
-                <p className="text-sm text-slate-500">Selecciona un negocio para gestionar su verificacion.</p>
+                <p className="text-sm text-slate-500">Selecciona un negocio para gestionar sus documentos.</p>
             )}
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(320px,0.94fr)]">
                 <SectionCard
-                    title="Estado actual"
+                    title="Estado de la revisión"
                     description={getStatusNarrative(currentStatus)}
                     density="compact"
                     actions={(
@@ -218,7 +218,7 @@ export function VerificationWorkspace({
                             </p>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Envio formal</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Solicitud</p>
                             <p className="mt-2 text-sm font-semibold text-slate-900">
                                 {verificationStatus?.verificationSubmittedAt ? 'Enviado' : 'Sin enviar'}
                             </p>
@@ -229,7 +229,7 @@ export function VerificationWorkspace({
                             </p>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Ultima decision</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Última respuesta</p>
                             <p className="mt-2 text-sm font-semibold text-slate-900">
                                 {verificationStatus?.verificationReviewedAt ? 'Revisado' : 'Sin decision'}
                             </p>
@@ -243,21 +243,21 @@ export function VerificationWorkspace({
 
                     <div className="mt-4 space-y-3">
                         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Lectura del expediente</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Resumen actual</p>
                             <p className="mt-2 text-sm leading-6 text-slate-700">
                                 {verificationStatus?.verified
                                     ? 'El negocio ya cuenta con sello de confianza. Solo conserva evidencia actualizada.'
                                     : documentSummary.rejected > 0
-                                        ? 'Hay evidencia rechazada. Corrige el motivo antes de seguir cargando documentos al azar.'
+                                        ? 'Hay documentos rechazados. Corrige el motivo antes de volver a subir más archivos.'
                                         : documentSummary.total > 0
-                                            ? 'El expediente ya tiene base documental. Asegura contexto y envia revision cuando este completo.'
-                                            : 'Empieza por documentos base del negocio y del responsable antes de pedir revision.'}
+                                            ? 'Ya hay documentos cargados. Cuando sientas que está completo, envía la solicitud.'
+                                            : 'Empieza por los documentos principales del negocio y de la persona responsable.'}
                             </p>
                         </div>
 
                         {verificationStatus?.verificationNotes ? (
                             <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Observacion del equipo</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Comentario del equipo</p>
                                 <p className="mt-2 text-sm leading-6 text-amber-900">{verificationStatus.verificationNotes}</p>
                             </div>
                         ) : null}
@@ -267,9 +267,9 @@ export function VerificationWorkspace({
                 <div className="space-y-4">
                     <div className="card-filter density-compact space-y-3">
                         <div>
-                            <p className="text-sm font-semibold text-slate-900">Checklist de requisitos</p>
+                            <p className="text-sm font-semibold text-slate-900">Checklist rápido</p>
                             <p className="mt-1 text-xs leading-5 text-slate-500">
-                                No mezcles todo en un solo bloque: valida contexto, evidencia y envio formal por separado.
+                                Completa primero lo básico y después envía la solicitud.
                             </p>
                         </div>
                         {checklistItems.map((item) => (
@@ -291,9 +291,9 @@ export function VerificationWorkspace({
 
                     <form onSubmit={onUploadDocument} className="card-form density-compact space-y-4">
                         <div>
-                            <p className="text-sm font-semibold text-slate-900">Subir evidencia</p>
+                            <p className="text-sm font-semibold text-slate-900">Subir documento</p>
                             <p className="mt-1 text-xs leading-5 text-slate-500">
-                                Usa solo documentos legibles y tipados correctamente para no contaminar la revision.
+                                Usa archivos claros y legibles para que el equipo pueda revisarlos sin retrasos.
                             </p>
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
@@ -338,7 +338,7 @@ export function VerificationWorkspace({
                     <div>
                         <p className="text-sm font-semibold text-slate-900">Solicitar revision</p>
                         <p className="mt-1 text-xs leading-5 text-slate-500">
-                            Hazlo solo cuando el expediente tenga contexto suficiente. El objetivo es revisar, no adivinar.
+                            Haz la solicitud cuando ya tengas cargados los documentos principales.
                         </p>
                     </div>
 
@@ -347,7 +347,7 @@ export function VerificationWorkspace({
                         <textarea
                             className="input-field text-sm"
                             rows={4}
-                            placeholder="Resume contexto operativo, ownership o aclaraciones utiles para la revision."
+                            placeholder="Explica cualquier detalle útil para ayudar a revisar estos documentos."
                             value={verificationNotes}
                             onChange={(event) => onVerificationNotesChange(event.target.value)}
                             disabled={!selectedBusinessId || saving}
@@ -358,10 +358,10 @@ export function VerificationWorkspace({
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Antes de enviar</p>
                         <p className="mt-2 text-sm leading-6 text-slate-700">
                             {documentSummary.total === 0
-                                ? 'Todavia no hay evidencia cargada. El siguiente paso correcto es subir documentos.'
+                                ? 'Todavía no hay documentos cargados. El siguiente paso correcto es subirlos.'
                                 : verificationStatus?.verificationSubmittedAt
-                                    ? 'Ya existe una solicitud formal. Envia una nueva solo si hubo correccion de expediente.'
-                                    : 'El expediente ya tiene base documental. Si el contexto esta claro, puedes pasar a revision.'}
+                                    ? 'Ya existe una solicitud enviada. Vuelve a mandar algo solo si corregiste información.'
+                                    : 'Ya tienes una base suficiente. Si todo está claro, puedes pedir la revisión.'}
                         </p>
                     </div>
 
@@ -376,26 +376,26 @@ export function VerificationWorkspace({
                         </button>
                         <p className="text-xs text-slate-500">
                             {documentSummary.total > 0
-                                ? 'El equipo vera los documentos cargados y estas notas como paquete unificado.'
+                                ? 'El equipo revisará juntos los documentos y estas notas.'
                                 : 'Primero se necesita al menos un documento para poder solicitar revision.'}
                         </p>
                     </div>
                 </div>
 
                 <SectionCard
-                    title="Historial documental"
-                    description="Evidencia subida, estado y motivos de rechazo en un solo listado."
+                    title="Historial de documentos"
+                    description="Revisa lo que ya subiste, su estado y cualquier motivo de rechazo."
                     density="compact"
                 >
                     {documents.length === 0 ? (
                         <EmptyState
                             title="Todavia no hay documentos"
-                            body="Cuando cargues evidencia, el historial aparecera aqui con su estado y trazabilidad."
+                            body="Cuando cargues archivos, aparecerán aquí con su estado."
                         />
                     ) : (
                         <div className="card-list">
                             <div className="card-list__header">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Expediente actual</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Documentos cargados</p>
                                 <p className="text-xs text-slate-500">{documents.length} documento(s)</p>
                             </div>
                             {documents.map((document) => (
