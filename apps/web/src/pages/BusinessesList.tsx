@@ -59,6 +59,16 @@ const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; descr
     },
 };
 
+const QUICK_INTENTION_FEATURE_MAP: Record<string, string> = {
+    'con-delivery': 'delivery',
+    'pet-friendly': 'pet friendly',
+    'con-parqueo': 'estacionamiento',
+    'con-reservas': 'reservaciones',
+    'accesible-ada': 'accesible',
+    'acepta-tarjeta': 'tarjeta',
+    'wifi-gratis': 'wifi',
+};
+
 const NO_RESULTS_SUGGESTIONS = [
     { to: '/negocios/intencion/con-delivery', label: 'Con delivery' },
     { to: '/negocios/intencion/con-reservas', label: 'Con reservas' },
@@ -123,6 +133,23 @@ function buildPagination(currentPage: number, totalPages: number): Array<number 
     return pages;
 }
 
+function parseNumericParam(value: string | null): number | null {
+    if (!value) {
+        return null;
+    }
+
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeFilterText(value: string): string {
+    return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+}
+
 export function BusinessesList() {
     const { isAuthenticated, user } = useAuth();
     const { categorySlug, provinceSlug, intentSlug } = useParams<{
@@ -160,6 +187,9 @@ export function BusinessesList() {
     const currentFeature = searchParams.get('feature') || '';
     const currentOpenNow = searchParams.get('openNow') === 'true';
     const currentVerified = searchParams.get('verified') === 'true';
+    const currentLatitude = parseNumericParam(searchParams.get('latitude'));
+    const currentLongitude = parseNumericParam(searchParams.get('longitude'));
+    const currentRadiusKm = parseNumericParam(searchParams.get('radiusKm')) ?? 5;
     const currentView: ListingViewMode = searchParams.get('view') === 'map' ? 'map' : 'list';
     const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
     const currentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
@@ -250,6 +280,26 @@ export function BusinessesList() {
         () => (intentSlug ? INTENT_FEATURE_MAP[intentSlug] || null : null),
         [intentSlug],
     );
+    const selectedIntentions = useMemo(() => {
+        const selected: string[] = [];
+        const normalizedFeature = normalizeFilterText(currentFeature);
+
+        Object.entries(QUICK_INTENTION_FEATURE_MAP).forEach(([intentionId, featureValue]) => {
+            if (normalizedFeature && normalizedFeature === normalizeFilterText(featureValue)) {
+                selected.push(intentionId);
+            }
+        });
+
+        if (currentOpenNow) {
+            selected.push('abierto-ahora');
+        }
+
+        if (currentVerified) {
+            selected.push('verificado');
+        }
+
+        return selected;
+    }, [currentFeature, currentOpenNow, currentVerified]);
     const listingHeading = useMemo(() => {
         if (activeIntent) {
             return activeIntent.label;
@@ -296,8 +346,21 @@ export function BusinessesList() {
         if (currentFeature) chips.push(`Servicio: ${currentFeature}`);
         if (currentOpenNow) chips.push('Abiertos ahora');
         if (currentVerified) chips.push('Verificados');
+        if (currentLatitude !== null && currentLongitude !== null) chips.push(`Cerca de ti (${currentRadiusKm} km)`);
         return chips;
-    }, [activeCategory, activeCity, activeProvince, activeSector, currentFeature, currentOpenNow, currentSearch, currentVerified]);
+    }, [
+        activeCategory,
+        activeCity,
+        activeProvince,
+        activeSector,
+        currentFeature,
+        currentLatitude,
+        currentLongitude,
+        currentOpenNow,
+        currentRadiusKm,
+        currentSearch,
+        currentVerified,
+    ]);
     const seoCanonicalPath = useMemo(() => {
         if (intentSlug) {
             return `/negocios/intencion/${intentSlug}`;
@@ -474,6 +537,11 @@ export function BusinessesList() {
             if (currentFeature) params.feature = currentFeature;
             if (currentOpenNow) params.openNow = true;
             if (currentVerified) params.verified = true;
+            if (currentLatitude !== null && currentLongitude !== null) {
+                params.latitude = currentLatitude;
+                params.longitude = currentLongitude;
+                params.radiusKm = currentRadiusKm;
+            }
 
             const businessesRes = await businessApi.getAll(params);
 
@@ -487,7 +555,22 @@ export function BusinessesList() {
         } finally {
             setLoading(false);
         }
-    }, [categorySlug, currentCategory, currentCity, currentFeature, currentOpenNow, currentPage, currentProvince, currentSearch, currentSector, currentVerified, provinceSlug]);
+    }, [
+        categorySlug,
+        currentCategory,
+        currentCity,
+        currentFeature,
+        currentLatitude,
+        currentLongitude,
+        currentOpenNow,
+        currentPage,
+        currentProvince,
+        currentRadiusKm,
+        currentSearch,
+        currentSector,
+        currentVerified,
+        provinceSlug,
+    ]);
 
     useEffect(() => {
         void loadBusinesses();
@@ -708,6 +791,72 @@ export function BusinessesList() {
         });
         updateFilter(key, value);
     }, [trackListingEvent, updateFilter]);
+
+    const handleIntentionChange = useCallback((intentionId: string, selected: boolean) => {
+        if (intentionId === 'abierto-ahora') {
+            handleTrackedFilterChange('openNow', selected ? 'true' : '', {
+                source: 'sidebar-intention',
+                intentionId,
+            });
+            return;
+        }
+
+        if (intentionId === 'verificado') {
+            handleTrackedFilterChange('verified', selected ? 'true' : '', {
+                source: 'sidebar-intention',
+                intentionId,
+            });
+            return;
+        }
+
+        const featureValue = QUICK_INTENTION_FEATURE_MAP[intentionId] ?? '';
+        handleTrackedFilterChange('feature', selected ? featureValue : '', {
+            source: 'sidebar-intention',
+            intentionId,
+        });
+    }, [handleTrackedFilterChange]);
+
+    const handleGeoFilterChange = useCallback((latitude: number, longitude: number, distance: number) => {
+        trackListingEvent('LISTING_FILTER_APPLY', {
+            filterKey: 'proximity',
+            value: `${distance}km`,
+            source: 'sidebar-geo',
+            latitude,
+            longitude,
+        });
+
+        startTransition(() => {
+            setSearchParams((previous) => {
+                const params = new URLSearchParams(previous);
+                params.set('latitude', String(latitude));
+                params.set('longitude', String(longitude));
+                params.set('radiusKm', String(distance));
+                params.set('page', '1');
+                return params;
+            });
+        });
+
+        setSortKey((current) => (current === 'relevance' ? 'distance' : current));
+    }, [setSearchParams, trackListingEvent]);
+
+    const handleGeoFilterClear = useCallback(() => {
+        trackListingEvent('LISTING_FILTER_APPLY', {
+            filterKey: 'proximity',
+            value: null,
+            source: 'sidebar-geo-clear',
+        });
+
+        startTransition(() => {
+            setSearchParams((previous) => {
+                const params = new URLSearchParams(previous);
+                params.delete('latitude');
+                params.delete('longitude');
+                params.delete('radiusKm');
+                params.set('page', '1');
+                return params;
+            });
+        });
+    }, [setSearchParams, trackListingEvent]);
 
     const handleViewModeChange = useCallback((nextView: ListingViewMode) => {
         if (nextView === currentView) {
@@ -1029,15 +1178,20 @@ export function BusinessesList() {
                     currentCategory={currentCategory}
                     currentCity={currentCity}
                     currentFeature={currentFeature}
-                    currentOpenNow={currentOpenNow}
+                    currentIntentions={selectedIntentions}
+                    currentLatitude={currentLatitude}
+                    currentLongitude={currentLongitude}
                     currentProvince={currentProvince}
+                    currentRadiusKm={currentRadiusKm}
                     currentSector={currentSector}
-                    currentVerified={currentVerified}
                     filtersOpen={filtersOpen}
                     loading={filtersLoading}
                     onClearFilters={handleClearFilters}
                     onClose={() => setFiltersOpen(false)}
                     onFeatureChange={(value) => updateFilter('feature', value)}
+                    onGeoFilterChange={handleGeoFilterChange}
+                    onGeoFilterClear={handleGeoFilterClear}
+                    onIntentionChange={handleIntentionChange}
                     onTrackedFilterChange={handleTrackedFilterChange}
                     provinces={provinces}
                     sectors={sectors}
@@ -1066,35 +1220,7 @@ export function BusinessesList() {
                     {shouldShowInitialLoading ? (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {Array.from({ length: 3 }).map((_, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex min-h-[24rem] flex-col rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-40px_rgba(15,23,42,0.35)]"
-                                    >
-                                        <div className="relative overflow-hidden rounded-[1.35rem] bg-slate-100">
-                                            <div className="absolute left-3 top-3 h-7 w-24 rounded-full bg-white/80 animate-pulse"></div>
-                                            <div className="absolute left-28 top-3 h-7 w-20 rounded-full bg-white/70 animate-pulse"></div>
-                                            <div className="aspect-[4/3] animate-pulse bg-slate-100"></div>
-                                        </div>
-
-                                        <div className="mt-4 space-y-3">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="h-6 w-3/5 rounded-full bg-slate-100 animate-pulse"></div>
-                                                <div className="h-6 w-14 rounded-full bg-slate-100 animate-pulse"></div>
-                                            </div>
-
-                                            <div className="h-4 w-2/5 rounded-full bg-slate-100 animate-pulse"></div>
-                                            <div className="h-4 w-1/3 rounded-full bg-slate-100 animate-pulse"></div>
-                                            <div className="h-4 w-4/5 rounded-full bg-slate-100 animate-pulse"></div>
-
-                                            <div className="flex flex-wrap gap-2 pt-1">
-                                                <div className="h-7 w-24 rounded-full bg-slate-100 animate-pulse"></div>
-                                                <div className="h-7 w-36 rounded-full bg-slate-100 animate-pulse"></div>
-                                                <div className="h-7 w-24 rounded-full bg-slate-100 animate-pulse"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                <SkeletonLoader variant="card" count={3} />
                             </div>
 
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1499,6 +1625,3 @@ export function BusinessesList() {
         </PublicPageShell>
     );
 }
-
-
-

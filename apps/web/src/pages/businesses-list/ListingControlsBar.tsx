@@ -77,6 +77,7 @@ export function ListingControlsBar({
                         {provinces.map((province) => (
                             <option key={province.id} value={province.id}>
                                 {province.name}
+                                {typeof province._count?.businesses === 'number' ? ` (${province._count.businesses})` : ''}
                             </option>
                         ))}
                     </select>

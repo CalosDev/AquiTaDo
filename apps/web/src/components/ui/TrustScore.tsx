@@ -1,89 +1,80 @@
-import React, { useState } from 'react';
-
 interface TrustScoreProps {
-  score: number; // 0-100
+  score: number;
   showLabel?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   animated?: boolean;
 }
 
-const TrustScore: React.FC<TrustScoreProps> = ({
+function TrustScore({
   score,
   showLabel = true,
   size = 'md',
   className = '',
-  animated = true,
-}) => {
-  const [showTooltip, setShowTooltip] = useState(false);
+  animated = false,
+}: TrustScoreProps) {
+  const safeScore = Math.max(0, Math.min(100, Math.round(score)));
 
-  // Determine color based on score
-  const getScoreColor = (s: number) => {
-    if (s < 34) return 'text-red-600 bg-red-50';
-    if (s < 67) return 'text-amber-600 bg-amber-50';
-    return 'text-green-600 bg-green-50';
-  };
+  const getTone = (value: number) => {
+    if (value < 34) {
+      return {
+        text: 'text-rose-700',
+        bg: 'bg-rose-50',
+        border: 'border-rose-200',
+        label: 'Baja',
+        description: 'Confianza baja. Faltan señales suficientes para validar la ficha.',
+      };
+    }
 
-  const getScoreBorderColor = (s: number) => {
-    if (s < 34) return 'border-red-200';
-    if (s < 67) return 'border-amber-200';
-    return 'border-green-200';
-  };
+    if (value < 67) {
+      return {
+        text: 'text-amber-700',
+        bg: 'bg-amber-50',
+        border: 'border-amber-200',
+        label: 'Media',
+        description: 'Confianza media. La ficha tiene señales útiles, pero aún puede reforzarse.',
+      };
+    }
 
-  const getScoreLabel = (s: number) => {
-    if (s < 34) return 'Bajo';
-    if (s < 67) return 'Medio';
-    return 'Alto';
-  };
-
-  const getScoreDescription = (s: number) => {
-    if (s < 34) return 'Confianza baja. Pocos datos disponibles.';
-    if (s < 67) return 'Confianza media. Algunos datos verificados.';
-    return 'Confianza alta. Datos verificados y reseñas positivas.';
+    return {
+      text: 'text-emerald-700',
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-200',
+      label: 'Alta',
+      description: 'Confianza alta. La ficha combina buenas señales de verificación y contexto.',
+    };
   };
 
   const sizeClasses = {
     sm: 'h-8 w-8 text-xs',
-    md: 'h-12 w-12 text-sm',
-    lg: 'h-16 w-16 text-lg',
+    md: 'h-11 w-11 text-sm',
+    lg: 'h-14 w-14 text-base',
   };
 
-  const colorClasses = getScoreColor(score);
-  const borderColorClass = getScoreBorderColor(score);
-  const label = getScoreLabel(score);
-  const description = getScoreDescription(score);
+  const tone = getTone(safeScore);
 
   return (
-    <div className={`relative inline-flex items-center ${className}`}>
+    <div
+      className={`inline-flex items-center gap-3 ${className}`}
+      title={tone.description}
+      aria-label={`Puntuacion de confianza ${safeScore} de 100. Nivel ${tone.label}.`}
+    >
       <div
-        className={`relative flex items-center justify-center rounded-full border-2 font-bold transition ${sizeClasses[size]} ${colorClasses} ${borderColorClass} ${
-          animated ? 'animate-pulse' : ''
+        className={`inline-flex items-center justify-center rounded-full border-2 font-bold ${sizeClasses[size]} ${tone.bg} ${tone.border} ${tone.text} ${
+          animated ? 'motion-safe:animate-pulse' : ''
         }`}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        role="status"
-        aria-label={`Puntuación de confianza: ${score} de 100`}
       >
-        {score}
+        {safeScore}
       </div>
 
-      {showLabel && (
-        <div className="ml-3 flex flex-col">
-          <span className={`text-xs font-semibold ${getScoreColor(score).split(' ')[0]}`}>
-            {label}
-          </span>
-          <span className="text-xs text-slate-600">{score}/100</span>
+      {showLabel ? (
+        <div className="min-w-0">
+          <p className={`text-xs font-semibold ${tone.text}`}>Confianza {tone.label}</p>
+          <p className="text-xs text-slate-500">{safeScore}/100</p>
         </div>
-      )}
-
-      {showTooltip && (
-        <div className="absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 transform rounded-lg bg-slate-900 px-3 py-2 text-xs text-white shadow-lg whitespace-nowrap">
-          {description}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 transform border-4 border-transparent border-t-slate-900" />
-        </div>
-      )}
+      ) : null}
     </div>
   );
-};
+}
 
 export default TrustScore;

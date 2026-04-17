@@ -10,7 +10,7 @@ type RankedCategory = {
 };
 
 type RankedImage = {
-    url: string;
+    url?: string | null;
     isCover?: boolean | null;
 };
 

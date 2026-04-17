@@ -1,5 +1,3 @@
-import React, { useState } from 'react';
-
 type VerificationStatus = 'verified' | 'unverified' | 'pending';
 
 interface VerificationBadgeProps {
@@ -9,70 +7,57 @@ interface VerificationBadgeProps {
   showTooltip?: boolean;
 }
 
-const VerificationBadge: React.FC<VerificationBadgeProps> = ({
+function VerificationBadge({
   status,
   size = 'md',
   className = '',
   showTooltip = true,
-}) => {
-  const [isHovering, setIsHovering] = useState(false);
-
+}: VerificationBadgeProps) {
   const statusConfig = {
     verified: {
-      icon: '✅',
       label: 'Verificado',
-      description: 'Este negocio ha sido verificado por AquiTa.do',
-      bgColor: 'bg-green-50',
-      textColor: 'text-green-700',
-      borderColor: 'border-green-200',
+      description: 'Este negocio fue verificado por AquiTa.do.',
+      dotClass: 'bg-emerald-500',
+      toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     },
     unverified: {
-      icon: '⚪',
       label: 'No verificado',
-      description: 'Este negocio aún no ha sido verificado',
-      bgColor: 'bg-slate-50',
-      textColor: 'text-slate-600',
-      borderColor: 'border-slate-200',
+      description: 'Este negocio aun no completa verificacion.',
+      dotClass: 'bg-slate-400',
+      toneClass: 'border-slate-200 bg-slate-50 text-slate-600',
     },
     pending: {
-      icon: '⏳',
       label: 'Pendiente',
-      description: 'Verificación en proceso',
-      bgColor: 'bg-amber-50',
-      textColor: 'text-amber-700',
-      borderColor: 'border-amber-200',
+      description: 'La verificacion esta en proceso.',
+      dotClass: 'bg-amber-500',
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-700',
     },
+  } as const;
+
+  const sizeClasses = {
+    sm: 'px-2 py-1 text-xs gap-1.5',
+    md: 'px-3 py-1.5 text-sm gap-2',
+    lg: 'px-4 py-2 text-base gap-2.5',
+  };
+
+  const dotSizes = {
+    sm: 'h-2 w-2',
+    md: 'h-2.5 w-2.5',
+    lg: 'h-3 w-3',
   };
 
   const config = statusConfig[status];
 
-  const sizeClasses = {
-    sm: 'px-2 py-1 text-xs gap-1',
-    md: 'px-3 py-1.5 text-sm gap-1.5',
-    lg: 'px-4 py-2 text-base gap-2',
-  };
-
   return (
-    <div className="relative inline-block">
-      <div
-        className={`inline-flex items-center rounded-full border ${sizeClasses[size]} ${config.bgColor} ${config.textColor} ${config.borderColor} font-medium transition ${className}`}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-        role="status"
-        aria-label={config.label}
-      >
-        <span>{config.icon}</span>
-        <span>{config.label}</span>
-      </div>
-
-      {showTooltip && isHovering && (
-        <div className="absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 transform rounded-lg bg-slate-900 px-3 py-2 text-xs text-white shadow-lg whitespace-nowrap">
-          {config.description}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 transform border-4 border-transparent border-t-slate-900" />
-        </div>
-      )}
-    </div>
+    <span
+      className={`inline-flex items-center rounded-full border font-medium ${sizeClasses[size]} ${config.toneClass} ${className}`}
+      title={showTooltip ? config.description : undefined}
+      aria-label={config.label}
+    >
+      <span className={`rounded-full ${dotSizes[size]} ${config.dotClass}`} aria-hidden="true" />
+      <span>{config.label}</span>
+    </span>
   );
-};
+}
 
 export default VerificationBadge;

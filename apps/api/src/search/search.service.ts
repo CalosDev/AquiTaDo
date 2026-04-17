@@ -50,77 +50,111 @@ type NormalizedPublicDiscoveryQuery = {
     limit: number;
 };
 
-type PublicBusinessCandidate = {
-    id: string;
-    name: string;
-    slug: string;
-    description: string;
-    address: string;
-    phone: string | null;
-    whatsapp: string | null;
-    website: string | null;
-    email: string | null;
-    instagramUrl: string | null;
-    facebookUrl: string | null;
-    tiktokUrl: string | null;
-    priceRange: string | null;
-    verified: boolean;
-    publicStatus: string;
-    claimStatus: string;
-    source: string;
-    catalogSource: string | null;
-    lifecycleStatus: string | null;
-    isClaimable: boolean;
-    isActive: boolean;
-    primaryManagingOrganizationId: string | null;
-    reputationScore: Prisma.Decimal;
-    verificationStatus: string;
-    createdAt: Date;
-    latitude: number | null;
-    longitude: number | null;
+const publicBusinessRankingSelect = {
+    id: true,
+    name: true,
+    description: true,
+    address: true,
+    phone: true,
+    whatsapp: true,
+    website: true,
+    email: true,
+    instagramUrl: true,
+    facebookUrl: true,
+    tiktokUrl: true,
+    priceRange: true,
+    verified: true,
+    publicStatus: true,
+    claimStatus: true,
+    source: true,
+    catalogSource: true,
+    lifecycleStatus: true,
+    isClaimable: true,
+    isActive: true,
+    primaryManagingOrganizationId: true,
+    reputationScore: true,
+    verificationStatus: true,
+    createdAt: true,
+    latitude: true,
+    longitude: true,
     province: {
-        id: string;
-        name: string;
-        slug: string;
-    };
+        select: { name: true },
+    },
     city: {
-        id: string;
-        name: string;
-        slug: string;
-    } | null;
+        select: { name: true },
+    },
     sector: {
-        id: string;
-        name: string;
-        slug: string;
-    } | null;
-    categories: Array<{
-        category: {
-            id: string;
-            name: string;
-            slug: string;
-            icon: string | null;
-            parentId: string | null;
-        };
-    }>;
-    images: Array<{
-        id: string;
-        url: string;
-        isCover: boolean;
-        caption: string | null;
-        type: string;
-    }>;
-    hours: Array<{
-        dayOfWeek: number;
-        opensAt: string | null;
-        closesAt: string | null;
-        closed: boolean;
-    }>;
+        select: { name: true },
+    },
+    categories: {
+        select: {
+            category: {
+                select: { name: true },
+            },
+        },
+    },
+    images: {
+        select: { isCover: true },
+        orderBy: [
+            { isCover: Prisma.SortOrder.desc },
+            { sortOrder: Prisma.SortOrder.asc },
+            { id: Prisma.SortOrder.asc },
+        ],
+        take: 1,
+    },
+    hours: {
+        select: {
+            dayOfWeek: true,
+            opensAt: true,
+            closesAt: true,
+            closed: true,
+        },
+        orderBy: { dayOfWeek: Prisma.SortOrder.asc },
+    },
     _count: {
-        reviews: number;
-    };
-};
+        select: { reviews: true },
+    },
+} satisfies Prisma.BusinessSelect;
 
-type RankedBusinessCandidate = PublicBusinessCandidate & {
+const publicBusinessListItemHydrationSelect = {
+    id: true,
+    slug: true,
+    province: {
+        select: { id: true, name: true, slug: true },
+    },
+    city: {
+        select: { id: true, name: true, slug: true },
+    },
+    sector: {
+        select: { id: true, name: true, slug: true },
+    },
+    categories: {
+        select: {
+            category: {
+                select: { id: true, name: true, slug: true, icon: true, parentId: true },
+            },
+        },
+    },
+    images: {
+        select: { id: true, url: true, isCover: true, caption: true, type: true },
+        orderBy: [
+            { isCover: Prisma.SortOrder.desc },
+            { sortOrder: Prisma.SortOrder.asc },
+            { id: Prisma.SortOrder.asc },
+        ],
+        take: 1,
+    },
+} satisfies Prisma.BusinessSelect;
+
+type PublicBusinessRankingCandidate = Prisma.BusinessGetPayload<{
+    select: typeof publicBusinessRankingSelect;
+}>;
+
+type PublicBusinessListItemHydration = Prisma.BusinessGetPayload<{
+    select: typeof publicBusinessListItemHydrationSelect;
+}>;
+
+type RankedBusinessCandidate = PublicBusinessRankingCandidate & {
     relevanceScore: number;
     distanceKm: number | null;
 };
@@ -148,6 +182,10 @@ type NearbyBusinessRow = {
     distanceMeters: number;
 };
 
+type DistanceFilteredBusinessRow = {
+    id: string;
+};
+
 @Injectable()
 export class SearchService {
     private readonly logger = new Logger(SearchService.name);
@@ -164,73 +202,6 @@ export class SearchService {
         @Inject(AnalyticsService)
         private readonly analyticsService: AnalyticsService,
     ) { }
-
-    private readonly publicBusinessCandidateSelect = {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        address: true,
-        phone: true,
-        whatsapp: true,
-        website: true,
-        email: true,
-        instagramUrl: true,
-        facebookUrl: true,
-        tiktokUrl: true,
-        priceRange: true,
-        verified: true,
-        publicStatus: true,
-        claimStatus: true,
-        source: true,
-        catalogSource: true,
-        lifecycleStatus: true,
-        isClaimable: true,
-        isActive: true,
-        primaryManagingOrganizationId: true,
-        reputationScore: true,
-        verificationStatus: true,
-        createdAt: true,
-        latitude: true,
-        longitude: true,
-        province: {
-            select: { id: true, name: true, slug: true },
-        },
-        city: {
-            select: { id: true, name: true, slug: true },
-        },
-        sector: {
-            select: { id: true, name: true, slug: true },
-        },
-        categories: {
-            select: {
-                category: {
-                    select: { id: true, name: true, slug: true, icon: true, parentId: true },
-                },
-            },
-        },
-        images: {
-            select: { id: true, url: true, isCover: true, caption: true, type: true },
-            orderBy: [
-                { isCover: Prisma.SortOrder.desc },
-                { sortOrder: Prisma.SortOrder.asc },
-                { id: Prisma.SortOrder.asc },
-            ],
-            take: 1,
-        },
-        hours: {
-            select: {
-                dayOfWeek: true,
-                opensAt: true,
-                closesAt: true,
-                closed: true,
-            },
-            orderBy: { dayOfWeek: Prisma.SortOrder.asc },
-        },
-        _count: {
-            select: { reviews: true },
-        },
-    } satisfies Prisma.BusinessSelect;
 
     async onModuleInit() {
         this.logger.log('Search provider: PostgreSQL');
@@ -418,7 +389,7 @@ export class SearchService {
         const where = await this.buildPublicWhere(query);
         let candidates = await this.prisma.business.findMany({
             where,
-            select: this.publicBusinessCandidateSelect,
+            select: publicBusinessRankingSelect,
         });
 
         if (query.openNow) {
@@ -442,42 +413,28 @@ export class SearchService {
             .sort((left, right) => this.compareRankedBusinesses(left, right));
 
         const skip = (query.page - 1) * query.limit;
-        const paginatedData = rankedBusinesses.slice(skip, skip + query.limit).map((candidate) => ({
-            id: candidate.id,
-            name: candidate.name,
-            slug: candidate.slug,
-            description: candidate.description,
-            address: candidate.address,
-            verified: candidate.verified,
-            publicStatus: candidate.publicStatus,
-            claimStatus: candidate.claimStatus,
-            source: candidate.source,
-            catalogSource: normalizeCatalogSource(candidate.catalogSource ?? candidate.source),
-            lifecycleStatus: toLifecycleStatus({
-                lifecycleStatus: candidate.lifecycleStatus,
-                publicStatus: candidate.publicStatus,
-                isActive: candidate.isActive,
-            }),
-            isActive: candidate.isActive,
-            isClaimable: candidate.isClaimable,
-            reputationScore: candidate.reputationScore,
-            verificationStatus: candidate.verificationStatus,
-            primaryManagingOrganizationId: candidate.primaryManagingOrganizationId,
-            province: candidate.province,
-            city: candidate.city,
-            categories: candidate.categories,
-            images: candidate.images,
-            _count: candidate._count,
-            relevanceScore: candidate.relevanceScore,
-            distanceKm: candidate.distanceKm,
-            latitude: candidate.latitude,
-            longitude: candidate.longitude,
-            priceRange: candidate.priceRange,
-            sector: candidate.sector,
-            openNow: isBusinessOpenNow(candidate.hours),
-            todayHoursLabel: buildTodayBusinessHoursLabel(candidate.hours),
-            profileCompletenessScore: calculateBusinessProfileCompletenessScore(candidate),
-        }));
+        const paginatedCandidates = rankedBusinesses.slice(skip, skip + query.limit);
+        const hydratedPageItems = paginatedCandidates.length > 0
+            ? await this.prisma.business.findMany({
+                where: {
+                    id: {
+                        in: paginatedCandidates.map((candidate) => candidate.id),
+                    },
+                },
+                select: publicBusinessListItemHydrationSelect,
+            })
+            : [];
+        const hydratedPageItemsById = new Map(
+            hydratedPageItems.map((candidate) => [candidate.id, candidate] as const),
+        );
+        const paginatedData = paginatedCandidates.map((candidate) => {
+            const hydratedCandidate = hydratedPageItemsById.get(candidate.id);
+            if (!hydratedCandidate) {
+                return null;
+            }
+
+            return this.toPublicBusinessListItem(candidate, hydratedCandidate);
+        }).filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null);
 
         return {
             data: paginatedData,
@@ -490,7 +447,7 @@ export class SearchService {
     }
 
     private rankCandidate(
-        candidate: PublicBusinessCandidate,
+        candidate: PublicBusinessRankingCandidate,
         query: NormalizedPublicDiscoveryQuery,
         popularitySignals?: DiscoveryPopularitySignals,
     ): RankedBusinessCandidate {
@@ -643,7 +600,89 @@ export class SearchService {
             };
         }
 
+        const geoFilteredBusinessIds = await this.resolveGeoFilteredBusinessIds(query);
+        if (geoFilteredBusinessIds) {
+            if (geoFilteredBusinessIds.length === 0) {
+                where.id = '__no_geo_match__';
+                return where;
+            }
+
+            where.id = {
+                in: geoFilteredBusinessIds,
+            };
+        }
+
         return where;
+    }
+
+    private toPublicBusinessListItem(
+        candidate: RankedBusinessCandidate,
+        hydratedCandidate: PublicBusinessListItemHydration,
+    ) {
+        return {
+            id: candidate.id,
+            name: candidate.name,
+            slug: hydratedCandidate.slug,
+            description: candidate.description,
+            address: candidate.address,
+            verified: candidate.verified,
+            publicStatus: candidate.publicStatus,
+            claimStatus: candidate.claimStatus,
+            source: candidate.source,
+            catalogSource: normalizeCatalogSource(candidate.catalogSource ?? candidate.source),
+            lifecycleStatus: toLifecycleStatus({
+                lifecycleStatus: candidate.lifecycleStatus,
+                publicStatus: candidate.publicStatus,
+                isActive: candidate.isActive,
+            }),
+            isActive: candidate.isActive,
+            isClaimable: candidate.isClaimable,
+            reputationScore: candidate.reputationScore,
+            verificationStatus: candidate.verificationStatus,
+            primaryManagingOrganizationId: candidate.primaryManagingOrganizationId,
+            province: hydratedCandidate.province,
+            city: hydratedCandidate.city,
+            categories: hydratedCandidate.categories,
+            images: hydratedCandidate.images,
+            _count: candidate._count,
+            relevanceScore: candidate.relevanceScore,
+            distanceKm: candidate.distanceKm,
+            latitude: candidate.latitude,
+            longitude: candidate.longitude,
+            priceRange: candidate.priceRange,
+            sector: hydratedCandidate.sector,
+            openNow: isBusinessOpenNow(candidate.hours),
+            todayHoursLabel: buildTodayBusinessHoursLabel(candidate.hours),
+            profileCompletenessScore: calculateBusinessProfileCompletenessScore(candidate),
+        };
+    }
+
+    private async resolveGeoFilteredBusinessIds(query: NormalizedPublicDiscoveryQuery): Promise<string[] | null> {
+        if (typeof query.lat !== 'number' || typeof query.lng !== 'number') {
+            return null;
+        }
+
+        const radiusKm = query.radiusKm ?? 5;
+        const radiusMeters = radiusKm * 1000;
+        const origin = Prisma.sql`ST_SetSRID(ST_MakePoint(${query.lng}, ${query.lat}), 4326)::geography`;
+        const rows = await this.prisma.$queryRaw<DistanceFilteredBusinessRow[]>(Prisma.sql`
+            SELECT b.id
+            FROM businesses b
+            WHERE b."deletedAt" IS NULL
+              AND b."isActive" = true
+              AND b."publicStatus" = 'PUBLISHED'
+              AND b."isPublished" = true
+              AND b."isSearchable" = true
+              AND b."isDiscoverable" = true
+              AND b.location IS NOT NULL
+              AND ST_DWithin(
+                    b.location::geography,
+                    ${origin},
+                    ${radiusMeters}
+              )
+        `);
+
+        return rows.map((row) => row.id);
     }
 
     private async resolveFeatureIds(featureQuery: string): Promise<string[]> {

@@ -36,16 +36,27 @@ export interface Province {
     id: string;
     name: string;
     slug: string;
+    _count?: {
+        businesses?: number;
+        cities?: number;
+    };
 }
 
 export interface City {
     id: string;
     name: string;
+    _count?: {
+        businesses?: number;
+        sectors?: number;
+    };
 }
 
 export interface Sector {
     id: string;
     name: string;
+    _count?: {
+        businesses?: number;
+    };
 }
 
 export interface SponsoredPlacement {

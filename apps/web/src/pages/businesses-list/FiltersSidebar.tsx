@@ -1,6 +1,8 @@
 import type { Category, City, Province, Sector } from './types';
 import { formatPublicCategoryIcon, formatPublicCategoryName } from '../../lib/categoryLabel';
 import { ActionBar, AppCard, InlineNotice } from '../../components/ui';
+import IntentionFilter from './IntentionFilter';
+import LocationFilter from './LocationFilter';
 
 interface FiltersSidebarProps {
     activeFilterChips: string[];
@@ -9,15 +11,20 @@ interface FiltersSidebarProps {
     currentCategory: string;
     currentCity: string;
     currentFeature: string;
-    currentOpenNow: boolean;
+    currentLatitude: number | null;
+    currentLongitude: number | null;
     currentProvince: string;
+    currentRadiusKm: number;
     currentSector: string;
-    currentVerified: boolean;
+    currentIntentions: string[];
     filtersOpen: boolean;
     loading: boolean;
     onClearFilters: () => void;
     onClose: () => void;
     onFeatureChange: (value: string) => void;
+    onGeoFilterChange: (latitude: number, longitude: number, distance: number) => void;
+    onGeoFilterClear: () => void;
+    onIntentionChange: (intentionId: string, selected: boolean) => void;
     onTrackedFilterChange: (key: string, value: string, metadata: { source: string }) => void;
     provinces: Province[];
     sectors: Sector[];
@@ -30,15 +37,20 @@ export function FiltersSidebar({
     currentCategory,
     currentCity,
     currentFeature,
-    currentOpenNow,
+    currentLatitude,
+    currentLongitude,
     currentProvince,
+    currentRadiusKm,
     currentSector,
-    currentVerified,
+    currentIntentions,
     filtersOpen,
     loading,
     onClearFilters,
     onClose,
     onFeatureChange,
+    onGeoFilterChange,
+    onGeoFilterClear,
+    onIntentionChange,
     onTrackedFilterChange,
     provinces,
     sectors,
@@ -126,6 +138,32 @@ export function FiltersSidebar({
 
             <section className="space-y-3">
                 <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Intenciones</p>
+                    <p className="mt-1 text-sm text-slate-600">Activa senales rapidas sin escribir filtros manuales.</p>
+                </div>
+                <IntentionFilter
+                    selectedIntentions={currentIntentions}
+                    onIntentionChange={onIntentionChange}
+                />
+            </section>
+
+            <section className="space-y-3">
+                <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cerca de ti</p>
+                    <p className="mt-1 text-sm text-slate-600">Ordena el discovery por cercania cuando quieras explorar por contexto real.</p>
+                </div>
+                <LocationFilter
+                    currentLatitude={currentLatitude}
+                    currentLongitude={currentLongitude}
+                    currentDistance={currentRadiusKm}
+                    disabled={loading}
+                    onLocationChange={onGeoFilterChange}
+                    onClearLocation={onGeoFilterClear}
+                />
+            </section>
+
+            <section className="space-y-3">
+                <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Ubicacion</p>
                     <p className="mt-1 text-sm text-slate-600">Provincia, ciudad y sector se encadenan para no sobrecargar el listado.</p>
                 </div>
@@ -141,6 +179,7 @@ export function FiltersSidebar({
                         {provinces.map((province) => (
                             <option key={province.id} value={province.id}>
                                 {province.name}
+                                {typeof province._count?.businesses === 'number' ? ` (${province._count.businesses})` : ''}
                             </option>
                         ))}
                     </select>
@@ -158,6 +197,7 @@ export function FiltersSidebar({
                         {cities.map((city) => (
                             <option key={city.id} value={city.id}>
                                 {city.name}
+                                {typeof city._count?.businesses === 'number' ? ` (${city._count.businesses})` : ''}
                             </option>
                         ))}
                     </select>
@@ -175,6 +215,7 @@ export function FiltersSidebar({
                         {sectors.map((sector) => (
                             <option key={sector.id} value={sector.id}>
                                 {sector.name}
+                                {typeof sector._count?.businesses === 'number' ? ` (${sector._count.businesses})` : ''}
                             </option>
                         ))}
                     </select>
@@ -195,33 +236,6 @@ export function FiltersSidebar({
                     disabled={loading}
                     className="input-field"
                 />
-            </section>
-
-            <section className="space-y-3">
-                <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Disponibilidad</p>
-                    <p className="mt-1 text-sm text-slate-600">Activa solo los estados que de verdad cambian la decision de busqueda.</p>
-                </div>
-                <div className="space-y-2">
-                    <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700">
-                        <input
-                            type="checkbox"
-                            checked={currentOpenNow}
-                            onChange={(event) => onTrackedFilterChange('openNow', event.target.checked ? 'true' : '', { source: 'sidebar-open-now' })}
-                            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500/30"
-                        />
-                        Abierto ahora
-                    </label>
-                    <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700">
-                        <input
-                            type="checkbox"
-                            checked={currentVerified}
-                            onChange={(event) => onTrackedFilterChange('verified', event.target.checked ? 'true' : '', { source: 'sidebar-verified' })}
-                            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500/30"
-                        />
-                        Solo verificados
-                    </label>
-                </div>
             </section>
             </div>
         </AppCard>
