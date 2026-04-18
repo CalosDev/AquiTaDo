@@ -6,33 +6,22 @@ on:
       - main
       - master
   pull_request:
+  workflow_dispatch:
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aquita_test
+      DATABASE_URL: postgresql://aquita:aquita123@127.0.0.1:55432/aquita_test
+      REDIS_URL: redis://127.0.0.1:56379
       JWT_SECRET: ci-super-secret-key-at-least-16
-      PORT: 3000
-      CORS_ORIGIN: http://localhost:5173
+      PORT: 3300
+      CORS_ORIGIN: http://127.0.0.1:4173
       THROTTLE_TTL_MS: 60000
       THROTTLE_LIMIT: 120
-      SMOKE_BASE_URL: http://localhost:3000
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: aquita_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d aquita_test"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+      PLAYWRIGHT_ADMIN_EMAIL: admin@aquita.do
+      PLAYWRIGHT_ADMIN_PASSWORD: admin12345
 
     steps:
       - name: Checkout
@@ -52,27 +41,49 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start QA services
+        run: docker compose -f docker/docker-compose.test.yml up -d --wait
+
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      - name: Lint
-        run: pnpm lint
+      - name: QA PR gate
+        run: pnpm qa:pr
 
-      - name: Apply Prisma migrations
-        run: pnpm db:migrate:deploy
+      - name: Stop QA services
+        if: always()
+        run: docker compose -f docker/docker-compose.test.yml down -v --remove-orphans
 
-      - name: Test
-        run: pnpm test
+  release-gates:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PLAYWRIGHT_ADMIN_EMAIL: admin@aquita.do
+      PLAYWRIGHT_ADMIN_PASSWORD: admin12345
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: E2E API
-        run: pnpm test:e2e:api
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
-      - name: Build
-        run: pnpm build
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
 
-      - name: Smoke test API
-        run: |
-          pnpm --filter @aquita/api start:prod &
-          API_PID=$!
-          trap "kill $API_PID" EXIT
-          pnpm smoke:api
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: QA release gate
+        run: pnpm qa:release

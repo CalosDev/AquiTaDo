@@ -26,6 +26,7 @@ La propuesta de escalado B2B2C (Discovery + SaaS + Marketplace) esta documentada
 - `docs/ROLE_ACCESS_MATRIX.md`
 - `docs/DOMINICAN_PRODUCT_GUARDRAILS.md`
 - `docs/OPERATIONS_SUPPORT_PLAYBOOK.md`
+- `docs/QA_AUTOMATION.md`
 
 ## Estructura
 
@@ -99,6 +100,25 @@ Servicios:
 - Web: http://localhost:5173
 - API: http://localhost:3000
 - Health: http://localhost:3000/api/health
+
+## QA automatizado
+
+Comandos principales:
+
+- `pnpm qa:smoke`
+- `pnpm qa:pr`
+- `pnpm qa:release`
+
+Suites disponibles:
+
+- `pnpm test:unit`
+- `pnpm test:integration`
+- `pnpm test:e2e`
+- `pnpm test:a11y`
+- `pnpm test:visual`
+- `pnpm test:lighthouse`
+
+La configuracion, la estructura de carpetas y el entorno reproducible para QA estan en [docs/QA_AUTOMATION.md](docs/QA_AUTOMATION.md).
 
 ## Entorno
 
