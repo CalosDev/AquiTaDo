@@ -19,3 +19,4 @@ apps/api/src/generated/prisma/
 .run/
 .docs/
 .playwright-cli/
+.lighthouseci/

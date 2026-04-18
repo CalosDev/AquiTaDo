@@ -179,7 +179,7 @@ async function deduplicateFeaturesByName() {
 }
 
 async function main() {
-    console.log('🌱 Seeding AquiTa.do database...');
+    console.log('[seed] Seeding AquiTa.do database...');
 
     // Create admin user
     const adminPassword = await bcrypt.hash('admin12345', 12);
@@ -193,7 +193,7 @@ async function main() {
             role: 'ADMIN',
         },
     });
-    console.log('✅ Admin user created:', admin.email);
+    console.log('[ok] Admin user created:', admin.email);
 
     const plans = [
         {
@@ -272,7 +272,7 @@ async function main() {
             },
         });
     }
-    console.log(`✅ ${plans.length} plans created`);
+    console.log(`[ok] ${plans.length} plans created`);
 
     // Create categories
     const categories = [
@@ -300,7 +300,7 @@ async function main() {
             create: cat,
         });
     }
-    console.log(`✅ ${categories.length} categories created`);
+    console.log(`[ok] ${categories.length} categories created`);
 
     const dominicanLocalCategories = [
         { name: 'Colmados', slug: 'colmados', icon: '🏪' },
@@ -319,7 +319,7 @@ async function main() {
             create: localCategory,
         });
     }
-    console.log(`✅ ${dominicanLocalCategories.length} Dominican local categories ensured`);
+    console.log(`[ok] ${dominicanLocalCategories.length} Dominican local categories ensured`);
 
     const additionalDominicanLocalCategories = [
         { name: 'Pica Pollos', slug: 'pica-pollos', icon: 'PP' },
@@ -338,7 +338,7 @@ async function main() {
             create: category,
         });
     }
-    console.log(`âœ… ${additionalDominicanLocalCategories.length} additional local categories ensured`);
+    console.log(`[ok] ${additionalDominicanLocalCategories.length} additional local categories ensured`);
 
     const categoryParentAssignments = [
         { parentSlug: 'restaurantes', childSlug: 'colmados' },
@@ -365,7 +365,7 @@ async function main() {
             data: { parentId: parent.id },
         });
     }
-    console.log(`âœ… ${categoryParentAssignments.length} category parent relationships ensured`);
+    console.log(`[ok] ${categoryParentAssignments.length} category parent relationships ensured`);
 
     // Create provinces
     const provincesFromApi = await loadProvincesFromAdministrativeDivisionsDb();
@@ -381,7 +381,7 @@ async function main() {
         });
         createdProvincesBySlug[slug] = province.id;
     }
-    console.log(`✅ ${provinces.length} provinces created/updated`);
+    console.log(`[ok] ${provinces.length} provinces created/updated`);
 
     // Create cities for major provinces
     const citiesData: Record<string, string[]> = {
@@ -413,12 +413,12 @@ async function main() {
             }
         }
     }
-    console.log('✅ Cities created');
+    console.log('[ok] Cities created');
 
     const sectorsData: Array<{ provinceName: string; cityName: string; sectors: string[] }> = [
         {
             provinceName: 'Distrito Nacional',
-            cityName: 'Santo Domingo de GuzmÃ¡n',
+            cityName: 'Santo Domingo de Guzmán',
             sectors: ['Piantini', 'Naco', 'Gazcue', 'Zona Colonial', 'Bella Vista'],
         },
         {
@@ -485,7 +485,7 @@ async function main() {
             });
         }
     }
-    console.log(`âœ… ${sectorsData.length} city sector groups created`);
+    console.log(`[ok] ${sectorsData.length} city sector groups created`);
 
     // Create features
     const features = [
@@ -503,7 +503,7 @@ async function main() {
             create: { name },
         });
     }
-    console.log(`✅ ${features.length} features created`);
+    console.log(`[ok] ${features.length} features created`);
 
 
     await prisma.$executeRaw`
@@ -512,9 +512,9 @@ async function main() {
         WHERE latitude IS NOT NULL
           AND longitude IS NOT NULL
     `;
-    console.log('✅ Business locations synced to PostGIS geometry column');
+    console.log('[ok] Business locations synced to PostGIS geometry column');
 
-    console.log('\n🎉 Seed completado exitosamente!');
+    console.log('\n[ok] Seed completado exitosamente!');
 }
 
 main()

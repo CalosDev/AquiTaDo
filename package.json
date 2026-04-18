@@ -22,7 +22,7 @@
     "test:visual": "node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test --grep @visual",
     "test:visual:update": "node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test --grep @visual --update-snapshots",
     "test:a11y": "node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test --grep @a11y",
-    "test:lighthouse": "node scripts/run-with-qa-stack.mjs -- pnpm exec lhci autorun --config=./lighthouse/lighthouserc.js",
+    "test:lighthouse": "node scripts/run-with-qa-stack.mjs -- node scripts/run-lighthouse-ci.mjs",
     "test:e2e:api": "pnpm --filter @aquita/api test:e2e",
     "audit:architecture": "node scripts/audit-architecture.mjs",
     "quality:check": "pnpm check:encoding && pnpm lint && pnpm audit:architecture && pnpm test",

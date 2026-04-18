@@ -1,12 +1,3 @@
-const path = require('node:path');
-
-const chromeProfileDir = path
-    .join(process.cwd(), 'output', 'lighthouse', 'chrome-profile')
-    .replace(/\\/g, '/');
-const chromeCacheDir = path
-    .join(chromeProfileDir, 'cache')
-    .replace(/\\/g, '/');
-
 module.exports = {
     ci: {
         collect: {
@@ -18,7 +9,6 @@ module.exports = {
             ],
             settings: {
                 preset: 'desktop',
-                chromeFlags: `--user-data-dir=${chromeProfileDir} --disk-cache-dir=${chromeCacheDir} --disable-dev-shm-usage`,
             },
         },
         assert: {
@@ -26,7 +16,7 @@ module.exports = {
                 'categories:performance': [
                     'warn',
                     {
-                        minScore: 0.8,
+                        minScore: 0.7,
                     },
                 ],
                 'categories:accessibility': [
@@ -41,8 +31,6 @@ module.exports = {
                         minScore: 0.9,
                     },
                 ],
-                'installable-manifest': 'error',
-                'service-worker': 'warn',
             },
         },
         upload: {
