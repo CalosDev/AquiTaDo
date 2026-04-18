@@ -10,7 +10,9 @@ export function Footer({ compact = false }: FooterProps) {
             <footer className="mt-6 border-t border-slate-200 bg-white/90">
                 <div className="container-xl flex flex-col gap-3 py-5 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
-                        <span className="font-display text-lg font-bold text-slate-900">AquiTa.do</span>
+                        <Link to="/" className="font-display text-lg font-bold text-slate-900 transition-colors hover:text-primary-700">
+                            AquiTa.do
+                        </Link>
                         <span className="text-xs uppercase tracking-[0.16em] text-slate-400">Discovery local en RD</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-4">

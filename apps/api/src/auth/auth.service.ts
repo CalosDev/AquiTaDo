@@ -936,6 +936,8 @@ export class AuthService {
                     ipAddress,
                 },
             });
+        }, {
+            timeout: 15_000,
         });
 
         response.cookie(

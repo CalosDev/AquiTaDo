@@ -64,7 +64,7 @@ describe('Navbar role navigation', () => {
         });
 
         expect(screen.getAllByRole('link', { name: /panel negocio/i }).length).toBeGreaterThan(0);
-        expect(screen.getAllByRole('link', { name: /\+ registrar/i }).length).toBeGreaterThan(0);
+        expect(screen.getAllByRole('link', { name: /registrar negocio/i }).length).toBeGreaterThan(0);
         expect(screen.queryByRole('link', { name: /seguridad/i })).not.toBeInTheDocument();
     });
 
