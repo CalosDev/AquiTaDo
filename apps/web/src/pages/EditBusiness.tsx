@@ -524,6 +524,12 @@ export function EditBusiness() {
 
             <AppCard>
                 <form onSubmit={(event) => void handleSubmit(event)} className="space-y-6">
+                    <div className="space-y-1">
+                        <h2 className="font-display text-lg font-semibold text-gray-900">Informacion principal</h2>
+                        <p className="text-sm text-gray-600">
+                            Revisa nombre, descripcion, contacto y ubicacion base antes de entrar a detalles mas finos.
+                        </p>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                         <label htmlFor="edit-business-name" className="text-sm font-medium text-gray-700 mb-1 block">
@@ -768,6 +774,15 @@ export function EditBusiness() {
                     </div>
                 </div>
 
+                <div className="space-y-1 pt-2">
+                    <div>
+                        <h2 className="font-display text-lg font-semibold text-gray-900">Categorias y servicios</h2>
+                        <p className="text-sm text-gray-600">
+                            Define como aparece el negocio y que experiencias ofrece desde su perfil.
+                        </p>
+                    </div>
+                </div>
+
                 <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">Categorías *</p>
                     <div className="flex flex-wrap gap-2">
@@ -904,7 +919,7 @@ export function EditBusiness() {
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                         <div>
-                            <h2 className="font-display text-lg font-semibold text-gray-900">Horarios del negocio</h2>
+                            <h2 className="font-display text-lg font-semibold text-gray-900">Horarios</h2>
                             <p className="text-sm text-gray-600">
                                 La ficha pública y el filtro abierto ahora dependen de estos horarios.
                             </p>
@@ -926,9 +941,9 @@ export function EditBusiness() {
 
                 <div className="space-y-4 rounded-xl border border-gray-100 p-4">
                     <div>
-                        <h2 className="font-display text-lg font-semibold text-gray-900">Imágenes del negocio</h2>
+                        <h2 className="font-display text-lg font-semibold text-gray-900">Imagenes del negocio</h2>
                         <p className="text-sm text-gray-600">
-                            Puedes eliminar imágenes actuales y subir nuevas imágenes.
+                            Puedes eliminar imagenes actuales y subir nuevas imagenes.
                         </p>
                     </div>
 

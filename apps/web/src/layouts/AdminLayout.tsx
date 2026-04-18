@@ -86,28 +86,28 @@ export function AdminLayout() {
         {
             label: 'Catálogo',
             to: '/admin?tab=catalog',
-            description: 'Claims, duplicados y ownership.',
+            description: 'Reclamaciones, duplicados y control del negocio.',
             active: location.pathname === '/admin' && activeTab === 'catalog',
             icon: adminIcon('catalog'),
         },
         {
             label: 'Verificación',
             to: '/admin?tab=verification',
-            description: 'KYC, moderación y data layer.',
+            description: 'Documentos, revisión y seguimiento de casos.',
             active: location.pathname === '/admin' && activeTab === 'verification',
             icon: adminIcon('verification'),
         },
         {
-            label: 'Observabilidad',
+            label: 'Estado del sistema',
             to: '/admin?tab=observability',
-            description: 'Health, frontend y operación.',
+            description: 'Frontend, operación y alertas recientes.',
             active: location.pathname === '/admin' && activeTab === 'observability',
             icon: adminIcon('observability'),
         },
         {
             label: 'Seguridad',
             to: '/security',
-            description: '2FA y controles sensibles.',
+            description: 'Acceso, 2FA y controles sensibles.',
             active: location.pathname === '/security',
             icon: adminIcon('security'),
         },
@@ -185,10 +185,10 @@ export function AdminLayout() {
                             Modo consola
                         </p>
                         <p className="mt-2 text-sm font-semibold text-white">
-                            Moderación, catálogo y observabilidad
+                            Moderación, catálogo y operación
                         </p>
                         <p className="mt-1 text-sm leading-6 text-slate-300">
-                            La prioridad aquí es operar la plataforma con densidad compacta y navegación estable, no parecer una landing.
+                            La prioridad aquí es revisar la plataforma con foco operativo y navegación clara.
                         </p>
                     </div>
 
