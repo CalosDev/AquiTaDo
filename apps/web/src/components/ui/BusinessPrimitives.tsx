@@ -311,9 +311,9 @@ export function PlanStatusCard({
         >
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{code}</p>
             <div className="mt-3 flex flex-nowrap items-end gap-1 text-slate-900">
-                <p className="text-3xl font-bold leading-none">{price}</p>
+                <p className="shrink-0 whitespace-nowrap text-3xl font-bold leading-none">{price}</p>
                 {priceSuffix ? (
-                    <span className="whitespace-nowrap text-base font-medium leading-none text-slate-500">
+                    <span className="shrink-0 whitespace-nowrap text-base font-medium leading-none text-slate-500">
                         {priceSuffix}
                     </span>
                 ) : null}

@@ -639,7 +639,7 @@ export function BillingWorkspace({
                                     code={plan.code}
                                     name={plan.name}
                                     price={formatCurrencyDo(plan.priceMonthly, plan.currency)}
-                                    priceSuffix="/ mes"
+                                    priceSuffix="/mes"
                                     description={plan.description || 'Sin descripcion.'}
                                     badge={isCurrent ? (
                                         <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700">
