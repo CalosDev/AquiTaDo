@@ -649,7 +649,7 @@ export function DashboardBusiness() {
                                             ? 'La organizacion ya opera este negocio.'
                                             : selectedBusiness.claimStatus === 'PENDING_CLAIM'
                                                 ? 'Hay una solicitud activa esperando decision.'
-                                                : 'Todavia falta completar el control del claim.'}
+                                                : 'Todavia falta confirmar el control de esta ficha.'}
                                     </p>
                                     <p className="mt-2 text-sm leading-6 text-slate-600">
                                         {latestSelectedClaimRequest
@@ -797,10 +797,10 @@ export function DashboardBusiness() {
             {selectedBusiness && activeWorkspace !== 'overview' && (
                 <section aria-label="Estado del negocio activo">
                     <div className="grid gap-3 md:grid-cols-3">
-                        {/* Claim */}
+                        {/* Control */}
                         <div className="card-section density-compact">
                             <div className="card-section__header">
-                                <h3 className="card-section__title">Claim</h3>
+                                <h3 className="card-section__title">Control</h3>
                                 <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
                                     selectedBusiness.claimStatus === 'CLAIMED'
                                         ? 'bg-emerald-100 text-emerald-700'
@@ -868,7 +868,7 @@ export function DashboardBusiness() {
                 <section aria-label="Negocios gestionados">
                     <AppCard
                         title="Negocio activo"
-                        description="Cambia el contexto del dashboard sin salir del workspace actual."
+                        description="Elige el negocio que quieres revisar ahora sin perder el hilo del panel."
                         className="card-filter density-compact"
                     >
                         <label htmlFor="business-select" className="text-xs font-semibold text-slate-600 mb-2 block">
@@ -895,13 +895,13 @@ export function DashboardBusiness() {
                         <div>
                             <p className="page-kicker">{activeWorkspaceMeta.label}</p>
                             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                                Cambia de workspace sin salir del contexto del negocio actual. El shell y la URL quedan alineados.
+                                Cambia de area sin salir del negocio actual. El panel mantiene el mismo contexto mientras te mueves.
                             </p>
                         </div>
                         {selectedBusiness ? (
                             <div className="grid gap-3 sm:grid-cols-3">
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Claim</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Control</p>
                                     <p className="mt-2 text-sm font-semibold text-slate-900">
                                         {selectedBusiness.claimStatus === 'CLAIMED'
                                             ? 'Activo'
@@ -917,7 +917,7 @@ export function DashboardBusiness() {
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Salud perfil</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Perfil</p>
                                     <p className="mt-2 text-sm font-semibold text-slate-900">
                                         {selectedBusiness.profileCompletenessScore ?? 0}% completo
                                     </p>

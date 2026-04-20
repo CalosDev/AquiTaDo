@@ -267,13 +267,13 @@ export function DashboardLayout() {
                     </svg>
                 </button>
 
-                <Link to={roleHomePath} className="flex items-center gap-3">
+                <Link to={roleHomePath} className="flex min-w-0 items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-700 text-white shadow-sm shadow-primary-700/25">
                         <span className="font-display text-lg font-bold">A</span>
                     </div>
-                    <div className="leading-tight">
-                        <p className="font-display text-base font-bold text-slate-900">{shellLabel}</p>
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                    <div className="min-w-0 leading-tight">
+                        <p className="truncate font-display text-sm font-bold text-slate-900 sm:text-base">{shellLabel}</p>
+                        <p className="hidden truncate whitespace-nowrap text-[11px] uppercase tracking-[0.16em] text-slate-500 sm:block">
                             {activeOrganization?.name || roleHomeLabel}
                         </p>
                     </div>

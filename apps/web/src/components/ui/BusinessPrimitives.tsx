@@ -310,10 +310,14 @@ export function PlanStatusCard({
             actions={badge}
         >
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{code}</p>
-            <p className="mt-3 text-3xl font-bold text-slate-900">
-                {price}
-                {priceSuffix ? <span className="ml-1 text-base font-medium text-slate-500">{priceSuffix}</span> : null}
-            </p>
+            <div className="mt-3 flex flex-nowrap items-end gap-1 text-slate-900">
+                <p className="text-3xl font-bold leading-none">{price}</p>
+                {priceSuffix ? (
+                    <span className="whitespace-nowrap text-base font-medium leading-none text-slate-500">
+                        {priceSuffix}
+                    </span>
+                ) : null}
+            </div>
             <div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
                 {features.map((feature, index) => (
                     <p key={index}>{feature}</p>

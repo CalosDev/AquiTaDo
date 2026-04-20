@@ -697,6 +697,10 @@ async function removePathWithRetries(targetPath, attempts = 6) {
                 await delay(250 * attempt);
                 continue;
             }
+            if (code === 'EBUSY' || code === 'EPERM') {
+                console.warn(`Skipping Brave profile cleanup for ${targetPath} after repeated ${code} errors.`);
+                return;
+            }
             if (code === 'ENOENT') {
                 return;
             }
@@ -1046,6 +1050,16 @@ async function run() {
                 label: 'owner-dashboard',
                 role: 'BUSINESS_OWNER',
                 url: withSyntheticAudit(`${appBaseUrl}/dashboard`),
+                session: {
+                    accessToken: owner.accessToken,
+                    user: owner.user,
+                    activeOrganizationId: organizationId,
+                },
+            },
+            {
+                label: 'owner-billing',
+                role: 'BUSINESS_OWNER',
+                url: withSyntheticAudit(`${appBaseUrl}/dashboard?workspace=billing`),
                 session: {
                     accessToken: owner.accessToken,
                     user: owner.user,

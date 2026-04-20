@@ -1272,7 +1272,7 @@ export function OrganizationWorkspace({
                             onClick={() => void handleRefreshAll()}
                             disabled={loading || crmLoading}
                         >
-                            {loading || crmLoading ? 'Actualizando...' : 'Actualizar workspace'}
+                            {loading || crmLoading ? 'Actualizando...' : 'Actualizar panel'}
                         </button>
                     </div>
                 )}
@@ -1304,7 +1304,7 @@ export function OrganizationWorkspace({
                 primary={(
                     <AppCard
                         title="Configuracion de la organizacion"
-                        description="Ajusta el nombre visible y confirma quien lidera el workspace sin navegar a otra vista."
+                        description="Ajusta el nombre visible y confirma quien lidera el equipo sin navegar a otra vista."
                         actions={(
                             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                                 Plan {organization?.plan || usage?.plan || 'FREE'}
@@ -1326,7 +1326,7 @@ export function OrganizationWorkspace({
                                     {
                                         label: 'Slug',
                                         value: organization?.slug || 'Pendiente',
-                                        hint: 'Identificador interno del workspace.',
+                                        hint: 'Enlace corto para reconocer esta organizacion.',
                                     },
                                     {
                                         label: 'Responsable principal',
@@ -1341,7 +1341,7 @@ export function OrganizationWorkspace({
                                     <p className="mt-1 text-sm text-slate-600">
                                         {organization?.subscriptionRenewsAt
                                             ? `Renueva el ${formatDateDo(organization.subscriptionRenewsAt)}`
-                                            : 'Gestiona el plan y pagos en billing cuando quieras cambiar la capacidad del workspace.'}
+                                            : 'Gestiona el plan y pagos en la seccion de facturacion cuando quieras cambiar la capacidad de la organizacion.'}
                                     </p>
                                 </div>
                                 <button
@@ -1361,7 +1361,7 @@ export function OrganizationWorkspace({
                         description="Consulta cuanto has usado del plan y cuanto margen queda antes de necesitar un ajuste."
                         actions={(
                             <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
-                                Billing enlazado
+                                Pagos listos
                             </span>
                         )}
                     >
@@ -1475,7 +1475,7 @@ export function OrganizationWorkspace({
                         ) : (
                             <EmptyState
                                 title="Sin miembros cargados"
-                                body="Cuando sumes personas al workspace, apareceran aqui con su rol y sus controles."
+                                body="Cuando sumes personas al equipo, apareceran aqui con su rol y sus controles."
                             />
                         )}
                     </QueueCard>

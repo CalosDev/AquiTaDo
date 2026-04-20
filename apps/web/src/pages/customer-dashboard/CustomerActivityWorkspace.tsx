@@ -419,6 +419,33 @@ export function CustomerActivityWorkspace() {
                         </div>
                     ))}
                 </div>
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    {Array.from({ length: 2 }).map((_, index) => (
+                        <div key={index} className="rounded-[26px] border border-slate-200 bg-white p-5">
+                            <div className="h-5 w-40 rounded-full bg-slate-100 animate-pulse" />
+                            <div className="mt-5 space-y-3">
+                                {Array.from({ length: 3 }).map((__, rowIndex) => (
+                                    <div key={rowIndex} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                                        <div className="h-4 w-32 rounded-full bg-slate-100 animate-pulse" />
+                                        <div className="mt-3 h-3 w-24 rounded-full bg-slate-100 animate-pulse" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.88fr)_minmax(320px,0.62fr)]">
+                    {Array.from({ length: 2 }).map((_, index) => (
+                        <div key={index} className="rounded-[26px] border border-slate-200 bg-white p-5">
+                            <div className="h-5 w-36 rounded-full bg-slate-100 animate-pulse" />
+                            <div className="mt-5 space-y-3">
+                                <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
+                                <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
+                                <div className="h-24 rounded-2xl bg-slate-50 animate-pulse" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </PageShell>
         );
     }

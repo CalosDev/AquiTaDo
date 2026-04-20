@@ -297,75 +297,97 @@ export function CustomerDashboard() {
                 )}
             </AppCard>
 
-            {loading ? null : (
-                <SplitPanelLayout
-                    primary={(
-                        <AppCard
-                            title="Tus favoritos"
-                            description="Una vista corta de los negocios que quieres revisar, comparar o retomar mas tarde."
-                            actions={(
-                                <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
-                                    Ver directorio
-                                </Link>
-                            )}
-                        >
-                            {favorites.length === 0 ? (
-                                <EmptyState
-                                    title="Aun no has guardado negocios"
-                                    body="Explora el directorio y guarda los perfiles que quieras revisar con mas calma."
-                                    action={(
-                                        <Link to="/businesses" className="btn-primary inline-flex text-sm">
-                                            Empezar a explorar
-                                        </Link>
-                                    )}
-                                />
-                            ) : (
-                                <div className="space-y-3">
-                                    {favorites.map((favorite) => (
-                                        <FavoriteRow
-                                            key={favorite.businessId}
-                                            favorite={favorite}
-                                            busy={favoritesActionLoading === `favorite-${favorite.businessId}`}
-                                            onRemove={() => handleRemoveFavorite(favorite.businessId)}
-                                        />
-                                    ))}
+            <SplitPanelLayout
+                primary={loading ? (
+                    <AppCard title="Tus favoritos" description="Una vista corta de los negocios que quieres revisar, comparar o retomar mas tarde.">
+                        <div className="space-y-3">
+                            {Array.from({ length: 3 }).map((_, index) => (
+                                <div key={index} className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-sm shadow-slate-900/5">
+                                    <div className="h-4 w-40 rounded-full bg-slate-100 animate-pulse" />
+                                    <div className="mt-3 h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
+                                    <div className="mt-4 h-10 rounded-2xl bg-slate-50 animate-pulse" />
                                 </div>
-                            )}
-                        </AppCard>
-                    )}
-                    secondary={(
-                        <AppCard
-                            title="Tus listas"
-                            description="Agrupa opciones por zona, plan o tipo de negocio para decidir mejor."
-                            actions={<span className="chip">{lists.length} activas</span>}
-                        >
-                            {lists.length === 0 ? (
-                                <EmptyState
-                                    title="Todavia no tienes listas"
-                                    body="Crea una lista desde cualquier negocio para comparar ideas sin perder el hilo."
-                                    action={(
-                                        <Link to="/businesses" className="btn-secondary inline-flex text-sm">
-                                            Ir al directorio
-                                        </Link>
-                                    )}
-                                />
-                            ) : (
-                                <div className="space-y-3">
-                                    {lists.map((list) => (
-                                        <ListRow
-                                            key={list.id}
-                                            list={list}
-                                            actionLoading={favoritesActionLoading}
-                                            onDelete={() => handleDeleteList(list.id)}
-                                            onRemoveItem={(businessId) => handleRemoveFromList(list.id, businessId)}
-                                        />
-                                    ))}
+                            ))}
+                        </div>
+                    </AppCard>
+                ) : (
+                    <AppCard
+                        title="Tus favoritos"
+                        description="Una vista corta de los negocios que quieres revisar, comparar o retomar mas tarde."
+                        actions={(
+                            <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
+                                Ver directorio
+                            </Link>
+                        )}
+                    >
+                        {favorites.length === 0 ? (
+                            <EmptyState
+                                title="Aun no has guardado negocios"
+                                body="Explora el directorio y guarda los perfiles que quieras revisar con mas calma."
+                                action={(
+                                    <Link to="/businesses" className="btn-primary inline-flex text-sm">
+                                        Empezar a explorar
+                                    </Link>
+                                )}
+                            />
+                        ) : (
+                            <div className="space-y-3">
+                                {favorites.map((favorite) => (
+                                    <FavoriteRow
+                                        key={favorite.businessId}
+                                        favorite={favorite}
+                                        busy={favoritesActionLoading === `favorite-${favorite.businessId}`}
+                                        onRemove={() => handleRemoveFavorite(favorite.businessId)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </AppCard>
+                )}
+                secondary={loading ? (
+                    <AppCard title="Tus listas" description="Agrupa opciones por zona, plan o tipo de negocio para decidir mejor.">
+                        <div className="space-y-3">
+                            {Array.from({ length: 2 }).map((_, index) => (
+                                <div key={index} className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-sm shadow-slate-900/5">
+                                    <div className="h-4 w-32 rounded-full bg-slate-100 animate-pulse" />
+                                    <div className="mt-3 h-3 w-24 rounded-full bg-slate-100 animate-pulse" />
+                                    <div className="mt-4 h-20 rounded-2xl bg-slate-50 animate-pulse" />
                                 </div>
-                            )}
-                        </AppCard>
-                    )}
-                />
-            )}
+                            ))}
+                        </div>
+                    </AppCard>
+                ) : (
+                    <AppCard
+                        title="Tus listas"
+                        description="Agrupa opciones por zona, plan o tipo de negocio para decidir mejor."
+                        actions={<span className="chip">{lists.length} activas</span>}
+                    >
+                        {lists.length === 0 ? (
+                            <EmptyState
+                                title="Todavia no tienes listas"
+                                body="Crea una lista desde cualquier negocio para comparar ideas sin perder el hilo."
+                                action={(
+                                    <Link to="/businesses" className="btn-secondary inline-flex text-sm">
+                                        Ir al directorio
+                                    </Link>
+                                )}
+                            />
+                        ) : (
+                            <div className="space-y-3">
+                                {lists.map((list) => (
+                                    <ListRow
+                                        key={list.id}
+                                        list={list}
+                                        actionLoading={favoritesActionLoading}
+                                        onDelete={() => handleDeleteList(list.id)}
+                                        onRemoveItem={(businessId) => handleRemoveFromList(list.id, businessId)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </AppCard>
+                )}
+            />
 
             <CustomerActivityWorkspace />
         </PageShell>

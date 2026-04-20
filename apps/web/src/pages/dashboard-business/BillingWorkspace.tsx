@@ -541,11 +541,11 @@ export function BillingWorkspace({
             />
 
             <KPIHeader
-                eyebrow="Billing / SaaS"
-                title="Planes, suscripcion y caja operativa"
+                eyebrow="Planes y pagos"
+                title="Plan, cobros y saldo para campanas"
                 description={organizationName
-                    ? `Controla el plan activo y la facturacion de ${organizationName}.`
-                    : 'Controla el plan activo y la facturacion de tu organizacion.'}
+                    ? `Controla el plan activo, los cobros y el saldo disponible de ${organizationName}.`
+                    : 'Controla el plan activo, los cobros y el saldo disponible de tu organizacion.'}
                 actions={(
                     <div className="flex flex-wrap gap-2">
                         <button
@@ -554,7 +554,7 @@ export function BillingWorkspace({
                             onClick={() => void loadBillingData({ silent: true })}
                             disabled={refreshing}
                         >
-                            {refreshing ? 'Actualizando...' : 'Actualizar billing'}
+                            {refreshing ? 'Actualizando...' : 'Actualizar panel'}
                         </button>
                         {subscription && currentPlanCode !== 'FREE' && !subscription.cancelAtPeriodEnd ? (
                             <button
@@ -575,9 +575,9 @@ export function BillingWorkspace({
                         delta: subscription ? `${formatCurrencyDo(subscription.plan.priceMonthly, subscription.plan.currency)}/mes` : 'Sin suscripcion',
                     },
                     {
-                        label: 'Balance Ads',
+                        label: 'Saldo para anuncios',
                         value: formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP'),
-                        delta: 'Disponible para campanas CPC',
+                        delta: 'Disponible para promocionar tu negocio',
                     },
                     {
                         label: 'Cobrado',
@@ -587,17 +587,17 @@ export function BillingWorkspace({
                     {
                         label: 'Facturado',
                         value: formatCurrencyDo(billingSummary?.invoices.total ?? 0, 'DOP'),
-                        delta: 'Total de invoices emitidas',
+                        delta: 'Total de facturas emitidas en el rango',
                     },
                     {
-                        label: 'Marketplace neto',
+                        label: 'Neto recibido',
                         value: formatCurrencyDo(billingSummary?.marketplace.netAmount ?? 0, 'DOP'),
-                        delta: `Fee ${formatCurrencyDo(billingSummary?.marketplace.platformFeeAmount ?? 0, 'DOP')}`,
+                        delta: `Comision ${formatCurrencyDo(billingSummary?.marketplace.platformFeeAmount ?? 0, 'DOP')}`,
                     },
                     {
                         label: 'Pendiente fiscal',
                         value: formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP'),
-                        delta: `${fiscalSummary?.totals.invoicesIssued ?? 0} invoices emitidas`,
+                        delta: `${fiscalSummary?.totals.invoicesIssued ?? 0} facturas emitidas`,
                     },
                 ]}
             />
@@ -620,8 +620,8 @@ export function BillingWorkspace({
             {refreshing ? (
                 <PartialDataState
                     compact
-                    title="Actualizando billing"
-                    body="Seguimos refrescando plan, wallet y resumen contable sin perder el contexto financiero actual."
+                    title="Actualizando panel"
+                    body="Seguimos refrescando plan, saldo y resumen financiero sin perder el contexto actual."
                 />
             ) : null}
 
@@ -651,18 +651,18 @@ export function BillingWorkspace({
                                         formatCapabilityLimit(plan.maxMembers, 'miembros'),
                                         formatCapabilityLimit(plan.maxImagesPerBusiness, 'imagenes por ficha'),
                                         formatCapabilityLimit(plan.maxPromotions, 'promociones'),
-                                        `Retencion analytics: ${plan.analyticsRetentionDays === null
+                                        `Analitica disponible: ${plan.analyticsRetentionDays === null
                                             ? 'Ilimitada'
                                             : `${formatNumberDo(plan.analyticsRetentionDays)} dias`}`,
-                                        `Fee por transaccion: ${(plan.transactionFeeBps / 100).toFixed(2)}%`,
+                                        `Comision por transaccion: ${(plan.transactionFeeBps / 100).toFixed(2)}%`,
                                     ]}
                                     footer={isCurrent ? (
                                         <p className="rounded-2xl border border-primary-100 bg-primary-50 px-3 py-2 text-sm text-primary-700">
-                                            Este plan gobierna actualmente tu organizacion.
+                                            Este es el plan que hoy usa tu organizacion.
                                         </p>
                                     ) : !canCheckout ? (
                                         <p className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                                            Si necesitas bajar desde un plan pago, usa la cancelacion al cierre del periodo.
+                                            Si mas adelante quieres bajar desde un plan pago, programa la cancelacion al cierre del periodo.
                                         </p>
                                     ) : undefined}
                                     action={canCheckout ? (
@@ -686,7 +686,7 @@ export function BillingWorkspace({
 
                 <div className="space-y-5">
                     <NextStepCard
-                        title="Ads Wallet"
+                        title="Saldo para anuncios"
                         body={(
                             <div className="space-y-4">
                                 <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
@@ -715,14 +715,14 @@ export function BillingWorkspace({
                                 onClick={() => void handleTopupCheckout()}
                                 disabled={actionKey === 'ads-topup'}
                             >
-                                {actionKey === 'ads-topup' ? 'Abriendo checkout...' : 'Recargar wallet'}
+                                {actionKey === 'ads-topup' ? 'Abriendo checkout...' : 'Recargar saldo'}
                             </button>
                         )}
                     />
 
                     <InvoiceTable
                         title="Recargas recientes"
-                        description="Trazabilidad corta del wallet para campanas."
+                        description="Resumen corto del saldo que has recargado para promocionar tu negocio."
                         items={(adsWallet?.topups ?? []).map((topup) => ({
                             id: topup.id,
                             title: formatCurrencyDo(topup.amount, topup.currency),
@@ -733,7 +733,7 @@ export function BillingWorkspace({
                             detail: topup.failureReason || 'Recarga procesada para el saldo publicitario.',
                         }))}
                         emptyTitle="Sin recargas registradas"
-                        emptyBody="Cuando la organizacion recargue saldo para ads, veras aqui la trazabilidad del wallet."
+                        emptyBody="Cuando la organizacion recargue saldo para anuncios, veras aqui el historial del wallet."
                     />
                 </div>
             </div>
@@ -767,8 +767,8 @@ export function BillingWorkspace({
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
                     <div className="space-y-5">
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <BillingSummaryCard label="Invoices emitidas" value={fiscalSummary?.totals.invoicesIssued ?? 0} />
-                            <BillingSummaryCard label="Invoices pagadas" value={fiscalSummary?.totals.invoicesPaid ?? 0} />
+                            <BillingSummaryCard label="Facturas emitidas" value={fiscalSummary?.totals.invoicesIssued ?? 0} />
+                            <BillingSummaryCard label="Facturas pagadas" value={fiscalSummary?.totals.invoicesPaid ?? 0} />
                             <BillingSummaryCard label="Pagado" value={formatCurrencyDo(fiscalSummary?.totals.paidTotal ?? 0, 'DOP')} />
                             <BillingSummaryCard label="Pendiente" value={formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')} />
                         </div>
@@ -784,7 +784,7 @@ export function BillingWorkspace({
                                         onClick={() => void handleExportCsv('invoices')}
                                         disabled={actionKey === 'export:invoices'}
                                     >
-                                        {actionKey === 'export:invoices' ? 'Descargando...' : 'CSV invoices'}
+                                        {actionKey === 'export:invoices' ? 'Descargando...' : 'Descargar facturas'}
                                     </button>
                                     <button
                                         type="button"
@@ -792,7 +792,7 @@ export function BillingWorkspace({
                                         onClick={() => void handleExportCsv('payments')}
                                         disabled={actionKey === 'export:payments'}
                                     >
-                                        {actionKey === 'export:payments' ? 'Descargando...' : 'CSV pagos'}
+                                        {actionKey === 'export:payments' ? 'Descargando...' : 'Descargar pagos'}
                                     </button>
                                     <button
                                         type="button"
@@ -800,7 +800,7 @@ export function BillingWorkspace({
                                         onClick={() => void handleExportCsv('fiscal')}
                                         disabled={actionKey === 'export:fiscal'}
                                     >
-                                        {actionKey === 'export:fiscal' ? 'Descargando...' : 'CSV fiscal'}
+                                        {actionKey === 'export:fiscal' ? 'Descargando...' : 'Descargar resumen'}
                                     </button>
                                 </div>
                             )}
@@ -834,7 +834,7 @@ export function BillingWorkspace({
                         />
 
                         <InvoiceTable
-                            title="Invoices recientes"
+                            title="Facturas recientes"
                             description="Documentos emitidos y acceso rapido al PDF."
                             items={invoices.map((invoice) => ({
                                 id: invoice.id,
@@ -860,8 +860,8 @@ export function BillingWorkspace({
                                     </a>
                                 ) : undefined,
                             }))}
-                            emptyTitle="Sin invoices registradas"
-                            emptyBody="Cuando la organizacion emita invoices, veras aqui su estado y accesos al PDF."
+                            emptyTitle="Sin facturas registradas"
+                            emptyBody="Cuando la organizacion emita facturas, veras aqui su estado y los accesos al PDF."
                         />
                     </div>
                 </div>
