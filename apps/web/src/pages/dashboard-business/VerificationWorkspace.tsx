@@ -1,5 +1,14 @@
 import type { FormEvent } from 'react';
-import { EmptyState, SectionCard } from '../../components/ui';
+import {
+    ClaimStatusBanner,
+    DocumentUploadCard,
+    KPIHeader,
+    NextStepCard,
+    PendingReviewPanel,
+    PageShell,
+    TimelineBlock,
+    VerificationChecklist,
+} from '../../components/ui';
 import { formatDateTimeDo } from '../../lib/market';
 
 type VerificationToneStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED' | 'APPROVED';
@@ -61,9 +70,9 @@ function getStatusNarrative(status: VerificationToneStatus): string {
         case 'REJECTED':
             return 'Hay observaciones pendientes. Revisa el motivo, corrige evidencia y vuelve a enviar.';
         case 'SUSPENDED':
-            return 'La revisión está pausada y necesita atención manual antes de continuar.';
+            return 'La revision esta pausada y necesita atencion manual antes de continuar.';
         default:
-            return 'Todavía no hay suficiente información cargada para pedir la revisión.';
+            return 'Todavia no hay suficiente informacion cargada para pedir la revision.';
     }
 }
 
@@ -114,7 +123,7 @@ export function VerificationWorkspace({
         {
             label: 'Evidencia cargada',
             detail: documentSummary.total > 0
-                ? `${documentSummary.total} documento(s) cargado(s) en esta revisión.`
+                ? `${documentSummary.total} documento(s) cargado(s) en esta revision.`
                 : 'Sube por lo menos un documento legible antes de pedir revision.',
             done: documentSummary.total > 0,
         },
@@ -122,7 +131,7 @@ export function VerificationWorkspace({
             label: 'Revision formal enviada',
             detail: verificationStatus?.verificationSubmittedAt
                 ? `Enviada el ${formatDateTimeDo(verificationStatus.verificationSubmittedAt)}.`
-                : 'Todavía no se ha enviado la solicitud al equipo de revisión.',
+                : 'Todavia no se ha enviado la solicitud al equipo de revision.',
             done: Boolean(verificationStatus?.verificationSubmittedAt),
         },
         {
@@ -136,59 +145,72 @@ export function VerificationWorkspace({
 
     if (showVerificationSkeleton) {
         return (
-            <article className="section-shell p-6 lg:col-span-2 space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="space-y-2">
-                        <div className="h-3 w-28 animate-pulse rounded-full bg-slate-100" />
-                        <div className="h-7 w-64 animate-pulse rounded-full bg-slate-100" />
-                    </div>
-                    <div className="h-8 w-28 animate-pulse rounded-full bg-slate-100" />
+            <PageShell className="space-y-5 p-6" width="full">
+                <div className="space-y-2">
+                    <div className="h-3 w-28 animate-pulse rounded-full bg-slate-100" />
+                    <div className="h-8 w-72 animate-pulse rounded-full bg-slate-100" />
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                        <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <div className="h-3 w-20 animate-pulse rounded-full bg-slate-100" />
+                            <div className="mt-3 h-7 w-24 animate-pulse rounded-full bg-slate-100" />
+                            <div className="mt-2 h-3 w-32 animate-pulse rounded-full bg-slate-100" />
+                        </div>
+                    ))}
                 </div>
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(320px,0.94fr)]">
-                    <div className="card-section density-compact space-y-3">
-                        <div className="h-5 w-40 animate-pulse rounded-full bg-slate-100" />
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            {Array.from({ length: 3 }).map((_, index) => (
-                                <div key={index} className="h-24 animate-pulse rounded-2xl bg-slate-50" />
-                            ))}
-                        </div>
-                        <div className="h-16 animate-pulse rounded-2xl bg-slate-50" />
-                    </div>
+                    <div className="h-72 animate-pulse rounded-[28px] bg-slate-100" />
                     <div className="space-y-4">
-                        <div className="card-filter density-compact space-y-3">
-                            <div className="h-5 w-36 animate-pulse rounded-full bg-slate-100" />
-                            {Array.from({ length: 4 }).map((_, index) => (
-                                <div key={index} className="h-14 animate-pulse rounded-2xl bg-white" />
-                            ))}
-                        </div>
-                        <div className="card-form density-compact space-y-3">
-                            <div className="h-5 w-40 animate-pulse rounded-full bg-slate-100" />
-                            <div className="grid gap-3 md:grid-cols-2">
-                                <div className="h-11 animate-pulse rounded-2xl bg-slate-50" />
-                                <div className="h-11 animate-pulse rounded-2xl bg-slate-50" />
-                            </div>
-                            <div className="h-10 w-36 animate-pulse rounded-2xl bg-slate-100" />
-                        </div>
+                        <div className="h-64 animate-pulse rounded-[28px] bg-slate-100" />
+                        <div className="h-56 animate-pulse rounded-[28px] bg-slate-100" />
                     </div>
                 </div>
-            </article>
+            </PageShell>
         );
     }
 
+    const nextStepMessage = verificationStatus?.verified
+        ? 'Tu siguiente paso es mantener la evidencia al dia cuando cambien documentos o titularidad.'
+        : documentSummary.rejected > 0
+            ? 'Corrige los documentos observados y vuelve a subir una version clara antes de reenviar.'
+            : documentSummary.total > 0
+                ? 'Ya tienes base para solicitar revision. Revisa las notas y envia cuando todo este claro.'
+                : 'Empieza subiendo los documentos principales del negocio y de la persona responsable.';
+
     return (
-        <article className="section-shell p-6 lg:col-span-2 space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Verificación</p>
-                    <h2 className="font-display text-xl font-bold text-slate-900">Documentos del negocio</h2>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Revisa el estado, carga documentos claros y envía la solicitud cuando todo esté listo.
-                    </p>
-                </div>
-                <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClass(currentStatus)}`}>
-                    {getStatusLabel(currentStatus)}
-                </span>
-            </div>
+        <PageShell className="space-y-6 p-6" width="full">
+            <KPIHeader
+                eyebrow="Verificacion"
+                title="Documentos del negocio"
+                description="Revisa el estado, carga evidencia clara y envia la solicitud cuando todo este listo."
+                actions={(
+                    <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClass(currentStatus)}`}>
+                        {getStatusLabel(currentStatus)}
+                    </span>
+                )}
+                metrics={[
+                    {
+                        label: 'Documentos',
+                        value: documentSummary.total,
+                        delta: `${documentSummary.approved} aprobados | ${documentSummary.pending} pendientes`,
+                    },
+                    {
+                        label: 'Solicitud',
+                        value: verificationStatus?.verificationSubmittedAt ? 'Enviada' : 'Sin enviar',
+                        delta: verificationStatus?.verificationSubmittedAt
+                            ? formatDateTimeDo(verificationStatus.verificationSubmittedAt)
+                            : 'Todavia no se ha solicitado revision',
+                    },
+                    {
+                        label: 'Ultima respuesta',
+                        value: verificationStatus?.verificationReviewedAt ? 'Revisada' : 'Sin decision',
+                        delta: verificationStatus?.verificationReviewedAt
+                            ? formatDateTimeDo(verificationStatus.verificationReviewedAt)
+                            : 'Aun no hay respuesta del equipo',
+                    },
+                ]}
+            />
 
             {selectedBusiness ? (
                 <p className="text-sm text-slate-600">
@@ -199,104 +221,57 @@ export function VerificationWorkspace({
             )}
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(320px,0.94fr)]">
-                <SectionCard
-                    title="Estado de la revisión"
+                <ClaimStatusBanner
+                    title="Estado de la revision"
                     description={getStatusNarrative(currentStatus)}
-                    density="compact"
-                    actions={(
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getStatusClass(currentStatus)}`}>
-                            {getStatusLabel(currentStatus)}
-                        </span>
+                    statusLabel={getStatusLabel(currentStatus)}
+                    statusClassName={getStatusClass(currentStatus)}
+                    summary={(
+                        verificationStatus?.verified
+                            ? 'El negocio ya cuenta con sello de confianza. Solo conserva evidencia actualizada.'
+                            : documentSummary.rejected > 0
+                                ? 'Hay documentos rechazados. Corrige el motivo antes de volver a subir mas archivos.'
+                                : documentSummary.total > 0
+                                    ? 'Ya hay documentos cargados. Cuando sientas que esta completo, envia la solicitud.'
+                                    : 'Empieza por los documentos principales del negocio y de la persona responsable.'
                     )}
+                    note={verificationStatus?.verificationNotes || undefined}
                 >
                     <div className="grid gap-3 sm:grid-cols-3">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Documentos</p>
-                            <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{documentSummary.total}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                                {documentSummary.approved} aprobados · {documentSummary.pending} pendientes
-                            </p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Aprobados</p>
+                            <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{documentSummary.approved}</p>
+                            <p className="mt-1 text-xs text-slate-500">Documentos listos para la revision final</p>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Solicitud</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-900">
-                                {verificationStatus?.verificationSubmittedAt ? 'Enviado' : 'Sin enviar'}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                                {verificationStatus?.verificationSubmittedAt
-                                    ? formatDateTimeDo(verificationStatus.verificationSubmittedAt)
-                                    : 'Todavia no se ha solicitado revision'}
-                            </p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Pendientes</p>
+                            <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{documentSummary.pending}</p>
+                            <p className="mt-1 text-xs text-slate-500">Aun deben recibir decision del equipo</p>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Última respuesta</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-900">
-                                {verificationStatus?.verificationReviewedAt ? 'Revisado' : 'Sin decision'}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                                {verificationStatus?.verificationReviewedAt
-                                    ? formatDateTimeDo(verificationStatus.verificationReviewedAt)
-                                    : 'Aun no hay respuesta del equipo'}
-                            </p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Observados</p>
+                            <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{documentSummary.rejected}</p>
+                            <p className="mt-1 text-xs text-slate-500">Necesitan ajuste antes de reenviar</p>
                         </div>
                     </div>
-
-                    <div className="mt-4 space-y-3">
-                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Resumen actual</p>
-                            <p className="mt-2 text-sm leading-6 text-slate-700">
-                                {verificationStatus?.verified
-                                    ? 'El negocio ya cuenta con sello de confianza. Solo conserva evidencia actualizada.'
-                                    : documentSummary.rejected > 0
-                                        ? 'Hay documentos rechazados. Corrige el motivo antes de volver a subir más archivos.'
-                                        : documentSummary.total > 0
-                                            ? 'Ya hay documentos cargados. Cuando sientas que está completo, envía la solicitud.'
-                                            : 'Empieza por los documentos principales del negocio y de la persona responsable.'}
-                            </p>
-                        </div>
-
-                        {verificationStatus?.verificationNotes ? (
-                            <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Comentario del equipo</p>
-                                <p className="mt-2 text-sm leading-6 text-amber-900">{verificationStatus.verificationNotes}</p>
-                            </div>
-                        ) : null}
-                    </div>
-                </SectionCard>
+                </ClaimStatusBanner>
 
                 <div className="space-y-4">
-                    <div className="card-filter density-compact space-y-3">
-                        <div>
-                            <p className="text-sm font-semibold text-slate-900">Checklist rápido</p>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">
-                                Completa primero lo básico y después envía la solicitud.
-                            </p>
-                        </div>
-                        {checklistItems.map((item) => (
-                            <div key={item.label} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                                <span
-                                    className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                                        item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                    }`}
-                                >
-                                    {item.done ? 'OK' : '!'}
-                                </span>
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                                    <p className="mt-1 text-xs leading-5 text-slate-600">{item.detail}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <VerificationChecklist items={checklistItems} />
 
-                    <form onSubmit={onUploadDocument} className="card-form density-compact space-y-4">
-                        <div>
-                            <p className="text-sm font-semibold text-slate-900">Subir documento</p>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">
-                                Usa archivos claros y legibles para que el equipo pueda revisarlos sin retrasos.
-                            </p>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2">
+                    <DocumentUploadCard
+                        footer={(
+                            <div className="flex flex-wrap items-center gap-3">
+                                <button type="submit" form="verification-document-form" className="btn-primary text-sm" disabled={!selectedBusinessId || !hasSelectedFile || saving}>
+                                    {saving ? 'Subiendo...' : 'Subir documento'}
+                                </button>
+                                <p className="text-xs text-slate-500">
+                                    PDF o imagen clara. El documento queda ligado al negocio activo.
+                                </p>
+                            </div>
+                        )}
+                    >
+                        <form id="verification-document-form" onSubmit={onUploadDocument} className="grid gap-3 md:grid-cols-2">
                             <label className="card-form__group">
                                 <span className="card-form__label">Tipo de documento</span>
                                 <select
@@ -320,104 +295,73 @@ export function VerificationWorkspace({
                                     disabled={!selectedBusinessId || saving}
                                 />
                             </label>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <button type="submit" className="btn-primary text-sm" disabled={!selectedBusinessId || !hasSelectedFile || saving}>
-                                {saving ? 'Subiendo...' : 'Subir documento'}
-                            </button>
-                            <p className="text-xs text-slate-500">
-                                PDF o imagen clara. El documento queda ligado al negocio activo.
-                            </p>
-                        </div>
-                    </form>
+                        </form>
+                    </DocumentUploadCard>
                 </div>
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-                <div className="card-form density-compact space-y-4">
-                    <div>
-                        <p className="text-sm font-semibold text-slate-900">Solicitar revision</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">
-                            Haz la solicitud cuando ya tengas cargados los documentos principales.
-                        </p>
-                    </div>
-
-                    <label className="card-form__group">
-                        <span className="card-form__label">Notas para el equipo</span>
-                        <textarea
-                            className="input-field text-sm"
-                            rows={4}
-                            placeholder="Explica cualquier detalle útil para ayudar a revisar estos documentos."
-                            value={verificationNotes}
-                            onChange={(event) => onVerificationNotesChange(event.target.value)}
-                            disabled={!selectedBusinessId || saving}
-                        />
-                    </label>
-
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Antes de enviar</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">
-                            {documentSummary.total === 0
-                                ? 'Todavía no hay documentos cargados. El siguiente paso correcto es subirlos.'
+                <div className="space-y-4">
+                    <PendingReviewPanel
+                        summaryBody={(
+                            documentSummary.total === 0
+                                ? 'Todavia no hay documentos cargados. El siguiente paso correcto es subirlos.'
                                 : verificationStatus?.verificationSubmittedAt
-                                    ? 'Ya existe una solicitud enviada. Vuelve a mandar algo solo si corregiste información.'
-                                    : 'Ya tienes una base suficiente. Si todo está claro, puedes pedir la revisión.'}
-                        </p>
-                    </div>
+                                    ? 'Ya existe una solicitud enviada. Vuelve a mandar algo solo si corregiste informacion.'
+                                    : 'Ya tienes una base suficiente. Si todo esta claro, puedes pedir la revision.'
+                        )}
+                        action={(
+                            <div className="space-y-4">
+                                <label className="card-form__group">
+                                    <span className="card-form__label">Notas para el equipo</span>
+                                    <textarea
+                                        className="input-field text-sm"
+                                        rows={4}
+                                        placeholder="Explica cualquier detalle util para ayudar a revisar estos documentos."
+                                        value={verificationNotes}
+                                        onChange={(event) => onVerificationNotesChange(event.target.value)}
+                                        disabled={!selectedBusinessId || saving}
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    className="btn-secondary text-sm"
+                                    onClick={onSubmitBusinessVerification}
+                                    disabled={!selectedBusinessId || saving || documentSummary.total === 0}
+                                >
+                                    {saving ? 'Enviando...' : 'Solicitar verificacion'}
+                                </button>
+                            </div>
+                        )}
+                        supportingCopy={documentSummary.total > 0
+                            ? 'El equipo revisara juntos los documentos y estas notas.'
+                            : 'Primero se necesita al menos un documento para poder solicitar revision.'}
+                    />
 
-                    <div className="flex flex-wrap items-center gap-3">
-                        <button
-                            type="button"
-                            className="btn-secondary text-sm"
-                            onClick={onSubmitBusinessVerification}
-                            disabled={!selectedBusinessId || saving || documentSummary.total === 0}
-                        >
-                            {saving ? 'Enviando...' : 'Solicitar verificacion'}
-                        </button>
-                        <p className="text-xs text-slate-500">
-                            {documentSummary.total > 0
-                                ? 'El equipo revisará juntos los documentos y estas notas.'
-                                : 'Primero se necesita al menos un documento para poder solicitar revision.'}
-                        </p>
-                    </div>
+                    <NextStepCard
+                        title="Siguiente paso recomendado"
+                        body={nextStepMessage}
+                    />
                 </div>
 
-                <SectionCard
+                <TimelineBlock
                     title="Historial de documentos"
                     description="Revisa lo que ya subiste, su estado y cualquier motivo de rechazo."
-                    density="compact"
-                >
-                    {documents.length === 0 ? (
-                        <EmptyState
-                            title="Todavia no hay documentos"
-                            body="Cuando cargues archivos, aparecerán aquí con su estado."
-                        />
-                    ) : (
-                        <div className="card-list">
-                            <div className="card-list__header">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Documentos cargados</p>
-                                <p className="text-xs text-slate-500">{documents.length} documento(s)</p>
-                            </div>
-                            {documents.map((document) => (
-                                <div key={document.id} className="card-list__item items-start justify-between">
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium text-slate-900">{getDocumentTypeLabel(document.documentType)}</p>
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Subido: {formatDateTimeDo(document.submittedAt)}
-                                        </p>
-                                        {document.rejectionReason ? (
-                                            <p className="mt-2 text-xs leading-5 text-red-700">Motivo: {document.rejectionReason}</p>
-                                        ) : null}
-                                    </div>
-                                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${getStatusClass(document.status)}`}>
-                                        {getStatusLabel(document.status)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </SectionCard>
+                    items={documents.map((document) => ({
+                        id: document.id,
+                        title: getDocumentTypeLabel(document.documentType),
+                        meta: `Subido: ${formatDateTimeDo(document.submittedAt)}`,
+                        body: document.rejectionReason ? `Motivo: ${document.rejectionReason}` : undefined,
+                        badge: (
+                            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${getStatusClass(document.status)}`}>
+                                {getStatusLabel(document.status)}
+                            </span>
+                        ),
+                    }))}
+                    emptyTitle="Todavia no hay documentos"
+                    emptyBody="Cuando cargues archivos, apareceran aqui con su estado."
+                />
             </div>
-        </article>
+        </PageShell>
     );
 }

@@ -4,6 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { favoritesApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
+import {
+    ActionBar,
+    AppCard,
+    EmptyState,
+    LoadingState,
+    MetricCard,
+    PageIntroCompact,
+    PageShell,
+    SplitPanelLayout,
+} from '../components/ui';
 import { useAuth } from '../context/useAuth';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 import { formatDateTimeDo } from '../lib/market';
@@ -47,20 +57,113 @@ interface UserBusinessList {
 const EMPTY_FAVORITES: FavoriteBusinessItem[] = [];
 const EMPTY_LISTS: UserBusinessList[] = [];
 
-function EmptyPanel({
-    title,
-    description,
-    primaryAction,
+function FavoriteRow({
+    favorite,
+    busy,
+    onRemove,
 }: {
-    title: string;
-    description: string;
-    primaryAction?: React.ReactNode;
+    favorite: FavoriteBusinessItem;
+    busy: boolean;
+    onRemove: () => Promise<void>;
 }) {
     return (
-        <div className="discovery-callout">
-            <p className="text-sm font-semibold text-slate-900">{title}</p>
-            <p className="mt-1 text-sm leading-relaxed text-slate-600">{description}</p>
-            {primaryAction ? <div className="mt-4">{primaryAction}</div> : null}
+        <div className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-sm shadow-slate-900/5">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{favorite.business.name}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                        {favorite.business.province?.name || favorite.business.address}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                        Guardado el {formatDateTimeDo(favorite.createdAt)}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => void onRemove()}
+                    disabled={busy}
+                >
+                    {busy ? 'Quitando...' : 'Quitar'}
+                </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Link to={`/businesses/${favorite.business.slug}`} className="text-sm font-semibold text-primary-700 hover:text-primary-800">
+                    Ver negocio
+                </Link>
+            </div>
+        </div>
+    );
+}
+
+function ListRow({
+    list,
+    actionLoading,
+    onDelete,
+    onRemoveItem,
+}: {
+    list: UserBusinessList;
+    actionLoading: string | null;
+    onDelete: () => Promise<void>;
+    onRemoveItem: (businessId: string) => Promise<void>;
+}) {
+    const itemCount = list._count?.items ?? list.items.length;
+
+    return (
+        <div className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-sm shadow-slate-900/5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-slate-900">{list.name}</p>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                            {itemCount} guardados
+                        </span>
+                    </div>
+                    {list.description ? <p className="mt-2 text-sm text-slate-600">{list.description}</p> : null}
+                </div>
+
+                <button
+                    type="button"
+                    className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => void onDelete()}
+                    disabled={actionLoading === `delete-list-${list.id}`}
+                >
+                    {actionLoading === `delete-list-${list.id}` ? 'Eliminando...' : 'Eliminar lista'}
+                </button>
+            </div>
+
+            {list.items.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                    {list.items.slice(0, 3).map((item) => (
+                        <div
+                            key={item.businessId}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-slate-200/70 bg-slate-50 px-3 py-3"
+                        >
+                            <div className="min-w-0">
+                                <Link
+                                    to={`/businesses/${item.business.slug}`}
+                                    className="truncate text-sm font-medium text-slate-700 hover:text-primary-700"
+                                >
+                                    {item.business.name}
+                                </Link>
+                                <p className="text-xs text-slate-500">Agregado a tu coleccion</p>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="text-xs font-semibold text-rose-700 hover:text-rose-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                onClick={() => void onRemoveItem(item.businessId)}
+                                disabled={actionLoading === `remove-item-${list.id}-${item.businessId}`}
+                            >
+                                {actionLoading === `remove-item-${list.id}-${item.businessId}` ? 'Quitando...' : 'Quitar'}
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="mt-4 text-sm text-slate-500">Todavia no has agregado negocios a esta lista.</p>
+            )}
         </div>
     );
 }
@@ -96,6 +199,7 @@ export function CustomerDashboard() {
 
     const favorites = dashboardQuery.data?.favorites ?? EMPTY_FAVORITES;
     const lists = dashboardQuery.data?.lists ?? EMPTY_LISTS;
+    const firstName = user?.name?.split(' ')[0] ?? 'Usuario';
 
     const reloadDashboard = async () => {
         await dashboardQuery.refetch();
@@ -149,25 +253,8 @@ export function CustomerDashboard() {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="page-shell py-10 animate-fade-in">
-                <div className="h-10 w-56 rounded-xl bg-gray-100 animate-pulse mb-4"></div>
-                <div className="h-5 w-80 rounded-lg bg-gray-100 animate-pulse mb-8"></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Array.from({ length: 2 }).map((_, index) => (
-                        <div key={index} className="card p-6">
-                            <div className="h-4 w-24 bg-gray-100 rounded mb-3 animate-pulse"></div>
-                            <div className="h-7 w-16 bg-gray-100 rounded animate-pulse"></div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="page-shell space-y-8 animate-fade-in">
+        <PageShell width="wide" className="py-10 animate-fade-in">
             <PageFeedbackStack
                 items={[
                     { id: 'customer-dashboard-error', tone: 'danger', text: error },
@@ -176,177 +263,111 @@ export function CustomerDashboard() {
                 ]}
             />
 
-            <section className="role-hero role-hero-user">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">Panel cliente</p>
-                <h1 className="mt-2 font-display text-3xl font-bold text-white">
-                    Hola, {user?.name?.split(' ')[0] ?? 'Usuario'}
-                </h1>
-                <p className="mt-2 max-w-2xl text-blue-100">
-                    Organiza tus negocios favoritos, compara listas y vuelve rapido a los perfiles que mas te interesan.
-                </p>
+            <AppCard className="space-y-5">
+                <PageIntroCompact
+                    eyebrow="Panel cliente"
+                    title={`Hola, ${firstName}`}
+                    description="Guarda negocios, arma listas por zona y vuelve rapido a los perfiles que quieres comparar con calma."
+                />
 
-                <div className="mt-5 role-kpi-grid">
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Favoritos</p>
-                        <p className="role-kpi-value">{favorites.length}</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Listas</p>
-                        <p className="role-kpi-value">{lists.length}</p>
-                    </article>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-3">
+                <ActionBar>
                     <Link className="btn-primary" to="/businesses">
                         Explorar negocios
                     </Link>
                     <Link className="btn-secondary" to="/profile">
-                        Editar perfil
+                        Ajustar perfil
                     </Link>
-                </div>
-            </section>
+                </ActionBar>
 
-            <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                <article className="section-shell p-6">
-                    <div className="mb-5 flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Guardados</p>
-                            <h2 className="font-display text-xl font-bold text-slate-900">Mis favoritos</h2>
-                        </div>
-                        <Link to="/businesses" className="text-sm font-medium text-primary-600 hover:text-primary-700">
-                            Explorar
-                        </Link>
+                {loading ? (
+                    <LoadingState label="Cargando tu panel..." />
+                ) : (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <MetricCard
+                            label="Favoritos guardados"
+                            value={favorites.length}
+                            delta={favorites.length > 0 ? 'Negocios que quieres revisar despues' : 'Empieza guardando tus lugares clave'}
+                        />
+                        <MetricCard
+                            label="Listas activas"
+                            value={lists.length}
+                            delta={lists.length > 0 ? 'Colecciones listas para comparar opciones' : 'Crea una lista para ordenar tu busqueda'}
+                        />
                     </div>
+                )}
+            </AppCard>
 
-                    {favorites.length === 0 ? (
-                        <EmptyPanel
-                            title="Aun no has guardado negocios"
-                            description="Explora el directorio, compara perfiles y guarda los lugares que quieras revisar despues."
-                            primaryAction={(
-                                <Link to="/businesses" className="btn-primary inline-flex text-sm">
-                                    Empezar a explorar
+            {loading ? null : (
+                <SplitPanelLayout
+                    primary={(
+                        <AppCard
+                            title="Tus favoritos"
+                            description="Una vista corta de los negocios que quieres revisar, comparar o retomar mas tarde."
+                            actions={(
+                                <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
+                                    Ver directorio
                                 </Link>
                             )}
-                        />
-                    ) : (
-                        <div className="space-y-3">
-                            {favorites.map((favorite) => (
-                                <div key={favorite.businessId} className="panel-premium p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <p className="truncate font-semibold text-slate-900">{favorite.business.name}</p>
-                                            <p className="mt-1 text-xs text-slate-500">
-                                                {favorite.business.province?.name || favorite.business.address}
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className="rounded-lg bg-red-100 px-2 py-1 text-xs text-red-700 transition-colors hover:bg-red-200 disabled:opacity-50"
-                                            onClick={() => void handleRemoveFavorite(favorite.businessId)}
-                                            disabled={favoritesActionLoading === `favorite-${favorite.businessId}`}
-                                        >
-                                            {favoritesActionLoading === `favorite-${favorite.businessId}` ? 'Quitando...' : 'Quitar'}
-                                        </button>
-                                    </div>
-
-                                    <div className="mt-3 flex items-center justify-between gap-3">
-                                        <p className="text-xs text-slate-400">
-                                            Guardado: {formatDateTimeDo(favorite.createdAt)}
-                                        </p>
-                                        <Link
-                                            to={`/businesses/${favorite.business.slug}`}
-                                            className="text-xs font-semibold text-primary-700 hover:text-primary-800"
-                                        >
-                                            Ver negocio
+                        >
+                            {favorites.length === 0 ? (
+                                <EmptyState
+                                    title="Aun no has guardado negocios"
+                                    body="Explora el directorio y guarda los perfiles que quieras revisar con mas calma."
+                                    action={(
+                                        <Link to="/businesses" className="btn-primary inline-flex text-sm">
+                                            Empezar a explorar
                                         </Link>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </article>
-
-                <article className="section-shell p-6">
-                    <div className="mb-5 flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Curacion</p>
-                            <h2 className="font-display text-xl font-bold text-slate-900">Mis listas</h2>
-                        </div>
-                        <span className="chip">{lists.length} listas</span>
-                    </div>
-
-                    {lists.length === 0 ? (
-                        <EmptyPanel
-                            title="Tus listas aun estan vacias"
-                            description="Crea listas desde el detalle de cada negocio para comparar opciones, guardar ideas por zona y armar tu shortlist con mas contexto."
-                            primaryAction={(
-                                <Link to="/businesses" className="btn-secondary inline-flex text-sm">
-                                    Ir al directorio
-                                </Link>
-                            )}
-                        />
-                    ) : (
-                        <div className="space-y-3">
-                            {lists.map((list) => (
-                                <div key={list.id} className="panel-premium p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <p className="truncate font-semibold text-slate-900">{list.name}</p>
-                                            {list.description ? (
-                                                <p className="mt-1 line-clamp-2 text-sm text-slate-600">{list.description}</p>
-                                            ) : null}
-                                        </div>
-                                        <div className="flex shrink-0 items-center gap-2">
-                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                                                {list._count?.items ?? list.items.length} items
-                                            </span>
-                                            <button
-                                                type="button"
-                                                className="rounded-lg bg-red-100 px-2 py-1 text-xs text-red-700 transition-colors hover:bg-red-200 disabled:opacity-50"
-                                                onClick={() => void handleDeleteList(list.id)}
-                                                disabled={favoritesActionLoading === `delete-list-${list.id}`}
-                                            >
-                                                {favoritesActionLoading === `delete-list-${list.id}` ? 'Eliminando...' : 'Borrar'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {list.items.length > 0 ? (
-                                        <div className="mt-3 space-y-2">
-                                            {list.items.slice(0, 3).map((item) => (
-                                                <div
-                                                    key={item.businessId}
-                                                    className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white px-3 py-2"
-                                                >
-                                                    <Link
-                                                        to={`/businesses/${item.business.slug}`}
-                                                        className="truncate text-xs font-medium text-slate-700 hover:text-primary-700"
-                                                    >
-                                                        {item.business.name}
-                                                    </Link>
-                                                    <button
-                                                        type="button"
-                                                        className="text-[11px] text-red-700 hover:text-red-800 disabled:opacity-50"
-                                                        onClick={() => void handleRemoveFromList(list.id, item.businessId)}
-                                                        disabled={favoritesActionLoading === `remove-item-${list.id}-${item.businessId}`}
-                                                    >
-                                                        {favoritesActionLoading === `remove-item-${list.id}-${item.businessId}` ? 'Quitando...' : 'Quitar'}
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="mt-3 text-xs text-slate-500">Sin negocios todavia.</p>
                                     )}
+                                />
+                            ) : (
+                                <div className="space-y-3">
+                                    {favorites.map((favorite) => (
+                                        <FavoriteRow
+                                            key={favorite.businessId}
+                                            favorite={favorite}
+                                            busy={favoritesActionLoading === `favorite-${favorite.businessId}`}
+                                            onRemove={() => handleRemoveFavorite(favorite.businessId)}
+                                        />
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            )}
+                        </AppCard>
                     )}
-                </article>
-            </section>
+                    secondary={(
+                        <AppCard
+                            title="Tus listas"
+                            description="Agrupa opciones por zona, plan o tipo de negocio para decidir mejor."
+                            actions={<span className="chip">{lists.length} activas</span>}
+                        >
+                            {lists.length === 0 ? (
+                                <EmptyState
+                                    title="Todavia no tienes listas"
+                                    body="Crea una lista desde cualquier negocio para comparar ideas sin perder el hilo."
+                                    action={(
+                                        <Link to="/businesses" className="btn-secondary inline-flex text-sm">
+                                            Ir al directorio
+                                        </Link>
+                                    )}
+                                />
+                            ) : (
+                                <div className="space-y-3">
+                                    {lists.map((list) => (
+                                        <ListRow
+                                            key={list.id}
+                                            list={list}
+                                            actionLoading={favoritesActionLoading}
+                                            onDelete={() => handleDeleteList(list.id)}
+                                            onRemoveItem={(businessId) => handleRemoveFromList(list.id, businessId)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </AppCard>
+                    )}
+                />
+            )}
 
             <CustomerActivityWorkspace />
-        </div>
+        </PageShell>
     );
 }
-

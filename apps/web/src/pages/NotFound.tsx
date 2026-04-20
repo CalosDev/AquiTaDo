@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
+import { AppCard, PageShell } from '../components/ui';
 
 export function NotFound() {
     return (
-        <div className="page-shell-narrow py-20 text-center animate-fade-in">
-            <div className="section-shell p-10">
+        <PageShell className="py-20 text-center animate-fade-in" width="narrow">
+            <AppCard className="px-10 py-10">
                 <p className="mb-4 text-6xl">404</p>
                 <h1 className="font-display mb-2 text-3xl font-bold text-slate-900">
                     Pagina no encontrada
@@ -14,7 +15,7 @@ export function NotFound() {
                 <Link to="/" className="btn-primary">
                     Volver al inicio
                 </Link>
-            </div>
-        </div>
+            </AppCard>
+        </PageShell>
     );
 }

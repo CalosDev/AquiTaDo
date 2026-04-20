@@ -2,7 +2,20 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { crmApi, organizationApi } from '../../api/endpoints';
 import { getApiErrorMessage } from '../../api/error';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
-import { EmptyState, SectionCard, SummaryCard } from '../../components/ui';
+import {
+    AppCard,
+    DashboardContentLayout,
+    EmptyState,
+    EntityListItem,
+    FormSection,
+    InfoList,
+    KPIHeader,
+    PageShell,
+    QueueCard,
+    SectionCard,
+    SummaryCard,
+    TimelineBlock,
+} from '../../components/ui';
 import { useOrganization } from '../../context/useOrganization';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
@@ -1197,7 +1210,7 @@ export function OrganizationWorkspace({
 
     if (loading) {
         return (
-            <section className="section-shell p-6 space-y-5">
+            <PageShell className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-2">
                         <div className="h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
@@ -1221,12 +1234,12 @@ export function OrganizationWorkspace({
                         </div>
                     ))}
                 </div>
-            </section>
+            </PageShell>
         );
     }
 
     return (
-        <section className="section-shell p-6 space-y-6">
+        <PageShell className="space-y-6">
             <PageFeedbackStack
                 items={[
                     { id: 'organization-workspace-error', tone: 'danger', text: errorMessage },
@@ -1234,335 +1247,327 @@ export function OrganizationWorkspace({
                 ]}
             />
 
-            <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Organizacion + CRM</p>
-                    <h2 className="font-display text-2xl font-bold text-slate-900">
-                        Equipo, uso y relacion con clientes
-                    </h2>
-                    <p className="max-w-3xl text-sm text-slate-600">
-                        Gestiona la organizacion activa, distribuye acceso, monitorea limites del plan y mueve oportunidades dentro del pipeline comercial.
-                    </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <span className="chip">
-                        Organizacion: {organization?.name || organizationName || 'Sin contexto'}
-                    </span>
-                    {organization?.actorRole ? (
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getRoleTone(organization.actorRole)}`}>
-                            {getRoleLabel(organization.actorRole)}
+            <KPIHeader
+                eyebrow="Organizacion + CRM"
+                title="Equipo, plan y relacion con clientes"
+                description="Gestiona la organizacion activa, distribuye acceso, monitorea limites del plan y mueve oportunidades dentro del pipeline comercial sin abrumarte con detalles internos."
+                actions={(
+                    <div className="flex flex-wrap gap-2">
+                        <span className="chip">
+                            Organizacion: {organization?.name || organizationName || 'Sin contexto'}
                         </span>
-                    ) : null}
-                    {organization?.subscriptionStatus ? (
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getSubscriptionTone(organization.subscriptionStatus)}`}>
-                            {getSubscriptionLabel(organization.subscriptionStatus)}
-                        </span>
-                    ) : null}
-                    <button
-                        type="button"
-                        className="btn-secondary text-sm"
-                        onClick={() => void handleRefreshAll()}
-                        disabled={loading || crmLoading}
+                        {organization?.actorRole ? (
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getRoleTone(organization.actorRole)}`}>
+                                {getRoleLabel(organization.actorRole)}
+                            </span>
+                        ) : null}
+                        {organization?.subscriptionStatus ? (
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getSubscriptionTone(organization.subscriptionStatus)}`}>
+                                {getSubscriptionLabel(organization.subscriptionStatus)}
+                            </span>
+                        ) : null}
+                        <button
+                            type="button"
+                            className="btn-secondary text-sm"
+                            onClick={() => void handleRefreshAll()}
+                            disabled={loading || crmLoading}
+                        >
+                            {loading || crmLoading ? 'Actualizando...' : 'Actualizar workspace'}
+                        </button>
+                    </div>
+                )}
+                metrics={[
+                    {
+                        label: 'Negocios conectados',
+                        value: formatNumberDo(organization?._count?.businesses ?? 0),
+                        delta: 'Portafolio administrado por esta organizacion',
+                    },
+                    {
+                        label: 'Equipo activo',
+                        value: formatNumberDo(organization?._count?.members ?? members.length),
+                        delta: 'Miembros con acceso a esta organizacion',
+                    },
+                    {
+                        label: 'Invitaciones pendientes',
+                        value: formatNumberDo(invites.length),
+                        delta: 'Accesos esperando aceptacion',
+                    },
+                    {
+                        label: 'Pipeline vivo',
+                        value: formatNumberDo(pipelineSummary.total),
+                        delta: 'Oportunidades visibles con el filtro actual',
+                    },
+                ]}
+            />
+
+            <DashboardContentLayout
+                primary={(
+                    <AppCard
+                        title="Configuracion de la organizacion"
+                        description="Ajusta el nombre visible y confirma quien lidera el workspace sin navegar a otra vista."
+                        actions={(
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                                Plan {organization?.plan || usage?.plan || 'FREE'}
+                            </span>
+                        )}
                     >
-                        {loading || crmLoading ? 'Actualizando...' : 'Actualizar workspace'}
-                    </button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard
-                    label="Negocios conectados"
-                    value={formatNumberDo(organization?._count?.businesses ?? 0)}
-                    delta="Portafolio administrado por esta organizacion"
-                />
-                <SummaryCard
-                    label="Equipo activo"
-                    value={formatNumberDo(organization?._count?.members ?? members.length)}
-                    delta="Miembros con acceso a esta organizacion"
-                />
-                <SummaryCard
-                    label="Invites pendientes"
-                    value={formatNumberDo(invites.length)}
-                    delta="Tokens activos esperando aceptacion"
-                />
-                <SummaryCard
-                    label="Pipeline vivo"
-                    value={formatNumberDo(pipelineSummary.total)}
-                    delta="Leads visibles con el filtro actual"
-                />
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Identidad operativa</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Configuracion de la organizacion</h3>
-                        </div>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                            Plan {organization?.plan || usage?.plan || 'FREE'}
-                        </span>
-                    </div>
-
-                    <form className="mt-5 space-y-4" onSubmit={(event) => void handleOrganizationSubmit(event)}>
-                        <label className="block text-sm font-medium text-slate-700">
-                            Nombre visible
-                            <input
-                                className="input-field mt-2"
-                                value={organizationNameDraft}
-                                onChange={(event) => setOrganizationNameDraft(event.target.value)}
-                                placeholder="Nombre de la organizacion"
-                                disabled={!canManageOrganization}
+                        <form className="space-y-4" onSubmit={(event) => void handleOrganizationSubmit(event)}>
+                            <FormSection title="Nombre visible" description="Este nombre ayuda al equipo a reconocer la organizacion correcta en el panel y en la gestion diaria.">
+                                <input
+                                    className="input-field"
+                                    value={organizationNameDraft}
+                                    onChange={(event) => setOrganizationNameDraft(event.target.value)}
+                                    placeholder="Nombre de la organizacion"
+                                    disabled={!canManageOrganization}
+                                />
+                            </FormSection>
+                            <InfoList
+                                items={[
+                                    {
+                                        label: 'Slug',
+                                        value: organization?.slug || 'Pendiente',
+                                        hint: 'Identificador interno del workspace.',
+                                    },
+                                    {
+                                        label: 'Responsable principal',
+                                        value: organization?.ownerUser?.name || 'Sin owner visible',
+                                        hint: organization?.ownerUser?.email || 'No disponible',
+                                    },
+                                ]}
                             />
-                        </label>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Slug</p>
-                                <p className="mt-2 text-sm font-medium text-slate-900">{organization?.slug || 'pendiente'}</p>
+                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                                <div>
+                                    <p className="text-sm font-medium text-slate-900">Renovacion y estado</p>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        {organization?.subscriptionRenewsAt
+                                            ? `Renueva el ${formatDateDo(organization.subscriptionRenewsAt)}`
+                                            : 'Gestiona el plan y pagos en billing cuando quieras cambiar la capacidad del workspace.'}
+                                    </p>
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="btn-primary text-sm"
+                                    disabled={!canManageOrganization || actionKey === 'organization-update' || !organizationNameDraft.trim()}
+                                >
+                                    {actionKey === 'organization-update' ? 'Guardando...' : 'Guardar cambios'}
+                                </button>
                             </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Owner principal</p>
-                                <p className="mt-2 text-sm font-medium text-slate-900">{organization?.ownerUser?.name || 'Sin owner visible'}</p>
-                                <p className="mt-1 text-xs text-slate-500">{organization?.ownerUser?.email || 'No disponible'}</p>
+                        </form>
+                    </AppCard>
+                )}
+                secondary={(
+                    <AppCard
+                        title="Uso, limites y margen operativo"
+                        description="Consulta cuanto has usado del plan y cuanto margen queda antes de necesitar un ajuste."
+                        actions={(
+                            <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
+                                Billing enlazado
+                            </span>
+                        )}
+                    >
+                        {usage ? (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {orderedUsageKeys.map((key) => {
+                                    const used = usage.usage[key];
+                                    const limit = usage.limits[key];
+                                    const remaining = usage.remaining[key];
+                                    const percentage = limit && limit > 0
+                                        ? Math.min(100, Math.round((used / limit) * 100))
+                                        : null;
+
+                                    return (
+                                        <article key={key} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <p className="text-sm font-semibold text-slate-900">{getUsageLabel(key)}</p>
+                                                <span className="text-xs text-slate-500">
+                                                    {formatUsageValue(used)} / {formatUsageValue(limit)}
+                                                </span>
+                                            </div>
+                                            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                                                <div
+                                                    className="h-full rounded-full bg-primary-500 transition-all"
+                                                    style={{ width: `${percentage ?? 18}%` }}
+                                                />
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                                                <span>Usado: {formatUsageValue(used)}</span>
+                                                <span>Restante: {formatUsageValue(remaining)}</span>
+                                            </div>
+                                        </article>
+                                    );
+                                })}
                             </div>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                            <div>
-                                <p className="text-sm font-medium text-slate-900">Renovacion y estado</p>
-                                <p className="mt-1 text-sm text-slate-600">
-                                    {organization?.subscriptionRenewsAt
-                                        ? `Renueva el ${formatDateDo(organization.subscriptionRenewsAt)}`
-                                        : 'Gestiona el plan y pagos en la seccion de billing que esta arriba.'}
-                                </p>
-                            </div>
-                            <button
-                                type="submit"
-                                className="btn-primary text-sm"
-                                disabled={!canManageOrganization || actionKey === 'organization-update' || !organizationNameDraft.trim()}
-                            >
-                                {actionKey === 'organization-update' ? 'Guardando...' : 'Guardar cambios'}
-                            </button>
-                        </div>
-                    </form>
-                </article>
+                        ) : (
+                            <EmptyState
+                                title="Sin resumen de uso por ahora"
+                                body="Cuando el sistema consolide el consumo del plan, veras aqui el margen operativo de la organizacion."
+                            />
+                        )}
+                    </AppCard>
+                )}
+            />
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Capacidad del plan</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Uso, limites y margen operativo</h3>
-                        </div>
-                        <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
-                            Billing enlazado
-                        </span>
-                    </div>
-
-                    {usage ? (
-                        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {orderedUsageKeys.map((key) => {
-                                const used = usage.usage[key];
-                                const limit = usage.limits[key];
-                                const remaining = usage.remaining[key];
-                                const percentage = limit && limit > 0
-                                    ? Math.min(100, Math.round((used / limit) * 100))
-                                    : null;
-
-                                return (
-                                    <article key={key} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <p className="text-sm font-semibold text-slate-900">{getUsageLabel(key)}</p>
-                                            <span className="text-xs text-slate-500">
-                                                {formatUsageValue(used)} / {formatUsageValue(limit)}
-                                            </span>
-                                        </div>
-                                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-                                            <div
-                                                className="h-full rounded-full bg-primary-500 transition-all"
-                                                style={{ width: `${percentage ?? 18}%` }}
-                                            />
-                                        </div>
-                                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                                            <span>Usado: {formatUsageValue(used)}</span>
-                                            <span>Restante: {formatUsageValue(remaining)}</span>
-                                        </div>
-                                    </article>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <p className="mt-5 text-sm text-slate-600">
-                            No hay snapshot de uso disponible todavia para esta organizacion.
-                        </p>
-                    )}
-                </article>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Equipo interno</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Miembros y permisos</h3>
-                        </div>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                            {members.length} miembros
-                        </span>
-                    </div>
-
-                    <div className="mt-5 space-y-3">
-                        {members.length > 0 ? members.map((member) => (
-                            <article key={member.userId} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <p className="font-medium text-slate-900">{member.user.name}</p>
+            <DashboardContentLayout
+                primary={(
+                    <QueueCard
+                        title="Miembros y permisos"
+                        description="Cada persona queda visible con su rol actual y con acciones claras para actualizar acceso sin saturar el bloque."
+                        actions={(
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                                {members.length} miembros
+                            </span>
+                        )}
+                    >
+                        {members.length > 0 ? (
+                            <div className="space-y-3">
+                                {members.map((member) => (
+                                    <EntityListItem
+                                        key={member.userId}
+                                        title={member.user.name}
+                                        subtitle={member.user.email}
+                                        badge={(
                                             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRoleTone(member.role)}`}>
                                                 {getRoleLabel(member.role)}
                                             </span>
-                                        </div>
-                                        <p className="mt-1 text-sm text-slate-600">{member.user.email}</p>
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            En el equipo desde {formatDateDo(member.createdAt)}
-                                        </p>
-                                    </div>
-
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <select
-                                            className="input-field min-w-[9rem]"
-                                            value={memberRoleDrafts[member.userId] || member.role}
-                                            onChange={(event) => {
-                                                const value = event.target.value as OrganizationRole;
-                                                setMemberRoleDrafts((current) => ({
-                                                    ...current,
-                                                    [member.userId]: value,
-                                                }));
-                                            }}
-                                            disabled={!canManageOrganization || member.role === 'OWNER'}
-                                        >
-                                            {(['OWNER', 'MANAGER', 'STAFF'] as OrganizationRole[]).map((role) => (
-                                                <option key={role} value={role}>
-                                                    {getRoleLabel(role)}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <button
-                                            type="button"
-                                            className="btn-secondary text-sm"
-                                            onClick={() => void handleMemberRoleUpdate(member)}
-                                            disabled={!canManageOrganization || member.role === 'OWNER' || actionKey === `member-role-${member.userId}`}
-                                        >
-                                            {actionKey === `member-role-${member.userId}` ? 'Guardando...' : 'Aplicar rol'}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn-secondary text-sm"
-                                            onClick={() => void handleMemberRemoval(member)}
-                                            disabled={!canManageOrganization || member.role === 'OWNER' || actionKey === `member-remove-${member.userId}`}
-                                        >
-                                            {actionKey === `member-remove-${member.userId}` ? 'Removiendo...' : 'Remover'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </article>
-                        )) : (
-                            <p className="text-sm text-slate-600">No hay miembros cargados para esta organizacion.</p>
-                        )}
-                    </div>
-                </article>
-
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Invites</p>
-                        <h3 className="mt-1 text-lg font-semibold text-slate-900">Invitar y seguir accesos</h3>
-                    </div>
-
-                    <form className="mt-5 space-y-4" onSubmit={(event) => void handleInviteSubmit(event)}>
-                        <label className="block text-sm font-medium text-slate-700">
-                            Correo del miembro
-                            <input
-                                className="input-field mt-2"
-                                type="email"
-                                value={inviteEmail}
-                                onChange={(event) => setInviteEmail(event.target.value)}
-                                placeholder="equipo@negocio.com"
-                                disabled={!canManageOrganization}
+                                        )}
+                                        meta={`En el equipo desde ${formatDateDo(member.createdAt)}`}
+                                        actions={(
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <select
+                                                    className="input-field min-w-[9rem]"
+                                                    value={memberRoleDrafts[member.userId] || member.role}
+                                                    onChange={(event) => {
+                                                        const value = event.target.value as OrganizationRole;
+                                                        setMemberRoleDrafts((current) => ({
+                                                            ...current,
+                                                            [member.userId]: value,
+                                                        }));
+                                                    }}
+                                                    disabled={!canManageOrganization || member.role === 'OWNER'}
+                                                >
+                                                    {(['OWNER', 'MANAGER', 'STAFF'] as OrganizationRole[]).map((role) => (
+                                                        <option key={role} value={role}>
+                                                            {getRoleLabel(role)}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    className="btn-secondary text-sm"
+                                                    onClick={() => void handleMemberRoleUpdate(member)}
+                                                    disabled={!canManageOrganization || member.role === 'OWNER' || actionKey === `member-role-${member.userId}`}
+                                                >
+                                                    {actionKey === `member-role-${member.userId}` ? 'Guardando...' : 'Aplicar rol'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn-secondary text-sm"
+                                                    onClick={() => void handleMemberRemoval(member)}
+                                                    disabled={!canManageOrganization || member.role === 'OWNER' || actionKey === `member-remove-${member.userId}`}
+                                                >
+                                                    {actionKey === `member-remove-${member.userId}` ? 'Removiendo...' : 'Remover'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                title="Sin miembros cargados"
+                                body="Cuando sumes personas al workspace, apareceran aqui con su rol y sus controles."
                             />
-                        </label>
-                        <label className="block text-sm font-medium text-slate-700">
-                            Rol inicial
-                            <select
-                                className="input-field mt-2"
-                                value={inviteRole}
-                                onChange={(event) => setInviteRole(event.target.value as OrganizationRole)}
-                                disabled={!canManageOrganization || manageableInviteRoles.length === 0}
-                            >
-                                {manageableInviteRoles.length > 0 ? manageableInviteRoles.map((role) => (
-                                    <option key={role} value={role}>
-                                        {getRoleLabel(role)}
-                                    </option>
-                                )) : (
-                                    <option value="STAFF">Sin permisos para invitar</option>
-                                )}
-                            </select>
-                        </label>
-                        <button
-                            type="submit"
-                            className="btn-primary text-sm w-full"
-                            disabled={!canManageOrganization || !inviteEmail.trim() || actionKey === 'organization-invite'}
-                        >
-                            {actionKey === 'organization-invite' ? 'Creando invite...' : 'Crear invite'}
-                        </button>
-                    </form>
-
-                    {lastInviteToken ? (
-                        <div className="mt-5 rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
-                            <p className="text-sm font-semibold text-primary-900">Ultimo token emitido</p>
-                            <p className="mt-2 break-all rounded-xl bg-white p-3 text-xs text-slate-700">
-                                {buildInviteAcceptanceUrl(lastInviteToken)}
-                            </p>
-                            <button
-                                type="button"
-                                className="btn-secondary mt-3 text-sm"
-                                onClick={() => void handleCopyInviteToken()}
-                            >
-                                Copiar enlace
-                            </button>
-                        </div>
-                    ) : null}
-
-                    <div className="mt-5 space-y-3">
-                        <p className="text-sm font-semibold text-slate-900">Pendientes</p>
-                        {invites.length > 0 ? invites.map((invite) => (
-                            <article key={invite.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <div className="flex flex-wrap items-start justify-between gap-2">
-                                    <div>
-                                        <p className="font-medium text-slate-900">{invite.email}</p>
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Expira el {formatDateDo(invite.expiresAt)}
-                                        </p>
-                                    </div>
-                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRoleTone(invite.role)}`}>
-                                        {getRoleLabel(invite.role)}
-                                    </span>
-                                </div>
-                                {invite.invitedByUser?.name ? (
-                                    <p className="mt-2 text-xs text-slate-500">
-                                        Invitado por {invite.invitedByUser.name}
-                                    </p>
-                                ) : null}
-                            </article>
-                        )) : (
-                            <p className="text-sm text-slate-600">No hay invites pendientes.</p>
                         )}
-                    </div>
-                </article>
-            </div>
+                    </QueueCard>
+                )}
+                secondary={(
+                    <QueueCard
+                        title="Invitar y seguir accesos"
+                        description="Invita nuevos miembros y mantente al tanto de los accesos que todavia no se han aceptado."
+                    >
+                        <form className="space-y-4" onSubmit={(event) => void handleInviteSubmit(event)}>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Correo del miembro
+                                <input
+                                    className="input-field mt-2"
+                                    type="email"
+                                    value={inviteEmail}
+                                    onChange={(event) => setInviteEmail(event.target.value)}
+                                    placeholder="equipo@negocio.com"
+                                    disabled={!canManageOrganization}
+                                />
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Rol inicial
+                                <select
+                                    className="input-field mt-2"
+                                    value={inviteRole}
+                                    onChange={(event) => setInviteRole(event.target.value as OrganizationRole)}
+                                    disabled={!canManageOrganization || manageableInviteRoles.length === 0}
+                                >
+                                    {manageableInviteRoles.length > 0 ? manageableInviteRoles.map((role) => (
+                                        <option key={role} value={role}>
+                                            {getRoleLabel(role)}
+                                        </option>
+                                    )) : (
+                                        <option value="STAFF">Sin permisos para invitar</option>
+                                    )}
+                                </select>
+                            </label>
+                            <button
+                                type="submit"
+                                className="btn-primary text-sm w-full"
+                                disabled={!canManageOrganization || !inviteEmail.trim() || actionKey === 'organization-invite'}
+                            >
+                                {actionKey === 'organization-invite' ? 'Creando invitacion...' : 'Crear invitacion'}
+                            </button>
+                        </form>
+
+                        {lastInviteToken ? (
+                            <div className="mt-5 rounded-[22px] border border-primary-100 bg-primary-50/70 p-4">
+                                <p className="text-sm font-semibold text-primary-900">Ultimo enlace emitido</p>
+                                <p className="mt-2 break-all rounded-xl bg-white p-3 text-xs text-slate-700">
+                                    {buildInviteAcceptanceUrl(lastInviteToken)}
+                                </p>
+                                <button
+                                    type="button"
+                                    className="btn-secondary mt-3 text-sm"
+                                    onClick={() => void handleCopyInviteToken()}
+                                >
+                                    Copiar enlace
+                                </button>
+                            </div>
+                        ) : null}
+
+                        <div className="mt-5 space-y-3">
+                            {invites.length > 0 ? invites.map((invite) => (
+                                <EntityListItem
+                                    key={invite.id}
+                                    title={invite.email}
+                                    subtitle={`Expira el ${formatDateDo(invite.expiresAt)}`}
+                                    badge={(
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRoleTone(invite.role)}`}>
+                                            {getRoleLabel(invite.role)}
+                                        </span>
+                                    )}
+                                    body={invite.invitedByUser?.name ? `Invitacion enviada por ${invite.invitedByUser.name}.` : 'Invitacion pendiente de aceptacion.'}
+                                />
+                            )) : (
+                                <EmptyState
+                                    title="Sin invitaciones pendientes"
+                                    body="Cuando invites nuevos accesos, veras aqui quien falta por aceptar."
+                                />
+                            )}
+                        </div>
+                    </QueueCard>
+                )}
+            />
 
             <div className="space-y-3">
                 <div className="space-y-2">
-                    <p className="page-kicker">CRM comercial</p>
-                    <h3 className="page-title-sm">Clientes y pipeline accionable</h3>
-                    <p className="page-description">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">CRM comercial</p>
+                    <h3 className="font-display text-2xl font-semibold tracking-tight text-slate-900">Clientes y pipeline accionable</h3>
+                    <p className="text-sm leading-6 text-slate-600">
                         Ordena el seguimiento comercial con filtros simples, historial accesible y oportunidades listas para mover entre etapas.
                     </p>
                 </div>
@@ -2013,45 +2018,24 @@ export function OrganizationWorkspace({
                 </SectionCard>
             </div>
 
-            <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Actividad</p>
-                        <h3 className="mt-1 text-lg font-semibold text-slate-900">Actividad reciente del equipo</h3>
-                        <p className="mt-2 text-sm text-slate-600">
-                            Resume cambios de equipo, plan y portafolio sin exponer logs tecnicos ni payloads internos.
-                        </p>
-                    </div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        {organizationActivity.length} eventos recientes
-                    </span>
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-3 xl:grid-cols-2">
-                    {organizationActivity.length > 0 ? organizationActivity.map((activity) => {
-                        return (
-                            <article key={activity.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${activity.categoryTone}`}>
-                                            {activity.category}
-                                        </span>
-                                        <p className="mt-2 font-medium text-slate-900">{activity.title}</p>
-                                    </div>
-                                    <p className="text-xs text-slate-500">{formatDateTimeDo(activity.createdAt)}</p>
-                                </div>
-                                <p className="mt-3 text-sm text-slate-600">{activity.description}</p>
-                                <p className="mt-3 text-xs font-medium text-slate-500">{activity.actorLabel}</p>
-                            </article>
-                        );
-                    }) : (
-                        <EmptyState
-                            title="Sin actividad reciente para mostrar"
-                            body="Cuando haya cambios de equipo, plan o portafolio, apareceran resumidos aqui sin detalles tecnicos."
-                        />
-                    )}
-                </div>
-            </article>
-        </section>
+            <TimelineBlock
+                title="Actividad reciente del equipo"
+                description="Resume cambios de equipo, plan y portafolio sin exponer logs tecnicos ni payloads internos."
+                items={organizationActivity.map((activity) => ({
+                    id: activity.id,
+                    title: activity.title,
+                    meta: `${activity.actorLabel} · ${formatDateTimeDo(activity.createdAt)}`,
+                    body: activity.description,
+                    badge: (
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${activity.categoryTone}`}>
+                            {activity.category}
+                        </span>
+                    ),
+                }))}
+                emptyTitle="Sin actividad reciente para mostrar"
+                emptyBody="Cuando haya cambios de equipo, plan o portafolio, apareceran aqui resumidos en lenguaje claro."
+                className="bg-white"
+            />
+        </PageShell>
     );
 }

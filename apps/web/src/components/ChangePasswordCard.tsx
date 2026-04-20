@@ -1,8 +1,15 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { BusyButtonLabel } from './BusyButtonLabel';
+import {
+    AppCard,
+    FieldHint,
+    FormSection,
+    InlineNotice,
+    StickyFormActions,
+} from './ui';
 import { useAuth } from '../context/useAuth';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 
@@ -15,8 +22,8 @@ type ChangePasswordCardProps = {
 };
 
 export function ChangePasswordCard({
-    title = 'Cambiar contraseña',
-    description = 'Actualiza tu contraseña actual y vuelve a iniciar sesión para aplicar el cambio.',
+    title = 'Cambiar contrasena',
+    description = 'Actualiza tu clave de acceso. Al guardar, cerraremos tu sesion para que entres otra vez con la nueva contrasena.',
     className = '',
 }: ChangePasswordCardProps) {
     const navigate = useNavigate();
@@ -34,27 +41,27 @@ export function ChangePasswordCard({
         setErrorMessage('');
 
         if (!currentPassword) {
-            setErrorMessage('Escribe tu contraseña actual');
+            setErrorMessage('Escribe tu contrasena actual');
             return;
         }
 
         if (newPassword.length < 8) {
-            setErrorMessage('La nueva contraseña debe tener al menos 8 caracteres');
+            setErrorMessage('La nueva contrasena debe tener al menos 8 caracteres');
             return;
         }
 
         if (!PASSWORD_COMPLEXITY_REGEX.test(newPassword)) {
-            setErrorMessage('La nueva contraseña debe incluir letras y números');
+            setErrorMessage('La nueva contrasena debe incluir letras y numeros');
             return;
         }
 
         if (currentPassword === newPassword) {
-            setErrorMessage('La nueva contraseña debe ser diferente a la actual');
+            setErrorMessage('La nueva contrasena debe ser diferente a la actual');
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            setErrorMessage('La confirmación de contraseña no coincide');
+            setErrorMessage('La confirmacion de contrasena no coincide');
             return;
         }
 
@@ -68,27 +75,27 @@ export function ChangePasswordCard({
             navigate('/login', {
                 replace: true,
                 state: {
-                    notice: 'Contraseña actualizada. Inicia sesión nuevamente.',
+                    notice: 'Contrasena actualizada. Inicia sesion nuevamente.',
                 },
             });
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'No se pudo cambiar la contraseña'));
+            setErrorMessage(getApiErrorMessage(error, 'No se pudo cambiar la contrasena'));
             setSaving(false);
         }
     };
 
     return (
-        <div className={['card p-5', className].filter(Boolean).join(' ')}>
-            <h2 className="font-display text-lg font-semibold text-gray-900 mb-2">{title}</h2>
-            <p className="text-sm text-gray-600 mb-4">{description}</p>
+        <AppCard title={title} description={description} className={className}>
+            {errorMessage ? (
+                <InlineNotice
+                    tone="danger"
+                    title="No pudimos actualizar tu clave"
+                    body={errorMessage}
+                    className="mb-4"
+                />
+            ) : null}
 
-            {errorMessage && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errorMessage}
-                </div>
-            )}
-
-            <form className="space-y-3" onSubmit={handleSubmit}>
+            <form className="space-y-4" onSubmit={handleSubmit}>
                 <input
                     className="sr-only"
                     type="email"
@@ -100,57 +107,70 @@ export function ChangePasswordCard({
                     aria-hidden="true"
                 />
 
-                <div>
-                    <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 mb-1">
-                        Contraseña actual
-                    </label>
-                    <input
-                        id="current-password"
-                        type="password"
-                        autoComplete="current-password"
-                        className="input-field text-sm"
-                        value={currentPassword}
-                        onChange={(event) => setCurrentPassword(event.target.value)}
-                    />
-                </div>
+                <FormSection
+                    title="Nueva clave"
+                    description="Usa una combinacion facil de recordar para ti, pero dificil de adivinar para otros."
+                >
+                    <div className="space-y-4">
+                        <div>
+                            <label htmlFor="current-password" className="mb-1 block text-sm font-medium text-slate-700">
+                                Contrasena actual
+                            </label>
+                            <input
+                                id="current-password"
+                                type="password"
+                                autoComplete="current-password"
+                                className="input-field text-sm"
+                                value={currentPassword}
+                                onChange={(event) => setCurrentPassword(event.target.value)}
+                            />
+                        </div>
 
-                <div>
-                    <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">
-                        Nueva contraseña
-                    </label>
-                    <input
-                        id="new-password"
-                        type="password"
-                        autoComplete="new-password"
-                        className="input-field text-sm"
-                        value={newPassword}
-                        onChange={(event) => setNewPassword(event.target.value)}
-                        placeholder="Mínimo 8 caracteres, con letras y números"
-                    />
-                </div>
+                        <div>
+                            <label htmlFor="new-password" className="mb-1 block text-sm font-medium text-slate-700">
+                                Nueva contrasena
+                            </label>
+                            <input
+                                id="new-password"
+                                type="password"
+                                autoComplete="new-password"
+                                className="input-field text-sm"
+                                value={newPassword}
+                                onChange={(event) => setNewPassword(event.target.value)}
+                                placeholder="Minimo 8 caracteres, con letras y numeros"
+                            />
+                        </div>
 
-                <div>
-                    <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
-                        Confirmar nueva contraseña
-                    </label>
-                    <input
-                        id="confirm-password"
-                        type="password"
-                        autoComplete="new-password"
-                        className="input-field text-sm"
-                        value={confirmPassword}
-                        onChange={(event) => setConfirmPassword(event.target.value)}
-                    />
-                </div>
+                        <div>
+                            <label htmlFor="confirm-password" className="mb-1 block text-sm font-medium text-slate-700">
+                                Confirmar nueva contrasena
+                            </label>
+                            <input
+                                id="confirm-password"
+                                type="password"
+                                autoComplete="new-password"
+                                className="input-field text-sm"
+                                value={confirmPassword}
+                                onChange={(event) => setConfirmPassword(event.target.value)}
+                            />
+                        </div>
 
-                <button type="submit" className="btn-primary text-sm" disabled={saving}>
-                    <BusyButtonLabel
-                        busy={saving}
-                        busyText="Actualizando..."
-                        idleText="Actualizar contraseña y cerrar sesión"
-                    />
-                </button>
+                        <FieldHint>
+                            Al actualizar tu clave cerraremos la sesion para proteger tu cuenta.
+                        </FieldHint>
+                    </div>
+                </FormSection>
+
+                <StickyFormActions>
+                    <button type="submit" className="btn-primary text-sm" disabled={saving}>
+                        <BusyButtonLabel
+                            busy={saving}
+                            busyText="Actualizando..."
+                            idleText="Actualizar contrasena"
+                        />
+                    </button>
+                </StickyFormActions>
             </form>
-        </div>
+        </AppCard>
     );
 }

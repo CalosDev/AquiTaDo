@@ -2,7 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '../../api/error';
 import { paymentsApi, plansApi, subscriptionsApi } from '../../api/endpoints';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
-import { EmptyState, PartialDataState, SectionCard, SummaryCard } from '../../components/ui';
+import {
+    BillingSummaryCard,
+    InvoiceTable,
+    KPIHeader,
+    NextStepCard,
+    PageShell,
+    PartialDataState,
+    PlanStatusCard,
+    TrendPanel,
+} from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
 
@@ -493,7 +502,7 @@ export function BillingWorkspace({
 
     if (loading) {
         return (
-            <section className="section-shell p-6 space-y-5">
+            <PageShell className="p-6 space-y-5" width="full">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-2">
                         <div className="h-3 w-24 rounded-full bg-slate-100 animate-pulse" />
@@ -518,12 +527,12 @@ export function BillingWorkspace({
                         </div>
                     ))}
                 </div>
-            </section>
+            </PageShell>
         );
     }
 
     return (
-        <section className="section-shell p-6 space-y-6">
+        <PageShell className="p-6 space-y-6" width="full">
             <PageFeedbackStack
                 items={[
                     { id: 'billing-error', tone: 'danger', text: errorMessage },
@@ -531,56 +540,80 @@ export function BillingWorkspace({
                 ]}
             />
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Billing / SaaS</p>
-                    <h2 className="font-display text-xl font-bold text-slate-900">Planes, suscripcion y caja operativa</h2>
-                    <p className="mt-2 text-sm text-slate-600">
-                        {organizationName
-                            ? `Controla el plan activo y la facturacion de ${organizationName}.`
-                            : 'Controla el plan activo y la facturacion de tu organizacion.'}
-                    </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        className="btn-secondary text-sm"
-                        onClick={() => void loadBillingData({ silent: true })}
-                        disabled={refreshing}
-                    >
-                        {refreshing ? 'Actualizando...' : 'Actualizar billing'}
-                    </button>
-                    {subscription && currentPlanCode !== 'FREE' && !subscription.cancelAtPeriodEnd ? (
+            <KPIHeader
+                eyebrow="Billing / SaaS"
+                title="Planes, suscripcion y caja operativa"
+                description={organizationName
+                    ? `Controla el plan activo y la facturacion de ${organizationName}.`
+                    : 'Controla el plan activo y la facturacion de tu organizacion.'}
+                actions={(
+                    <div className="flex flex-wrap gap-2">
                         <button
                             type="button"
-                            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            onClick={() => void handleCancelAtPeriodEnd()}
-                            disabled={actionKey === 'cancel-subscription'}
+                            className="btn-secondary text-sm"
+                            onClick={() => void loadBillingData({ silent: true })}
+                            disabled={refreshing}
                         >
-                            {actionKey === 'cancel-subscription' ? 'Procesando...' : 'Cancelar al final del periodo'}
+                            {refreshing ? 'Actualizando...' : 'Actualizar billing'}
                         </button>
-                    ) : null}
-                </div>
-            </div>
+                        {subscription && currentPlanCode !== 'FREE' && !subscription.cancelAtPeriodEnd ? (
+                            <button
+                                type="button"
+                                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                onClick={() => void handleCancelAtPeriodEnd()}
+                                disabled={actionKey === 'cancel-subscription'}
+                            >
+                                {actionKey === 'cancel-subscription' ? 'Procesando...' : 'Cancelar al final del periodo'}
+                            </button>
+                        ) : null}
+                    </div>
+                )}
+                metrics={[
+                    {
+                        label: 'Plan',
+                        value: subscription?.plan.name || 'N/D',
+                        delta: subscription ? `${formatCurrencyDo(subscription.plan.priceMonthly, subscription.plan.currency)}/mes` : 'Sin suscripcion',
+                    },
+                    {
+                        label: 'Balance Ads',
+                        value: formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP'),
+                        delta: 'Disponible para campanas CPC',
+                    },
+                    {
+                        label: 'Cobrado',
+                        value: formatCurrencyDo(billingSummary?.payments.totalCollected ?? 0, 'DOP'),
+                        delta: 'Pagos exitosos en el rango',
+                    },
+                    {
+                        label: 'Facturado',
+                        value: formatCurrencyDo(billingSummary?.invoices.total ?? 0, 'DOP'),
+                        delta: 'Total de invoices emitidas',
+                    },
+                    {
+                        label: 'Marketplace neto',
+                        value: formatCurrencyDo(billingSummary?.marketplace.netAmount ?? 0, 'DOP'),
+                        delta: `Fee ${formatCurrencyDo(billingSummary?.marketplace.platformFeeAmount ?? 0, 'DOP')}`,
+                    },
+                    {
+                        label: 'Pendiente fiscal',
+                        value: formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP'),
+                        delta: `${fiscalSummary?.totals.invoicesIssued ?? 0} invoices emitidas`,
+                    },
+                ]}
+            />
 
             <div className="flex flex-wrap gap-2.5">
-                <span className="chip">
-                    Plan actual: {subscription?.plan.name || 'Sin plan'}
-                </span>
+                <span className="chip">Plan actual: {subscription?.plan.name || 'Sin plan'}</span>
                 {subscription ? (
                     <span className={`chip ${getSubscriptionTone(subscription.status)}`}>
                         Suscripcion: {getSubscriptionLabel(subscription.status)}
                     </span>
                 ) : null}
                 {subscription?.currentPeriodEnd ? (
-                    <span className="chip">
-                        Periodo vigente hasta: {formatDateDo(subscription.currentPeriodEnd)}
-                    </span>
+                    <span className="chip">Periodo vigente hasta: {formatDateDo(subscription.currentPeriodEnd)}</span>
                 ) : null}
                 {subscription?.cancelAtPeriodEnd ? (
-                    <span className="chip bg-amber-100 text-amber-800">
-                        Se cancela al cierre del periodo
-                    </span>
+                    <span className="chip bg-amber-100 text-amber-800">Se cancela al cierre del periodo</span>
                 ) : null}
             </div>
 
@@ -592,50 +625,8 @@ export function BillingWorkspace({
                 />
             ) : null}
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
-                <SummaryCard
-                    label="Plan"
-                    value={subscription?.plan.name || 'N/D'}
-                    delta={subscription ? `${formatCurrencyDo(subscription.plan.priceMonthly, subscription.plan.currency)}/mes` : 'Sin suscripcion'}
-                />
-                <SummaryCard
-                    label="Balance Ads"
-                    value={formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP')}
-                    delta="Disponible para campanas CPC"
-                />
-                <SummaryCard
-                    label="Cobrado"
-                    value={formatCurrencyDo(billingSummary?.payments.totalCollected ?? 0, 'DOP')}
-                    delta="Pagos exitosos en el rango"
-                />
-                <SummaryCard
-                    label="Facturado"
-                    value={formatCurrencyDo(billingSummary?.invoices.total ?? 0, 'DOP')}
-                    delta="Total de invoices emitidas"
-                />
-                <SummaryCard
-                    label="Marketplace neto"
-                    value={formatCurrencyDo(billingSummary?.marketplace.netAmount ?? 0, 'DOP')}
-                    delta={`Fee ${formatCurrencyDo(billingSummary?.marketplace.platformFeeAmount ?? 0, 'DOP')}`}
-                />
-                <SummaryCard
-                    label="Pendiente fiscal"
-                    value={formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')}
-                    delta={`${fiscalSummary?.totals.invoicesIssued ?? 0} invoices emitidas`}
-                />
-            </div>
-
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
-                <SectionCard
-                    title="Comparador de planes"
-                    description="Sube de plan cuando necesites mas negocios, equipo, imagenes o menor fee de transaccion."
-                    density="compact"
-                    actions={subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd ? (
-                        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                            La suscripcion cerrara el {formatDateDo(subscription.currentPeriodEnd)}.
-                        </p>
-                    ) : undefined}
-                >
+                <div className="space-y-5">
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                         {plans.map((plan) => {
                             const isCurrent = plan.code === currentPlanCode;
@@ -643,150 +634,112 @@ export function BillingWorkspace({
                             const canCheckout = isPaidPlan && !isCurrent;
 
                             return (
-                                <article
+                                <PlanStatusCard
                                     key={plan.id}
-                                    className={`rounded-3xl border p-5 ${
-                                        isCurrent
-                                            ? 'border-primary-300 bg-white shadow-sm'
-                                            : 'border-slate-200 bg-white'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{plan.code}</p>
-                                            <h4 className="mt-2 font-display text-xl font-bold text-slate-900">{plan.name}</h4>
-                                        </div>
-                                        {isCurrent ? (
-                                            <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700">
-                                                Plan actual
-                                            </span>
-                                        ) : null}
-                                    </div>
-
-                                    <p className="mt-3 text-3xl font-bold text-slate-900">
-                                        {formatCurrencyDo(plan.priceMonthly, plan.currency)}
-                                        <span className="ml-1 text-base font-medium text-slate-500">/ mes</span>
-                                    </p>
-                                    <p className="mt-2 text-sm text-slate-600">{plan.description || 'Sin descripcion.'}</p>
-
-                                    <div className="mt-4 space-y-2 text-sm text-slate-700">
-                                        <p>{formatCapabilityLimit(plan.maxBusinesses, 'negocios')}</p>
-                                        <p>{formatCapabilityLimit(plan.maxMembers, 'miembros')}</p>
-                                        <p>{formatCapabilityLimit(plan.maxImagesPerBusiness, 'imagenes por ficha')}</p>
-                                        <p>{formatCapabilityLimit(plan.maxPromotions, 'promociones')}</p>
-                                        <p>
-                                            Retencion analytics:{' '}
-                                            {plan.analyticsRetentionDays === null
-                                                ? 'Ilimitada'
-                                                : `${formatNumberDo(plan.analyticsRetentionDays)} dias`}
+                                    code={plan.code}
+                                    name={plan.name}
+                                    price={formatCurrencyDo(plan.priceMonthly, plan.currency)}
+                                    priceSuffix="/ mes"
+                                    description={plan.description || 'Sin descripcion.'}
+                                    badge={isCurrent ? (
+                                        <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700">
+                                            Plan actual
+                                        </span>
+                                    ) : undefined}
+                                    features={[
+                                        formatCapabilityLimit(plan.maxBusinesses, 'negocios'),
+                                        formatCapabilityLimit(plan.maxMembers, 'miembros'),
+                                        formatCapabilityLimit(plan.maxImagesPerBusiness, 'imagenes por ficha'),
+                                        formatCapabilityLimit(plan.maxPromotions, 'promociones'),
+                                        `Retencion analytics: ${plan.analyticsRetentionDays === null
+                                            ? 'Ilimitada'
+                                            : `${formatNumberDo(plan.analyticsRetentionDays)} dias`}`,
+                                        `Fee por transaccion: ${(plan.transactionFeeBps / 100).toFixed(2)}%`,
+                                    ]}
+                                    footer={isCurrent ? (
+                                        <p className="rounded-2xl border border-primary-100 bg-primary-50 px-3 py-2 text-sm text-primary-700">
+                                            Este plan gobierna actualmente tu organizacion.
                                         </p>
-                                        <p>Fee por transaccion: {(plan.transactionFeeBps / 100).toFixed(2)}%</p>
-                                    </div>
-
-                                    <div className="mt-5">
-                                        {canCheckout ? (
-                                            <button
-                                                type="button"
-                                                className="btn-primary w-full text-sm"
-                                                onClick={() => void handleCheckoutPlan(plan.code)}
-                                                disabled={actionKey === `plan:${plan.code}`}
-                                            >
-                                                {actionKey === `plan:${plan.code}` ? 'Abriendo checkout...' : `Cambiar a ${plan.name}`}
-                                            </button>
-                                        ) : isCurrent ? (
-                                            <p className="rounded-2xl border border-primary-100 bg-primary-50 px-3 py-2 text-sm text-primary-700">
-                                                Este plan gobierna actualmente tu organizacion.
-                                            </p>
-                                        ) : (
-                                            <p className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                                                El plan gratuito sirve como base operativa; si necesitas bajar desde un plan pago, usa la cancelacion al cierre del periodo.
-                                            </p>
-                                        )}
-                                    </div>
-                                </article>
+                                    ) : !canCheckout ? (
+                                        <p className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                                            Si necesitas bajar desde un plan pago, usa la cancelacion al cierre del periodo.
+                                        </p>
+                                    ) : undefined}
+                                    action={canCheckout ? (
+                                        <button
+                                            type="button"
+                                            className="btn-primary w-full text-sm"
+                                            onClick={() => void handleCheckoutPlan(plan.code)}
+                                            disabled={actionKey === `plan:${plan.code}`}
+                                        >
+                                            {actionKey === `plan:${plan.code}` ? 'Abriendo checkout...' : `Cambiar a ${plan.name}`}
+                                        </button>
+                                    ) : undefined}
+                                />
                             );
                         })}
                     </div>
                     {paidPlans.length === 0 ? (
-                        <p className="mt-4 text-sm text-slate-500">Todavia no hay planes pagos disponibles para esta organizacion.</p>
+                        <p className="text-sm text-slate-500">Todavia no hay planes pagos disponibles para esta organizacion.</p>
                     ) : null}
-                </SectionCard>
+                </div>
 
-                <SectionCard
-                    title="Ads Wallet"
-                    description="Recarga saldo para campanas patrocinadas sin salir del dashboard."
-                    density="compact"
-                >
-
-                    <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Saldo disponible</p>
-                        <p className="mt-2 text-3xl font-bold text-slate-900">
-                            {formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP')}
-                        </p>
-                    </div>
-
-                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                        <label className="text-sm font-medium text-slate-800" htmlFor="ads-topup-amount">
-                            Recarga rapida
-                        </label>
-                        <input
-                            id="ads-topup-amount"
-                            className="input-field"
-                            inputMode="decimal"
-                            value={topupAmount}
-                            onChange={(event) => setTopupAmount(event.target.value)}
-                            placeholder="2500"
-                        />
-                        <button
-                            type="button"
-                            className="btn-secondary w-full text-sm"
-                            onClick={() => void handleTopupCheckout()}
-                            disabled={actionKey === 'ads-topup'}
-                        >
-                            {actionKey === 'ads-topup' ? 'Abriendo checkout...' : 'Recargar wallet'}
-                        </button>
-                    </div>
-
-                    <div>
-                        <h4 className="font-medium text-slate-900">Recargas recientes</h4>
-                        {adsWallet?.topups?.length ? (
-                            <div className="mt-3 space-y-2">
-                                {adsWallet.topups.map((topup) => (
-                                    <div key={topup.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <p className="text-sm font-medium text-slate-900">
-                                                {formatCurrencyDo(topup.amount, topup.currency)}
-                                            </p>
-                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getPaymentTone(topup.status)}`}>
-                                                {getPaymentLabel(topup.status)}
-                                            </span>
-                                        </div>
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            {formatDateTimeDo(topup.createdAt)}
-                                        </p>
-                                        {topup.failureReason ? (
-                                            <p className="mt-1 text-xs text-red-700">{topup.failureReason}</p>
-                                        ) : null}
-                                    </div>
-                                ))}
+                <div className="space-y-5">
+                    <NextStepCard
+                        title="Ads Wallet"
+                        body={(
+                            <div className="space-y-4">
+                                <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Saldo disponible</p>
+                                    <p className="mt-2 text-3xl font-bold text-slate-900">
+                                        {formatCurrencyDo(adsWallet?.balance ?? 0, 'DOP')}
+                                    </p>
+                                </div>
+                                <label className="block text-sm font-medium text-slate-800" htmlFor="ads-topup-amount">
+                                    Recarga rapida
+                                </label>
+                                <input
+                                    id="ads-topup-amount"
+                                    className="input-field"
+                                    inputMode="decimal"
+                                    value={topupAmount}
+                                    onChange={(event) => setTopupAmount(event.target.value)}
+                                    placeholder="2500"
+                                />
                             </div>
-                        ) : (
-                            <EmptyState
-                                className="mt-3"
-                                title="Sin recargas registradas"
-                                body="Cuando la organizacion recargue saldo para ads, veras aqui la trazabilidad del wallet."
-                            />
                         )}
-                    </div>
-                </SectionCard>
+                        action={(
+                            <button
+                                type="button"
+                                className="btn-secondary w-full text-sm"
+                                onClick={() => void handleTopupCheckout()}
+                                disabled={actionKey === 'ads-topup'}
+                            >
+                                {actionKey === 'ads-topup' ? 'Abriendo checkout...' : 'Recargar wallet'}
+                            </button>
+                        )}
+                    />
+
+                    <InvoiceTable
+                        title="Recargas recientes"
+                        description="Trazabilidad corta del wallet para campanas."
+                        items={(adsWallet?.topups ?? []).map((topup) => ({
+                            id: topup.id,
+                            title: formatCurrencyDo(topup.amount, topup.currency),
+                            meta: formatDateTimeDo(topup.createdAt),
+                            statusLabel: getPaymentLabel(topup.status),
+                            statusClassName: getPaymentTone(topup.status),
+                            amount: formatCurrencyDo(topup.amount, topup.currency),
+                            detail: topup.failureReason || 'Recarga procesada para el saldo publicitario.',
+                        }))}
+                        emptyTitle="Sin recargas registradas"
+                        emptyBody="Cuando la organizacion recargue saldo para ads, veras aqui la trazabilidad del wallet."
+                    />
+                </div>
             </div>
 
-            <SectionCard
-                title="Resumen contable"
-                description="Filtra el rango para revisar facturacion, cobros y cierre fiscal sin salir del panel."
-                density="compact"
-            >
-                <div className="card-filter density-compact mb-4">
+            <div className="space-y-5">
+                <div className="card-filter density-compact">
                     <div className="flex flex-wrap gap-2">
                         <input
                             type="date"
@@ -814,15 +767,16 @@ export function BillingWorkspace({
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
                     <div className="space-y-5">
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <SummaryCard label="Invoices emitidas" value={fiscalSummary?.totals.invoicesIssued ?? 0} />
-                            <SummaryCard label="Invoices pagadas" value={fiscalSummary?.totals.invoicesPaid ?? 0} />
-                            <SummaryCard label="Pagado" value={formatCurrencyDo(fiscalSummary?.totals.paidTotal ?? 0, 'DOP')} />
-                            <SummaryCard label="Pendiente" value={formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')} />
+                            <BillingSummaryCard label="Invoices emitidas" value={fiscalSummary?.totals.invoicesIssued ?? 0} />
+                            <BillingSummaryCard label="Invoices pagadas" value={fiscalSummary?.totals.invoicesPaid ?? 0} />
+                            <BillingSummaryCard label="Pagado" value={formatCurrencyDo(fiscalSummary?.totals.paidTotal ?? 0, 'DOP')} />
+                            <BillingSummaryCard label="Pendiente" value={formatCurrencyDo(fiscalSummary?.totals.pendingTotal ?? 0, 'DOP')} />
                         </div>
 
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <h4 className="font-medium text-slate-900">Cierre mensual</h4>
+                        <TrendPanel
+                            title="Cierre mensual"
+                            description="Revisa el pulso fiscal sin salir del panel."
+                            actions={(
                                 <div className="flex flex-wrap gap-2">
                                     <button
                                         type="button"
@@ -849,126 +803,69 @@ export function BillingWorkspace({
                                         {actionKey === 'export:fiscal' ? 'Descargando...' : 'CSV fiscal'}
                                     </button>
                                 </div>
-                            </div>
-
-                            {fiscalPreview.length > 0 ? (
-                                <div className="mt-4 space-y-2">
-                                    {fiscalPreview.map((row) => (
-                                        <div key={row.period} className="rounded-2xl border border-white bg-white px-4 py-3">
-                                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{row.period}</p>
-                                                    <p className="mt-1 text-xs text-slate-500">
-                                                        Emitidas {row.invoicesIssued} - Pagadas {row.invoicesPaid}
-                                                    </p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm font-semibold text-slate-900">
-                                                        {formatCurrencyDo(row.total, 'DOP')}
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-slate-500">
-                                                        Cobrado {formatCurrencyDo(row.paidTotal, 'DOP')}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    className="mt-4"
-                                    title="Sin movimientos fiscales"
-                                    body="Ajusta el rango para revisar cierres mensuales cuando haya actividad contable."
-                                />
                             )}
-                        </div>
+                            rows={fiscalPreview.map((row) => ({
+                                id: row.period,
+                                label: row.period,
+                                meta: `Emitidas ${row.invoicesIssued} | Pagadas ${row.invoicesPaid}`,
+                                value: formatCurrencyDo(row.total, 'DOP'),
+                                detail: `Cobrado ${formatCurrencyDo(row.paidTotal, 'DOP')}`,
+                            }))}
+                            emptyTitle="Sin movimientos fiscales"
+                            emptyBody="Ajusta el rango para revisar cierres mensuales cuando haya actividad contable."
+                        />
                     </div>
 
                     <div className="grid grid-cols-1 gap-5">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                            <h4 className="font-medium text-slate-900">Pagos recientes</h4>
-                            {payments.length > 0 ? (
-                                <div className="mt-3 space-y-2">
-                                    {payments.map((payment) => (
-                                        <div key={payment.id} className="rounded-2xl border border-white bg-white px-4 py-3">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <p className="text-sm font-medium text-slate-900">
-                                                        {formatCurrencyDo(payment.amount, payment.currency)}
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-slate-500">
-                                                        {payment.provider} - {formatDateTimeDo(payment.createdAt)}
-                                                    </p>
-                                                </div>
-                                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getPaymentTone(payment.status)}`}>
-                                                    {getPaymentLabel(payment.status)}
-                                                </span>
-                                            </div>
-                                            {payment.failureReason ? (
-                                                <p className="mt-2 text-xs text-red-700">{payment.failureReason}</p>
-                                            ) : null}
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    className="mt-3"
-                                    title="Sin pagos registrados"
-                                    body="Cuando entren cobros o intentos de pago, apareceran aqui con su estado."
-                                />
-                            )}
-                        </div>
+                        <InvoiceTable
+                            title="Pagos recientes"
+                            description="Cobros e intentos de pago mas recientes."
+                            items={payments.map((payment) => ({
+                                id: payment.id,
+                                title: formatCurrencyDo(payment.amount, payment.currency),
+                                meta: `${payment.provider} | ${formatDateTimeDo(payment.createdAt)}`,
+                                statusLabel: getPaymentLabel(payment.status),
+                                statusClassName: getPaymentTone(payment.status),
+                                amount: formatCurrencyDo(payment.amount, payment.currency),
+                                detail: payment.failureReason || 'Movimiento registrado correctamente.',
+                            }))}
+                            emptyTitle="Sin pagos registrados"
+                            emptyBody="Cuando entren cobros o intentos de pago, apareceran aqui con su estado."
+                        />
 
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                            <h4 className="font-medium text-slate-900">Invoices recientes</h4>
-                            {invoices.length > 0 ? (
-                                <div className="mt-3 space-y-2">
-                                    {invoices.map((invoice) => (
-                                        <div key={invoice.id} className="rounded-2xl border border-white bg-white px-4 py-3">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <p className="text-sm font-medium text-slate-900">
-                                                        {invoice.number || invoice.id.slice(0, 8)}
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-slate-500">
-                                                        Emitida {formatDateTimeDo(invoice.issuedAt)}
-                                                    </p>
-                                                </div>
-                                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getPaymentTone(invoice.status)}`}>
-                                                    {getPaymentLabel(invoice.status)}
-                                                </span>
-                                            </div>
-                                            <p className="mt-2 text-sm text-slate-700">
-                                                Total {formatCurrencyDo(invoice.amountTotal, invoice.currency)}
-                                            </p>
-                                            <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-                                                {invoice.dueAt ? <span>Vence {formatDateDo(invoice.dueAt)}</span> : null}
-                                                {invoice.paidAt ? <span>Pagada {formatDateDo(invoice.paidAt)}</span> : null}
-                                                {invoice.pdfUrl ? (
-                                                    <a
-                                                        className="font-semibold text-primary-700 hover:text-primary-800"
-                                                        href={invoice.pdfUrl}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                    >
-                                                        Abrir PDF
-                                                    </a>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    className="mt-3"
-                                    title="Sin invoices registradas"
-                                    body="Cuando la organizacion emita invoices, veras aqui su estado y accesos al PDF."
-                                />
-                            )}
-                        </div>
+                        <InvoiceTable
+                            title="Invoices recientes"
+                            description="Documentos emitidos y acceso rapido al PDF."
+                            items={invoices.map((invoice) => ({
+                                id: invoice.id,
+                                title: invoice.number || invoice.id.slice(0, 8),
+                                meta: `Emitida ${formatDateTimeDo(invoice.issuedAt)}`,
+                                statusLabel: getPaymentLabel(invoice.status),
+                                statusClassName: getPaymentTone(invoice.status),
+                                amount: `Total ${formatCurrencyDo(invoice.amountTotal, invoice.currency)}`,
+                                detail: (
+                                    <div className="flex flex-wrap gap-3">
+                                        {invoice.dueAt ? <span>Vence {formatDateDo(invoice.dueAt)}</span> : null}
+                                        {invoice.paidAt ? <span>Pagada {formatDateDo(invoice.paidAt)}</span> : null}
+                                    </div>
+                                ),
+                                links: invoice.pdfUrl ? (
+                                    <a
+                                        className="font-semibold text-primary-700 hover:text-primary-800"
+                                        href={invoice.pdfUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Abrir PDF
+                                    </a>
+                                ) : undefined,
+                            }))}
+                            emptyTitle="Sin invoices registradas"
+                            emptyBody="Cuando la organizacion emita invoices, veras aqui su estado y accesos al PDF."
+                        />
                     </div>
                 </div>
-            </SectionCard>
-        </section>
+            </div>
+        </PageShell>
     );
 }

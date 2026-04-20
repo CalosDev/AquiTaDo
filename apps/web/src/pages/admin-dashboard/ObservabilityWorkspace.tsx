@@ -1,3 +1,4 @@
+import { AppCard, EmptyState } from '../../components/ui';
 import {
     frontendAlertClass,
     frontendVitalClass,
@@ -37,9 +38,10 @@ export function ObservabilityWorkspace({
 }: ObservabilityWorkspaceProps) {
     return (
         <div className="space-y-4">
-            <div className="card p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <h3 className="font-display font-semibold text-gray-900">Centro de operaciones</h3>
+            <AppCard
+                title="Centro de operaciones"
+                description="Estado operativo de plataforma, dependencias y salud general del sistema."
+                actions={(
                     <button
                         type="button"
                         className="btn-secondary text-xs"
@@ -51,7 +53,8 @@ export function ObservabilityWorkspace({
                     >
                         {operationalHealthLoading ? 'Actualizando...' : 'Actualizar estado'}
                     </button>
-                </div>
+                )}
+            >
 
                 {operationalHealth ? (
                     <div className="space-y-3">
@@ -122,20 +125,17 @@ export function ObservabilityWorkspace({
                         </div>
                     </div>
                 ) : (
-                    <p className="text-sm text-gray-500">
-                        No hay datos operativos disponibles en este momento.
-                    </p>
+                    <EmptyState
+                        title="Sin datos operativos por ahora"
+                        body="Cuando el sistema vuelva a responder con salud consolidada, veras aqui el resumen del estado general."
+                    />
                 )}
-            </div>
+            </AppCard>
 
-            <div className="card p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <div>
-                        <h3 className="font-display font-semibold text-gray-900">Resumen operativo</h3>
-                        <p className="mt-1 text-sm text-gray-600">
-                            El resumen Prometheus se carga bajo demanda para mantener ligero el panel.
-                        </p>
-                    </div>
+            <AppCard
+                title="Resumen operativo"
+                description="El resumen Prometheus se carga bajo demanda para mantener ligero el panel."
+                actions={(
                     <div className="flex flex-wrap items-center gap-2">
                         <button
                             type="button"
@@ -161,7 +161,8 @@ export function ObservabilityWorkspace({
                                     : 'Cargar raw metrics'}
                         </button>
                     </div>
-                </div>
+                )}
+            >
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
@@ -200,22 +201,19 @@ export function ObservabilityWorkspace({
                         Las metricas raw solo se consultan cuando las necesitas para evitar una carga pesada en cada visita al panel.
                     </p>
                 ) : null}
-            </div>
+            </AppCard>
 
-            <div className="card p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <div>
-                        <h3 className="font-display font-semibold text-gray-900">Salud frontend</h3>
-                        <p className="mt-1 text-sm text-gray-600">
-                            Errores cliente, web vitals y rutas calientes de las ultimas 24 horas.
-                        </p>
-                    </div>
+            <AppCard
+                title="Salud frontend"
+                description="Errores cliente, web vitals y rutas calientes de las ultimas 24 horas."
+                actions={(
                     <div className="text-xs text-gray-500">
                         {frontendHealthSummary.generatedAt
                             ? `Actualizado ${new Date(frontendHealthSummary.generatedAt).toLocaleString()}`
                             : 'Sin muestras recientes'}
                     </div>
-                </div>
+                )}
+            >
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
@@ -327,17 +325,12 @@ export function ObservabilityWorkspace({
                         </div>
                     </div>
                 </div>
-            </div>
+            </AppCard>
 
-            <div className="card p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                    <div>
-                        <h3 className="font-display font-semibold text-gray-900">Raw metrics (Prometheus)</h3>
-                        <p className="mt-1 text-sm text-gray-600">
-                            Usa esta vista solo cuando necesites diagnostico fino o exportar el texto completo de Prometheus.
-                        </p>
-                    </div>
-                    {!rawMetricsLoaded ? (
+            <AppCard
+                title="Raw metrics (Prometheus)"
+                description="Usa esta vista solo cuando necesites diagnostico fino o exportar el texto completo de Prometheus."
+                actions={!rawMetricsLoaded ? (
                         <button
                             type="button"
                             className="btn-secondary text-xs"
@@ -347,7 +340,7 @@ export function ObservabilityWorkspace({
                             {rawMetricsLoading ? 'Cargando raw...' : 'Cargar raw metrics'}
                         </button>
                     ) : null}
-                </div>
+            >
                 {rawMetricsLoaded ? (
                     <pre className="max-h-[420px] overflow-auto rounded-xl border border-gray-100 bg-slate-950 p-4 text-[11px] leading-5 text-slate-100">
                         {observabilityRaw || 'Sin datos de metricas'}
@@ -357,7 +350,7 @@ export function ObservabilityWorkspace({
                         Las metricas raw aun no se han cargado en esta sesion.
                     </div>
                 )}
-            </div>
+            </AppCard>
         </div>
     );
 }

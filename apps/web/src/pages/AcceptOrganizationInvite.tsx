@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { organizationApi } from '../api/endpoints';
 import { getApiErrorMessage } from '../api/error';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
-import { SuccessState } from '../components/ui';
+import { AppCard, PageShell, PageIntroCompact, SuccessState } from '../components/ui';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
 import { useTimedMessage } from '../hooks/useTimedMessage';
@@ -61,7 +61,7 @@ export function AcceptOrganizationInvite() {
     };
 
     return (
-        <div className="page-shell space-y-6 animate-fade-in py-10">
+        <PageShell className="space-y-6 animate-fade-in py-10">
             <PageFeedbackStack
                 items={[
                     { id: 'accept-invite-error', tone: 'danger', text: errorMessage },
@@ -69,17 +69,15 @@ export function AcceptOrganizationInvite() {
                 ]}
             />
 
-            <section className="role-hero role-hero-owner">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">Invitacion de equipo</p>
-                <h1 className="mt-2 font-display text-3xl font-bold text-white">
-                    Acepta acceso a una organizacion
-                </h1>
-                <p className="mt-2 max-w-2xl text-blue-100">
-                    Usa el token que te compartio el owner o manager para unirte al tenant correcto sin depender de soporte manual.
-                </p>
-            </section>
+            <AppCard className="app-page-header">
+                <PageIntroCompact
+                    eyebrow="Invitacion de equipo"
+                    title="Acepta acceso a una organizacion"
+                    description="Usa el token que te compartio el owner o manager para unirte al espacio correcto sin depender de soporte manual."
+                />
+            </AppCard>
 
-            <section className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <AppCard className="mx-auto max-w-3xl">
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Token de acceso</p>
                     <h2 className="mt-1 text-2xl font-semibold text-slate-900">Unirse a una organizacion</h2>
@@ -125,7 +123,7 @@ export function AcceptOrganizationInvite() {
                         )}
                     />
                 ) : null}
-            </section>
-        </div>
+            </AppCard>
+        </PageShell>
     );
 }

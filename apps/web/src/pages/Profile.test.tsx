@@ -37,7 +37,7 @@ describe('Profile layout stability', () => {
         });
 
         expect(screen.getByText('Administrador')).toBeInTheDocument();
-        expect(screen.getByText('Mi Perfil')).toBeInTheDocument();
-        expect(screen.getByText('Usuarios')).toBeInTheDocument();
+        expect(screen.getByText('Mi perfil')).toBeInTheDocument();
+        expect(screen.getByText('Abrir seguridad')).toBeInTheDocument();
     });
 });

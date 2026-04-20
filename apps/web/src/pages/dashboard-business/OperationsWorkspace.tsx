@@ -2,7 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bookingsApi, messagingApi, whatsappApi } from '../../api/endpoints';
 import { getApiErrorMessage } from '../../api/error';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
-import { EmptyState, PartialDataState, SectionCard, SummaryCard } from '../../components/ui';
+import {
+    AppCard,
+    EmptyState,
+    EntityListItem,
+    KPIHeader,
+    PageShell,
+    PartialDataState,
+    SectionCard,
+    SplitPanelLayout,
+} from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo } from '../../lib/market';
 
@@ -792,7 +801,7 @@ export function OperationsWorkspace({
 
     if (loading) {
         return (
-            <section className="section-shell p-6 space-y-5">
+            <PageShell className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-2">
                         <div className="h-3 w-32 rounded-full bg-slate-100 animate-pulse" />
@@ -818,12 +827,12 @@ export function OperationsWorkspace({
                         <div className="mt-4 h-56 rounded-3xl bg-slate-50 animate-pulse" />
                     </div>
                 </div>
-            </section>
+            </PageShell>
         );
     }
 
     return (
-        <section className="section-shell p-6 space-y-6">
+        <PageShell className="space-y-6">
             <PageFeedbackStack
                 items={[
                     { id: 'operations-error', tone: 'danger', text: errorMessage },
@@ -831,46 +840,43 @@ export function OperationsWorkspace({
                 ]}
             />
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Operacion comercial</p>
-                    <h2 className="font-display text-xl font-bold text-slate-900">Reservas, inbox y WhatsApp</h2>
-                    <p className="mt-2 text-sm text-slate-600">
-                        Gestiona la demanda que entra por AquiTa.do y responde sin salir del panel.
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    className="btn-secondary text-sm"
-                    onClick={() => void refreshAll({ silent: true })}
-                    disabled={refreshing}
-                >
-                    {refreshing ? 'Actualizando...' : 'Actualizar operaciones'}
-                </button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard
-                    label="Reservas en cola"
-                    value={pendingBookingsCount}
-                    delta={`${bookings.total} en el filtro activo`}
-                />
-                <SummaryCard
-                    label="Transacciones pendientes"
-                    value={pendingTransactionsCount}
-                    delta={`${transactions.total} movimientos observados`}
-                />
-                <SummaryCard
-                    label="Inbox abierto"
-                    value={openConversationCount}
-                    delta={`${conversations.total} conversaciones activas`}
-                />
-                <SummaryCard
-                    label="WhatsApp activo"
-                    value={activeWhatsAppCount}
-                    delta={`${whatsAppConversations.total} hilos sincronizados`}
-                />
-            </div>
+            <KPIHeader
+                eyebrow="Operacion comercial"
+                title="Reservas, inbox y WhatsApp"
+                description="Gestiona la demanda que entra por AquiTa.do y responde sin salir del panel, con cada cola separada de su panel de accion."
+                actions={(
+                    <button
+                        type="button"
+                        className="btn-secondary text-sm"
+                        onClick={() => void refreshAll({ silent: true })}
+                        disabled={refreshing}
+                    >
+                        {refreshing ? 'Actualizando...' : 'Actualizar operaciones'}
+                    </button>
+                )}
+                metrics={[
+                    {
+                        label: 'Reservas en cola',
+                        value: pendingBookingsCount,
+                        delta: `${bookings.total} en el filtro activo`,
+                    },
+                    {
+                        label: 'Transacciones pendientes',
+                        value: pendingTransactionsCount,
+                        delta: `${transactions.total} movimientos observados`,
+                    },
+                    {
+                        label: 'Inbox abierto',
+                        value: openConversationCount,
+                        delta: `${conversations.total} conversaciones activas`,
+                    },
+                    {
+                        label: 'WhatsApp activo',
+                        value: activeWhatsAppCount,
+                        delta: `${whatsAppConversations.total} hilos sincronizados`,
+                    },
+                ]}
+            />
 
             <div className="flex flex-wrap gap-2.5">
                 {selectedConversationSummary ? (
@@ -941,141 +947,137 @@ export function OperationsWorkspace({
                         </div>
                     </div>
 
-                    <div className="grid gap-4 xl:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)]">
-                        {bookings.data.length > 0 ? (
-                            <div className="card-list">
-                                <div className="card-list__header">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Cola de reservas</p>
-                                    <p className="text-xs text-slate-500">{bookings.total} en el filtro</p>
+                    <SplitPanelLayout
+                        primary={bookings.data.length > 0 ? (
+                            <AppCard
+                                tone="queue"
+                                title="Cola de reservas"
+                                description={`${bookings.total} registros con el filtro activo.`}
+                            >
+                                <div className="space-y-3">
+                                    {bookings.data.map((booking) => (
+                                        <button
+                                            key={booking.id}
+                                            type="button"
+                                            className="block w-full text-left"
+                                            onClick={() => setSelectedBookingId(booking.id)}
+                                        >
+                                            <EntityListItem
+                                                className={booking.id === selectedBookingId ? 'border-primary-300 bg-primary-50' : 'hover:border-primary-200'}
+                                                title={booking.business.name}
+                                                subtitle={`${booking.user?.name || 'Cliente'} · ${formatDateTimeDo(booking.scheduledFor)}`}
+                                                badge={(
+                                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingStatusTone(booking.status)}`}>
+                                                        {getBookingStatusLabel(booking.status)}
+                                                    </span>
+                                                )}
+                                                body={(
+                                                    <div className="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                                        <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                                                            Cotizado: {formatCurrencyDo(booking.quotedAmount ?? 0, booking.currency)}
+                                                        </span>
+                                                        <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                                                            Deposito: {formatCurrencyDo(booking.depositAmount ?? 0, booking.currency)}
+                                                        </span>
+                                                        {booking.partySize ? (
+                                                            <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                                                                Party: {booking.partySize}
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                )}
+                                            />
+                                        </button>
+                                    ))}
                                 </div>
-                                {bookings.data.map((booking) => (
-                                    <button
-                                        key={booking.id}
-                                        type="button"
-                                        className={`card-list__item w-full flex-col items-start text-left ${
-                                            booking.id === selectedBookingId ? 'card-list__item--active' : ''
-                                        }`}
-                                        onClick={() => setSelectedBookingId(booking.id)}
-                                    >
-                                        <div className="flex w-full items-start justify-between gap-3">
-                                            <div>
-                                                <p className="font-medium text-slate-900">{booking.business.name}</p>
-                                                <p className="mt-1 text-xs text-slate-500">
-                                                    {booking.user?.name || 'Cliente'} - {formatDateTimeDo(booking.scheduledFor)}
-                                                </p>
-                                            </div>
-                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingStatusTone(booking.status)}`}>
-                                                {getBookingStatusLabel(booking.status)}
-                                            </span>
-                                        </div>
-                                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-                                            <span className="rounded-full bg-white px-2.5 py-1">
-                                                Cotizado: {formatCurrencyDo(booking.quotedAmount ?? 0, booking.currency)}
-                                            </span>
-                                            <span className="rounded-full bg-white px-2.5 py-1">
-                                                Deposito: {formatCurrencyDo(booking.depositAmount ?? 0, booking.currency)}
-                                            </span>
-                                            {booking.partySize ? (
-                                                <span className="rounded-full bg-white px-2.5 py-1">
-                                                    Party: {booking.partySize}
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
+                            </AppCard>
                         ) : (
                             <EmptyState
                                 title="Sin reservas en este filtro"
                                 body="Ajusta negocio o estado para volver a poblar la cola operativa."
                             />
                         )}
-
-                        <div className="card-form density-compact space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-900">Edicion rapida de reserva</p>
-                                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                                        {selectedBooking
-                                            ? `${selectedBooking.business.name} - ${selectedBooking.user?.name || 'Cliente'}`
-                                            : 'Selecciona una reserva para editarla sin perder el contexto de la cola.'}
-                                    </p>
-                                </div>
-                                {selectedBooking ? (
+                        secondary={(
+                            <AppCard
+                                title="Edicion rapida de reserva"
+                                description={selectedBooking
+                                    ? `${selectedBooking.business.name} · ${selectedBooking.user?.name || 'Cliente'}`
+                                    : 'Selecciona una reserva para editarla sin perder el contexto de la cola.'}
+                                actions={selectedBooking ? (
                                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingStatusTone(selectedBooking.status)}`}>
                                         {getBookingStatusLabel(selectedBooking.status)}
                                     </span>
-                                ) : null}
-                            </div>
-
-                            {selectedBooking ? (
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    <select
-                                        className="input-field"
-                                        value={bookingDraft.status}
-                                        onChange={(event) => setBookingDraft((current) => ({
-                                            ...current,
-                                            status: event.target.value as BookingStatus,
-                                        }))}
-                                    >
-                                        <option value="PENDING">Pendiente</option>
-                                        <option value="CONFIRMED">Confirmada</option>
-                                        <option value="COMPLETED">Completada</option>
-                                        <option value="CANCELED">Cancelada</option>
-                                        <option value="NO_SHOW">No asistio</option>
-                                    </select>
-                                    <input
-                                        className="input-field"
-                                        inputMode="decimal"
-                                        placeholder="Monto cotizado"
-                                        value={bookingDraft.quotedAmount}
-                                        onChange={(event) => setBookingDraft((current) => ({
-                                            ...current,
-                                            quotedAmount: event.target.value,
-                                        }))}
-                                    />
-                                    <input
-                                        className="input-field"
-                                        inputMode="decimal"
-                                        placeholder="Deposito"
-                                        value={bookingDraft.depositAmount}
-                                        onChange={(event) => setBookingDraft((current) => ({
-                                            ...current,
-                                            depositAmount: event.target.value,
-                                        }))}
-                                    />
-                                    <textarea
-                                        className="input-field md:col-span-2"
-                                        rows={3}
-                                        placeholder="Notas internas o para la reserva"
-                                        value={bookingDraft.notes}
-                                        onChange={(event) => setBookingDraft((current) => ({
-                                            ...current,
-                                            notes: event.target.value,
-                                        }))}
-                                    />
-                                    <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-                                        <button
-                                            type="button"
-                                            className="btn-primary text-sm"
-                                            onClick={() => void handleUpdateBooking()}
-                                            disabled={actionKey === `booking:${selectedBooking.id}`}
+                                ) : undefined}
+                            >
+                                {selectedBooking ? (
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <select
+                                            className="input-field"
+                                            value={bookingDraft.status}
+                                            onChange={(event) => setBookingDraft((current) => ({
+                                                ...current,
+                                                status: event.target.value as BookingStatus,
+                                            }))}
                                         >
-                                            {actionKey === `booking:${selectedBooking.id}` ? 'Guardando...' : 'Guardar reserva'}
-                                        </button>
-                                        <p className="text-sm text-slate-500">
-                                            Programada para {formatDateTimeDo(selectedBooking.scheduledFor)}
-                                        </p>
+                                            <option value="PENDING">Pendiente</option>
+                                            <option value="CONFIRMED">Confirmada</option>
+                                            <option value="COMPLETED">Completada</option>
+                                            <option value="CANCELED">Cancelada</option>
+                                            <option value="NO_SHOW">No asistio</option>
+                                        </select>
+                                        <input
+                                            className="input-field"
+                                            inputMode="decimal"
+                                            placeholder="Monto cotizado"
+                                            value={bookingDraft.quotedAmount}
+                                            onChange={(event) => setBookingDraft((current) => ({
+                                                ...current,
+                                                quotedAmount: event.target.value,
+                                            }))}
+                                        />
+                                        <input
+                                            className="input-field"
+                                            inputMode="decimal"
+                                            placeholder="Deposito"
+                                            value={bookingDraft.depositAmount}
+                                            onChange={(event) => setBookingDraft((current) => ({
+                                                ...current,
+                                                depositAmount: event.target.value,
+                                            }))}
+                                        />
+                                        <textarea
+                                            className="input-field md:col-span-2"
+                                            rows={3}
+                                            placeholder="Notas internas o para la reserva"
+                                            value={bookingDraft.notes}
+                                            onChange={(event) => setBookingDraft((current) => ({
+                                                ...current,
+                                                notes: event.target.value,
+                                            }))}
+                                        />
+                                        <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+                                            <button
+                                                type="button"
+                                                className="btn-primary text-sm"
+                                                onClick={() => void handleUpdateBooking()}
+                                                disabled={actionKey === `booking:${selectedBooking.id}`}
+                                            >
+                                                {actionKey === `booking:${selectedBooking.id}` ? 'Guardando...' : 'Guardar reserva'}
+                                            </button>
+                                            <p className="text-sm text-slate-500">
+                                                Programada para {formatDateTimeDo(selectedBooking.scheduledFor)}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    title="Sin reserva seleccionada"
-                                    body="Selecciona un item de la cola para editar estado, monto o notas."
-                                />
-                            )}
-                        </div>
-                    </div>
+                                ) : (
+                                    <EmptyState
+                                        title="Sin reserva seleccionada"
+                                        body="Selecciona un item de la cola para editar estado, monto o notas."
+                                    />
+                                )}
+                            </AppCard>
+                        )}
+                    />
                 </SectionCard>
 
                 <SectionCard
@@ -1135,18 +1137,14 @@ export function OperationsWorkspace({
                 </SectionCard>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.4fr)]">
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h3 className="font-display text-lg font-semibold text-slate-900">Inbox AquiTa.do</h3>
-                            <p className="mt-1 text-sm text-slate-600">
-                                Responde conversaciones, cambia estados y convierte leads en reservas.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="card-filter density-compact">
+            <SplitPanelLayout
+                primary={(
+                    <AppCard
+                        tone="queue"
+                        title="Inbox AquiTa.do"
+                        description="Responde conversaciones, cambia estados y convierte leads en reservas sin perder el hilo."
+                    >
+                        <div className="card-filter density-compact">
                         <div className="grid grid-cols-1 gap-3">
                             <select
                                 className="input-field"
@@ -1186,84 +1184,76 @@ export function OperationsWorkspace({
                                 </button>
                             </div>
                         </div>
-                    </div>
+                        </div>
 
-                    {conversations.data.length > 0 ? (
-                        <div className="card-list">
-                            <div className="card-list__header">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Cola de conversaciones</p>
-                                <p className="text-xs text-slate-500">{conversations.total} conversaciones</p>
+                        {conversations.data.length > 0 ? (
+                            <div className="mt-4 space-y-3">
+                                {conversations.data.map((conversation) => {
+                                    const lastMessage = conversation.messages[0];
+                                    return (
+                                        <button
+                                            key={conversation.id}
+                                            type="button"
+                                            className="block w-full text-left"
+                                            onClick={() => setSelectedConversationId(conversation.id)}
+                                        >
+                                            <EntityListItem
+                                                className={conversation.id === selectedConversationId ? 'border-primary-300 bg-primary-50' : 'hover:border-primary-200'}
+                                                title={conversation.business.name}
+                                                subtitle={`${conversation.customerUser.name} · ${formatDateTimeDo(conversation.lastMessageAt)}`}
+                                                badge={(
+                                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConversationTone(conversation.status)}`}>
+                                                        {getConversationLabel(conversation.status)}
+                                                    </span>
+                                                )}
+                                                body={(
+                                                    <div className="space-y-3">
+                                                        <p className="line-clamp-2 text-sm text-slate-700">
+                                                            {lastMessage?.content || 'Sin mensajes visibles'}
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                                            <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                                                                {conversation._count.messages} mensajes
+                                                            </span>
+                                                            {conversation.convertedBooking ? (
+                                                                <span className="rounded-full bg-slate-100 px-2.5 py-1">
+                                                                    Reserva {conversation.convertedBooking.status}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            />
+                                        </button>
+                                    );
+                                })}
                             </div>
-                            {conversations.data.map((conversation) => {
-                                const lastMessage = conversation.messages[0];
-                                return (
-                                    <button
-                                        key={conversation.id}
-                                        type="button"
-                                        className={`card-list__item w-full flex-col items-start text-left ${
-                                            conversation.id === selectedConversationId ? 'card-list__item--active' : ''
-                                        }`}
-                                        onClick={() => setSelectedConversationId(conversation.id)}
-                                    >
-                                        <div className="flex w-full items-start justify-between gap-3">
-                                            <div>
-                                                <p className="font-medium text-slate-900">{conversation.business.name}</p>
-                                                <p className="mt-1 text-xs text-slate-500">
-                                                    {conversation.customerUser.name} - {formatDateTimeDo(conversation.lastMessageAt)}
-                                                </p>
-                                            </div>
-                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConversationTone(conversation.status)}`}>
-                                                {getConversationLabel(conversation.status)}
-                                            </span>
-                                        </div>
-                                        <p className="mt-3 line-clamp-2 text-sm text-slate-700">
-                                            {lastMessage?.content || 'Sin mensajes visibles'}
-                                        </p>
-                                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-                                            <span className="rounded-full bg-white px-2.5 py-1">
-                                                {conversation._count.messages} mensajes
-                                            </span>
-                                            {conversation.convertedBooking ? (
-                                                <span className="rounded-full bg-white px-2.5 py-1">
-                                                    Reserva {conversation.convertedBooking.status}
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <EmptyState
-                            title="Sin conversaciones en este filtro"
-                            body="Cuando entre nueva demanda por AquiTa.do, aparecera aqui como una cola operativa."
-                        />
-                    )}
-                </article>
-
-                <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h3 className="font-display text-lg font-semibold text-slate-900">Hilo seleccionado</h3>
-                            <p className="mt-1 text-sm text-slate-600">
-                                Mantiene respuesta operativa y conversion inmediata a reserva.
-                            </p>
-                        </div>
-                        {conversationThread ? (
+                        ) : (
+                            <EmptyState
+                                title="Sin conversaciones en este filtro"
+                                body="Cuando entre nueva demanda por AquiTa.do, aparecera aqui como una cola operativa."
+                            />
+                        )}
+                    </AppCard>
+                )}
+                secondary={(
+                    <AppCard
+                        title="Hilo seleccionado"
+                        description="Mantiene respuesta operativa y conversion inmediata a reserva."
+                        actions={conversationThread ? (
                             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConversationTone(conversationThread.status)}`}>
                                 {getConversationLabel(conversationThread.status)}
                             </span>
-                        ) : null}
-                    </div>
-
-                    {threadLoading ? (
-                        <div className="space-y-3">
-                            <div className="h-5 w-40 rounded-full bg-slate-100 animate-pulse" />
-                            <div className="h-40 rounded-3xl bg-slate-50 animate-pulse" />
-                        </div>
-                    ) : conversationThread ? (
-                        <>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        ) : undefined}
+                    >
+                        {threadLoading ? (
+                            <div className="space-y-3">
+                                <div className="h-5 w-40 rounded-full bg-slate-100 animate-pulse" />
+                                <div className="h-40 rounded-3xl bg-slate-50 animate-pulse" />
+                            </div>
+                        ) : conversationThread ? (
+                            <>
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
                                         <p className="font-medium text-slate-900">{conversationThread.business.name}</p>
@@ -1426,15 +1416,16 @@ export function OperationsWorkspace({
                                     )}
                                 </div>
                             </div>
-                        </>
-                    ) : (
-                        <EmptyState
-                            title="Sin hilo seleccionado"
-                            body="Selecciona una conversacion de la cola para responder, cambiar estado o convertirla en reserva."
-                        />
-                    )}
-                </article>
-            </div>
+                            </>
+                        ) : (
+                            <EmptyState
+                                title="Sin hilo seleccionado"
+                                body="Selecciona una conversacion de la cola para responder, cambiar estado o convertirla en reserva."
+                            />
+                        )}
+                    </AppCard>
+                )}
+            />
 
             <article className="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1547,6 +1538,6 @@ export function OperationsWorkspace({
                     />
                 )}
             </article>
-        </section>
+        </PageShell>
     );
 }

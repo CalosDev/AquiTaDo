@@ -28,6 +28,13 @@ import type { GrowthInsightsSnapshot, ModerationQueueItem, OperationalDashboardS
 import { InlineDangerConfirm } from '../components/InlineDangerConfirm';
 import { PageBlockingLoader } from '../components/PageBlockingLoader';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
+import {
+    AppCard,
+    DataTableWrapper,
+    EmptyState,
+    KPIHeader,
+    PageShell,
+} from '../components/ui';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 
 const GrowthInsightsPanel = lazy(async () => ({
@@ -528,15 +535,14 @@ const DELETE_CONFIRMATION_TEXT = 'ELIMINAR';
 
 function LazyAdminPanelFallback({ label }: { label: string }) {
     return (
-        <div className="card p-5">
+        <AppCard title="Cargando panel" description={label}>
             <div className="h-5 w-44 rounded-lg bg-slate-100 animate-pulse" />
-            <p className="mt-3 text-sm text-gray-500">{label}</p>
             <div className="mt-4 space-y-3">
                 <div className="h-16 rounded-2xl bg-slate-50 animate-pulse" />
                 <div className="h-16 rounded-2xl bg-slate-50 animate-pulse" />
                 <div className="h-16 rounded-2xl bg-slate-50 animate-pulse" />
             </div>
-        </div>
+        </AppCard>
     );
 }
 
@@ -1534,13 +1540,13 @@ export function AdminDashboard() {
             await verificationApi.resolvePreventiveModerationAdmin(businessId, {
                 decision,
                 notes: decision === 'APPROVE_FOR_KYC'
-                    ? 'Liberado por moderacion preventiva para revision KYC'
+                    ? 'Liberado por moderacion preventiva para revision documental'
                     : 'Bloqueo preventivo confirmado por revision administrativa',
             });
             await loadVerificationData();
             setSuccessMessage(
                 decision === 'APPROVE_FOR_KYC'
-                    ? 'Negocio liberado para entrar a la cola KYC'
+                    ? 'Negocio liberado para entrar a la cola de revision'
                     : 'Negocio mantenido en bloqueo preventivo',
             );
         } catch (error) {
@@ -1558,7 +1564,7 @@ export function AdminDashboard() {
     ] as const;
 
     return (
-        <div className="app-page-inner animate-fade-in">
+        <PageShell className="app-page-inner animate-fade-in space-y-6" width="full">
             <PageFeedbackStack
                 items={[
                     { id: 'admin-dashboard-error', tone: 'danger', text: errorMessage },
@@ -1566,36 +1572,17 @@ export function AdminDashboard() {
                 ]}
             />
             
-            <section className="console-section console-section--dark" aria-label={activeTabMeta.description}>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Panel Admin</p>
-                <h1 className="mt-2 font-display text-3xl font-bold text-slate-950">Control de plataforma</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                    Gestion de negocios, categorias, revision de contenido y salud operativa.
-                </p>
-
-                <div className="mt-5 role-kpi-grid !xl:grid-cols-4">
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Total negocios</p>
-                        <p className="role-kpi-value">{businessStatusSummary.total}</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Verificados</p>
-                        <p className="role-kpi-value">{businessStatusSummary.verified}</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Pendientes KYC</p>
-                        <p className="role-kpi-value">{businessStatusSummary.pending}</p>
-                    </article>
-                    <article className="role-kpi-card">
-                        <p className="role-kpi-label">Categorías</p>
-                        <p className="role-kpi-value">{categories.length}</p>
-                    </article>
-                </div>
-            </section>
-
-            <p className="mb-8 text-slate-600">
-                Gestiona negocios, categorias, revisiones y estado del sistema en un solo panel.
-            </p>
+            <KPIHeader
+                eyebrow="Panel admin"
+                title="Control de plataforma"
+                description={activeTabMeta.description}
+                metrics={[
+                    { label: 'Total negocios', value: businessStatusSummary.total, delta: 'Inventario visible' },
+                    { label: 'Verificados', value: businessStatusSummary.verified, delta: 'Listos para operar' },
+                    { label: 'Pendientes de revision', value: businessStatusSummary.pending, delta: 'En cola o con observaciones' },
+                    { label: 'Categorias', value: categories.length, delta: 'Taxonomia activa' },
+                ]}
+            />
 
             <div className="workspace-strip border border-slate-200 bg-white/88 p-2 shadow-sm shadow-slate-900/5">
                 {tabs.map((tab) => (
@@ -1629,8 +1616,21 @@ export function AdminDashboard() {
             ) : (
                 <>
                     {activeTab === 'businesses' && (
-                        <div className="card overflow-hidden">
-                            <div className="border-b border-gray-100 p-4">
+                        <DataTableWrapper
+                            title="Negocios en revision y publicados"
+                            description="Busca por negocio, propietario, organizacion o provincia y actua desde una sola tabla."
+                            actions={(
+                                <button
+                                    type="button"
+                                    className="btn-secondary text-xs w-fit"
+                                    onClick={() => void loadData()}
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Actualizando...' : 'Actualizar lista'}
+                                </button>
+                            )}
+                        >
+                            <div className="border-b border-gray-100 pb-4">
                                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                         <input
@@ -1657,14 +1657,6 @@ export function AdminDashboard() {
                                         </select>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        className="btn-secondary text-xs w-fit"
-                                        onClick={() => void loadData()}
-                                        disabled={loading}
-                                    >
-                                        {loading ? 'Actualizando...' : 'Actualizar lista'}
-                                    </button>
                                 </div>
 
                                 <div className="mt-3 flex flex-wrap gap-2">
@@ -1821,11 +1813,13 @@ export function AdminDashboard() {
                                 </table>
                             </div>
                             {filteredBusinesses.length === 0 && (
-                                <div className="p-10 text-center text-gray-400">
-                                    No hay negocios que coincidan con el filtro actual
-                                </div>
+                                <EmptyState
+                                    title="Sin negocios para este filtro"
+                                    body="Ajusta la busqueda o el estado para volver a poblar la tabla administrativa."
+                                    className="mt-4"
+                                />
                             )}
-                        </div>
+                        </DataTableWrapper>
                     )}
 
                     {activeTab === 'categories' && (
@@ -3174,7 +3168,7 @@ export function AdminDashboard() {
 
                             <div className="card p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                    <h3 className="font-display font-semibold">Data Layer: snapshots</h3>
+                                    <h3 className="font-display font-semibold">Reportes de mercado</h3>
                                     <div className="flex gap-2">
                                         <button
                                             type="button"
@@ -3227,13 +3221,13 @@ export function AdminDashboard() {
                                             </p>
                                         </button>
                                     )) : (
-                                        <p className="text-sm text-gray-500">Sin snapshots generados.</p>
+                                        <p className="text-sm text-gray-500">Aun no hay reportes generados.</p>
                                     )}
                                 </div>
 
                                 <div className="mt-4 rounded-xl border border-gray-100 p-3">
                                     <div className="flex items-center justify-between gap-2 mb-2">
-                                        <h4 className="font-medium text-gray-900">Detalle del snapshot</h4>
+                                        <h4 className="font-medium text-gray-900">Detalle del reporte</h4>
                                         {selectedMarketReportId ? (
                                             <button
                                                 type="button"
@@ -3247,7 +3241,7 @@ export function AdminDashboard() {
                                     </div>
 
                                     {!selectedMarketReportId ? (
-                                        <p className="text-sm text-gray-500">Selecciona un snapshot para ver su detalle.</p>
+                                        <p className="text-sm text-gray-500">Selecciona un reporte para ver su detalle.</p>
                                     ) : marketReportLoading ? (
                                         <p className="text-sm text-gray-500">Cargando detalle...</p>
                                     ) : marketReportDetail ? (
@@ -3287,8 +3281,10 @@ export function AdminDashboard() {
                     )}
                 </>
             )}
-        </div>
+        </PageShell>
     );
 }
+
+
 
 

@@ -1,3 +1,4 @@
+import { AppCard, EmptyState, EntityListItem } from '../../components/ui';
 import type { ModerationQueueItem } from './types';
 
 type VerificationQueueSectionProps = {
@@ -20,26 +21,23 @@ export function VerificationQueueSection({
     onReviewDocument,
 }: VerificationQueueSectionProps) {
     return (
-        <div className="card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h3 className="font-display font-semibold">Cola unificada de moderacion</h3>
+        <AppCard
+            title="Cola unificada de moderacion"
+            description="Casos preventivos, documentos y revision de negocios en una sola vista."
+            actions={(
                 <span className="text-xs rounded-full px-2 py-0.5 bg-primary-50 text-primary-700">
                     {items.length} items
                 </span>
-            </div>
+            )}
+        >
 
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                 {items.length > 0 ? items.map((item) => (
-                    <div key={item.id} className="rounded-xl border border-gray-100 p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                                <p className="font-medium text-gray-900">
-                                    {item.business.name} - {item.organization.name}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                    {item.queueType} - {new Date(item.createdAt).toLocaleString('es-DO')}
-                                </p>
-                            </div>
+                    <EntityListItem
+                        key={item.id}
+                        title={`${item.business.name} · ${item.organization.name}`}
+                        subtitle={`${item.queueType} · ${new Date(item.createdAt).toLocaleString('es-DO')}`}
+                        badge={(
                             <div className="flex items-center gap-2">
                                 <span className={`text-xs rounded-full px-2 py-0.5 ${
                                     item.priority === 'HIGH'
@@ -52,7 +50,9 @@ export function VerificationQueueSection({
                                     {item.status}
                                 </span>
                             </div>
-                        </div>
+                        )}
+                        body={(
+                            <>
 
                         {item.queueType === 'BUSINESS_PREMODERATION' && item.payload?.preventiveReasons?.length ? (
                             <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -144,11 +144,16 @@ export function VerificationQueueSection({
                                 </button>
                             </div>
                         ) : null}
-                    </div>
+                            </>
+                        )}
+                    />
                 )) : (
-                    <p className="text-sm text-gray-500">No hay items en la cola unificada.</p>
+                    <EmptyState
+                        title="Sin items en la cola"
+                        body="Cuando aparezcan nuevos casos de revision, los veras aqui priorizados."
+                    />
                 )}
             </div>
-        </div>
+        </AppCard>
     );
 }

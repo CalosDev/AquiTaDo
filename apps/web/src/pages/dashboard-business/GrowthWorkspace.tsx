@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { adsApi, categoryApi, locationApi, promotionsApi } from '../../api/endpoints';
 import { getApiErrorMessage } from '../../api/error';
 import { PageFeedbackStack } from '../../components/PageFeedbackStack';
-import { EmptyState, SectionCard, SummaryCard } from '../../components/ui';
+import { CampaignTable, KPIHeader, PageShell, PromotionList, SectionCard } from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
 import { formatCurrencyDo, formatDateDo, formatDateTimeDo, formatNumberDo } from '../../lib/market';
 
@@ -561,7 +561,7 @@ export function GrowthWorkspace({
 
     if (loading) {
         return (
-            <section className="section-shell p-6 space-y-5">
+            <PageShell className="p-6 space-y-5" width="full">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-2">
                         <div className="h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
@@ -579,18 +579,15 @@ export function GrowthWorkspace({
                 </div>
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                     {Array.from({ length: 2 }).map((_, index) => (
-                        <div key={index} className="rounded-3xl border border-slate-200 bg-white p-5">
-                            <div className="h-5 w-44 rounded-full bg-slate-100 animate-pulse" />
-                            <div className="mt-4 h-56 rounded-3xl bg-slate-50 animate-pulse" />
-                        </div>
+                        <div key={index} className="rounded-[28px] bg-slate-100 h-96 animate-pulse" />
                     ))}
                 </div>
-            </section>
+            </PageShell>
         );
     }
 
     return (
-        <section className="section-shell p-6 space-y-6">
+        <PageShell className="p-6 space-y-6" width="full">
             <PageFeedbackStack
                 items={[
                     { id: 'growth-workspace-error', tone: 'danger', text: errorMessage },
@@ -598,42 +595,39 @@ export function GrowthWorkspace({
                 ]}
             />
 
-            <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Promociones + ads</p>
-                    <h2 className="font-display text-2xl font-bold text-slate-900">Crecimiento comercial desde el panel</h2>
-                    <p className="max-w-3xl text-sm text-slate-600">
-                        Crea ofertas, pauta interna y manten tu adquisicion activa sin salir del dashboard owner.
-                    </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <span className="chip">Promos {formatNumberDo(promotions.total)}</span>
-                    <span className="chip">Campanas {formatNumberDo(campaigns.total)}</span>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard
-                    label="Promos activas"
-                    value={formatNumberDo(promotionSummary.active)}
-                    delta={`${formatNumberDo(promotionSummary.scheduled)} programadas`}
-                />
-                <SummaryCard
-                    label="Flash offers"
-                    value={formatNumberDo(promotionSummary.flash)}
-                    delta={`${formatNumberDo(promotions.total)} promos en este filtro`}
-                />
-                <SummaryCard
-                    label="Campanas activas"
-                    value={formatNumberDo(campaignSummary.active)}
-                    delta={`${formatNumberDo(campaignSummary.draft)} borradores`}
-                />
-                <SummaryCard
-                    label="Gasto acumulado"
-                    value={formatCurrencyDo(campaignSummary.totalSpent)}
-                    delta={`${formatNumberDo(campaignSummary.totalClicks)} clicks`}
-                />
-            </div>
+            <KPIHeader
+                eyebrow="Promociones + ads"
+                title="Crecimiento comercial desde el panel"
+                description="Crea ofertas, pauta interna y manten tu adquisicion activa sin salir del dashboard owner."
+                actions={(
+                    <div className="flex flex-wrap gap-2">
+                        <span className="chip">Promos {formatNumberDo(promotions.total)}</span>
+                        <span className="chip">Campanas {formatNumberDo(campaigns.total)}</span>
+                    </div>
+                )}
+                metrics={[
+                    {
+                        label: 'Promos activas',
+                        value: formatNumberDo(promotionSummary.active),
+                        delta: `${formatNumberDo(promotionSummary.scheduled)} programadas`,
+                    },
+                    {
+                        label: 'Flash offers',
+                        value: formatNumberDo(promotionSummary.flash),
+                        delta: `${formatNumberDo(promotions.total)} promos en este filtro`,
+                    },
+                    {
+                        label: 'Campanas activas',
+                        value: formatNumberDo(campaignSummary.active),
+                        delta: `${formatNumberDo(campaignSummary.draft)} borradores`,
+                    },
+                    {
+                        label: 'Gasto acumulado',
+                        value: formatCurrencyDo(campaignSummary.totalSpent),
+                        delta: `${formatNumberDo(campaignSummary.totalClicks)} clicks`,
+                    },
+                ]}
+            />
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 <SectionCard
@@ -711,66 +705,62 @@ export function GrowthWorkspace({
                     </form>
                 </SectionCard>
 
-                <SectionCard
+                <PromotionList
                     title="Promociones creadas"
                     description="Listado publicable con filtros simples y acciones directas de edicion."
-                    density="compact"
-                >
-                    <div className="card-filter density-compact mb-4">
-                        <div className="flex flex-wrap gap-2">
-                            <select className="input-field min-w-[10rem]" value={promotionStatusFilter} onChange={(event) => setPromotionStatusFilter(event.target.value as PromotionLifecycleStatus)}>
-                                <option value="ALL">Todas</option>
-                                <option value="ACTIVE">Activas</option>
-                                <option value="SCHEDULED">Programadas</option>
-                                <option value="EXPIRED">Expiradas</option>
-                            </select>
-                            <select className="input-field min-w-[10rem]" value={promotionBusinessFilter} onChange={(event) => setPromotionBusinessFilter(event.target.value)}>
-                                <option value="">Todos los negocios</option>
-                                {businesses.map((business) => <option key={business.id} value={business.id}>{business.name}</option>)}
-                            </select>
+                    filters={(
+                        <div className="card-filter density-compact">
+                            <div className="flex flex-wrap gap-2">
+                                <select className="input-field min-w-[10rem]" value={promotionStatusFilter} onChange={(event) => setPromotionStatusFilter(event.target.value as PromotionLifecycleStatus)}>
+                                    <option value="ALL">Todas</option>
+                                    <option value="ACTIVE">Activas</option>
+                                    <option value="SCHEDULED">Programadas</option>
+                                    <option value="EXPIRED">Expiradas</option>
+                                </select>
+                                <select className="input-field min-w-[10rem]" value={promotionBusinessFilter} onChange={(event) => setPromotionBusinessFilter(event.target.value)}>
+                                    <option value="">Todos los negocios</option>
+                                    {businesses.map((business) => <option key={business.id} value={business.id}>{business.name}</option>)}
+                                </select>
+                            </div>
                         </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        {promotions.data.length > 0 ? promotions.data.map((promotion) => {
-                            const lifecycle = getPromotionLifecycle(promotion);
-                            return (
-                                <article key={promotion.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <p className="font-medium text-slate-900">{promotion.title}</p>
-                                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getPromotionStatusTone(lifecycle)}`}>{getPromotionStatusLabel(lifecycle)}</span>
-                                                {promotion.isFlashOffer ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Flash</span> : null}
-                                            </div>
-                                            <p className="mt-1 text-sm text-slate-600">{promotion.business.name}</p>
-                                            <p className="mt-1 text-xs text-slate-500">{formatDateDo(promotion.startsAt)} al {formatDateDo(promotion.endsAt)}</p>
-                                        </div>
-                                        <div className="text-right text-xs text-slate-500">
-                                            <p className="font-semibold text-slate-900">{promotion.discountType === 'PERCENTAGE' ? `${promotion.discountValue}%` : formatCurrencyDo(promotion.discountValue)}</p>
-                                            <p>{promotion.couponCode || 'Sin cupon'}</p>
-                                        </div>
-                                    </div>
-                                    {promotion.description ? <p className="mt-3 rounded-xl bg-white p-3 text-sm text-slate-600">{promotion.description}</p> : null}
-                                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                                        <p className="text-xs text-slate-500">Creada {formatDateTimeDo(promotion.createdAt)}</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            <button type="button" className="btn-secondary text-sm" onClick={() => handlePromotionEdit(promotion)}>Editar</button>
-                                            <button type="button" className="btn-secondary text-sm" onClick={() => void handlePromotionDelete(promotion)} disabled={actionKey === `promotion-delete-${promotion.id}`}>
-                                                {actionKey === `promotion-delete-${promotion.id}` ? 'Eliminando...' : 'Eliminar'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </article>
-                            );
-                        }) : (
-                            <EmptyState
-                                title="Sin promociones para este filtro"
-                                body="Cuando publiques nuevas ofertas, apareceran aqui con estado, vigencia y acciones de edicion."
-                            />
-                        )}
-                    </div>
-                </SectionCard>
+                    )}
+                    items={promotions.data.map((promotion) => {
+                        const lifecycle = getPromotionLifecycle(promotion);
+                        return {
+                            id: promotion.id,
+                            title: promotion.title,
+                            subtitle: promotion.business.name,
+                            statusLabel: getPromotionStatusLabel(lifecycle),
+                            statusClassName: getPromotionStatusTone(lifecycle),
+                            badges: promotion.isFlashOffer ? (
+                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                                    Flash
+                                </span>
+                            ) : undefined,
+                            meta: `Creada ${formatDateTimeDo(promotion.createdAt)}`,
+                            description: promotion.description || undefined,
+                            value: promotion.discountType === 'PERCENTAGE'
+                                ? `${promotion.discountValue}%`
+                                : formatCurrencyDo(promotion.discountValue),
+                            code: (
+                                <div className="flex flex-wrap gap-3">
+                                    <span>{formatDateDo(promotion.startsAt)} al {formatDateDo(promotion.endsAt)}</span>
+                                    <span>{promotion.couponCode || 'Sin cupon'}</span>
+                                </div>
+                            ),
+                            actions: (
+                                <div className="flex flex-wrap gap-2">
+                                    <button type="button" className="btn-secondary text-sm" onClick={() => handlePromotionEdit(promotion)}>Editar</button>
+                                    <button type="button" className="btn-secondary text-sm" onClick={() => void handlePromotionDelete(promotion)} disabled={actionKey === `promotion-delete-${promotion.id}`}>
+                                        {actionKey === `promotion-delete-${promotion.id}` ? 'Eliminando...' : 'Eliminar'}
+                                    </button>
+                                </div>
+                            ),
+                        };
+                    })}
+                    emptyTitle="Sin promociones para este filtro"
+                    emptyBody="Cuando publiques nuevas ofertas, apareceran aqui con estado, vigencia y acciones de edicion."
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -845,71 +835,61 @@ export function GrowthWorkspace({
                     </form>
                 </SectionCard>
 
-                <SectionCard
+                <CampaignTable
                     title="Estado y rendimiento"
                     description="Mantiene filtros arriba y cada campana como unidad escaneable de performance."
-                    density="compact"
-                >
-                    <div className="card-filter density-compact mb-4">
-                        <div className="flex flex-wrap gap-2">
-                            <select className="input-field min-w-[10rem]" value={campaignStatusFilter} onChange={(event) => setCampaignStatusFilter(event.target.value as AdCampaignStatus | '')}>
-                                <option value="">Todos los estados</option>
-                                <option value="DRAFT">Borrador</option>
-                                <option value="ACTIVE">Activa</option>
-                                <option value="PAUSED">Pausada</option>
-                                <option value="ENDED">Finalizada</option>
-                                <option value="REJECTED">Rechazada</option>
-                            </select>
-                            <select className="input-field min-w-[10rem]" value={campaignBusinessFilter} onChange={(event) => setCampaignBusinessFilter(event.target.value)}>
-                                <option value="">Todos los negocios</option>
-                                {businesses.map((business) => <option key={business.id} value={business.id}>{business.name}</option>)}
-                            </select>
+                    filters={(
+                        <div className="card-filter density-compact">
+                            <div className="flex flex-wrap gap-2">
+                                <select className="input-field min-w-[10rem]" value={campaignStatusFilter} onChange={(event) => setCampaignStatusFilter(event.target.value as AdCampaignStatus | '')}>
+                                    <option value="">Todos los estados</option>
+                                    <option value="DRAFT">Borrador</option>
+                                    <option value="ACTIVE">Activa</option>
+                                    <option value="PAUSED">Pausada</option>
+                                    <option value="ENDED">Finalizada</option>
+                                    <option value="REJECTED">Rechazada</option>
+                                </select>
+                                <select className="input-field min-w-[10rem]" value={campaignBusinessFilter} onChange={(event) => setCampaignBusinessFilter(event.target.value)}>
+                                    <option value="">Todos los negocios</option>
+                                    {businesses.map((business) => <option key={business.id} value={business.id}>{business.name}</option>)}
+                                </select>
+                            </div>
                         </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        {campaigns.data.length > 0 ? campaigns.data.map((campaign) => (
-                            <article key={campaign.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <p className="font-medium text-slate-900">{campaign.name}</p>
-                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getCampaignTone(campaign.status)}`}>{getCampaignLabel(campaign.status)}</span>
-                                        </div>
-                                        <p className="mt-1 text-sm text-slate-600">{campaign.business.name}</p>
-                                        <p className="mt-1 text-xs text-slate-500">{formatDateDo(campaign.startsAt)} al {formatDateDo(campaign.endsAt)}</p>
-                                    </div>
-                                    <div className="text-right text-xs text-slate-500">
-                                        <p>CTR {campaign.ctr}%</p>
-                                        <p>{formatNumberDo(campaign.clicks)} clicks</p>
-                                    </div>
-                                </div>
-                                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                                    <div className="rounded-xl bg-white p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Diario</p><p className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyDo(campaign.dailyBudget)}</p></div>
-                                    <div className="rounded-xl bg-white p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Total</p><p className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyDo(campaign.totalBudget)}</p></div>
-                                    <div className="rounded-xl bg-white p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Gastado</p><p className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyDo(campaign.spentAmount)}</p></div>
-                                    <div className="rounded-xl bg-white p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Bid</p><p className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyDo(campaign.bidAmount)}</p></div>
-                                </div>
-                                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                                    <p className="text-xs text-slate-500">{campaign.targetProvince?.name || 'Todas las provincias'} | {campaign.targetCategory?.name || 'Todas las categorias'}</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {(['DRAFT', 'ACTIVE', 'PAUSED', 'ENDED'] as AdCampaignStatus[]).map((status) => (
-                                            <button key={status} type="button" className="btn-secondary text-sm" onClick={() => void handleCampaignStatusUpdate(campaign.id, status)} disabled={campaign.status === status || actionKey === `campaign-status-${campaign.id}`}>
-                                                {campaign.status === status ? getCampaignLabel(status) : `Pasar a ${getCampaignLabel(status).toLowerCase()}`}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </article>
-                        )) : (
-                            <EmptyState
-                                title="Sin campanas para este filtro"
-                                body="Cuando lances nuevas campañas, apareceran aqui con performance, presupuesto y cambios de estado."
-                            />
-                        )}
-                    </div>
-                </SectionCard>
+                    )}
+                    items={campaigns.data.map((campaign) => ({
+                        id: campaign.id,
+                        title: campaign.name,
+                        subtitle: campaign.business.name,
+                        statusLabel: getCampaignLabel(campaign.status),
+                        statusClassName: getCampaignTone(campaign.status),
+                        period: `${formatDateDo(campaign.startsAt)} al ${formatDateDo(campaign.endsAt)}`,
+                        performance: (
+                            <div className="space-y-1">
+                                <p>CTR {campaign.ctr}%</p>
+                                <p>{formatNumberDo(campaign.clicks)} clicks</p>
+                            </div>
+                        ),
+                        stats: [
+                            { label: 'Diario', value: formatCurrencyDo(campaign.dailyBudget) },
+                            { label: 'Total', value: formatCurrencyDo(campaign.totalBudget) },
+                            { label: 'Gastado', value: formatCurrencyDo(campaign.spentAmount) },
+                            { label: 'Bid', value: formatCurrencyDo(campaign.bidAmount) },
+                        ],
+                        targeting: `${campaign.targetProvince?.name || 'Todas las provincias'} | ${campaign.targetCategory?.name || 'Todas las categorias'}`,
+                        actions: (
+                            <div className="flex flex-wrap gap-2">
+                                {(['DRAFT', 'ACTIVE', 'PAUSED', 'ENDED'] as AdCampaignStatus[]).map((status) => (
+                                    <button key={status} type="button" className="btn-secondary text-sm" onClick={() => void handleCampaignStatusUpdate(campaign.id, status)} disabled={campaign.status === status || actionKey === `campaign-status-${campaign.id}`}>
+                                        {campaign.status === status ? getCampaignLabel(status) : `Pasar a ${getCampaignLabel(status).toLowerCase()}`}
+                                    </button>
+                                ))}
+                            </div>
+                        ),
+                    }))}
+                    emptyTitle="Sin campanas para este filtro"
+                    emptyBody="Cuando lances nuevas campanas, apareceran aqui con performance, presupuesto y cambios de estado."
+                />
             </div>
-        </section>
+        </PageShell>
     );
 }

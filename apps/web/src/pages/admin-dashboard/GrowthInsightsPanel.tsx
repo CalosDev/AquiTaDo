@@ -1,3 +1,4 @@
+import { AppCard, EmptyState } from '../../components/ui';
 import type { GrowthInsightsSnapshot, TrendDirection, TrendMetricSnapshot } from './types';
 
 const OPERATIONS_RHYTHMS = [
@@ -45,9 +46,10 @@ export function GrowthInsightsPanel({
     onRefresh,
 }: GrowthInsightsPanelProps) {
     return (
-        <div className="card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h3 className="font-display font-semibold">Insights de mercado y growth</h3>
+        <AppCard
+            title="Insights de mercado y growth"
+            description="Alertas accionables, tendencias y señales de conversion para operar con criterio."
+            actions={(
                 <button
                     type="button"
                     className="btn-secondary text-xs"
@@ -56,10 +58,14 @@ export function GrowthInsightsPanel({
                 >
                     {refreshing ? 'Actualizando...' : 'Refrescar insights'}
                 </button>
-            </div>
+            )}
+        >
 
             {loading ? (
-                <p className="text-sm text-gray-500">Cargando insights...</p>
+                <EmptyState
+                    title="Cargando insights"
+                    body="Estamos reuniendo alertas, tendencias y oportunidades para el equipo."
+                />
             ) : (
                 <div className="space-y-4">
                     {growthInsights?.actionableAlerts?.length ? (
@@ -301,7 +307,7 @@ export function GrowthInsightsPanel({
                     </div>
                 </div>
             )}
-        </div>
+        </AppCard>
     );
 }
 
