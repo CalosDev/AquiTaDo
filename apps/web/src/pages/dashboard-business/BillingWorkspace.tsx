@@ -10,6 +10,7 @@ import {
     PageShell,
     PartialDataState,
     PlanStatusCard,
+    StatusBadge,
     TrendPanel,
 } from '../../components/ui';
 import { useTimedMessage } from '../../hooks/useTimedMessage';
@@ -180,16 +181,16 @@ function resolveInitialDateRange(): BillingDateRange {
     };
 }
 
-function getSubscriptionTone(status: SubscriptionStatus): string {
+function getSubscriptionTone(status: SubscriptionStatus): 'info' | 'warning' | 'neutral' | 'danger' {
     switch (status) {
         case 'ACTIVE':
-            return 'bg-primary-100 text-primary-700';
+            return 'info';
         case 'PAST_DUE':
-            return 'bg-amber-100 text-amber-800';
+            return 'warning';
         case 'CANCELED':
-            return 'bg-slate-200 text-slate-700';
+            return 'neutral';
         default:
-            return 'bg-red-100 text-red-700';
+            return 'danger';
     }
 }
 
@@ -603,17 +604,19 @@ export function BillingWorkspace({
             />
 
             <div className="flex flex-wrap gap-2.5">
-                <span className="chip">Plan actual: {subscription?.plan.name || 'Sin plan'}</span>
+                <StatusBadge tone={currentPlanCode === 'FREE' ? 'free' : currentPlanCode === 'GROWTH' ? 'growth' : 'scale'}>
+                    Plan actual: {subscription?.plan.name || 'Sin plan'}
+                </StatusBadge>
                 {subscription ? (
-                    <span className={`chip ${getSubscriptionTone(subscription.status)}`}>
+                    <StatusBadge tone={getSubscriptionTone(subscription.status)}>
                         Suscripcion: {getSubscriptionLabel(subscription.status)}
-                    </span>
+                    </StatusBadge>
                 ) : null}
                 {subscription?.currentPeriodEnd ? (
-                    <span className="chip">Periodo vigente hasta: {formatDateDo(subscription.currentPeriodEnd)}</span>
+                    <StatusBadge tone="neutral">Periodo vigente hasta: {formatDateDo(subscription.currentPeriodEnd)}</StatusBadge>
                 ) : null}
                 {subscription?.cancelAtPeriodEnd ? (
-                    <span className="chip bg-amber-100 text-amber-800">Se cancela al cierre del periodo</span>
+                    <StatusBadge tone="warning">Se cancela al cierre del periodo</StatusBadge>
                 ) : null}
             </div>
 
@@ -642,9 +645,12 @@ export function BillingWorkspace({
                                     priceSuffix="/mes"
                                     description={plan.description || 'Sin descripcion.'}
                                     badge={isCurrent ? (
-                                        <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700">
+                                        <StatusBadge
+                                            tone={plan.code === 'FREE' ? 'free' : plan.code === 'GROWTH' ? 'growth' : 'scale'}
+                                            size="sm"
+                                        >
                                             Plan actual
-                                        </span>
+                                        </StatusBadge>
                                     ) : undefined}
                                     features={[
                                         formatCapabilityLimit(plan.maxBusinesses, 'negocios'),

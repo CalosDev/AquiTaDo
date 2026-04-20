@@ -14,6 +14,11 @@
     --glass-bg: rgba(255, 255, 255, 0.72);
     --glass-border: rgba(255, 255, 255, 0.4);
     --shadow-premium: 0 22px 48px -12px rgba(6, 54, 168, 0.12), 0 12px 24px -18px rgba(6, 54, 168, 0.08);
+    --shadow-sm: 0 10px 24px -18px rgba(15, 23, 42, 0.16);
+    --shadow-md: 0 18px 38px -24px rgba(15, 23, 42, 0.18);
+    --shadow-lg: 0 26px 52px -28px rgba(15, 23, 42, 0.22);
+    --border-width-standard: 1px;
+    --border-width-strong: 2px;
   }
 
   * {
@@ -906,10 +911,26 @@
     /* --- Spacing tokens (§ 5.3) -------------------------------- */
     --space-xs:  0.25rem;   /* 4px  — separación intra-componente */
     --space-sm:  0.5rem;    /* 8px  — labels, actions, chips       */
+    --space-3sm: 0.75rem;   /* 12px — padding corto y meta blocks  */
     --space-md:  1rem;      /* 16px — bloques dentro de una card   */
+    --space-md-plus: 1.25rem; /* 20px — breathing space control   */
     --space-lg:  1.5rem;    /* 24px — entre cards de una sección   */
+    --space-xl-plus: 2rem;  /* 32px — bloques complejos            */
     --space-xl:  2.5rem;    /* 40px — entre secciones mayores      */
+    --space-3xl: 3rem;      /* 48px — heroes y page transitions    */
     --space-2xl: 4rem;      /* 64px — sectores de marketing        */
+
+    /* --- Spec aliases ------------------------------------------ */
+    --space-4:  var(--space-xs);
+    --space-8:  var(--space-sm);
+    --space-12: var(--space-3sm);
+    --space-16: var(--space-md);
+    --space-20: var(--space-md-plus);
+    --space-24: var(--space-lg);
+    --space-32: var(--space-xl-plus);
+    --space-40: var(--space-xl);
+    --space-48: var(--space-3xl);
+    --space-64: var(--space-2xl);
 
     /* --- Surface tokens (§ 8.2) -------------------------------- */
     --surface-bg:    #f5f8ff;   /* fondo general suave               */
@@ -939,6 +960,16 @@
     --radius-xl:   1.5rem;     /* 24px — cards section              */
     --radius-2xl:  2rem;       /* 32px — panels principales         */
     --radius-full: 9999px;     /* pills, círculos                   */
+
+    /* --- Typography scale aliases ------------------------------ */
+    --type-display-lg: clamp(2.875rem, 5vw, 4.5rem);
+    --type-display-md: clamp(2.25rem, 4vw, 3.5rem);
+    --type-title-xl: 2rem;
+    --type-title-lg: 1.5rem;
+    --type-title-md: 1.25rem;
+    --type-title-sm: 1rem;
+    --type-body: 0.95rem;
+    --type-caption: 0.75rem;
 
     /* --- Density tokens (§ 12) --------------------------------- */
     /* Se sobreescriben por clase de densidad en el elemento padre  */
@@ -1182,6 +1213,62 @@
     @apply font-display text-4xl font-bold leading-tight tracking-tight text-slate-900;
   }
 
+  .text-display-lg {
+    font-family: 'Sora', 'Manrope', system-ui, sans-serif;
+    font-size: var(--type-display-lg);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--ink-900);
+  }
+
+  .text-display-md {
+    font-family: 'Sora', 'Manrope', system-ui, sans-serif;
+    font-size: var(--type-display-md);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    color: var(--ink-900);
+  }
+
+  .text-title-xl {
+    @apply font-display font-bold text-slate-900;
+    font-size: var(--type-title-xl);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+
+  .text-title-lg {
+    @apply font-display font-semibold text-slate-900;
+    font-size: var(--type-title-lg);
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+  }
+
+  .text-title-md {
+    @apply font-display font-semibold text-slate-800;
+    font-size: var(--type-title-md);
+    line-height: 1.2;
+  }
+
+  .text-title-sm {
+    @apply font-display font-semibold text-slate-800;
+    font-size: var(--type-title-sm);
+    line-height: 1.25;
+  }
+
+  .text-body {
+    @apply text-slate-700;
+    font-size: var(--type-body);
+    line-height: 1.65;
+  }
+
+  .text-caption {
+    @apply font-medium text-slate-500;
+    font-size: var(--type-caption);
+    line-height: 1.45;
+  }
+
   .text-h1 {
     @apply font-display text-2xl font-bold leading-snug tracking-tight text-slate-900;
   }
@@ -1192,10 +1279,6 @@
 
   .text-h3 {
     @apply font-display text-base font-bold text-slate-700;
-  }
-
-  .text-body {
-    @apply text-sm leading-relaxed text-slate-700;
   }
 
   .text-meta {

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { getRoleCapabilities } from '../auth/capabilities';
 import { resolveRoleHomeLabel, resolveRoleHomePath } from '../auth/roles';
+import { AppShell, SidebarNav, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/useAuth';
 import { useOrganization } from '../context/useOrganization';
 
@@ -13,7 +14,19 @@ interface NavItem {
     active: boolean;
 }
 
-function navIcon(path: 'home' | 'verification' | 'operations' | 'growth' | 'billing' | 'organization' | 'directory' | 'profile' | 'security' | 'suggest') {
+function navIcon(
+    path:
+        | 'home'
+        | 'verification'
+        | 'operations'
+        | 'growth'
+        | 'billing'
+        | 'organization'
+        | 'directory'
+        | 'profile'
+        | 'security'
+        | 'suggest',
+) {
     if (path === 'verification') {
         return (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
@@ -119,14 +132,14 @@ export function DashboardLayout() {
                     active: location.pathname === '/dashboard' && workspace === 'overview',
                 },
                 {
-                    label: 'Verificación',
+                    label: 'Verificacion',
                     to: '/dashboard?workspace=verification',
-                    description: 'Documentos, revisión y sello del negocio.',
+                    description: 'Documentos, revision y sello del negocio.',
                     icon: navIcon('verification'),
                     active: location.pathname === '/dashboard' && workspace === 'verification',
                 },
                 {
-                    label: 'Operación',
+                    label: 'Operacion',
                     to: '/dashboard?workspace=operations',
                     description: 'Reservas, inbox y WhatsApp.',
                     icon: navIcon('operations'),
@@ -135,19 +148,19 @@ export function DashboardLayout() {
                 {
                     label: 'Crecimiento',
                     to: '/dashboard?workspace=growth',
-                    description: 'Promociones, campañas y analytics.',
+                    description: 'Promociones, campanas y analytics.',
                     icon: navIcon('growth'),
                     active: location.pathname === '/dashboard' && workspace === 'growth',
                 },
                 {
-                    label: 'Facturación',
+                    label: 'Facturacion',
                     to: '/dashboard?workspace=billing',
                     description: 'Planes, uso y control financiero.',
                     icon: navIcon('billing'),
                     active: location.pathname === '/dashboard' && workspace === 'billing',
                 },
                 {
-                    label: 'Organización',
+                    label: 'Organizacion',
                     to: '/dashboard?workspace=organization',
                     description: 'Equipo, miembros y ajustes.',
                     icon: navIcon('organization'),
@@ -156,7 +169,7 @@ export function DashboardLayout() {
                 {
                     label: 'Directorio',
                     to: '/businesses',
-                    description: 'Ver experiencia pública.',
+                    description: 'Ver experiencia publica.',
                     icon: navIcon('directory'),
                     active: location.pathname === '/businesses' || location.pathname.startsWith('/businesses/'),
                 },
@@ -175,7 +188,7 @@ export function DashboardLayout() {
                 {
                     label: 'Panel admin',
                     to: '/admin',
-                    description: 'Moderación, catálogo y estado del sistema.',
+                    description: 'Moderacion, catalogo y estado del sistema.',
                     icon: navIcon('home'),
                     active: location.pathname === '/admin',
                 },
@@ -189,7 +202,7 @@ export function DashboardLayout() {
                 {
                     label: 'Directorio',
                     to: '/businesses',
-                    description: 'Ver experiencia pública.',
+                    description: 'Ver experiencia publica.',
                     icon: navIcon('directory'),
                     active: location.pathname === '/businesses' || location.pathname.startsWith('/businesses/'),
                 },
@@ -214,7 +227,7 @@ export function DashboardLayout() {
             {
                 label: 'Directorio',
                 to: '/businesses',
-                description: 'Explorar negocios del catálogo.',
+                description: 'Explorar negocios del catalogo.',
                 icon: navIcon('directory'),
                 active: location.pathname === '/businesses' || location.pathname.startsWith('/businesses/'),
             },
@@ -246,8 +259,20 @@ export function DashboardLayout() {
             ? 'Acceso autenticado'
             : 'Panel personal';
 
+    const shellModeLabel = capabilities.isBusinessOwner
+        ? 'Workspace negocio'
+        : capabilities.isAdmin
+            ? 'Modo operativo'
+            : 'Cuenta personal';
+
+    const sidebarCta = capabilities.isBusinessOwner
+        ? { to: '/businesses', label: 'Ver directorio publico' }
+        : capabilities.isAdmin
+            ? { to: '/admin', label: 'Ir al panel admin' }
+            : { to: '/suggest-business', label: 'Sugerir un negocio' };
+
     return (
-        <div className="app-shell density-compact">
+        <AppShell density="compact">
             <a href="#main-content" className="skip-link">
                 Saltar al contenido principal
             </a>
@@ -255,8 +280,8 @@ export function DashboardLayout() {
                 <button
                     type="button"
                     onClick={() => setSidebarOpen((current) => !current)}
-                    className="btn-ghost h-11 w-11 p-0 lg:hidden"
-                    aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+                    className="btn-icon lg:hidden"
+                    aria-label={sidebarOpen ? 'Cerrar menu' : 'Abrir menu'}
                     aria-expanded={sidebarOpen}
                     aria-controls="dashboard-shell-sidebar"
                 >
@@ -317,37 +342,50 @@ export function DashboardLayout() {
                         </p>
                         <p className="mt-1 text-sm leading-6 text-slate-600">
                             {capabilities.isBusinessOwner
-                                ? 'Revisa tu negocio, atiende clientes y mantén la información al día desde un solo lugar.'
+                                ? 'Revisa tu negocio, atiende clientes y manten la informacion al dia desde un solo lugar.'
                                 : capabilities.isAdmin
-                                    ? 'Accede rápido a plataforma, seguridad y tu perfil desde un mismo espacio.'
+                                    ? 'Accede rapido a plataforma, seguridad y tu perfil desde un mismo espacio.'
                                     : 'Explora, organiza favoritos y vuelve a tu actividad reciente sin perder contexto.'}
                         </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            <StatusBadge tone={capabilities.isBusinessOwner ? 'claimed' : capabilities.isAdmin ? 'verified' : 'info'} size="sm">
+                                {shellModeLabel}
+                            </StatusBadge>
+                            {activeOrganization ? (
+                                <StatusBadge tone="neutral" size="sm">
+                                    Organizacion activa
+                                </StatusBadge>
+                            ) : null}
+                        </div>
                     </div>
 
-                    <nav className="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Menú autenticado">
-                        {navItems.map((item) => (
-                            <Link
-                                key={item.to}
-                                to={item.to}
-                                className={item.active ? 'shell-nav-link shell-nav-link-active' : 'shell-nav-link'}
-                                onClick={() => setSidebarOpen(false)}
-                            >
-                                <span className="mt-0.5 text-current">{item.icon}</span>
-                                <span className="min-w-0">
-                                    <span className="block text-sm font-semibold">{item.label}</span>
-                                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                                        {item.description}
-                                    </span>
-                                </span>
-                            </Link>
-                        ))}
-                    </nav>
+                    <SidebarNav
+                        items={navItems}
+                        ariaLabel="Menu autenticado"
+                        onItemClick={() => setSidebarOpen(false)}
+                    />
+
+                    <div className="mt-4 rounded-[22px] border border-slate-200/90 bg-white px-4 py-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Accion rapida
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                            Mantente en contexto sin abrir menus extras.
+                        </p>
+                        <Link
+                            to={sidebarCta.to}
+                            className="btn-secondary mt-3 w-full justify-center"
+                            onClick={() => setSidebarOpen(false)}
+                        >
+                            {sidebarCta.label}
+                        </Link>
+                    </div>
                 </aside>
 
                 <main id="main-content" tabIndex={-1} className="app-content min-w-0">
                     <Outlet />
                 </main>
             </div>
-        </div>
+        </AppShell>
     );
 }

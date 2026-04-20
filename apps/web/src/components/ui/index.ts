@@ -1,23 +1,15 @@
 /**
- * UI Components — Barrel export
- * AquiTaDo Blueprint § 7 & § 10
+ * UI Components - Barrel export
+ * AquiTaDo design system foundation
  *
- * Tipos de card oficiales (§ 7.1):
- *   SummaryCard  — métricas y KPIs
- *   SectionCard  — módulos funcionales
+ * Cards oficiales:
+ *   SummaryCard - metricas y KPIs
+ *   SectionCard - modulos funcionales
+ *   FilterCard  - filtros y busqueda
  *
- * Estados UX obligatorios (§ 10):
- *   EmptyState       — sin datos
- *   LoadingState     — cargando
- *   ErrorState       — error
- *   SuccessState     — exito
- *   PartialDataState — datos parciales
- *   NoPermissionState — sin acceso
- *   FeatureDisabledState — feature apagada
- *
- * Nota: FilterCard, ListCard y FormCard se implementan
- * directamente con las clases CSS card-filter / card-list / card-form
- * por ser más estructurales y variar mucho por módulo.
+ * Estados UX:
+ *   EmptyState / LoadingState / ErrorState / SuccessState
+ *   PartialDataState / NoPermissionState / FeatureDisabledState
  */
 
 export { SummaryCard } from './SummaryCard';
@@ -42,12 +34,15 @@ export {
 export {
     ActionBar,
     AppCard,
+    AppShell,
     DashboardContentLayout,
+    DataTable,
     DataTableWrapper,
     EmptyStateCard,
     FieldError,
     FieldHint,
     FilterBar,
+    FilterCard,
     FormPageLayout,
     FormSection,
     InfoList,
@@ -62,8 +57,11 @@ export {
     PublicPageShell,
     QueueCard,
     SectionHeader,
+    SidebarNav,
+    SidebarNavItem,
     SplitPanelLayout,
     StatGroup,
+    StatusBadge,
     StatusCard,
     StickyFormActions,
     Toolbar,

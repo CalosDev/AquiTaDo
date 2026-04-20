@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { AppShell, SidebarNav, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/useAuth';
 
 interface AdminNavItem {
@@ -68,50 +69,53 @@ export function AdminLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const activeTab = new URLSearchParams(location.search).get('tab') || 'businesses';
 
-    const navItems = useMemo<AdminNavItem[]>(() => [
-        {
-            label: 'Negocios',
-            to: '/admin?tab=businesses',
-            description: 'Vista general de fichas y estados.',
-            active: location.pathname === '/admin' && activeTab === 'businesses',
-            icon: adminIcon('businesses'),
-        },
-        {
-            label: 'Categorías',
-            to: '/admin?tab=categories',
-            description: 'Taxonomía y estructura del catálogo.',
-            active: location.pathname === '/admin' && activeTab === 'categories',
-            icon: adminIcon('categories'),
-        },
-        {
-            label: 'Catálogo',
-            to: '/admin?tab=catalog',
-            description: 'Reclamaciones, duplicados y control del negocio.',
-            active: location.pathname === '/admin' && activeTab === 'catalog',
-            icon: adminIcon('catalog'),
-        },
-        {
-            label: 'Verificación',
-            to: '/admin?tab=verification',
-            description: 'Documentos, revisión y seguimiento de casos.',
-            active: location.pathname === '/admin' && activeTab === 'verification',
-            icon: adminIcon('verification'),
-        },
-        {
-            label: 'Estado del sistema',
-            to: '/admin?tab=observability',
-            description: 'Frontend, operación y alertas recientes.',
-            active: location.pathname === '/admin' && activeTab === 'observability',
-            icon: adminIcon('observability'),
-        },
-        {
-            label: 'Seguridad',
-            to: '/security',
-            description: 'Acceso, 2FA y controles sensibles.',
-            active: location.pathname === '/security',
-            icon: adminIcon('security'),
-        },
-    ], [activeTab, location.pathname]);
+    const navItems = useMemo<AdminNavItem[]>(
+        () => [
+            {
+                label: 'Negocios',
+                to: '/admin?tab=businesses',
+                description: 'Vista general de fichas y estados.',
+                active: location.pathname === '/admin' && activeTab === 'businesses',
+                icon: adminIcon('businesses'),
+            },
+            {
+                label: 'Categorias',
+                to: '/admin?tab=categories',
+                description: 'Taxonomia y estructura del catalogo.',
+                active: location.pathname === '/admin' && activeTab === 'categories',
+                icon: adminIcon('categories'),
+            },
+            {
+                label: 'Catalogo',
+                to: '/admin?tab=catalog',
+                description: 'Reclamaciones, duplicados y control del negocio.',
+                active: location.pathname === '/admin' && activeTab === 'catalog',
+                icon: adminIcon('catalog'),
+            },
+            {
+                label: 'Verificacion',
+                to: '/admin?tab=verification',
+                description: 'Documentos, revision y seguimiento de casos.',
+                active: location.pathname === '/admin' && activeTab === 'verification',
+                icon: adminIcon('verification'),
+            },
+            {
+                label: 'Estado del sistema',
+                to: '/admin?tab=observability',
+                description: 'Frontend, operacion y alertas recientes.',
+                active: location.pathname === '/admin' && activeTab === 'observability',
+                icon: adminIcon('observability'),
+            },
+            {
+                label: 'Seguridad',
+                to: '/security',
+                description: 'Acceso, 2FA y controles sensibles.',
+                active: location.pathname === '/security',
+                icon: adminIcon('security'),
+            },
+        ],
+        [activeTab, location.pathname],
+    );
 
     const handleLogout = () => {
         logout();
@@ -119,7 +123,7 @@ export function AdminLayout() {
     };
 
     return (
-        <div className="app-shell density-compact">
+        <AppShell density="compact">
             <a href="#main-content" className="skip-link">
                 Saltar al contenido principal
             </a>
@@ -127,8 +131,8 @@ export function AdminLayout() {
                 <button
                     type="button"
                     onClick={() => setSidebarOpen((current) => !current)}
-                    className="btn-ghost h-11 w-11 p-0 text-slate-700 lg:hidden"
-                    aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+                    className="btn-icon text-slate-700 lg:hidden"
+                    aria-label={sidebarOpen ? 'Cerrar menu' : 'Abrir menu'}
                     aria-expanded={sidebarOpen}
                     aria-controls="admin-shell-sidebar"
                 >
@@ -146,18 +150,18 @@ export function AdminLayout() {
                     <div className="leading-tight">
                         <p className="font-display text-base font-bold text-slate-950">Consola admin</p>
                         <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                            {user?.email || 'Operación de plataforma'}
+                            {user?.email || 'Operacion de plataforma'}
                         </p>
                     </div>
                 </Link>
 
                 <div className="flex-1" />
 
-                <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700 md:inline-flex">
+                <StatusBadge tone="success" size="sm" className="hidden md:inline-flex">
                     Sistema operativo
-                </span>
+                </StatusBadge>
                 <Link to="/" className="btn-ghost hidden text-slate-700 md:inline-flex">
-                    Sitio público
+                    Sitio publico
                 </Link>
                 <button type="button" onClick={handleLogout} className="btn-ghost text-slate-700">
                     Salir
@@ -185,37 +189,45 @@ export function AdminLayout() {
                             Modo consola
                         </p>
                         <p className="mt-2 text-sm font-semibold text-white">
-                            Moderación, catálogo y operación
+                            Moderacion, catalogo y operacion
                         </p>
                         <p className="mt-1 text-sm leading-6 text-slate-300">
-                            La prioridad aquí es revisar la plataforma con foco operativo y navegación clara.
+                            La prioridad aqui es revisar la plataforma con foco operativo y navegacion clara.
                         </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            <StatusBadge tone="verified" size="sm">
+                                Consola activa
+                            </StatusBadge>
+                            <StatusBadge tone="neutral" size="sm">
+                                Acceso sensible
+                            </StatusBadge>
+                        </div>
                     </div>
 
-                    <nav className="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Menú de administración">
-                        {navItems.map((item) => (
-                            <Link
-                                key={item.to}
-                                to={item.to}
-                                className={item.active ? 'console-nav-link console-nav-link-active' : 'console-nav-link'}
-                                onClick={() => setSidebarOpen(false)}
-                            >
-                                <span className="mt-0.5">{item.icon}</span>
-                                <span className="min-w-0">
-                                    <span className="block text-sm font-semibold">{item.label}</span>
-                                    <span className="mt-0.5 block text-xs leading-5 text-slate-400">
-                                        {item.description}
-                                    </span>
-                                </span>
-                            </Link>
-                        ))}
-                    </nav>
+                    <SidebarNav
+                        items={navItems}
+                        ariaLabel="Menu de administracion"
+                        tone="admin"
+                        onItemClick={() => setSidebarOpen(false)}
+                    />
+
+                    <div className="mt-4 rounded-[22px] border border-slate-200/90 bg-white px-4 py-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Acceso rapido
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                            Cambia entre consola y sitio publico sin perder el contexto del panel.
+                        </p>
+                        <Link to="/" className="btn-secondary mt-3 w-full justify-center" onClick={() => setSidebarOpen(false)}>
+                            Ir al sitio publico
+                        </Link>
+                    </div>
                 </aside>
 
                 <main id="main-content" tabIndex={-1} className="app-content min-w-0">
                     <Outlet />
                 </main>
             </div>
-        </div>
+        </AppShell>
     );
 }

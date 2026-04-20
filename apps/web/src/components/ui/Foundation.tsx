@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { EmptyState } from './EmptyState';
 import { NoPermissionState } from './NoPermissionState';
 import { SummaryCard } from './SummaryCard';
@@ -12,6 +13,22 @@ type ShellTag = 'div' | 'section' | 'article' | 'main';
 type SectionHeaderTone = 'default' | 'subtle';
 type NoticeTone = 'info' | 'success' | 'warning' | 'danger';
 type ChoiceColumns = 1 | 2 | 3;
+type Density = 'cozy' | 'medium' | 'compact';
+type SidebarTone = 'default' | 'admin';
+type StatusTone =
+    | 'success'
+    | 'warning'
+    | 'danger'
+    | 'info'
+    | 'neutral'
+    | 'pending'
+    | 'claimed'
+    | 'unclaimed'
+    | 'verified'
+    | 'suspended'
+    | 'free'
+    | 'growth'
+    | 'scale';
 
 interface PageShellProps {
     children: ReactNode;
@@ -26,6 +43,12 @@ const pageShellWidthClass: Record<ShellWidth, string> = {
     default: 'page-shell--default',
     wide: 'page-shell--wide',
     full: 'page-shell--full',
+};
+
+const appShellDensityClass: Record<Density, string> = {
+    cozy: 'density-cozy',
+    medium: 'density-medium',
+    compact: 'density-compact',
 };
 
 export function PageShell({
@@ -44,6 +67,16 @@ export function PageShell({
 
 export function PublicPageShell({ className = '', ...props }: PageShellProps) {
     return <PageShell {...props} className={cx('public-page-shell', className)} />;
+}
+
+interface AppShellProps {
+    children: ReactNode;
+    className?: string;
+    density?: Density;
+}
+
+export function AppShell({ children, className = '', density = 'compact' }: AppShellProps) {
+    return <div className={cx('app-shell', appShellDensityClass[density], className)}>{children}</div>;
 }
 
 interface DashboardContentLayoutProps {
@@ -221,6 +254,41 @@ export function FilterBar({
     );
 }
 
+interface FilterCardProps {
+    title?: string;
+    description?: string;
+    actions?: ReactNode;
+    children: ReactNode;
+    className?: string;
+    density?: Density;
+    as?: 'div' | 'section' | 'article';
+}
+
+export function FilterCard({
+    title,
+    description,
+    actions,
+    children,
+    className = '',
+    density = 'medium',
+    as: Tag = 'section',
+}: FilterCardProps) {
+    return (
+        <Tag className={cx('card-filter', `density-${density}`, className)}>
+            {title || description || actions ? (
+                <div className="card-section__header">
+                    <div>
+                        {title ? <h3 className="card-section__title">{title}</h3> : null}
+                        {description ? <p className="card-section__description">{description}</p> : null}
+                    </div>
+                    {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+                </div>
+            ) : null}
+            {children}
+        </Tag>
+    );
+}
+
 interface AppCardProps {
     children: ReactNode;
     title?: string;
@@ -324,6 +392,38 @@ export function DataTableWrapper({
     );
 }
 
+export const DataTable = DataTableWrapper;
+
+interface StatusBadgeProps {
+    children?: ReactNode;
+    label?: ReactNode;
+    tone?: StatusTone;
+    size?: 'sm' | 'md';
+    dot?: boolean;
+    className?: string;
+    title?: string;
+}
+
+export function StatusBadge({
+    children,
+    label,
+    tone = 'neutral',
+    size = 'md',
+    dot = false,
+    className = '',
+    title,
+}: StatusBadgeProps) {
+    return (
+        <span
+            className={cx('status-badge', `status-badge--${tone}`, `status-badge--${size}`, className)}
+            title={title}
+        >
+            {dot ? <span className="status-badge__dot" aria-hidden="true" /> : null}
+            <span>{label ?? children}</span>
+        </span>
+    );
+}
+
 interface InfoListItem {
     label: string;
     value: ReactNode;
@@ -399,6 +499,92 @@ export function InlineNotice({
             </div>
             {action ? <div className="inline-notice__action">{action}</div> : null}
         </div>
+    );
+}
+
+interface SidebarNavItemProps {
+    to: string;
+    label: string;
+    description?: ReactNode;
+    icon?: ReactNode;
+    active?: boolean;
+    badge?: ReactNode;
+    onClick?: () => void;
+    tone?: SidebarTone;
+}
+
+export function SidebarNavItem({
+    to,
+    label,
+    description,
+    icon,
+    active = false,
+    badge,
+    onClick,
+    tone = 'default',
+}: SidebarNavItemProps) {
+    return (
+        <Link
+            to={to}
+            className={cx(
+                'sidebar-nav__item',
+                tone === 'admin' ? 'sidebar-nav__item--admin' : 'sidebar-nav__item--default',
+                active && 'sidebar-nav__item--active',
+            )}
+            onClick={onClick}
+        >
+            {icon ? <span className="sidebar-nav__icon">{icon}</span> : null}
+            <span className="sidebar-nav__copy">
+                <span className="sidebar-nav__label-row">
+                    <span className="sidebar-nav__label">{label}</span>
+                    {badge ? <span className="sidebar-nav__badge">{badge}</span> : null}
+                </span>
+                {description ? <span className="sidebar-nav__description">{description}</span> : null}
+            </span>
+        </Link>
+    );
+}
+
+interface SidebarNavLinkItem {
+    to: string;
+    label: string;
+    description?: ReactNode;
+    icon?: ReactNode;
+    active?: boolean;
+    badge?: ReactNode;
+}
+
+interface SidebarNavProps {
+    items: ReadonlyArray<SidebarNavLinkItem>;
+    ariaLabel: string;
+    className?: string;
+    tone?: SidebarTone;
+    onItemClick?: () => void;
+}
+
+export function SidebarNav({
+    items,
+    ariaLabel,
+    className = '',
+    tone = 'default',
+    onItemClick,
+}: SidebarNavProps) {
+    return (
+        <nav className={cx('sidebar-nav', className)} aria-label={ariaLabel}>
+            {items.map((item) => (
+                <SidebarNavItem
+                    key={item.to}
+                    to={item.to}
+                    label={item.label}
+                    description={item.description}
+                    icon={item.icon}
+                    active={item.active}
+                    badge={item.badge}
+                    onClick={onItemClick}
+                    tone={tone}
+                />
+            ))}
+        </nav>
     );
 }
 

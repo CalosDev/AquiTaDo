@@ -236,11 +236,70 @@
     min-height: 44px;
   }
 
+  .btn-icon {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-2xl border bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900;
+    border-color: rgba(203, 213, 225, 0.95);
+  }
+
   .chip {
     @apply inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold;
     border-color: rgba(191, 219, 254, 0.9);
     background: rgba(239, 246, 255, 0.9);
     color: #1d4ed8;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold;
+    border-width: var(--border-width-standard);
+  }
+
+  .status-badge--sm {
+    @apply px-2.5 py-1 text-[11px];
+  }
+
+  .status-badge--md {
+    @apply text-xs;
+  }
+
+  .status-badge__dot {
+    @apply h-2 w-2 rounded-full bg-current opacity-80;
+  }
+
+  .status-badge--success,
+  .status-badge--verified {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700;
+  }
+
+  .status-badge--warning,
+  .status-badge--pending {
+    @apply border-amber-200 bg-amber-50 text-amber-700;
+  }
+
+  .status-badge--danger,
+  .status-badge--suspended {
+    @apply border-rose-200 bg-rose-50 text-rose-700;
+  }
+
+  .status-badge--info,
+  .status-badge--claimed {
+    @apply border-sky-200 bg-sky-50 text-sky-700;
+  }
+
+  .status-badge--neutral,
+  .status-badge--unclaimed {
+    @apply border-slate-200 bg-slate-100 text-slate-700;
+  }
+
+  .status-badge--free {
+    @apply border-slate-200 bg-slate-50 text-slate-700;
+  }
+
+  .status-badge--growth {
+    @apply border-indigo-200 bg-indigo-50 text-indigo-700;
+  }
+
+  .status-badge--scale {
+    @apply border-primary-200 bg-primary-50 text-primary-700;
   }
 
   .input-field {
@@ -600,6 +659,55 @@
   .console-nav-link-active {
     @apply bg-white text-slate-950;
     box-shadow: 0 14px 32px -28px rgba(15, 23, 42, 0.35);
+  }
+
+  .sidebar-nav {
+    @apply mt-4 flex flex-1 flex-col gap-1 overflow-y-auto;
+  }
+
+  .sidebar-nav__item {
+    @apply flex items-start gap-3 rounded-2xl px-3 py-3 transition-colors;
+  }
+
+  .sidebar-nav__item--default {
+    @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+  }
+
+  .sidebar-nav__item--admin {
+    @apply text-slate-600 hover:bg-white hover:text-slate-950;
+  }
+
+  .sidebar-nav__item--active.sidebar-nav__item--default {
+    @apply bg-primary-50 text-primary-700;
+  }
+
+  .sidebar-nav__item--active.sidebar-nav__item--admin {
+    @apply bg-white text-slate-950;
+    box-shadow: 0 14px 32px -28px rgba(15, 23, 42, 0.35);
+  }
+
+  .sidebar-nav__icon {
+    @apply mt-0.5 shrink-0 text-current;
+  }
+
+  .sidebar-nav__copy {
+    @apply min-w-0 flex-1;
+  }
+
+  .sidebar-nav__label-row {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .sidebar-nav__label {
+    @apply block text-sm font-semibold;
+  }
+
+  .sidebar-nav__description {
+    @apply mt-0.5 block text-xs leading-5 text-slate-500;
+  }
+
+  .sidebar-nav__badge {
+    @apply shrink-0;
   }
 
   .app-content {
