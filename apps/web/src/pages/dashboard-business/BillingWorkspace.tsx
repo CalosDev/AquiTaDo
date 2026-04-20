@@ -627,7 +627,7 @@ export function BillingWorkspace({
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
                 <div className="space-y-5">
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
                         {plans.map((plan) => {
                             const isCurrent = plan.code === currentPlanCode;
                             const isPaidPlan = Number(plan.priceMonthly) > 0;
