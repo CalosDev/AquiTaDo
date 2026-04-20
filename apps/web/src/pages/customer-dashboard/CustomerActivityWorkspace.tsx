@@ -403,7 +403,7 @@ export function CustomerActivityWorkspace() {
 
     if (loading) {
         return (
-            <PageShell className="space-y-5">
+            <PageShell className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-2">
                         <div className="h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
@@ -434,18 +434,30 @@ export function CustomerActivityWorkspace() {
                         </div>
                     ))}
                 </div>
-                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.88fr)_minmax(320px,0.62fr)]">
-                    {Array.from({ length: 2 }).map((_, index) => (
-                        <div key={index} className="rounded-[26px] border border-slate-200 bg-white p-5">
-                            <div className="h-5 w-36 rounded-full bg-slate-100 animate-pulse" />
-                            <div className="mt-5 space-y-3">
-                                <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
-                                <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
+                <SplitPanelLayout
+                    primary={(
+                        <AppCard title="Mi inbox" description="Conversaciones con negocios y respuestas recientes.">
+                            <div className="mt-5 space-y-3 min-h-[20rem]">
+                                {Array.from({ length: 3 }).map((_, index) => (
+                                    <div key={index} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                                        <div className="h-4 w-36 rounded-full bg-slate-100 animate-pulse" />
+                                        <div className="mt-3 h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
+                                        <div className="mt-4 h-12 rounded-2xl bg-white animate-pulse" />
+                                    </div>
+                                ))}
+                            </div>
+                        </AppCard>
+                    )}
+                    secondary={(
+                        <AppCard title="Hilo seleccionado" description="Lee el historial y responde sin salir del panel.">
+                            <div className="mt-5 space-y-3 min-h-[20rem]">
+                                <div className="h-24 rounded-2xl bg-slate-100 animate-pulse" />
+                                <div className="h-44 rounded-2xl bg-slate-100 animate-pulse" />
                                 <div className="h-24 rounded-2xl bg-slate-50 animate-pulse" />
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        </AppCard>
+                    )}
+                />
             </PageShell>
         );
     }
