@@ -752,6 +752,14 @@
     box-shadow: var(--shadow-soft);
   }
 
+  .results-toolbar--sticky {
+    position: sticky;
+    top: 6rem;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(14px);
+  }
+
   .console-section {
     @apply rounded-[28px] border bg-white p-5 shadow-sm;
     border-color: var(--border-soft);

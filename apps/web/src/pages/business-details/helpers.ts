@@ -1,4 +1,4 @@
-import type { BusinessFeatureEntry } from './types';
+import type { BusinessFeatureEntry, BusinessImageEntry } from './types';
 
 export async function getCurrentLocation() {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -75,6 +75,56 @@ export function getDisplayInitial(value: string | undefined): string {
     }
 
     return normalized.charAt(0).toUpperCase();
+}
+
+export function findPreferredGalleryIndex(images: BusinessImageEntry[]): number {
+    if (images.length === 0) {
+        return 0;
+    }
+
+    const coverIndex = images.findIndex((image) => image.isCover);
+    return coverIndex >= 0 ? coverIndex : 0;
+}
+
+export interface HeroGalleryEntry {
+    index: number;
+    image: BusinessImageEntry;
+}
+
+export interface HeroGalleryState {
+    lead: HeroGalleryEntry | null;
+    previews: HeroGalleryEntry[];
+    remainingCount: number;
+}
+
+export function buildHeroGallery(
+    images: BusinessImageEntry[],
+    activeIndex: number,
+    maxPreviewCount = 3,
+): HeroGalleryState {
+    if (images.length === 0) {
+        return {
+            lead: null,
+            previews: [],
+            remainingCount: 0,
+        };
+    }
+
+    const safeIndex = Math.min(Math.max(activeIndex, 0), images.length - 1);
+    const lead: HeroGalleryEntry = {
+        index: safeIndex,
+        image: images[safeIndex],
+    };
+    const previews = images
+        .map((image, index) => ({ index, image }))
+        .filter((entry) => entry.index !== safeIndex)
+        .slice(0, maxPreviewCount);
+
+    return {
+        lead,
+        previews,
+        remainingCount: Math.max(0, images.length - 1 - previews.length),
+    };
 }
 
 export function renderStars(rating: number): string {

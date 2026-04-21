@@ -76,6 +76,24 @@ const OPERATING_POINTS = [
     },
 ];
 
+const HOW_IT_WORKS_STEPS = [
+    {
+        step: '01',
+        title: 'Busca con intencion',
+        description: 'Empieza por una necesidad real: delivery, reservas, cercania o una categoria puntual para moverte mas rapido.',
+    },
+    {
+        step: '02',
+        title: 'Compara senales reales',
+        description: 'Revisa reputacion, verificacion y contexto local para filtrar opciones utiles antes de escribir o visitar.',
+    },
+    {
+        step: '03',
+        title: 'Contacta con menos friccion',
+        description: 'Pasa de descubrir a actuar con una ficha clara, rutas rapidas y mejor informacion para decidir en el momento.',
+    },
+] as const;
+
 type DominicanCategoryPreset = {
     key: string;
     label: string;
@@ -395,16 +413,23 @@ export function Home() {
             )}
 
             <section className="gradient-hero relative overflow-hidden">
+                <div className="absolute inset-x-0 top-0 flag-ribbon opacity-90"></div>
                 <div className="absolute inset-0 opacity-20 subtle-grid-bg"></div>
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20">
                     <div className="grid gap-8 xl:gap-10 lg:grid-cols-12 lg:items-center">
                         <div className="lg:col-span-7">
                             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 backdrop-blur-md px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100/90 shadow-sm shadow-blue-900/10">
-                                <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-2 rounded-full bg-accent-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
+                                <span className="flex items-center gap-1.5" aria-hidden="true">
+                                    <span className="h-2 w-2 rounded-full bg-primary-950 ring-1 ring-white/35"></span>
+                                    <span className="h-2 w-2 rounded-full bg-white ring-1 ring-white/50"></span>
+                                    <span className="relative h-2 w-2 rounded-full bg-accent-500 ring-1 ring-white/25">
+                                        <span className="animate-ping absolute inset-0 rounded-full bg-accent-400 opacity-75"></span>
+                                    </span>
                                 </span>
                                 Ecosistema local dominicano
+                                <span className="rounded-full border border-amber-300/30 bg-amber-300/12 px-2 py-0.5 text-[9px] tracking-[0.18em] text-amber-100">
+                                    confianza local
+                                </span>
                             </div>
                             <h1 className="mt-6 font-display text-4xl sm:text-5xl xl:text-7xl font-black leading-[1.1] tracking-tight text-white">
                                 Descubre negocios <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">reales</span>
@@ -549,6 +574,49 @@ export function Home() {
 
                             </div>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
+                <div className="section-shell overflow-hidden p-6 md:p-8">
+                    <div className="flag-ribbon opacity-80"></div>
+                    <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">
+                                <span className="flex items-center gap-1.5" aria-hidden="true">
+                                    <span className="h-2 w-2 rounded-full bg-primary-900"></span>
+                                    <span className="h-2 w-2 rounded-full bg-white ring-1 ring-slate-300"></span>
+                                    <span className="h-2 w-2 rounded-full bg-accent-600"></span>
+                                </span>
+                                confianza y accion
+                            </div>
+                            <h2 className="section-title !text-3xl mt-4">Como funciona AquiTa.do</h2>
+                            <p className="section-subtitle mt-2 max-w-3xl">
+                                Un flujo simple para descubrir mejor, comparar con criterio y llegar al negocio correcto sin vueltas.
+                            </p>
+                        </div>
+                        <p className="text-sm font-semibold text-slate-500 md:max-w-xs">
+                            Pensado para decisiones rapidas en RD, no para perderte entre listados planos.
+                        </p>
+                    </div>
+                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+                        {HOW_IT_WORKS_STEPS.map((step, index) => (
+                            <article key={step.step} className="panel-premium relative p-5">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-700 via-primary-600 to-accent-600 text-sm font-black text-white shadow-lg shadow-primary-900/20">
+                                        {step.step}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-600">
+                                            Paso {index + 1}
+                                        </p>
+                                        <h3 className="mt-2 font-display text-xl font-semibold text-slate-900">{step.title}</h3>
+                                    </div>
+                                </div>
+                                <p className="mt-4 text-sm leading-relaxed text-slate-600">{step.description}</p>
+                            </article>
+                        ))}
                     </div>
                 </div>
             </section>
@@ -854,11 +922,19 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="defer-render-section gradient-hero mt-14">
+            <section className="defer-render-section gradient-hero relative mt-14 overflow-hidden">
+                <div className="absolute inset-x-0 top-0 flag-ribbon opacity-90"></div>
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
-                    <p className="chip !bg-white/10 !text-white !border-white/30 mx-auto w-fit">Impulsa tu presencia local</p>
+                    <p className="chip !bg-white/10 !text-white !border-white/30 mx-auto flex w-fit items-center gap-2">
+                        <span className="flex items-center gap-1.5" aria-hidden="true">
+                            <span className="h-2 w-2 rounded-full bg-primary-950 ring-1 ring-white/35"></span>
+                            <span className="h-2 w-2 rounded-full bg-white ring-1 ring-white/50"></span>
+                            <span className="h-2 w-2 rounded-full bg-accent-500 ring-1 ring-white/25"></span>
+                        </span>
+                        Impulsa tu presencia local
+                    </p>
                     <h2 className="mt-4 font-display text-3xl md:text-5xl font-extrabold text-white">
-                        Lleva tu negocio del barrio al siguiente nivel
+                        Lleva tu negocio del barrio al <span className="text-amber-200">siguiente nivel</span>
                     </h2>
                     <p className="mt-4 text-base md:text-lg text-blue-100 max-w-2xl mx-auto">
                         Crea una ficha mas completa, mejora tu visibilidad local y ayuda a que mas personas te encuentren.

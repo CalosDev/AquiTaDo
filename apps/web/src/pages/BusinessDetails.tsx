@@ -16,7 +16,15 @@ import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { featureFlags } from '../config/features';
 import { MobileContactBar } from './business-details/MobileContactBar';
 import { SidebarPanel } from './business-details/SidebarPanel';
-import { businessSupportsBooking, formatDaysAgo, getCurrentLocation, getDisplayInitial, renderStarsSafe } from './business-details/helpers';
+import {
+    buildHeroGallery,
+    businessSupportsBooking,
+    findPreferredGalleryIndex,
+    formatDaysAgo,
+    getCurrentLocation,
+    getDisplayInitial,
+    renderStarsSafe,
+} from './business-details/helpers';
 import type {
     Business,
     CheckInStats,
@@ -228,7 +236,7 @@ export function BusinessDetails() {
                 res = await businessApi.getByIdentifier(slug);
             }
             setBusiness(res.data);
-            setActiveImage(0);
+            setActiveImage(findPreferredGalleryIndex(res.data?.images ?? []));
             setErrorMessage('');
         } catch (error) {
             setBusiness(null);
@@ -675,8 +683,6 @@ export function BusinessDetails() {
     const memberSinceYear = business?.createdAt
         ? new Date(business.createdAt).getFullYear()
         : null;
-    const currentImage = business?.images?.[activeImage] ?? business?.images?.[0];
-    const coverImage = business?.images?.find((image) => image.isCover) ?? currentImage;
     const priceRangeLabel = businessPriceRangeLabel(business?.priceRange);
     const displayLocation = [
         business?.address,
@@ -684,6 +690,10 @@ export function BusinessDetails() {
         business?.city?.name,
         business?.province?.name,
     ].filter(Boolean).join(' · ');
+    const heroGallery = buildHeroGallery(business?.images ?? [], activeImage, 3);
+    const featuredGalleryEntry = heroGallery.lead;
+    const featuredImage = featuredGalleryEntry?.image ?? null;
+    const desktopPreviewEntries = heroGallery.previews;
     const reviewStarsLabel = averageRatingNumber ? renderStarsSafe(averageRatingNumber) : null;
     const todayDayOfWeek = new Date().getDay();
     const hoursByDay = BUSINESS_DAY_OPTIONS.map((day) => ({
@@ -1252,21 +1262,27 @@ export function BusinessDetails() {
                 <div className="lg:col-span-2 space-y-6">
                     {/* Image Gallery */}
                     <div className="panel-premium overflow-hidden">
-                        <div className="relative h-[320px] md:h-[380px] bg-gradient-to-br from-primary-900 via-primary-700 to-accent-700">
-                            {coverImage ? (
+                        <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1.7fr)_15rem]">
+                        <div className="relative min-h-[340px] overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary-900 via-primary-700 to-accent-700 md:min-h-[420px] lg:min-h-[460px]">
+                            {featuredImage ? (
                                 <OptimizedImage
-                                    src={coverImage.url}
-                                    alt={business.name}
-                                    className="w-full h-full object-cover"
+                                    src={featuredImage.url}
+                                    alt={featuredImage.caption || business.name}
+                                    className="h-full w-full object-cover"
                                     priority
-                                    sizes="(min-width: 1280px) 52vw, (min-width: 1024px) 60vw, 100vw"
+                                    sizes="(min-width: 1280px) 44vw, (min-width: 1024px) 56vw, 100vw"
                                 />
                             ) : (
                                 <div className="flex h-full items-center justify-center text-8xl font-display font-bold text-white/20">
                                     {getDisplayInitial(business.name)}
                                 </div>
                             )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/35 to-transparent"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-slate-950/10"></div>
+                            {business.images.length > 1 ? (
+                                <div className="absolute right-4 top-4 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md">
+                                    Galeria {business.images.length} fotos
+                                </div>
+                            ) : null}
                             <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
                                 <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
                                     <div className="max-w-3xl">
@@ -1312,7 +1328,7 @@ export function BusinessDetails() {
                                         )}
                                     </div>
                                     {averageRating && (
-                                        <div className="w-fit rounded-2xl bg-amber-500 px-5 py-4 text-center text-white shadow-lg shadow-amber-900/30">
+                                        <div className="w-fit rounded-[1.5rem] border border-white/12 bg-amber-500/95 px-5 py-4 text-center text-white shadow-lg shadow-amber-900/30 backdrop-blur-sm">
                                             <div className="font-display text-4xl font-bold leading-none">{averageRating}</div>
                                             {reviewStarsLabel && (
                                                 <div className="mt-1 text-xs tracking-[0.22em] text-white/90">{reviewStarsLabel}</div>
@@ -1325,23 +1341,73 @@ export function BusinessDetails() {
                                 </div>
                             </div>
                         </div>
+                            {desktopPreviewEntries.length > 0 ? (
+                                <div className="hidden gap-3 lg:grid lg:grid-rows-3">
+                                    {desktopPreviewEntries.map((entry, previewIndex) => (
+                                        <button
+                                            key={entry.image.id}
+                                            type="button"
+                                            onClick={() => setActiveImage(entry.index)}
+                                            className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200/70 bg-slate-100 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-lg"
+                                            aria-label={`Mostrar foto ${entry.index + 1} de ${business.images.length}`}
+                                        >
+                                            <OptimizedImage
+                                                src={entry.image.url}
+                                                alt={entry.image.caption || `${business.name} foto ${entry.index + 1}`}
+                                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                                                sizes="15rem"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/10 to-transparent"></div>
+                                            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-3">
+                                                <div>
+                                                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
+                                                        Vista {entry.index + 1}
+                                                    </p>
+                                                    <p className="mt-1 text-sm font-semibold text-white">Cambiar foto</p>
+                                                </div>
+                                                {previewIndex === desktopPreviewEntries.length - 1 && heroGallery.remainingCount > 0 ? (
+                                                    <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                                                        +{heroGallery.remainingCount}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
                         {business.images.length > 1 && (
-                            <div className="flex gap-2 p-3 overflow-x-auto">
+                            <div className="border-t border-slate-100 bg-slate-50/70 p-3">
+                                <div className="mb-2 flex items-center justify-between gap-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                        Recorrido visual
+                                    </p>
+                                    <span className="text-xs font-medium text-slate-500">
+                                        {activeImage + 1} de {business.images.length}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2 overflow-x-auto pb-1">
                                 {business.images.map((img, i) => (
                                     <button
                                         key={img.id}
+                                        type="button"
                                         onClick={() => setActiveImage(i)}
-                                        className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === activeImage ? 'border-primary-500' : 'border-transparent'
-                                            }`}
+                                        className={`h-[4.5rem] w-[4.5rem] flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
+                                            i === activeImage
+                                                ? 'border-primary-500 shadow-md shadow-primary-200/70'
+                                                : 'border-transparent opacity-80 hover:opacity-100'
+                                        }`}
+                                        aria-label={`Seleccionar foto ${i + 1}`}
                                     >
                                         <OptimizedImage
                                             src={img.url}
-                                            alt=""
-                                            className="w-full h-full object-cover"
-                                            sizes="(min-width: 1024px) 4rem, 20vw"
+                                            alt={img.caption || `${business.name} foto ${i + 1}`}
+                                            className="h-full w-full object-cover"
+                                            sizes="72px"
                                         />
                                     </button>
                                 ))}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1886,5 +1952,3 @@ export function BusinessDetails() {
         </PublicPageShell>
     );
 }
-
-

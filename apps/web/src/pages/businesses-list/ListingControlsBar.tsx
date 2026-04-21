@@ -39,7 +39,7 @@ export function ListingControlsBar({
     totalVisibleResults,
 }: ListingControlsBarProps) {
     return (
-        <FilterBar className="results-toolbar">
+        <FilterBar className="results-toolbar results-toolbar--sticky">
             <div className="flex flex-1 flex-col gap-3 xl:flex-row xl:items-center">
                 <label className="relative flex-1">
                     <span className="sr-only">Buscar negocios</span>
