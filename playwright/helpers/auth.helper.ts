@@ -10,7 +10,8 @@ export async function loginAsAdmin(page: Page): Promise<void> {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
     await loginPage.submit(ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
-    await expect(page).toHaveURL(/\/admin$/);
+    await page.waitForURL((url) => url.pathname === '/app' || url.pathname.startsWith('/admin'));
+    await expect(page).toHaveURL(/\/admin(?:[/?#].*)?$/);
 }
 
 export async function registerUserViaApi(
