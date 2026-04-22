@@ -12,6 +12,10 @@ const hooksMock = vi.hoisted(() => ({
     useBusinessesSeo: vi.fn(),
 }));
 
+const browserMock = vi.hoisted(() => ({
+    getCurrentPosition: vi.fn(),
+}));
+
 const endpointsMock = vi.hoisted(() => ({
     getAll: vi.fn(),
     getCategories: vi.fn(),
@@ -150,6 +154,28 @@ function getLastGetAllParams() {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window.navigator, 'geolocation', {
+        configurable: true,
+        value: {
+            getCurrentPosition: browserMock.getCurrentPosition,
+        },
+    });
+    browserMock.getCurrentPosition.mockImplementation((success: PositionCallback) => {
+        success({
+            coords: {
+                latitude: 18.47,
+                longitude: -69.94,
+                accuracy: 18,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                speed: null,
+                toJSON: () => ({}),
+            },
+            timestamp: Date.now(),
+            toJSON: () => ({}),
+        } as GeolocationPosition);
+    });
 
     endpointsMock.getAll.mockResolvedValue({
         data: {
@@ -232,6 +258,31 @@ describe('BusinessesList integration', () => {
         });
     });
 
+    it('removes invalid city and sector params after loading the province-specific options', async () => {
+        renderBusinessesList('/businesses?provinceId=prov-2&cityId=city-1&sectorId=sector-1&page=3');
+
+        expect((await screen.findAllByText('Cafe AquiTa')).length).toBeGreaterThan(0);
+
+        await waitFor(() => {
+            const locationText = currentLocationText();
+            expect(locationText).toContain('provinceId=prov-2');
+            expect(locationText).toContain('page=1');
+            expect(locationText).not.toContain('cityId=');
+            expect(locationText).not.toContain('sectorId=');
+        });
+
+        await waitFor(() => {
+            const lastCall = getLastGetAllParams();
+            expect(lastCall).toMatchObject({
+                provinceId: 'prov-2',
+                page: 1,
+                limit: 12,
+            });
+            expect(lastCall).not.toHaveProperty('cityId');
+            expect(lastCall).not.toHaveProperty('sectorId');
+        });
+    });
+
     it('navigates to /businesses when clear filters is triggered from an SEO route', async () => {
         renderBusinessesList('/negocios/provincia/distrito-nacional?feature=delivery&page=3');
 
@@ -262,23 +313,35 @@ describe('BusinessesList integration', () => {
         expect((await screen.findAllByText('Cafe AquiTa')).length).toBeGreaterThan(0);
 
         const searchInput = screen.getByPlaceholderText('Buscar restaurantes, colmados o servicios');
-        await userEvent.type(searchInput, 'brunch');
+        hooksMock.trackGrowthSignal.mockClear();
+        await userEvent.type(searchInput, ' brunch ');
 
         expect(currentLocationText()).toBe('/businesses?page=3');
 
         await waitFor(() => {
-            const locationText = currentLocationText();
-            expect(locationText).toContain('search=brunch');
-            expect(locationText).toContain('page=1');
+            const params = new URLSearchParams(currentLocationText().split('?')[1] ?? '');
+            expect(params.get('search')).toBe(' brunch ');
+            expect(params.get('page')).toBe('1');
         });
 
         await waitFor(() => {
             const lastCall = getLastGetAllParams();
             expect(lastCall).toMatchObject({
-                search: 'brunch',
+                search: ' brunch ',
                 page: 1,
                 limit: 12,
             });
+        });
+
+        await waitFor(() => {
+            expect(hooksMock.trackGrowthSignal).toHaveBeenCalledWith(expect.objectContaining({
+                eventType: 'LISTING_FILTER_APPLY',
+                metadata: expect.objectContaining({
+                    filterKey: 'search',
+                    value: 'brunch',
+                    source: 'topbar-search',
+                }),
+            }));
         });
     });
 
@@ -299,6 +362,47 @@ describe('BusinessesList integration', () => {
 
         await waitFor(() => {
             expect(currentLocationText()).toBe('/businesses');
+        });
+    });
+
+    it('promotes sort to distance only when geo filtering starts from relevance', async () => {
+        renderBusinessesList('/businesses');
+
+        expect((await screen.findAllByText('Cafe AquiTa')).length).toBeGreaterThan(0);
+
+        const sortSelect = screen.getByRole('combobox', { name: 'Ordenar resultados' }) as HTMLSelectElement;
+        expect(sortSelect.value).toBe('relevance');
+
+        await userEvent.click(screen.getByRole('button', { name: 'Usar mi ubicacion' }));
+
+        await waitFor(() => {
+            const params = new URLSearchParams(currentLocationText().split('?')[1] ?? '');
+            expect(params.get('latitude')).toBe('18.47');
+            expect(params.get('longitude')).toBe('-69.94');
+            expect(params.get('radiusKm')).toBe('5');
+            expect(params.get('page')).toBe('1');
+            expect(sortSelect.value).toBe('distance');
+        });
+    });
+
+    it('preserves an explicit non-relevance sort when geo filtering is applied', async () => {
+        renderBusinessesList('/businesses');
+
+        expect((await screen.findAllByText('Cafe AquiTa')).length).toBeGreaterThan(0);
+
+        const sortSelect = screen.getByRole('combobox', { name: 'Ordenar resultados' }) as HTMLSelectElement;
+        await userEvent.selectOptions(sortSelect, 'rating');
+        expect(sortSelect.value).toBe('rating');
+
+        await userEvent.click(screen.getByRole('button', { name: 'Usar mi ubicacion' }));
+
+        await waitFor(() => {
+            const params = new URLSearchParams(currentLocationText().split('?')[1] ?? '');
+            expect(params.get('latitude')).toBe('18.47');
+            expect(params.get('longitude')).toBe('-69.94');
+            expect(params.get('radiusKm')).toBe('5');
+            expect(params.get('page')).toBe('1');
+            expect(sortSelect.value).toBe('rating');
         });
     });
 });

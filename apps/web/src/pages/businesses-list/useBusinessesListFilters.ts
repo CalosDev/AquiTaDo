@@ -1,6 +1,7 @@
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import type { ListingViewMode } from './types';
+import { locationApi } from '../../api/endpoints';
+import type { City, ListingViewMode, Sector } from './types';
 
 export const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; description: string }> = {
     'con-delivery': {
@@ -65,6 +66,8 @@ export function useBusinessesListFilters() {
         intentSlug?: string;
     }>();
     const [searchParams, setSearchParams] = useSearchParams();
+    const [cities, setCities] = useState<City[]>([]);
+    const [sectors, setSectors] = useState<Sector[]>([]);
 
     const currentSearch = searchParams.get('search') || '';
     const currentCategory = searchParams.get('categoryId') || '';
@@ -229,6 +232,78 @@ export function useBusinessesListFilters() {
         setSearchParams({});
     }, [categorySlug, intentSlug, navigate, provinceSlug, setSearchParams]);
 
+    useEffect(() => {
+        if (!currentProvince) {
+            setCities([]);
+            setSectors([]);
+            if (currentCity) {
+                updateFilter('cityId', '');
+            }
+            if (currentSector) {
+                updateFilter('sectorId', '');
+            }
+            return;
+        }
+
+        let active = true;
+        void locationApi.getCities(currentProvince)
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+
+                const nextCities = (response.data || []) as City[];
+                setCities(nextCities);
+
+                if (currentCity && !nextCities.some((city) => city.id === currentCity)) {
+                    updateFilter('cityId', '');
+                }
+            })
+            .catch(() => {
+                if (active) {
+                    setCities([]);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [currentProvince, currentCity, currentSector, updateFilter]);
+
+    useEffect(() => {
+        if (!currentCity) {
+            setSectors([]);
+            if (currentSector) {
+                updateFilter('sectorId', '');
+            }
+            return;
+        }
+
+        let active = true;
+        void locationApi.getSectors(currentCity)
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+
+                const nextSectors = (response.data || []) as Sector[];
+                setSectors(nextSectors);
+
+                if (currentSector && !nextSectors.some((sector) => sector.id === currentSector)) {
+                    updateFilter('sectorId', '');
+                }
+            })
+            .catch(() => {
+                if (active) {
+                    setSectors([]);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [currentCity, currentSector, updateFilter]);
+
     return {
         categorySlug,
         provinceSlug,
@@ -250,6 +325,8 @@ export function useBusinessesListFilters() {
         currentPage,
         searchInput,
         setSearchInput,
+        cities,
+        sectors,
         selectedIntentions,
         seoCanonicalPath,
         updateFilter,

@@ -77,8 +77,6 @@ export function BusinessesList() {
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
-    const [cities, setCities] = useState<City[]>([]);
-    const [sectors, setSectors] = useState<Sector[]>([]);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [filtersLoading, setFiltersLoading] = useState(true);
@@ -108,6 +106,8 @@ export function BusinessesList() {
         currentPage,
         searchInput,
         setSearchInput,
+        cities,
+        sectors,
         selectedIntentions,
         seoCanonicalPath,
         updateFilter,
@@ -640,78 +640,6 @@ export function BusinessesList() {
             source: 'topbar-sort',
         });
     }, [trackListingEvent]);
-
-    useEffect(() => {
-        if (!currentProvince) {
-            setCities([]);
-            setSectors([]);
-            if (currentCity) {
-                updateFilter('cityId', '');
-            }
-            if (currentSector) {
-                updateFilter('sectorId', '');
-            }
-            return;
-        }
-
-        let active = true;
-        void locationApi.getCities(currentProvince)
-            .then((response) => {
-                if (!active) {
-                    return;
-                }
-
-                const nextCities = (response.data || []) as City[];
-                setCities(nextCities);
-
-                if (currentCity && !nextCities.some((city) => city.id === currentCity)) {
-                    updateFilter('cityId', '');
-                }
-            })
-            .catch(() => {
-                if (active) {
-                    setCities([]);
-                }
-            });
-
-        return () => {
-            active = false;
-        };
-    }, [currentProvince, currentCity, currentSector, updateFilter]);
-
-    useEffect(() => {
-        if (!currentCity) {
-            setSectors([]);
-            if (currentSector) {
-                updateFilter('sectorId', '');
-            }
-            return;
-        }
-
-        let active = true;
-        void locationApi.getSectors(currentCity)
-            .then((response) => {
-                if (!active) {
-                    return;
-                }
-
-                const nextSectors = (response.data || []) as Sector[];
-                setSectors(nextSectors);
-
-                if (currentSector && !nextSectors.some((sector) => sector.id === currentSector)) {
-                    updateFilter('sectorId', '');
-                }
-            })
-            .catch(() => {
-                if (active) {
-                    setSectors([]);
-                }
-            });
-
-        return () => {
-            active = false;
-        };
-    }, [currentCity, currentSector, updateFilter]);
 
     const handleClearFilters = useCallback(() => {
         trackListingEvent('LISTING_FILTER_APPLY', {

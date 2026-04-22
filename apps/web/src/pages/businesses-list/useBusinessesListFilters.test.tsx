@@ -120,7 +120,7 @@ describe('useBusinessesListFilters', () => {
         });
     });
 
-    it('updates non-seo filters conservatively and only clears city immediately on province change', async () => {
+    it('updates non-seo filters conservatively and lets dependent cleanup finish after province change', async () => {
         const { router, wrapper } = createDynamicWrapper('/businesses?provinceId=prov-1&cityId=city-1&sectorId=sector-1&page=3');
         const { result } = renderHook(() => useBusinessesListFilters(), { wrapper });
 
@@ -133,7 +133,7 @@ describe('useBusinessesListFilters', () => {
             expect(router.state.location.pathname).toBe('/businesses');
             expect(params.get('provinceId')).toBe('prov-2');
             expect(params.get('cityId')).toBeNull();
-            expect(params.get('sectorId')).toBe('sector-1');
+            expect(params.get('sectorId')).toBeNull();
             expect(params.get('page')).toBe('1');
         });
     });
