@@ -1,7 +1,7 @@
-import { screen, waitFor } from '@testing-library/react';
+import { cleanup, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BusinessesList } from '../../pages/BusinessesList';
 import { renderWithProviders } from '../../test/renderWithProviders';
 
@@ -51,6 +51,10 @@ vi.mock('../../lib/growthTracking', () => ({
 
 vi.mock('../../routes/preload', () => ({
     preloadRouteChunk: vi.fn(),
+}));
+
+vi.mock('../../components/BusinessesMap', () => ({
+    BusinessesMap: () => <div data-testid="businesses-map">map mock</div>,
 }));
 
 vi.mock('../../pages/businesses-list/useBusinessesSeo', () => ({
@@ -173,6 +177,10 @@ beforeEach(() => {
     }));
 });
 
+afterEach(() => {
+    cleanup();
+});
+
 describe('BusinessesList integration', () => {
     it('syncs a province SEO route into provinceId query params and the final fetch payload', async () => {
         renderBusinessesList('/negocios/provincia/distrito-nacional');
@@ -229,6 +237,10 @@ describe('BusinessesList integration', () => {
 
         expect((await screen.findAllByText('Cafe AquiTa')).length).toBeGreaterThan(0);
 
+        await waitFor(() => {
+            expect(currentLocationText()).toContain('provinceId=prov-1');
+        });
+
         await userEvent.click(screen.getAllByRole('button', { name: 'Limpiar' })[0]);
 
         await waitFor(() => {
@@ -241,6 +253,52 @@ describe('BusinessesList integration', () => {
                 page: 1,
                 limit: 12,
             });
+        });
+    });
+
+    it('applies the debounced search query and resets the page before the next fetch', async () => {
+        renderBusinessesList('/businesses?page=3');
+
+        expect((await screen.findAllByText('Cafe AquiTa')).length).toBeGreaterThan(0);
+
+        const searchInput = screen.getByPlaceholderText('Buscar restaurantes, colmados o servicios');
+        await userEvent.type(searchInput, 'brunch');
+
+        expect(currentLocationText()).toBe('/businesses?page=3');
+
+        await waitFor(() => {
+            const locationText = currentLocationText();
+            expect(locationText).toContain('search=brunch');
+            expect(locationText).toContain('page=1');
+        });
+
+        await waitFor(() => {
+            const lastCall = getLastGetAllParams();
+            expect(lastCall).toMatchObject({
+                search: 'brunch',
+                page: 1,
+                limit: 12,
+            });
+        });
+    });
+
+    it('persists the map view in the URL and renders the map container when toggled', async () => {
+        renderBusinessesList('/businesses');
+
+        expect((await screen.findAllByText('Cafe AquiTa')).length).toBeGreaterThan(0);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Mapa' }));
+
+        await waitFor(() => {
+            expect(currentLocationText()).toContain('view=map');
+        });
+
+        expect(await screen.findByText('Mapa sincronizado con el listado')).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole('button', { name: 'Lista' }));
+
+        await waitFor(() => {
+            expect(currentLocationText()).toBe('/businesses');
         });
     });
 });

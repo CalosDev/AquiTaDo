@@ -1,5 +1,5 @@
-import { Suspense, lazy, startTransition, useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getApiErrorMessage, isApiTimeoutError } from '../api/error';
 import { adsApi, analyticsApi, businessApi, categoryApi, locationApi } from '../api/endpoints';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
@@ -27,44 +27,11 @@ import type { Business, Category, City, ListingViewMode, Province, Sector, Spons
 import { useBusinessesSeo } from './businesses-list/useBusinessesSeo';
 import { useFavoriteBusinesses } from './businesses-list/useFavoriteBusinesses';
 import { useSponsoredPlacements } from './businesses-list/useSponsoredPlacements';
-
-const INTENT_FEATURE_MAP: Record<string, { label: string; feature: string; description: string }> = {
-    'con-delivery': {
-        label: 'Negocios con delivery',
-        feature: 'delivery',
-        description: 'Encuentra negocios que ofrecen delivery en Republica Dominicana.',
-    },
-    'pet-friendly': {
-        label: 'Negocios pet friendly',
-        feature: 'pet friendly',
-        description: 'Descubre negocios pet friendly para salir con tus mascotas.',
-    },
-    'con-parqueo': {
-        label: 'Negocios con parqueo',
-        feature: 'estacionamiento',
-        description: 'Explora negocios con opciones de parqueo para clientes.',
-    },
-    'con-reservas': {
-        label: 'Negocios con reservaciones',
-        feature: 'reservaciones',
-        description: 'Compara negocios que aceptan reservaciones en linea o por WhatsApp.',
-    },
-    accesibles: {
-        label: 'Negocios accesibles',
-        feature: 'accesible',
-        description: 'Listado de negocios con facilidades de accesibilidad.',
-    },
-};
-
-const QUICK_INTENTION_FEATURE_MAP: Record<string, string> = {
-    'con-delivery': 'delivery',
-    'pet-friendly': 'pet friendly',
-    'con-parqueo': 'estacionamiento',
-    'con-reservas': 'reservaciones',
-    'accesible-ada': 'accesible',
-    'acepta-tarjeta': 'tarjeta',
-    'wifi-gratis': 'wifi',
-};
+import {
+    INTENT_FEATURE_MAP,
+    QUICK_INTENTION_FEATURE_MAP,
+    useBusinessesListFilters,
+} from './businesses-list/useBusinessesListFilters';
 
 const NO_RESULTS_SUGGESTIONS = [
     { to: '/negocios/intencion/con-delivery', label: 'Con delivery' },
@@ -104,33 +71,9 @@ function buildPagination(currentPage: number, totalPages: number): Array<number 
     return pages;
 }
 
-function parseNumericParam(value: string | null): number | null {
-    if (!value) {
-        return null;
-    }
-
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : null;
-}
-
-function normalizeFilterText(value: string): string {
-    return value
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim();
-}
-
 export function BusinessesList() {
     const { isAuthenticated, user } = useAuth();
-    const { categorySlug, provinceSlug, intentSlug } = useParams<{
-        categorySlug?: string;
-        provinceSlug?: string;
-        intentSlug?: string;
-    }>();
-    const navigate = useNavigate();
     const isCustomerRole = user?.role === 'USER';
-    const [searchParams, setSearchParams] = useSearchParams();
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
@@ -145,22 +88,34 @@ export function BusinessesList() {
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [sortKey, setSortKey] = useState<'relevance' | 'rating' | 'distance' | 'name'>('relevance');
     const showSponsoredAds = featureFlags.sponsoredAds;
-
-    const currentSearch = searchParams.get('search') || '';
-    const currentCategory = searchParams.get('categoryId') || '';
-    const currentProvince = searchParams.get('provinceId') || '';
-    const currentCity = searchParams.get('cityId') || '';
-    const currentSector = searchParams.get('sectorId') || '';
-    const currentFeature = searchParams.get('feature') || '';
-    const currentOpenNow = searchParams.get('openNow') === 'true';
-    const currentVerified = searchParams.get('verified') === 'true';
-    const currentLatitude = parseNumericParam(searchParams.get('latitude'));
-    const currentLongitude = parseNumericParam(searchParams.get('longitude'));
-    const currentRadiusKm = parseNumericParam(searchParams.get('radiusKm')) ?? 5;
-    const currentView: ListingViewMode = searchParams.get('view') === 'map' ? 'map' : 'list';
-    const parsedPage = Number.parseInt(searchParams.get('page') || '1', 10);
-    const currentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
-    const [searchInput, setSearchInput] = useState(currentSearch);
+    const {
+        categorySlug,
+        provinceSlug,
+        intentSlug,
+        setSearchParams,
+        currentSearch,
+        currentCategory,
+        currentProvince,
+        currentCity,
+        currentSector,
+        currentFeature,
+        currentOpenNow,
+        currentVerified,
+        currentLatitude,
+        currentLongitude,
+        currentRadiusKm,
+        currentView,
+        currentPage,
+        searchInput,
+        setSearchInput,
+        selectedIntentions,
+        seoCanonicalPath,
+        updateFilter,
+        applyGeoFilter,
+        clearGeoFilter,
+        setViewMode,
+        clearAllFilters,
+    } = useBusinessesListFilters();
     const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
     const paginationItems = useMemo(
         () => buildPagination(currentPage, totalPages),
@@ -267,26 +222,6 @@ export function BusinessesList() {
         () => (intentSlug ? INTENT_FEATURE_MAP[intentSlug] || null : null),
         [intentSlug],
     );
-    const selectedIntentions = useMemo(() => {
-        const selected: string[] = [];
-        const normalizedFeature = normalizeFilterText(currentFeature);
-
-        Object.entries(QUICK_INTENTION_FEATURE_MAP).forEach(([intentionId, featureValue]) => {
-            if (normalizedFeature && normalizedFeature === normalizeFilterText(featureValue)) {
-                selected.push(intentionId);
-            }
-        });
-
-        if (currentOpenNow) {
-            selected.push('abierto-ahora');
-        }
-
-        if (currentVerified) {
-            selected.push('verificado');
-        }
-
-        return selected;
-    }, [currentFeature, currentOpenNow, currentVerified]);
     const listingHeading = useMemo(() => {
         if (activeIntent) {
             return activeIntent.label;
@@ -348,21 +283,6 @@ export function BusinessesList() {
         currentSearch,
         currentVerified,
     ]);
-    const seoCanonicalPath = useMemo(() => {
-        if (intentSlug) {
-            return `/negocios/intencion/${intentSlug}`;
-        }
-        if (categorySlug && provinceSlug) {
-            return `/negocios/${provinceSlug}/${categorySlug}`;
-        }
-        if (categorySlug) {
-            return `/negocios/categoria/${categorySlug}`;
-        }
-        if (provinceSlug) {
-            return `/negocios/provincia/${provinceSlug}`;
-        }
-        return '/businesses';
-    }, [categorySlug, provinceSlug, intentSlug]);
     const trustByBusinessId = useMemo(() => {
         const lookup = new Map<string, ReturnType<typeof calculateBusinessTrustScore>>();
         businesses.forEach((business) => {
@@ -398,10 +318,6 @@ export function BusinessesList() {
         intentSlug,
         seoCanonicalPath,
     });
-
-    useEffect(() => {
-        setSearchInput(currentSearch);
-    }, [currentSearch]);
 
     useEffect(() => {
         if (mappableBusinesses.length === 0) {
@@ -637,59 +553,6 @@ export function BusinessesList() {
         }, { businessId });
     }, [mappableBusinesses.length, sortedBusinesses.length, trackListingEvent]);
 
-    const updateFilter = useCallback((
-        key: string,
-        value: string,
-        options: { resetPage?: boolean } = {},
-    ) => {
-        const isSeoRoutePinnedFilter =
-            (key === 'categoryId' && Boolean(categorySlug))
-            || (key === 'provinceId' && Boolean(provinceSlug))
-            || (key === 'feature' && Boolean(intentSlug));
-
-        if (isSeoRoutePinnedFilter) {
-            const params = new URLSearchParams(searchParams);
-            if (value) {
-                params.set(key, value);
-            } else {
-                params.delete(key);
-            }
-
-            if (options.resetPage ?? true) {
-                params.set('page', '1');
-            }
-
-            startTransition(() => {
-                navigate({
-                    pathname: '/businesses',
-                    search: params.toString() ? `?${params.toString()}` : '',
-                });
-            });
-            return;
-        }
-
-        startTransition(() => {
-            setSearchParams((prev) => {
-                const params = new URLSearchParams(prev);
-                if (value) {
-                    params.set(key, value);
-                } else {
-                    params.delete(key);
-                }
-
-                if (key === 'provinceId' && params.has('cityId')) {
-                    params.delete('cityId');
-                }
-
-                if (options.resetPage ?? true) {
-                    params.set('page', '1');
-                }
-
-                return params;
-            });
-        });
-    }, [setSearchParams, categorySlug, provinceSlug, intentSlug, searchParams, navigate]);
-
     const handleTrackedFilterChange = useCallback((
         key: string,
         value: string,
@@ -736,19 +599,9 @@ export function BusinessesList() {
             longitude,
         });
 
-        startTransition(() => {
-            setSearchParams((previous) => {
-                const params = new URLSearchParams(previous);
-                params.set('latitude', String(latitude));
-                params.set('longitude', String(longitude));
-                params.set('radiusKm', String(distance));
-                params.set('page', '1');
-                return params;
-            });
-        });
-
+        applyGeoFilter(latitude, longitude, distance);
         setSortKey((current) => (current === 'relevance' ? 'distance' : current));
-    }, [setSearchParams, trackListingEvent]);
+    }, [applyGeoFilter, trackListingEvent]);
 
     const handleGeoFilterClear = useCallback(() => {
         trackListingEvent('LISTING_FILTER_APPLY', {
@@ -757,17 +610,8 @@ export function BusinessesList() {
             source: 'sidebar-geo-clear',
         });
 
-        startTransition(() => {
-            setSearchParams((previous) => {
-                const params = new URLSearchParams(previous);
-                params.delete('latitude');
-                params.delete('longitude');
-                params.delete('radiusKm');
-                params.set('page', '1');
-                return params;
-            });
-        });
-    }, [setSearchParams, trackListingEvent]);
+        clearGeoFilter();
+    }, [clearGeoFilter, trackListingEvent]);
 
     const handleViewModeChange = useCallback((nextView: ListingViewMode) => {
         if (nextView === currentView) {
@@ -785,18 +629,8 @@ export function BusinessesList() {
             mappableResults: mappableBusinesses.length,
         });
 
-        startTransition(() => {
-            setSearchParams((previous) => {
-                const params = new URLSearchParams(previous);
-                if (nextView === 'map') {
-                    params.set('view', 'map');
-                } else {
-                    params.delete('view');
-                }
-                return params;
-            });
-        });
-    }, [currentView, mappableBusinesses.length, setSearchParams, sortedBusinesses.length, trackListingEvent]);
+        setViewMode(nextView);
+    }, [currentView, mappableBusinesses.length, setViewMode, sortedBusinesses.length, trackListingEvent]);
 
     const handleSortChange = useCallback((nextSort: typeof sortKey) => {
         setSortKey(nextSort);
@@ -885,13 +719,8 @@ export function BusinessesList() {
             value: null,
             source: 'filters-panel',
         });
-        setSearchInput('');
-        if (categorySlug || provinceSlug || intentSlug) {
-            navigate('/businesses');
-            return;
-        }
-        setSearchParams({});
-    }, [categorySlug, intentSlug, navigate, provinceSlug, setSearchParams, trackListingEvent]);
+        clearAllFilters();
+    }, [clearAllFilters, trackListingEvent]);
 
     useEffect(() => {
         const debounceTimer = window.setTimeout(() => {
