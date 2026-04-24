@@ -23,7 +23,7 @@ import { formatPublicCategoryName, formatPublicCategoryPath } from '../lib/categ
 import { BusinessCard } from './businesses-list/BusinessCard';
 import { FiltersSidebar } from './businesses-list/FiltersSidebar';
 import { ListingControlsBar } from './businesses-list/ListingControlsBar';
-import type { Business, Category, City, ListingViewMode, Province, Sector, SponsoredPlacement } from './businesses-list/types';
+import type { Business, Category, ListingViewMode, Province } from './businesses-list/types';
 import { useBusinessesSeo } from './businesses-list/useBusinessesSeo';
 import { useFavoriteBusinesses } from './businesses-list/useFavoriteBusinesses';
 import { useSponsoredPlacements } from './businesses-list/useSponsoredPlacements';

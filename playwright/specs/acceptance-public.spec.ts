@@ -9,6 +9,20 @@ test.describe('Public acceptance @acceptance', () => {
         await expect(page.getByRole('link', { name: /Explorar negocios/i })).toBeVisible();
     });
 
+    test('businesses loads the public directory shell @acceptance', async ({ page }) => {
+        await page.goto('/businesses');
+
+        await expect(page).toHaveURL(/\/businesses$/);
+        await expect(page.getByRole('heading', { name: /Negocios/i })).toBeVisible();
+        await expect(page.getByRole('heading', { name: /Directorio listo para explorar/i })).toBeVisible();
+        await expect(page.getByRole('textbox', { name: /Buscar negocios/i })).toBeVisible();
+        await expect(page.getByRole('combobox', { name: /Filtrar por provincia/i })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Filtros', exact: true })).toBeVisible();
+        await expect(page.getByRole('main')).toContainText(
+            /Cargando resultados\.{3}|Mostrando 0 resultados|Mostrando \d+-\d+ de \d+ resultados|No encontramos coincidencias con esta combinaciÃ³n/i,
+        );
+    });
+
     test('businesses shows context, filters, and a result area @acceptance', async ({ page }) => {
         await page.goto('/businesses');
 
