@@ -1,6 +1,5 @@
 import {
     BadRequestException,
-    ForbiddenException,
     Inject,
     Injectable,
     Logger,
@@ -17,6 +16,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ReputationService } from '../reputation/reputation.service';
 import { NotificationsQueueService } from '../notifications/notifications.queue.service';
+import { OrganizationAccessService } from '../organizations/organization-access.service';
 import { UploadsService } from '../uploads/uploads.service';
 import {
     activeBusinessOwnershipSelect,
@@ -62,6 +62,8 @@ export class VerificationService {
         private readonly notificationsQueueService: NotificationsQueueService,
         @Inject(UploadsService)
         private readonly uploadsService: UploadsService,
+        @Inject(OrganizationAccessService)
+        private readonly organizationAccessService: OrganizationAccessService,
     ) { }
 
     async uploadDocumentFile(
@@ -1038,9 +1040,10 @@ export class VerificationService {
             return;
         }
 
-        if (!organizationRole) {
-            throw new ForbiddenException('No tienes permisos para subir documentos de verificación');
-        }
+        this.organizationAccessService.assertOrganizationMember(
+            organizationRole,
+            'No tienes permisos para subir documentos de verificación',
+        );
     }
 
     private assertCanManageBusinessVerification(
@@ -1051,9 +1054,14 @@ export class VerificationService {
             return;
         }
 
-        if (!organizationRole || organizationRole === 'STAFF') {
-            throw new ForbiddenException('No tienes permisos para enviar verificaciones');
-        }
+        this.organizationAccessService.assertOrganizationMember(
+            organizationRole,
+            'No tienes permisos para enviar verificaciones',
+        );
+        this.organizationAccessService.assertCanManageOrganization(
+            organizationRole,
+            'No tienes permisos para enviar verificaciones',
+        );
     }
 
     private assertDocumentUrl(fileUrl: string): void {

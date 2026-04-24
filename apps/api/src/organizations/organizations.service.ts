@@ -14,6 +14,7 @@ import {
     Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrganizationAccessService } from './organization-access.service';
 import {
     CreateOrganizationDto,
     InviteOrganizationMemberDto,
@@ -23,7 +24,6 @@ import {
 } from './dto/organization.dto';
 import { OrganizationsUsageService } from './organizations-usage.service';
 
-type ActorOrgRole = OrganizationRole;
 type PrismaClientLike = PrismaService | Prisma.TransactionClient;
 type AuditLogClient = PrismaClientLike;
 
@@ -44,6 +44,8 @@ export class OrganizationsService {
         private readonly prisma: PrismaService,
         @Inject(OrganizationsUsageService)
         private readonly organizationsUsageService: OrganizationsUsageService,
+        @Inject(OrganizationAccessService)
+        private readonly organizationAccessService: OrganizationAccessService,
     ) { }
 
     private readonly logger = new Logger(OrganizationsService.name);
@@ -148,7 +150,7 @@ export class OrganizationsService {
     }
 
     async findById(organizationId: string, userId: string) {
-        const actorRole = await this.resolveActorRole(organizationId, userId);
+        const actorRole = await this.organizationAccessService.resolveActorRole(organizationId, userId);
 
         const organization = await this.prisma.organization.findUnique({
             where: { id: organizationId },
@@ -166,8 +168,8 @@ export class OrganizationsService {
     }
 
     async update(organizationId: string, dto: UpdateOrganizationDto, userId: string) {
-        const actorRole = await this.resolveActorRole(organizationId, userId);
-        this.assertCanManageOrganization(actorRole);
+        const actorRole = await this.organizationAccessService.resolveActorRole(organizationId, userId);
+        this.organizationAccessService.assertCanManageOrganization(actorRole);
 
         const existing = await this.prisma.organization.findUnique({
             where: { id: organizationId },
@@ -223,7 +225,7 @@ export class OrganizationsService {
     }
 
     async listMembers(organizationId: string, userId: string) {
-        await this.resolveActorRole(organizationId, userId);
+        await this.organizationAccessService.resolveActorRole(organizationId, userId);
 
         return this.prisma.organizationMember.findMany({
             where: { organizationId },
@@ -242,8 +244,8 @@ export class OrganizationsService {
     }
 
     async listInvites(organizationId: string, userId: string) {
-        const actorRole = await this.resolveActorRole(organizationId, userId);
-        this.assertCanManageOrganization(actorRole);
+        const actorRole = await this.organizationAccessService.resolveActorRole(organizationId, userId);
+        this.organizationAccessService.assertCanManageOrganization(actorRole);
 
         return this.prisma.organizationInvite.findMany({
             where: {
@@ -264,7 +266,7 @@ export class OrganizationsService {
     }
 
     async getSubscription(organizationId: string, userId: string) {
-        const actorRole = await this.resolveActorRole(organizationId, userId);
+        const actorRole = await this.organizationAccessService.resolveActorRole(organizationId, userId);
 
         const organization = await this.prisma.organization.findUnique({
             where: { id: organizationId },
@@ -302,10 +304,11 @@ export class OrganizationsService {
         dto: UpdateOrganizationSubscriptionDto,
         userId: string,
     ) {
-        const actorRole = await this.resolveActorRole(organizationId, userId);
-        if (actorRole !== 'OWNER') {
-            throw new ForbiddenException('Solo el owner puede actualizar la suscripcion de la organizacion');
-        }
+        const actorRole = await this.organizationAccessService.resolveActorRole(organizationId, userId);
+        this.organizationAccessService.assertOwner(
+            actorRole,
+            'Solo el owner puede actualizar la suscripcion de la organizacion',
+        );
 
         const updated = await this.prisma.$transaction(async (tx) => {
             const currentOrganization = await tx.organization.findUnique({
@@ -424,7 +427,7 @@ export class OrganizationsService {
     }
 
     async getUsage(organizationId: string, userId: string) {
-        await this.resolveActorRole(organizationId, userId);
+        await this.organizationAccessService.resolveActorRole(organizationId, userId);
 
         const organization = await this.prisma.organization.findUnique({
             where: { id: organizationId },
@@ -456,7 +459,7 @@ export class OrganizationsService {
     }
 
     async listAuditLogs(organizationId: string, userId: string, limit = 50) {
-        await this.resolveActorRole(organizationId, userId);
+        await this.organizationAccessService.resolveActorRole(organizationId, userId);
 
         const boundedLimit = Math.min(Math.max(limit, 1), 200);
 
@@ -488,11 +491,11 @@ export class OrganizationsService {
         dto: InviteOrganizationMemberDto,
         userId: string,
     ) {
-        const actorRole = await this.resolveActorRole(organizationId, userId);
-        this.assertCanManageOrganization(actorRole);
+        const actorRole = await this.organizationAccessService.resolveActorRole(organizationId, userId);
+        this.organizationAccessService.assertCanManageOrganization(actorRole);
 
         const inviteRole = dto.role ?? 'STAFF';
-        this.assertInvitePermission(actorRole, inviteRole);
+        this.organizationAccessService.assertInvitePermission(actorRole, inviteRole);
 
         const normalizedEmail = dto.email.trim().toLowerCase();
 
@@ -698,8 +701,8 @@ export class OrganizationsService {
         dto: UpdateOrganizationMemberRoleDto,
         actorUserId: string,
     ) {
-        const actorRole = await this.resolveActorRole(organizationId, actorUserId);
-        this.assertCanManageOrganization(actorRole);
+        const actorRole = await this.organizationAccessService.resolveActorRole(organizationId, actorUserId);
+        this.organizationAccessService.assertCanManageOrganization(actorRole);
 
         const targetMembership = await this.prisma.organizationMember.findUnique({
             where: {
@@ -779,8 +782,8 @@ export class OrganizationsService {
         memberUserId: string,
         actorUserId: string,
     ) {
-        const actorRole = await this.resolveActorRole(organizationId, actorUserId);
-        this.assertCanManageOrganization(actorRole);
+        const actorRole = await this.organizationAccessService.resolveActorRole(organizationId, actorUserId);
+        this.organizationAccessService.assertCanManageOrganization(actorRole);
 
         const targetMembership = await this.prisma.organizationMember.findUnique({
             where: {
@@ -850,60 +853,6 @@ export class OrganizationsService {
             },
         },
     } as const;
-
-    private async resolveActorRole(
-        organizationId: string,
-        userId: string,
-    ): Promise<ActorOrgRole> {
-        const organization = await this.prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { id: true },
-        });
-
-        if (!organization) {
-            throw new NotFoundException('Organizacion no encontrada');
-        }
-
-        const membership = await this.prisma.organizationMember.findUnique({
-            where: {
-                organizationId_userId: {
-                    organizationId,
-                    userId,
-                },
-            },
-            select: { role: true },
-        });
-
-        if (!membership) {
-            throw new ForbiddenException('No tienes acceso a esta organizacion');
-        }
-
-        return membership.role;
-    }
-
-    private assertCanManageOrganization(actorRole: ActorOrgRole): void {
-        if (actorRole !== 'OWNER' && actorRole !== 'MANAGER') {
-            throw new ForbiddenException('No tienes permisos para gestionar esta organizacion');
-        }
-    }
-
-    private assertInvitePermission(actorRole: ActorOrgRole, inviteRole: OrganizationRole): void {
-        if (actorRole === 'OWNER') {
-            if (inviteRole === 'OWNER') {
-                throw new ForbiddenException('No puedes invitar otro OWNER desde este endpoint');
-            }
-            return;
-        }
-
-        if (actorRole === 'MANAGER') {
-            if (inviteRole !== 'STAFF') {
-                throw new ForbiddenException('El rol MANAGER solo puede invitar miembros STAFF');
-            }
-            return;
-        }
-
-        throw new ForbiddenException('No tienes permisos para invitar miembros');
-    }
 
     private async generateUniqueSlug(baseSlug: string, excludeOrganizationId?: string): Promise<string> {
         let slug = baseSlug;

@@ -12,6 +12,7 @@ import {
     OrganizationRole,
     Prisma,
 } from '../generated/prisma/client';
+import { OrganizationAccessService } from '../organizations/organization-access.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -44,6 +45,8 @@ export class PaymentsService {
         private readonly paymentsReportingService: PaymentsReportingService,
         @Inject(PaymentsWebhookService)
         private readonly paymentsWebhookService: PaymentsWebhookService,
+        @Inject(OrganizationAccessService)
+        private readonly organizationAccessService: OrganizationAccessService,
     ) { }
 
     async listMyPayments(organizationId: string, limit = 50) {
@@ -113,11 +116,14 @@ export class PaymentsService {
 
     async createAdsWalletCheckoutSession(
         organizationId: string,
+        organizationRole: OrganizationRole | null,
         actorUserId: string,
-        actorGlobalRole: string,
         dto: CreateAdsWalletCheckoutSessionDto,
     ) {
-        await this.assertCanManageBilling(organizationId, actorUserId, actorGlobalRole);
+        this.organizationAccessService.assertOwner(
+            organizationRole ?? 'STAFF',
+            'Solo el owner puede gestionar la facturacion',
+        );
 
         const stripe = this.resolveStripeClient();
         const amount = Number(dto.amount);
@@ -534,36 +540,6 @@ export class PaymentsService {
 
     async handleStripeWebhook(signature: string | undefined, body: unknown) {
         return this.paymentsWebhookService.handleStripeWebhook(signature, body);
-    }
-
-    private async assertCanManageBilling(
-        organizationId: string,
-        actorUserId: string,
-        actorGlobalRole: string,
-    ) {
-        if (actorGlobalRole === 'ADMIN') {
-            return;
-        }
-
-        const membership = await this.prisma.organizationMember.findUnique({
-            where: {
-                organizationId_userId: {
-                    organizationId,
-                    userId: actorUserId,
-                },
-            },
-            select: {
-                role: true,
-            },
-        });
-
-        if (!membership) {
-            throw new ForbiddenException('No tienes acceso a esta organizacion');
-        }
-
-        if (membership.role !== OrganizationRole.OWNER) {
-            throw new ForbiddenException('Solo el owner puede gestionar la facturacion');
-        }
     }
 
     private async assertCanCreateBookingPayment(

@@ -11,6 +11,7 @@ import {
     OrganizationRole,
     Prisma,
 } from '../generated/prisma/client';
+import { OrganizationAccessService } from '../organizations/organization-access.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { activeBusinessOwnershipSelect, resolveActiveBusinessOrganizationId } from '../businesses/business-ownership.helpers';
 import {
@@ -26,6 +27,8 @@ export class MessagingService {
     constructor(
         @Inject(PrismaService)
         private readonly prisma: PrismaService,
+        @Inject(OrganizationAccessService)
+        private readonly organizationAccessService: OrganizationAccessService,
     ) { }
 
     async createConversation(
@@ -210,7 +213,7 @@ export class MessagingService {
         organizationRole: OrganizationRole | null,
         dto: SendConversationMessageDto,
     ) {
-        this.assertCanManageConversation(globalRole, organizationRole);
+        this.assertCanParticipateAsOrganization(globalRole, organizationRole);
 
         const conversation = await this.prisma.conversation.findUnique({
             where: { id: conversationId },
@@ -307,8 +310,11 @@ export class MessagingService {
         organizationRole: OrganizationRole | null,
         dto: ConvertConversationToBookingDto,
     ) {
-        if (actorGlobalRole !== 'ADMIN' && organizationRole === 'STAFF') {
-            throw new ForbiddenException('El rol STAFF no puede convertir conversaciones en reservas');
+        if (actorGlobalRole !== 'ADMIN') {
+            this.organizationAccessService.assertCanManageOrganization(
+                organizationRole ?? 'STAFF',
+                'El rol STAFF no puede convertir conversaciones en reservas',
+            );
         }
 
         const scheduledFor = new Date(dto.scheduledFor);
@@ -469,6 +475,20 @@ export class MessagingService {
         };
     }
 
+    private assertCanParticipateAsOrganization(
+        globalRole: string,
+        organizationRole: OrganizationRole | null,
+    ): void {
+        if (globalRole === 'ADMIN') {
+            return;
+        }
+
+        this.organizationAccessService.assertOrganizationMember(
+            organizationRole,
+            'No tienes permisos para gestionar conversaciones',
+        );
+    }
+
     private assertCanManageConversation(
         globalRole: string,
         organizationRole: OrganizationRole | null,
@@ -477,9 +497,10 @@ export class MessagingService {
             return;
         }
 
-        if (!organizationRole) {
-            throw new ForbiddenException('No tienes permisos para gestionar conversaciones');
-        }
+        this.organizationAccessService.assertCanManageOrganization(
+            organizationRole ?? 'STAFF',
+            'No tienes permisos para gestionar conversaciones',
+        );
     }
 
     private composeBookingNotes(

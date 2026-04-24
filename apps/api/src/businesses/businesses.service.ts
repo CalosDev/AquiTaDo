@@ -11,6 +11,7 @@ import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { GrowthEventType, OrganizationRole, Prisma, SalesLeadStage } from '../generated/prisma/client';
+import { OrganizationAccessService } from '../organizations/organization-access.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
     CreateBusinessDto,
@@ -56,15 +57,74 @@ import {
     resolvePagination,
 } from './businesses.helpers';
 import {
-    normalizeClaimEvidenceType,
     normalizeCatalogSource,
     toCanonicalClaimEvidenceType,
     toCanonicalCatalogSource,
     toLifecycleStatus,
 } from './catalog-taxonomy.helpers';
 import {
+    assertActiveAdminCatalogBusiness,
+    buildAdminPublicationUpdateData,
+} from './admin-catalog.helpers';
+import {
+    assertApprovableClaimReview,
+    assertReviewableBusinessClaimRequest,
+    buildApprovedClaimBusinessUpdateData,
+    buildRejectedClaimBusinessUpdateData,
+    buildUnderReviewClaimBusinessUpdateData,
+} from './business-claim-review.helpers';
+import { buildExpiredClaimBusinessUpdateData } from './business-claim-expiration.helpers';
+import {
+    assertClaimRequestableBusiness,
+    assertNoActiveClaimRequestConflict,
+    assertNoActiveOwnershipClaimConflict,
+    buildClaimRequestSubmittedGrowthMetadata,
+    buildCreatedClaimRequestCreateData,
+    buildCreatedClaimRequestAuditMetadata,
+    buildCreatedClaimBusinessUpdateData,
+} from './business-claim-creation.helpers';
+import {
+    assertExistingAdminClaimRequest,
+    buildClaimRequestSummary,
+    CLAIM_REQUEST_DETAIL_SELECT,
+    clampClaimRequestLimit,
+    hydrateClaimRequestSnapshot,
+} from './business-claim-request.helpers';
+import {
+    assertApprovableBusinessSuggestion,
+    assertReviewableBusinessSuggestion,
+    buildApprovedBusinessSuggestionCatalogBusinessInput,
+    buildBusinessSuggestionSummary,
+    buildReviewedBusinessSuggestionAuditMetadata,
+    buildReviewedBusinessSuggestionUpdateData,
+    BUSINESS_SUGGESTION_LIST_SELECT,
+    clampBusinessSuggestionLimit,
+} from './business-suggestion.helpers';
+import {
+    buildDuplicateCaseSummary,
+    clampDuplicateCaseLimit,
+    DUPLICATE_CASE_LIST_SELECT,
+} from './business-duplicate.helpers';
+import {
+    buildMergedDuplicateCaseAuditMetadata,
+    buildMergedDuplicateCaseCreateData,
+    buildMergedDuplicateCaseResolutionMeta,
+    buildMergedDuplicateCaseUpdateData,
+    buildNonMergedDuplicateCaseAuditMetadata,
+    buildNonMergedDuplicateCaseCreateData,
+    buildNonMergedDuplicateCaseUpdateData,
+    MERGED_DUPLICATE_CASE_RESOLUTION_SELECT,
+    NON_MERGED_DUPLICATE_CASE_RESOLUTION_SELECT,
+} from './business-duplicate-resolution.helpers';
+import {
     activeBusinessOwnershipSelect,
+    assertAdminClaimableBusiness,
+    assertExistingOwnershipHistoryBusiness,
+    assertRevocableBusinessOwnership,
+    buildAdminMarkClaimedBusinessUpdateData,
+    buildOwnershipRevocationBusinessUpdateData,
     businessBelongsToOrganization,
+    clampOwnershipHistoryLimit,
     resolveActiveBusinessOrganizationId,
 } from './business-ownership.helpers';
 import {
@@ -119,59 +179,6 @@ type BusinessDuplicateSignalInput = {
 
 const ACTIVE_CLAIM_REQUEST_STATUSES = ['PENDING', 'UNDER_REVIEW'] as const;
 const CLAIM_REQUEST_EXPIRATION_DAYS = 30;
-const CLAIM_REQUEST_DETAIL_SELECT = {
-    id: true,
-    businessId: true,
-    requesterUserId: true,
-    requesterOrganizationId: true,
-    status: true,
-    evidenceType: true,
-    evidenceValue: true,
-    notes: true,
-    adminNotes: true,
-    createdAt: true,
-    updatedAt: true,
-    reviewedAt: true,
-    approvedAt: true,
-    rejectedAt: true,
-    expiredAt: true,
-    canceledAt: true,
-    business: {
-        select: {
-            id: true,
-            name: true,
-            slug: true,
-            claimStatus: true,
-            publicStatus: true,
-            source: true,
-            catalogSource: true,
-            lifecycleStatus: true,
-            primaryManagingOrganizationId: true,
-        },
-    },
-    requesterUser: {
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-        },
-    },
-    requesterOrganization: {
-        select: {
-            id: true,
-            name: true,
-            slug: true,
-        },
-    },
-    reviewedByAdmin: {
-        select: {
-            id: true,
-            name: true,
-            email: true,
-        },
-    },
-} satisfies Prisma.BusinessClaimRequestSelect;
 
 @Injectable()
 export class BusinessesService {
@@ -194,6 +201,8 @@ export class BusinessesService {
         private readonly integrationsService: IntegrationsService,
         @Inject(SearchService)
         private readonly searchService: SearchService,
+        @Inject(OrganizationAccessService)
+        private readonly organizationAccessService: OrganizationAccessService,
     ) { }
     private readonly uploadsRoot = path.resolve(process.cwd(), 'uploads');
 
@@ -598,7 +607,6 @@ export class BusinessesService {
             }),
         ]);
 
-        const activeOwnershipBusinessIds = new Set(activeOwnershipRows.map((row) => row.businessId));
         const activeOwnershipByBusinessId = new Map(
             activeOwnershipRows.map((row) => [row.businessId, row.organizationId]),
         );
@@ -609,15 +617,11 @@ export class BusinessesService {
         for (const affectedBusinessId of affectedBusinessIds) {
             await prismaClient.business.update({
                 where: { id: affectedBusinessId },
-                data: {
-                    claimStatus: activeOwnershipBusinessIds.has(affectedBusinessId)
-                        ? 'CLAIMED'
-                        : (activeClaimCounts.get(affectedBusinessId) ?? 0) > 0
-                            ? 'PENDING_CLAIM'
-                            : 'UNCLAIMED',
-                    primaryManagingOrganizationId: activeOwnershipByBusinessId.get(affectedBusinessId) ?? null,
-                    lastReviewedAt: referenceDate,
-                },
+                data: buildExpiredClaimBusinessUpdateData({
+                    activeOwnershipOrganizationId: activeOwnershipByBusinessId.get(affectedBusinessId) ?? null,
+                    remainingActiveClaims: activeClaimCounts.get(affectedBusinessId) ?? 0,
+                    referenceDate,
+                }),
                 select: {
                     id: true,
                 },
@@ -630,7 +634,7 @@ export class BusinessesService {
     async listClaimRequests(query: BusinessClaimRequestQueryDto) {
         await this.expireStaleClaimRequests(this.prisma);
 
-        const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
+        const limit = clampClaimRequestLimit(query.limit);
         const status = query.status ?? 'PENDING';
         const items = await this.prisma.businessClaimRequest.findMany({
             where: {
@@ -649,11 +653,8 @@ export class BusinessesService {
         });
 
         return {
-            data: items.map((item) => this.hydrateClaimRequestSnapshot(item)),
-            summary: summary.reduce<Record<string, number>>((accumulator, item) => {
-                accumulator[item.status] = item._count._all;
-                return accumulator;
-            }, {}),
+            data: items.map((item) => hydrateClaimRequestSnapshot(item)),
+            summary: buildClaimRequestSummary(summary),
         };
     }
 
@@ -663,7 +664,7 @@ export class BusinessesService {
     ) {
         await this.expireStaleClaimRequests(this.prisma);
 
-        const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
+        const limit = clampClaimRequestLimit(query.limit);
         const where: Prisma.BusinessClaimRequestWhereInput = {
             requesterUserId,
             ...(query.status ? { status: query.status } : {}),
@@ -688,27 +689,20 @@ export class BusinessesService {
         ]);
 
         return {
-            data: items.map((item) => this.hydrateClaimRequestSnapshot(item)),
-            summary: summary.reduce<Record<string, number>>((accumulator, item) => {
-                accumulator[item.status] = item._count._all;
-                return accumulator;
-            }, {}),
+            data: items.map((item) => hydrateClaimRequestSnapshot(item)),
+            summary: buildClaimRequestSummary(summary),
         };
     }
 
     async getClaimRequestAdmin(claimRequestId: string) {
         await this.expireStaleClaimRequests(this.prisma);
 
-        const claimRequest = await this.prisma.businessClaimRequest.findUnique({
+        const claimRequest = assertExistingAdminClaimRequest(await this.prisma.businessClaimRequest.findUnique({
             where: { id: claimRequestId },
             select: CLAIM_REQUEST_DETAIL_SELECT,
-        });
+        }));
 
-        if (!claimRequest) {
-            throw new NotFoundException('Solicitud de reclamacion no encontrada');
-        }
-
-        return this.hydrateClaimRequestSnapshot(claimRequest);
+        return hydrateClaimRequestSnapshot(claimRequest);
     }
 
     async createClaimRequest(
@@ -719,12 +713,13 @@ export class BusinessesService {
     ) {
         const normalizedEvidenceValue = normalizeOptionalText(dto.evidenceValue) ?? null;
         const normalizedNotes = normalizeOptionalText(dto.notes) ?? null;
+        const canonicalEvidenceType = toCanonicalClaimEvidenceType(dto.evidenceType);
 
         try {
             const claimRequest = await this.prisma.$transaction(async (tx) => {
                 await this.expireStaleClaimRequests(tx, businessId);
 
-                const business = await tx.business.findUnique({
+                const business = assertClaimRequestableBusiness(await tx.business.findUnique({
                     where: { id: businessId },
                     select: {
                         id: true,
@@ -736,19 +731,7 @@ export class BusinessesService {
                         isClaimable: true,
                         deletedAt: true,
                     },
-                });
-
-                if (!business || business.deletedAt) {
-                    throw new NotFoundException('Negocio no encontrado');
-                }
-
-                if (!business.isClaimable) {
-                    throw new BadRequestException('Este negocio no esta disponible para reclamacion');
-                }
-
-                if (business.claimStatus === 'CLAIMED') {
-                    throw new BadRequestException('Este negocio ya fue reclamado');
-                }
+                }));
 
                 const activeOwnership = await tx.businessOwnership.findFirst({
                     where: {
@@ -758,9 +741,7 @@ export class BusinessesService {
                     select: { id: true },
                 });
 
-                if (activeOwnership) {
-                    throw new ConflictException('Este negocio ya tiene un ownership activo');
-                }
+                assertNoActiveOwnershipClaimConflict(activeOwnership);
 
                 const existingPendingRequest = await tx.businessClaimRequest.findFirst({
                     where: {
@@ -772,19 +753,17 @@ export class BusinessesService {
                     select: { id: true },
                 });
 
-                if (existingPendingRequest) {
-                    throw new ConflictException('Ya existe una solicitud de reclamacion pendiente para este negocio');
-                }
+                assertNoActiveClaimRequestConflict(existingPendingRequest);
 
                 const createdRequest = await tx.businessClaimRequest.create({
-                    data: {
+                    data: buildCreatedClaimRequestCreateData({
                         businessId,
                         requesterUserId,
                         requesterOrganizationId: requesterOrganizationId ?? null,
-                        evidenceType: toCanonicalClaimEvidenceType(dto.evidenceType),
+                        evidenceType: canonicalEvidenceType,
                         evidenceValue: normalizedEvidenceValue,
                         notes: normalizedNotes,
-                    },
+                    }),
                     select: {
                         id: true,
                         status: true,
@@ -801,10 +780,9 @@ export class BusinessesService {
 
                 await tx.business.update({
                     where: { id: businessId },
-                    data: {
-                        claimStatus: 'PENDING_CLAIM',
-                        updatedByUserId: requesterUserId,
-                    },
+                    data: buildCreatedClaimBusinessUpdateData({
+                        requesterUserId,
+                    }),
                     select: { id: true },
                 });
 
@@ -815,11 +793,11 @@ export class BusinessesService {
                         action: 'business_claim_request.created',
                         targetType: 'business_claim_request',
                         targetId: createdRequest.id,
-                        metadata: {
+                        metadata: buildCreatedClaimRequestAuditMetadata({
                             businessId,
                             businessSlug: business.slug,
-                            evidenceType: toCanonicalClaimEvidenceType(dto.evidenceType),
-                        } as Prisma.InputJsonValue,
+                            evidenceType: canonicalEvidenceType,
+                        }),
                     },
                 });
 
@@ -831,10 +809,10 @@ export class BusinessesService {
                         userId: requesterUserId,
                         provinceId: business.provinceId,
                         cityId: business.cityId,
-                        metadata: {
+                        metadata: buildClaimRequestSubmittedGrowthMetadata({
                             claimRequestId: createdRequest.id,
-                            evidenceType: toCanonicalClaimEvidenceType(dto.evidenceType),
-                        } as Prisma.InputJsonValue,
+                            evidenceType: canonicalEvidenceType,
+                        }),
                     },
                 });
 
@@ -871,7 +849,7 @@ export class BusinessesService {
             const reviewedClaim = await this.prisma.$transaction(async (tx) => {
                 await this.expireStaleClaimRequests(tx, undefined, reviewedAt);
 
-                const claimRequest = await tx.businessClaimRequest.findUnique({
+                const claimRequest = assertReviewableBusinessClaimRequest(await tx.businessClaimRequest.findUnique({
                     where: { id: claimRequestId },
                     select: {
                         id: true,
@@ -888,15 +866,7 @@ export class BusinessesService {
                             },
                         },
                     },
-                });
-
-                if (!claimRequest) {
-                    throw new NotFoundException('Solicitud de reclamacion no encontrada');
-                }
-
-                if (!ACTIVE_CLAIM_REQUEST_STATUSES.includes(claimRequest.status as (typeof ACTIVE_CLAIM_REQUEST_STATUSES)[number])) {
-                    throw new BadRequestException('Esta solicitud ya fue revisada');
-                }
+                }));
 
                 if (dto.status === 'UNDER_REVIEW') {
                     const activeOwnership = await tx.businessOwnership.findFirst({
@@ -923,12 +893,11 @@ export class BusinessesService {
 
                     await tx.business.update({
                         where: { id: claimRequest.businessId },
-                        data: {
-                            claimStatus: activeOwnership ? 'CLAIMED' : 'PENDING_CLAIM',
-                            primaryManagingOrganizationId: activeOwnership?.organizationId ?? null,
-                            updatedByUserId: adminUserId,
-                            lastReviewedAt: reviewedAt,
-                        },
+                        data: buildUnderReviewClaimBusinessUpdateData({
+                            activeOwnershipOrganizationId: activeOwnership?.organizationId ?? null,
+                            reviewedAt,
+                            adminUserId,
+                        }),
                         select: { id: true },
                     });
 
@@ -975,9 +944,7 @@ export class BusinessesService {
                         },
                     });
 
-                    if (activeOwnership) {
-                        throw new ConflictException('El negocio ya tiene un ownership activo');
-                    }
+                    assertApprovableClaimReview(activeOwnership);
 
                     await tx.user.updateMany({
                         where: {
@@ -991,17 +958,12 @@ export class BusinessesService {
 
                     await tx.business.update({
                         where: { id: claimRequest.businessId },
-                        data: {
-                            ownerId: claimRequest.requesterUserId,
-                            organizationId: effectiveOrganizationId,
-                            primaryManagingOrganizationId: effectiveOrganizationId,
-                            claimStatus: 'CLAIMED',
-                            claimedAt: reviewedAt,
-                            claimedByUserId: claimRequest.requesterUserId,
-                            legacyOwnerMode: false,
-                            updatedByUserId: adminUserId,
-                            lastReviewedAt: reviewedAt,
-                        },
+                        data: buildApprovedClaimBusinessUpdateData({
+                            requesterUserId: claimRequest.requesterUserId,
+                            effectiveOrganizationId,
+                            reviewedAt,
+                            adminUserId,
+                        }),
                         select: {
                             id: true,
                         },
@@ -1120,16 +1082,12 @@ export class BusinessesService {
 
                 await tx.business.update({
                     where: { id: claimRequest.businessId },
-                    data: {
-                        claimStatus: activeOwnership
-                            ? 'CLAIMED'
-                            : remainingActiveClaims > 0
-                                ? 'PENDING_CLAIM'
-                                : 'UNCLAIMED',
-                        primaryManagingOrganizationId: activeOwnership?.organizationId ?? null,
-                        updatedByUserId: adminUserId,
-                        lastReviewedAt: reviewedAt,
-                    },
+                    data: buildRejectedClaimBusinessUpdateData({
+                        remainingActiveClaims,
+                        activeOwnershipOrganizationId: activeOwnership?.organizationId ?? null,
+                        reviewedAt,
+                        adminUserId,
+                    }),
                     select: { id: true },
                 });
 
@@ -1195,8 +1153,8 @@ export class BusinessesService {
     }
 
     async listOwnershipHistory(businessId: string, limit = 20) {
-        const safeLimit = Math.min(Math.max(limit, 1), 100);
-        const business = await this.prisma.business.findUnique({
+        const safeLimit = clampOwnershipHistoryLimit(limit);
+        const business = assertExistingOwnershipHistoryBusiness(await this.prisma.business.findUnique({
             where: { id: businessId },
             select: {
                 id: true,
@@ -1207,11 +1165,7 @@ export class BusinessesService {
                 organizationId: true,
                 primaryManagingOrganizationId: true,
             },
-        });
-
-        if (!business) {
-            throw new NotFoundException('Negocio no encontrado');
-        }
+        }));
 
         const ownerships = await this.prisma.businessOwnership.findMany({
             where: {
@@ -1288,7 +1242,7 @@ export class BusinessesService {
 
         try {
             const result = await this.prisma.$transaction(async (tx) => {
-                const ownership = await tx.businessOwnership.findFirst({
+                const ownership = assertRevocableBusinessOwnership(await tx.businessOwnership.findFirst({
                     where: {
                         id: ownershipId,
                         businessId,
@@ -1305,15 +1259,7 @@ export class BusinessesService {
                             },
                         },
                     },
-                });
-
-                if (!ownership) {
-                    throw new NotFoundException('Ownership no encontrado');
-                }
-
-                if (!ownership.isActive) {
-                    throw new BadRequestException('Este ownership ya fue revocado');
-                }
+                }));
 
                 await tx.businessOwnership.update({
                     where: { id: ownershipId },
@@ -1342,18 +1288,11 @@ export class BusinessesService {
 
                 await tx.business.update({
                     where: { id: businessId },
-                    data: {
-                        organizationId: nextActiveOwnership?.organizationId ?? null,
-                        primaryManagingOrganizationId: nextActiveOwnership?.organizationId ?? null,
-                        ownerId: nextActiveOwnership ? undefined : null,
-                        claimStatus: nextActiveOwnership ? 'CLAIMED' : 'SUSPENDED',
-                        claimedByUserId: nextActiveOwnership ? undefined : null,
-                        claimedAt: nextActiveOwnership ? undefined : null,
-                        isClaimable: nextActiveOwnership ? true : false,
-                        legacyOwnerMode: false,
-                        updatedByUserId: adminUserId,
-                        lastReviewedAt: revokedAt,
-                    },
+                    data: buildOwnershipRevocationBusinessUpdateData({
+                        nextActiveOrganizationId: nextActiveOwnership?.organizationId ?? null,
+                        reviewedAt: revokedAt,
+                        adminUserId,
+                    }),
                     select: {
                         id: true,
                     },
@@ -1404,7 +1343,7 @@ export class BusinessesService {
         const reviewedAt = new Date();
 
         const result = await this.prisma.$transaction(async (tx) => {
-            const business = await tx.business.findUnique({
+            const business = assertActiveAdminCatalogBusiness(await tx.business.findUnique({
                 where: { id: businessId },
                 select: {
                     id: true,
@@ -1416,34 +1355,14 @@ export class BusinessesService {
                     primaryManagingOrganizationId: true,
                     ownerships: activeBusinessOwnershipSelect,
                 },
+            }));
+
+            const updateData = buildAdminPublicationUpdateData({
+                shouldPublish,
+                reviewedAt,
+                firstPublishedAt: business.firstPublishedAt,
+                adminUserId,
             });
-
-            if (!business || business.deletedAt) {
-                throw new NotFoundException('Negocio no encontrado');
-            }
-
-            const publicationTimestamp = shouldPublish ? reviewedAt : null;
-            const updateData: Prisma.BusinessUpdateInput = {
-                publicStatus: shouldPublish ? 'PUBLISHED' : 'ARCHIVED',
-                lifecycleStatus: shouldPublish ? 'PUBLISHED' : 'ARCHIVED',
-                isActive: true,
-                isPublished: shouldPublish,
-                isSearchable: shouldPublish,
-                isDiscoverable: shouldPublish,
-                updatedByUser: {
-                    connect: {
-                        id: adminUserId,
-                    },
-                },
-                lastReviewedAt: reviewedAt,
-            };
-
-            if (shouldPublish) {
-                updateData.publishedAt = publicationTimestamp;
-                updateData.firstPublishedAt = business.firstPublishedAt ?? publicationTimestamp;
-            } else {
-                updateData.publishedAt = null;
-            }
 
             await tx.business.update({
                 where: { id: businessId },
@@ -1489,7 +1408,7 @@ export class BusinessesService {
         const reviewNotes = normalizeOptionalText(dto.notes) ?? null;
 
         const result = await this.prisma.$transaction(async (tx) => {
-            const business = await tx.business.findUnique({
+            const { business, activeOwnership } = assertAdminClaimableBusiness(await tx.business.findUnique({
                 where: { id: businessId },
                 select: {
                     id: true,
@@ -1507,11 +1426,7 @@ export class BusinessesService {
                         take: 1,
                     },
                 },
-            });
-
-            if (!business || business.deletedAt) {
-                throw new NotFoundException('Negocio no encontrado');
-            }
+            }), dto.organizationId);
 
             const organization = await tx.organization.findUnique({
                 where: { id: dto.organizationId },
@@ -1555,11 +1470,6 @@ export class BusinessesService {
                 },
             });
 
-            const activeOwnership = business.ownerships[0];
-            if (activeOwnership && activeOwnership.organizationId !== dto.organizationId) {
-                throw new ConflictException('Este negocio ya tiene un ownership activo en otra organizacion');
-            }
-
             if (!activeOwnership) {
                 await tx.businessOwnership.create({
                     data: {
@@ -1576,18 +1486,12 @@ export class BusinessesService {
 
             await tx.business.update({
                 where: { id: businessId },
-                data: {
-                    ownerId: dto.ownerUserId,
+                data: buildAdminMarkClaimedBusinessUpdateData({
                     organizationId: dto.organizationId,
-                    primaryManagingOrganizationId: dto.organizationId,
-                    claimStatus: 'CLAIMED',
-                    claimedAt: reviewedAt,
-                    claimedByUserId: dto.ownerUserId,
-                    isClaimable: true,
-                    legacyOwnerMode: false,
-                    updatedByUserId: adminUserId,
-                    lastReviewedAt: reviewedAt,
-                },
+                    ownerUserId: dto.ownerUserId,
+                    reviewedAt,
+                    adminUserId,
+                }),
                 select: { id: true },
             });
 
@@ -1664,7 +1568,7 @@ export class BusinessesService {
         const makeClaimable = dto.makeClaimable ?? true;
 
         const result = await this.prisma.$transaction(async (tx) => {
-            const business = await tx.business.findUnique({
+            const business = assertActiveAdminCatalogBusiness(await tx.business.findUnique({
                 where: { id: businessId },
                 select: {
                     id: true,
@@ -1679,11 +1583,7 @@ export class BusinessesService {
                         },
                     },
                 },
-            });
-
-            if (!business || business.deletedAt) {
-                throw new NotFoundException('Negocio no encontrado');
-            }
+            }));
 
             if (business.ownerships.length > 0) {
                 await tx.businessOwnership.updateMany({
@@ -1837,7 +1737,7 @@ export class BusinessesService {
         query: BusinessSuggestionQueryDto,
         submittedByUserId?: string,
     ) {
-        const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
+        const limit = clampBusinessSuggestionLimit(query.limit);
         const where: Prisma.BusinessSuggestionWhereInput = {
             ...(query.status ? { status: query.status } : {}),
             ...(submittedByUserId ? { submittedByUserId } : {}),
@@ -1846,65 +1746,7 @@ export class BusinessesService {
         const [items, summary] = await Promise.all([
             this.prisma.businessSuggestion.findMany({
                 where,
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    address: true,
-                    phone: true,
-                    whatsapp: true,
-                    website: true,
-                    email: true,
-                    notes: true,
-                    status: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    reviewedAt: true,
-                    category: {
-                        select: {
-                            id: true,
-                            name: true,
-                            slug: true,
-                        },
-                    },
-                    province: {
-                        select: {
-                            id: true,
-                            name: true,
-                            slug: true,
-                        },
-                    },
-                    city: {
-                        select: {
-                            id: true,
-                            name: true,
-                            slug: true,
-                        },
-                    },
-                    submittedByUser: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                        },
-                    },
-                    reviewedByAdmin: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                        },
-                    },
-                    createdBusiness: {
-                        select: {
-                            id: true,
-                            name: true,
-                            slug: true,
-                            claimStatus: true,
-                            publicStatus: true,
-                        },
-                    },
-                },
+                select: BUSINESS_SUGGESTION_LIST_SELECT,
                 orderBy: { createdAt: 'desc' },
                 take: limit,
             }),
@@ -1919,10 +1761,7 @@ export class BusinessesService {
 
         return {
             data: items,
-            summary: summary.reduce<Record<string, number>>((accumulator, item) => {
-                accumulator[item.status] = item._count._all;
-                return accumulator;
-            }, {}),
+            summary: buildBusinessSuggestionSummary(summary),
         };
     }
 
@@ -1934,7 +1773,7 @@ export class BusinessesService {
         const reviewNotes = normalizeOptionalText(dto.notes) ?? null;
         const reviewedAt = new Date();
 
-        const suggestion = await this.prisma.businessSuggestion.findUnique({
+        const suggestion = assertReviewableBusinessSuggestion(await this.prisma.businessSuggestion.findUnique({
             where: { id: suggestionId },
             select: {
                 id: true,
@@ -1951,43 +1790,17 @@ export class BusinessesService {
                 notes: true,
                 status: true,
             },
-        });
-
-        if (!suggestion) {
-            throw new NotFoundException('Sugerencia no encontrada');
-        }
-
-        if (suggestion.status !== 'PENDING') {
-            throw new BadRequestException('Esta sugerencia ya fue revisada');
-        }
+        }));
 
         if (dto.status === 'APPROVED') {
-            if (!suggestion.address || !suggestion.provinceId) {
-                throw new BadRequestException(
-                    'La sugerencia no tiene datos suficientes para crear la ficha publica',
-                );
-            }
+            const approvableSuggestion = assertApprovableBusinessSuggestion(suggestion);
 
             const createdBusiness = await this.createCatalogBusinessRecord(
-                {
-                    name: suggestion.name,
-                    description: suggestion.description
-                        ?? suggestion.notes
-                        ?? 'Ficha creada desde una sugerencia moderada de la comunidad en AquiTa.do.',
-                    address: suggestion.address,
-                    provinceId: suggestion.provinceId,
-                    cityId: suggestion.cityId ?? null,
-                    phone: suggestion.phone ?? undefined,
-                    whatsapp: suggestion.whatsapp ?? undefined,
-                    website: suggestion.website,
-                    email: suggestion.email,
-                    categoryIds: suggestion.categoryId ? [suggestion.categoryId] : undefined,
-                    publicStatus: dto.publicStatus ?? 'PUBLISHED',
-                    catalogManagedByAdmin: true,
-                    isClaimable: true,
+                buildApprovedBusinessSuggestionCatalogBusinessInput({
+                    suggestion: approvableSuggestion,
+                    publicStatus: dto.publicStatus,
                     ignorePotentialDuplicates: dto.ignorePotentialDuplicates,
-                    source: 'USER_SUGGESTION',
-                },
+                }),
                 adminUserId,
                 'business-suggestion-approval',
             );
@@ -1995,13 +1808,14 @@ export class BusinessesService {
             await this.prisma.$transaction(async (tx) => {
                 await tx.businessSuggestion.update({
                     where: { id: suggestionId },
-                    data: {
+                    data: buildReviewedBusinessSuggestionUpdateData({
                         status: 'APPROVED',
-                        notes: reviewNotes ?? suggestion.notes,
-                        reviewedByAdminId: adminUserId,
+                        reviewNotes,
+                        existingNotes: suggestion.notes,
+                        adminUserId,
                         reviewedAt,
                         createdBusinessId: createdBusiness.id,
-                    },
+                    }),
                 });
 
                 await tx.auditLog.create({
@@ -2011,10 +1825,10 @@ export class BusinessesService {
                         action: 'business_suggestion.reviewed',
                         targetType: 'business_suggestion',
                         targetId: suggestionId,
-                        metadata: {
+                        metadata: buildReviewedBusinessSuggestionAuditMetadata({
                             status: 'APPROVED',
                             createdBusinessId: createdBusiness.id,
-                        } as Prisma.InputJsonValue,
+                        }),
                     },
                 });
             });
@@ -2030,12 +1844,13 @@ export class BusinessesService {
         await this.prisma.$transaction(async (tx) => {
             await tx.businessSuggestion.update({
                 where: { id: suggestionId },
-                data: {
+                data: buildReviewedBusinessSuggestionUpdateData({
                     status: 'REJECTED',
-                    notes: reviewNotes ?? suggestion.notes,
-                    reviewedByAdminId: adminUserId,
+                    reviewNotes,
+                    existingNotes: suggestion.notes,
+                    adminUserId,
                     reviewedAt,
-                },
+                }),
             });
 
             await tx.auditLog.create({
@@ -2045,9 +1860,9 @@ export class BusinessesService {
                     action: 'business_suggestion.reviewed',
                     targetType: 'business_suggestion',
                     targetId: suggestionId,
-                    metadata: {
+                    metadata: buildReviewedBusinessSuggestionAuditMetadata({
                         status: 'REJECTED',
-                    } as Prisma.InputJsonValue,
+                    }),
                 },
             });
         });
@@ -2059,7 +1874,7 @@ export class BusinessesService {
     }
 
     async listDuplicateCases(query: BusinessDuplicateCaseQueryDto) {
-        const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
+        const limit = clampDuplicateCaseLimit(query.limit);
         const where: Prisma.BusinessDuplicateCaseWhereInput = query.status
             ? { status: query.status }
             : {};
@@ -2067,33 +1882,7 @@ export class BusinessesService {
         const [items, summary] = await Promise.all([
             this.prisma.businessDuplicateCase.findMany({
                 where,
-                select: {
-                    id: true,
-                    clusterKey: true,
-                    status: true,
-                    businessIds: true,
-                    reasons: true,
-                    primaryBusinessId: true,
-                    resolutionNotes: true,
-                    resolutionMeta: true,
-                    resolvedAt: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    primaryBusiness: {
-                        select: {
-                            id: true,
-                            name: true,
-                            slug: true,
-                        },
-                    },
-                    resolvedByAdmin: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                        },
-                    },
-                },
+                select: DUPLICATE_CASE_LIST_SELECT,
                 orderBy: { resolvedAt: 'desc' },
                 take: limit,
             }),
@@ -2107,10 +1896,7 @@ export class BusinessesService {
 
         return {
             data: items,
-            summary: summary.reduce<Record<string, number>>((accumulator, item) => {
-                accumulator[item.status] = item._count._all;
-                return accumulator;
-            }, {}),
+            summary: buildDuplicateCaseSummary(summary),
         };
     }
 
@@ -2167,37 +1953,30 @@ export class BusinessesService {
         const resolutionNotes = normalizeOptionalText(dto.notes) ?? null;
 
         if (dto.status !== 'MERGED') {
+            const nonMergedStatus: 'DISMISSED' | 'CONFLICT' = dto.status;
+            const resolvedAt = new Date();
+
             const duplicateCase = await this.prisma.$transaction(async (tx) => {
                 const updatedCase = await tx.businessDuplicateCase.upsert({
                     where: { clusterKey },
-                    update: {
-                        status: dto.status,
+                    update: buildNonMergedDuplicateCaseUpdateData({
+                        status: nonMergedStatus,
                         businessIds,
-                        reasons: reasons.length > 0 ? reasons : Prisma.JsonNull,
-                        primaryBusinessId: null,
-                        resolvedByAdminId: adminUserId,
+                        reasons,
+                        adminUserId,
                         resolutionNotes,
-                        resolutionMeta: Prisma.JsonNull,
-                        resolvedAt: new Date(),
-                    },
-                    create: {
+                        resolvedAt,
+                    }),
+                    create: buildNonMergedDuplicateCaseCreateData({
                         clusterKey,
-                        status: dto.status,
+                        status: nonMergedStatus,
                         businessIds,
-                        reasons: reasons.length > 0 ? reasons : Prisma.JsonNull,
-                        resolvedByAdminId: adminUserId,
+                        reasons,
+                        adminUserId,
                         resolutionNotes,
-                        resolvedAt: new Date(),
-                    },
-                    select: {
-                        id: true,
-                        clusterKey: true,
-                        status: true,
-                        businessIds: true,
-                        reasons: true,
-                        resolutionNotes: true,
-                        resolvedAt: true,
-                    },
+                        resolvedAt,
+                    }),
+                    select: NON_MERGED_DUPLICATE_CASE_RESOLUTION_SELECT,
                 });
 
                 await tx.auditLog.create({
@@ -2207,11 +1986,11 @@ export class BusinessesService {
                         action: 'business_duplicate_case.resolved',
                         targetType: 'business_duplicate_case',
                         targetId: updatedCase.id,
-                        metadata: {
-                            status: dto.status,
+                        metadata: buildNonMergedDuplicateCaseAuditMetadata({
+                            status: nonMergedStatus,
                             businessIds,
                             reasons,
-                        } as Prisma.InputJsonValue,
+                        }),
                     },
                 });
 
@@ -3016,48 +2795,35 @@ export class BusinessesService {
             },
         });
 
+        const businessIds = params.businesses.map((business) => business.id);
+        const resolutionMeta = buildMergedDuplicateCaseResolutionMeta({
+            primaryBusinessId: primaryBusiness.id,
+            archivedBusinessIds: secondaryIds,
+            transferred,
+        });
+
         const duplicateCase = await tx.businessDuplicateCase.upsert({
             where: { clusterKey: params.clusterKey },
-            update: {
-                status: 'MERGED',
-                businessIds: params.businesses.map((business) => business.id),
-                reasons: params.reasons.length > 0 ? params.reasons : Prisma.JsonNull,
+            update: buildMergedDuplicateCaseUpdateData({
+                businessIds,
+                reasons: params.reasons,
                 primaryBusinessId: primaryBusiness.id,
-                resolvedByAdminId: params.adminUserId,
+                adminUserId: params.adminUserId,
                 resolutionNotes: params.resolutionNotes,
-                resolutionMeta: {
-                    mergedIntoBusinessId: primaryBusiness.id,
-                    archivedBusinessIds: secondaryIds,
-                    transferred,
-                } as Prisma.InputJsonValue,
+                resolutionMeta,
                 resolvedAt: archivedAt,
-            },
-            create: {
+            }),
+            create: buildMergedDuplicateCaseCreateData({
                 clusterKey: params.clusterKey,
-                status: 'MERGED',
-                businessIds: params.businesses.map((business) => business.id),
-                reasons: params.reasons.length > 0 ? params.reasons : Prisma.JsonNull,
+                businessIds,
+                reasons: params.reasons,
                 primaryBusinessId: primaryBusiness.id,
-                resolvedByAdminId: params.adminUserId,
+                adminUserId: params.adminUserId,
                 resolutionNotes: params.resolutionNotes,
-                resolutionMeta: {
-                    mergedIntoBusinessId: primaryBusiness.id,
-                    archivedBusinessIds: secondaryIds,
-                    transferred,
-                } as Prisma.InputJsonValue,
+                resolutionMeta,
                 resolvedAt: archivedAt,
-            },
-            select: {
-                id: true,
-                clusterKey: true,
-                status: true,
-                businessIds: true,
-                reasons: true,
-                primaryBusinessId: true,
-                resolutionNotes: true,
-                resolutionMeta: true,
-                resolvedAt: true,
-            },
+            }),
+            select: MERGED_DUPLICATE_CASE_RESOLUTION_SELECT,
         });
 
         await tx.auditLog.create({
@@ -3067,13 +2833,12 @@ export class BusinessesService {
                 action: 'business_duplicate_case.resolved',
                 targetType: 'business_duplicate_case',
                 targetId: duplicateCase.id,
-                metadata: {
-                    status: 'MERGED',
+                metadata: buildMergedDuplicateCaseAuditMetadata({
                     clusterKey: params.clusterKey,
                     primaryBusinessId: primaryBusiness.id,
                     archivedBusinessIds: secondaryIds,
                     transferred,
-                } as Prisma.InputJsonValue,
+                }),
             },
         });
 
@@ -3153,13 +2918,7 @@ export class BusinessesService {
                 const claimedAt = new Date();
 
                 if (organizationId) {
-                    if (!organizationRole) {
-                        throw new ForbiddenException('No tienes permisos para crear negocios en esta organización');
-                    }
-
-                    if (organizationRole === 'STAFF') {
-                        throw new ForbiddenException('El rol STAFF no puede crear negocios');
-                    }
+                    this.assertCanCreateBusinessInOrganizationContext(organizationRole);
                 }
 
                 await this.assertOrganizationCanCreateBusiness(tx, effectiveOrganizationId);
@@ -3375,9 +3134,10 @@ export class BusinessesService {
                     throw new NotFoundException('Negocio no encontrado');
                 }
 
-                if (organizationRole === 'STAFF') {
-                    throw new ForbiddenException('No tienes permisos para editar este negocio');
-                }
+                this.assertCanManageBusinessInOrganizationContext(
+                    organizationRole,
+                    'No tienes permisos para editar este negocio',
+                );
 
                 const normalizedTargetProvinceId = dto.provinceId ?? business.provinceId;
                 const normalizedTargetCityId = dto.cityId ?? business.cityId ?? undefined;
@@ -3517,9 +3277,10 @@ export class BusinessesService {
                 throw new NotFoundException('Negocio no encontrado');
             }
 
-            if (!organizationRole || organizationRole === 'STAFF') {
-                throw new ForbiddenException('No tienes permisos para eliminar este negocio');
-            }
+            this.assertCanManageBusinessInOrganizationContext(
+                organizationRole,
+                'No tienes permisos para eliminar este negocio',
+            );
         }
 
         const imageUrls = business.images.map((image) => image.url);
@@ -4315,40 +4076,6 @@ export class BusinessesService {
         return slug;
     }
 
-    private hydrateClaimRequestSnapshot<
-        T extends {
-            evidenceType?: string | null;
-            business?: {
-                source?: string | null;
-                catalogSource?: string | null;
-                lifecycleStatus?: string | null;
-                primaryManagingOrganizationId?: string | null;
-            } | null;
-        },
-    >(claimRequest: T): T {
-        if (!claimRequest.business) {
-            return claimRequest;
-        }
-
-        return {
-            ...claimRequest,
-            evidenceType: normalizeClaimEvidenceType(claimRequest.evidenceType ?? null),
-            business: {
-                ...claimRequest.business,
-                source: claimRequest.business.source
-                    ?? normalizeCatalogSource(claimRequest.business.catalogSource ?? null)
-                    ?? null,
-                catalogSource: normalizeCatalogSource(
-                    claimRequest.business.catalogSource ?? claimRequest.business.source ?? null,
-                ),
-                lifecycleStatus: toLifecycleStatus({
-                    lifecycleStatus: claimRequest.business.lifecycleStatus ?? null,
-                }),
-                primaryManagingOrganizationId: claimRequest.business.primaryManagingOrganizationId ?? null,
-            },
-        };
-    }
-
     private publishBusinessChangedEvent(
         businessId: string,
         slug: string | null,
@@ -4520,6 +4247,30 @@ export class BusinessesService {
             );
             return [];
         }
+    }
+
+    private assertCanCreateBusinessInOrganizationContext(
+        organizationRole?: OrganizationRole,
+    ): void {
+        const scopedRole = organizationRole ?? null;
+        this.organizationAccessService.assertOrganizationMember(
+            scopedRole,
+            'No tienes permisos para crear negocios en esta organización',
+        );
+        this.organizationAccessService.assertCanManageOrganization(
+            scopedRole,
+            'El rol STAFF no puede crear negocios',
+        );
+    }
+
+    private assertCanManageBusinessInOrganizationContext(
+        organizationRole: OrganizationRole | undefined,
+        message: string,
+    ): void {
+        this.organizationAccessService.assertCanManageOrganization(
+            organizationRole ?? 'STAFF',
+            message,
+        );
     }
 
     private async ensureOwnerOrganization(

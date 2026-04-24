@@ -160,14 +160,14 @@ export class PaymentsController {
     @UseGuards(JwtAuthGuard, OrgContextGuard)
     async createAdsWalletCheckoutSession(
         @CurrentOrganization('organizationId') organizationId: string,
+        @CurrentOrganization('organizationRole') organizationRole: string | null,
         @CurrentUser('id') actorUserId: string,
-        @CurrentUser('role') actorGlobalRole: string,
         @Body() dto: CreateAdsWalletCheckoutSessionDto,
     ) {
         return this.paymentsService.createAdsWalletCheckoutSession(
             organizationId,
+            organizationRole as never,
             actorUserId,
-            actorGlobalRole,
             dto,
         );
     }

@@ -31,8 +31,13 @@ test.describe('Public acceptance @acceptance', () => {
     test('business detail recovers from a missing slug @acceptance', async ({ page }) => {
         await page.goto('/businesses/definitely-not-a-real-business-slug-123456');
 
+        await expect(page).toHaveURL(/\/businesses\/definitely-not-a-real-business-slug-123456$/);
         await expect(page.getByRole('main')).toContainText(/Negocio no encontrado/i);
-        await expect(page.getByRole('link', { name: /Volver al directorio/i })).toBeVisible();
-        await expect(page.getByRole('link', { name: /Ir al inicio/i })).toBeVisible();
+        const directoryLink = page.getByRole('link', { name: /Volver al directorio/i });
+        await expect(directoryLink).toBeVisible();
+        await expect(directoryLink).toHaveAttribute('href', '/businesses');
+        const homeLink = page.getByRole('link', { name: /Ir al inicio/i });
+        await expect(homeLink).toBeVisible();
+        await expect(homeLink).toHaveAttribute('href', '/');
     });
 });

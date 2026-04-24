@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 interface JwtPayload {
     sub: string;
     role: Role;
+    sessionVersion?: number;
 }
 
 const jwtSessionUserSelect = {
@@ -15,6 +16,7 @@ const jwtSessionUserSelect = {
     email: true,
     name: true,
     role: true,
+    sessionVersion: true,
 } as const;
 
 @Injectable()
@@ -44,6 +46,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         });
 
         if (!user) {
+            throw new UnauthorizedException();
+        }
+
+        const tokenSessionVersion = payload.sessionVersion ?? 0;
+        if (user.sessionVersion !== tokenSessionVersion) {
             throw new UnauthorizedException();
         }
 

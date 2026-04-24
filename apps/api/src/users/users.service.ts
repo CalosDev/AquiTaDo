@@ -20,6 +20,7 @@ export class UsersService {
         phone: true,
         avatarUrl: true,
         role: true,
+        twoFactorEnabled: true,
         createdAt: true,
         updatedAt: true,
     };
@@ -338,6 +339,7 @@ export class UsersService {
             return {
                 ...fallbackUser,
                 avatarUrl: null,
+                twoFactorEnabled: false,
             };
         }
     }

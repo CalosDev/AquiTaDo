@@ -6,7 +6,6 @@ import {
     Post,
     UseGuards,
 } from '@nestjs/common';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentOrganization } from '../organizations/decorators/current-organization.decorator';
 import { OrgContextGuard } from '../organizations/guards/org-context.guard';
@@ -32,14 +31,12 @@ export class SubscriptionsController {
     @UseGuards(JwtAuthGuard, OrgContextGuard)
     async createCheckoutSession(
         @CurrentOrganization('organizationId') organizationId: string,
-        @CurrentUser('id') actorUserId: string,
-        @CurrentUser('role') actorGlobalRole: string,
+        @CurrentOrganization('organizationRole') organizationRole: string | null,
         @Body() dto: CreateCheckoutSessionDto,
     ) {
         return this.subscriptionsService.createCheckoutSession(
             organizationId,
-            actorUserId,
-            actorGlobalRole,
+            organizationRole as never,
             dto,
         );
     }
@@ -48,13 +45,11 @@ export class SubscriptionsController {
     @UseGuards(JwtAuthGuard, OrgContextGuard)
     async cancelAtPeriodEnd(
         @CurrentOrganization('organizationId') organizationId: string,
-        @CurrentUser('id') actorUserId: string,
-        @CurrentUser('role') actorGlobalRole: string,
+        @CurrentOrganization('organizationRole') organizationRole: string | null,
     ) {
         return this.subscriptionsService.cancelAtPeriodEnd(
             organizationId,
-            actorUserId,
-            actorGlobalRole,
+            organizationRole as never,
         );
     }
 }

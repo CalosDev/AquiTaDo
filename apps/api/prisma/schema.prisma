@@ -335,6 +335,7 @@ model User {
   checkinCount          Int       @default(0)
   checkinStreak         Int       @default(0)
   lastCheckinAt         DateTime?
+  sessionVersion        Int       @default(0)
   twoFactorEnabled       Boolean  @default(false)
   twoFactorSecret        String?  @db.VarChar(128)
   twoFactorPendingSecret String?  @db.VarChar(128)

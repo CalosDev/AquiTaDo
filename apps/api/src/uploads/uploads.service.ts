@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
@@ -6,6 +6,7 @@ import * as path from 'path';
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationRole } from '../generated/prisma/client';
+import { OrganizationAccessService } from '../organizations/organization-access.service';
 import { UpdateBusinessImageDto } from './dto/update-business-image.dto';
 import {
     activeBusinessOwnershipSelect,
@@ -31,6 +32,8 @@ export class UploadsService {
         private readonly prisma: PrismaService,
         @Inject(ConfigService)
         private readonly configService: ConfigService,
+        @Inject(OrganizationAccessService)
+        private readonly organizationAccessService: OrganizationAccessService,
     ) { }
 
     private readonly allowedMimeTypes: Record<string, string> = {
@@ -82,10 +85,10 @@ export class UploadsService {
             if (!businessBelongsToOrganization(business, organizationId)) {
                 throw new NotFoundException('Negocio no encontrado');
             }
-
-            if (organizationRole === 'STAFF') {
-                throw new ForbiddenException('No tienes permisos para subir imágenes a este negocio');
-            }
+            this.organizationAccessService.assertCanManageOrganization(
+                organizationRole,
+                'No tienes permisos para subir imágenes a este negocio',
+            );
         }
 
         const imageCount = await this.prisma.businessImage.count({
@@ -204,9 +207,10 @@ export class UploadsService {
         }
 
         if (userRole !== 'ADMIN') {
-            if (!organizationRole) {
-                throw new ForbiddenException('No tienes permisos para subir documentos');
-            }
+            this.organizationAccessService.assertOrganizationMember(
+                organizationRole,
+                'No tienes permisos para subir documentos',
+            );
 
             if (!businessBelongsToOrganization(business, organizationId)) {
                 throw new NotFoundException('Negocio no encontrado');
@@ -288,10 +292,10 @@ export class UploadsService {
             if (!businessBelongsToOrganization(image.business, organizationId)) {
                 throw new NotFoundException('Imagen no encontrada');
             }
-
-            if (organizationRole === 'STAFF') {
-                throw new ForbiddenException('No tienes permisos para eliminar esta imagen');
-            }
+            this.organizationAccessService.assertCanManageOrganization(
+                organizationRole,
+                'No tienes permisos para eliminar esta imagen',
+            );
         }
 
         await this.prisma.businessImage.delete({
@@ -328,10 +332,10 @@ export class UploadsService {
             if (!businessBelongsToOrganization(image.business, organizationId)) {
                 throw new NotFoundException('Imagen no encontrada');
             }
-
-            if (organizationRole === 'STAFF') {
-                throw new ForbiddenException('No tienes permisos para editar esta imagen');
-            }
+            this.organizationAccessService.assertCanManageOrganization(
+                organizationRole,
+                'No tienes permisos para editar esta imagen',
+            );
         }
 
         const normalizedCaption = dto.caption === undefined

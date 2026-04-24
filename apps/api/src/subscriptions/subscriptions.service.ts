@@ -1,6 +1,5 @@
 import {
     BadRequestException,
-    ForbiddenException,
     Inject,
     Injectable,
     NotFoundException,
@@ -14,6 +13,7 @@ import {
     OrganizationSubscriptionStatus,
     SubscriptionStatus,
 } from '../generated/prisma/client';
+import { OrganizationAccessService } from '../organizations/organization-access.service';
 import { PlansService } from '../plans/plans.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CircuitBreakerService } from '../resilience/circuit-breaker.service';
@@ -30,6 +30,8 @@ export class SubscriptionsService {
         private readonly configService: ConfigService,
         @Inject(CircuitBreakerService)
         private readonly circuitBreaker: CircuitBreakerService,
+        @Inject(OrganizationAccessService)
+        private readonly organizationAccessService: OrganizationAccessService,
     ) { }
 
     async getCurrent(organizationId: string) {
@@ -39,11 +41,13 @@ export class SubscriptionsService {
 
     async createCheckoutSession(
         organizationId: string,
-        actorUserId: string,
-        actorGlobalRole: string,
+        organizationRole: OrganizationRole | null,
         dto: CreateCheckoutSessionDto,
     ) {
-        await this.assertCanManageBilling(organizationId, actorUserId, actorGlobalRole);
+        this.organizationAccessService.assertOwner(
+            organizationRole ?? 'STAFF',
+            'Solo el owner puede gestionar la facturación',
+        );
 
         const stripe = this.resolveStripeClient();
         const organization = await this.prisma.organization.findUnique({
@@ -148,10 +152,12 @@ export class SubscriptionsService {
 
     async cancelAtPeriodEnd(
         organizationId: string,
-        actorUserId: string,
-        actorGlobalRole: string,
+        organizationRole: OrganizationRole | null,
     ) {
-        await this.assertCanManageBilling(organizationId, actorUserId, actorGlobalRole);
+        this.organizationAccessService.assertOwner(
+            organizationRole ?? 'STAFF',
+            'Solo el owner puede gestionar la facturación',
+        );
         const stripe = this.resolveStripeClient();
 
         const subscription = await this.ensureSubscriptionForOrganization(organizationId);
@@ -336,33 +342,4 @@ export class SubscriptionsService {
         return new Stripe(stripeSecretKey);
     }
 
-    private async assertCanManageBilling(
-        organizationId: string,
-        actorUserId: string,
-        actorGlobalRole: string,
-    ) {
-        if (actorGlobalRole === 'ADMIN') {
-            return;
-        }
-
-        const membership = await this.prisma.organizationMember.findUnique({
-            where: {
-                organizationId_userId: {
-                    organizationId,
-                    userId: actorUserId,
-                },
-            },
-            select: {
-                role: true,
-            },
-        });
-
-        if (!membership) {
-            throw new ForbiddenException('No tienes acceso a esta organización');
-        }
-
-        if (membership.role !== OrganizationRole.OWNER) {
-            throw new ForbiddenException('Solo el owner puede gestionar la facturación');
-        }
-    }
 }

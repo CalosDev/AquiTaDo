@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const E2E_EMAIL_DOMAIN = '@e2e.aquita.local';
 const GOOGLE_TEST_CLIENT_ID = 'google-client-id.apps.googleusercontent.com';
-const E2E_THROTTLE_LIMIT = '1000';
+let registerRequestIpOctet = 0;
 
 function makeRegisterPayload(seed: string) {
     return {
@@ -27,6 +27,18 @@ function mockJsonResponse(payload: unknown, status = 200): Response {
     } as unknown as Response;
 }
 
+function nextRegisterRequestIp(): string {
+    registerRequestIpOctet = (registerRequestIpOctet % 250) + 1;
+    return `198.51.100.${registerRequestIpOctet}`;
+}
+
+function registerUser(app: INestApplication, payload: ReturnType<typeof makeRegisterPayload>) {
+    return request(app.getHttpServer())
+        .post('/api/auth/register')
+        .set('x-forwarded-for', nextRegisterRequestIp())
+        .send(payload);
+}
+
 describe('AuthController (e2e)', () => {
     let app: INestApplication;
     let prisma: PrismaService;
@@ -34,13 +46,13 @@ describe('AuthController (e2e)', () => {
     beforeAll(async () => {
         process.env.AUTH_DEBUG_RESET_TOKENS = 'true';
         process.env.GOOGLE_OAUTH_CLIENT_ID = GOOGLE_TEST_CLIENT_ID;
-        process.env.THROTTLE_LIMIT = E2E_THROTTLE_LIMIT;
 
         const moduleRef = await Test.createTestingModule({
             imports: [AppModule],
         }).compile();
 
         app = moduleRef.createNestApplication();
+        app.getHttpAdapter().getInstance().set('trust proxy', 1);
         app.setGlobalPrefix('api');
         app.useGlobalPipes(
             new ValidationPipe({
@@ -85,10 +97,7 @@ describe('AuthController (e2e)', () => {
         const seed = `${Date.now()}`;
         const payload = makeRegisterPayload(seed);
 
-        const response = await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(201);
+        const response = await registerUser(app, payload).expect(201);
 
         expect(typeof response.body.accessToken).toBe('string');
         expect(response.body.accessToken.length).toBeGreaterThan(20);
@@ -114,15 +123,9 @@ describe('AuthController (e2e)', () => {
     it('rejects duplicate email registration', async () => {
         const payload = makeRegisterPayload('duplicate');
 
-        await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(201);
+        await registerUser(app, payload).expect(201);
 
-        const response = await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(409);
+        const response = await registerUser(app, payload).expect(409);
 
         expect(response.body).toMatchObject({
             statusCode: 409,
@@ -137,10 +140,7 @@ describe('AuthController (e2e)', () => {
             role: 'ADMIN',
         };
 
-        const response = await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(400);
+        const response = await registerUser(app, payload).expect(400);
 
         expect(response.body).toMatchObject({
             statusCode: 400,
@@ -151,10 +151,7 @@ describe('AuthController (e2e)', () => {
     it('logs in with valid credentials', async () => {
         const payload = makeRegisterPayload('login-success');
 
-        await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(201);
+        await registerUser(app, payload).expect(201);
 
         const response = await request(app.getHttpServer())
             .post('/api/auth/login')
@@ -176,10 +173,7 @@ describe('AuthController (e2e)', () => {
     it('rejects login with invalid password', async () => {
         const payload = makeRegisterPayload('login-invalid');
 
-        await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(201);
+        await registerUser(app, payload).expect(201);
 
         const response = await request(app.getHttpServer())
             .post('/api/auth/login')
@@ -198,10 +192,7 @@ describe('AuthController (e2e)', () => {
     it('rotates refresh token via HttpOnly cookie flow', async () => {
         const payload = makeRegisterPayload('refresh-cookie');
 
-        const registerResponse = await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(201);
+        const registerResponse = await registerUser(app, payload).expect(201);
 
         const rawCookieHeader = registerResponse.headers['set-cookie'];
         const cookieHeader = Array.isArray(rawCookieHeader)
@@ -231,10 +222,7 @@ describe('AuthController (e2e)', () => {
     it('changes password, revokes refresh token, and rejects the previous password', async () => {
         const payload = makeRegisterPayload('change-password');
 
-        const registerResponse = await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(201);
+        const registerResponse = await registerUser(app, payload).expect(201);
 
         const accessToken = String(registerResponse.body.accessToken);
         const rawCookieHeader = registerResponse.headers['set-cookie'];
@@ -284,13 +272,62 @@ describe('AuthController (e2e)', () => {
             .expect(401);
     });
 
+    it('invalidates the current access token after logout', async () => {
+        const payload = makeRegisterPayload('logout-access-token');
+
+        const registerResponse = await registerUser(app, payload).expect(201);
+
+        const accessToken = String(registerResponse.body.accessToken);
+        const rawCookieHeader = registerResponse.headers['set-cookie'];
+        const cookieHeader = Array.isArray(rawCookieHeader)
+            ? rawCookieHeader
+            : rawCookieHeader
+                ? [String(rawCookieHeader)]
+                : [];
+        const refreshCookie = cookieHeader.find((cookie) =>
+            cookie.startsWith('aquita_refresh_token='),
+        );
+
+        expect(refreshCookie).toBeDefined();
+
+        await request(app.getHttpServer())
+            .post('/api/auth/logout')
+            .set('Cookie', [refreshCookie as string])
+            .send({})
+            .expect(200);
+
+        await request(app.getHttpServer())
+            .get('/api/users/me')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(401);
+    });
+
+    it('invalidates the current access token after password change', async () => {
+        const payload = makeRegisterPayload('change-password-access-token');
+
+        const registerResponse = await registerUser(app, payload).expect(201);
+
+        const accessToken = String(registerResponse.body.accessToken);
+
+        await request(app.getHttpServer())
+            .post('/api/auth/change-password')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({
+                currentPassword: payload.password,
+                newPassword: 'Password456',
+            })
+            .expect(200);
+
+        await request(app.getHttpServer())
+            .get('/api/users/me')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(401);
+    });
+
     it('returns a generic response for forgot password and exposes debug data for known users', async () => {
         const payload = makeRegisterPayload('forgot-password');
 
-        await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(201);
+        await registerUser(app, payload).expect(201);
 
         const existingUserResponse = await request(app.getHttpServer())
             .post('/api/auth/forgot-password')
@@ -317,10 +354,7 @@ describe('AuthController (e2e)', () => {
     it('resets the password, rejects the old password, and invalidates the token after one use', async () => {
         const payload = makeRegisterPayload('reset-password');
 
-        await request(app.getHttpServer())
-            .post('/api/auth/register')
-            .send(payload)
-            .expect(201);
+        await registerUser(app, payload).expect(201);
 
         const forgotPasswordResponse = await request(app.getHttpServer())
             .post('/api/auth/forgot-password')
@@ -363,6 +397,35 @@ describe('AuthController (e2e)', () => {
                 newPassword: 'Reset5678',
             })
             .expect(400);
+    });
+
+    it('invalidates the current access token after password reset', async () => {
+        const payload = makeRegisterPayload('reset-password-access-token');
+
+        const registerResponse = await registerUser(app, payload).expect(201);
+
+        const accessToken = String(registerResponse.body.accessToken);
+
+        const forgotPasswordResponse = await request(app.getHttpServer())
+            .post('/api/auth/forgot-password')
+            .send({ email: payload.email })
+            .expect(200);
+
+        const resetToken = String(forgotPasswordResponse.body.debugResetToken || '');
+        expect(resetToken.length).toBeGreaterThan(20);
+
+        await request(app.getHttpServer())
+            .post('/api/auth/reset-password')
+            .send({
+                token: resetToken,
+                newPassword: 'Reset4567',
+            })
+            .expect(200);
+
+        await request(app.getHttpServer())
+            .get('/api/users/me')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(401);
     });
 
     it('creates a new account from a valid Google identity token', async () => {

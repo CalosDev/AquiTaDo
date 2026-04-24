@@ -136,6 +136,28 @@ describe('UsersController (e2e)', () => {
         expect(typeof response.body.updatedAt).toBe('string');
     });
 
+    it('returns twoFactorEnabled in GET /api/users/me', async () => {
+        const user = await prisma.user.create({
+            data: {
+                name: `E2E 2FA User ${makeSeed()}`,
+                email: `user-2fa-${makeSeed()}${USERS_EMAIL_DOMAIN}`,
+                password: 'e2e-not-used-password-hash',
+                twoFactorEnabled: true,
+            },
+        });
+        const accessToken = jwtService.sign({ sub: user.id, role: user.role });
+
+        const response = await request(app.getHttpServer())
+            .get('/api/users/me')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(200);
+
+        expect(response.body).toMatchObject({
+            id: user.id,
+            twoFactorEnabled: true,
+        });
+    });
+
     it('uploads, replaces, and deletes a managed avatar for the current user', async () => {
         const user = await createUser();
         const accessToken = jwtService.sign({ sub: user.id, role: user.role });

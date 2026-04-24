@@ -26,6 +26,7 @@ import {
 interface AuthTokenPayload {
     sub: string;
     role: Role;
+    sessionVersion?: number;
 }
 
 type AuthSessionUser = {
@@ -38,6 +39,7 @@ type AuthSessionUser = {
     createdAt: Date;
     updatedAt: Date;
     twoFactorEnabled: boolean;
+    sessionVersion: number;
 };
 
 type GoogleIdentityPayload = {
@@ -68,6 +70,7 @@ const authSessionBaseSelect = {
     role: true,
     createdAt: true,
     updatedAt: true,
+    sessionVersion: true,
 } as const;
 
 const authLoginSelect = {
@@ -288,15 +291,44 @@ export class AuthService {
 
         if (normalizedToken) {
             const tokenHash = this.hashToken(normalizedToken);
-            await this.prisma.refreshToken.updateMany({
-                where: {
-                    tokenHash,
-                    revokedAt: null,
-                },
-                data: {
-                    revokedAt: new Date(),
+            const refreshToken = await this.prisma.refreshToken.findUnique({
+                where: { tokenHash },
+                select: {
+                    userId: true,
+                    revokedAt: true,
                 },
             });
+
+            if (refreshToken?.userId && !refreshToken.revokedAt) {
+                await this.prisma.$transaction(async (tx) => {
+                    await tx.refreshToken.updateMany({
+                        where: {
+                            tokenHash,
+                            revokedAt: null,
+                        },
+                        data: {
+                            revokedAt: new Date(),
+                        },
+                    });
+
+                    await tx.user.update({
+                        where: { id: refreshToken.userId },
+                        data: {
+                            sessionVersion: { increment: 1 },
+                        },
+                    });
+                });
+            } else {
+                await this.prisma.refreshToken.updateMany({
+                    where: {
+                        tokenHash,
+                        revokedAt: null,
+                    },
+                    data: {
+                        revokedAt: new Date(),
+                    },
+                });
+            }
         }
 
         this.clearRefreshCookie(response);
@@ -332,6 +364,7 @@ export class AuthService {
                 where: { id: user.id },
                 data: {
                     password: hashedPassword,
+                    sessionVersion: { increment: 1 },
                 },
             });
 
@@ -444,6 +477,7 @@ export class AuthService {
                 where: { id: resetToken.userId },
                 data: {
                     password: hashedPassword,
+                    sessionVersion: { increment: 1 },
                 },
             });
 
@@ -569,6 +603,7 @@ export class AuthService {
                 await tx.user.update({
                     where: { id: user.id },
                     data: {
+                        sessionVersion: { increment: 1 },
                         twoFactorEnabled: true,
                         twoFactorSecret: user.twoFactorPendingSecret,
                         twoFactorPendingSecret: null,
@@ -628,6 +663,7 @@ export class AuthService {
                 await tx.user.update({
                     where: { id: user.id },
                     data: {
+                        sessionVersion: { increment: 1 },
                         twoFactorEnabled: false,
                         twoFactorSecret: null,
                         twoFactorPendingSecret: null,
@@ -673,6 +709,7 @@ export class AuthService {
         createdAt: Date;
         updatedAt: Date;
         twoFactorEnabled?: boolean;
+        sessionVersion?: number;
     }): AuthSessionUser {
         return {
             id: user.id,
@@ -684,6 +721,7 @@ export class AuthService {
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
             twoFactorEnabled: user.twoFactorEnabled ?? false,
+            sessionVersion: user.sessionVersion ?? 0,
         };
     }
 
@@ -895,7 +933,7 @@ export class AuthService {
         replacingTokenHash?: string,
     ) {
         const refreshTtlDays = this.resolveRefreshTokenTtlDays(user.role);
-        const accessToken = this.generateAccessToken(user.id, user.role);
+        const accessToken = this.generateAccessToken(user.id, user.role, user.sessionVersion);
         const refreshToken = this.generateRefreshToken(user.id, user.role, refreshTtlDays);
         const refreshTokenHash = this.hashToken(refreshToken);
         const expiresAt = new Date(Date.now() + refreshTtlDays * 24 * 60 * 60 * 1000);
@@ -962,16 +1000,16 @@ export class AuthService {
         };
     }
 
-    private generateAccessToken(userId: string, role: Role): string {
+    private generateAccessToken(userId: string, role: Role, sessionVersion: number): string {
         if (role === 'ADMIN') {
             const adminAccessTtl = this.configService.get<string>('JWT_ACCESS_TTL_ADMIN')?.trim() || '10m';
             return this.jwtService.sign(
-                { sub: userId, role },
+                { sub: userId, role, sessionVersion },
                 { expiresIn: adminAccessTtl as never },
             );
         }
 
-        return this.jwtService.sign({ sub: userId, role });
+        return this.jwtService.sign({ sub: userId, role, sessionVersion });
     }
 
     private generateRefreshToken(userId: string, role: Role, refreshTtlDays: number): string {
