@@ -161,6 +161,16 @@ type CatalogBusinessInput = {
     source: 'ADMIN' | 'IMPORT' | 'USER_SUGGESTION' | 'SYSTEM';
 };
 
+type BusinessChangedTarget = {
+    id: string;
+    slug: string | null;
+};
+
+type StaleClaimExpirationResult = {
+    expiredCount: number;
+    affectedBusinesses: BusinessChangedTarget[];
+};
+
 type BusinessDuplicateSignalInput = {
     name?: string | null;
     search?: string | null;
@@ -513,7 +523,7 @@ export class BusinessesService {
         prismaClient: PrismaService | Prisma.TransactionClient,
         businessId?: string,
         referenceDate: Date = new Date(),
-    ) {
+    ): Promise<StaleClaimExpirationResult> {
         const expirationCutoff = new Date(
             referenceDate.getTime() - (CLAIM_REQUEST_EXPIRATION_DAYS * 24 * 60 * 60 * 1000),
         );
@@ -541,11 +551,20 @@ export class BusinessesService {
         });
 
         if (staleClaims.length === 0) {
-            return 0;
+            return {
+                expiredCount: 0,
+                affectedBusinesses: [],
+            };
         }
 
         const staleClaimIds = staleClaims.map((claim) => claim.id);
-        const affectedBusinessIds = [...new Set(staleClaims.map((claim) => claim.businessId))];
+        const affectedBusinesses = this.toUniqueBusinessChangedTargets(
+            staleClaims.map((claim) => ({
+                id: claim.businessId,
+                slug: claim.business.slug ?? null,
+            })),
+        );
+        const affectedBusinessIds = affectedBusinesses.map((business) => business.id);
 
         await prismaClient.businessClaimRequest.updateMany({
             where: {
@@ -628,11 +647,15 @@ export class BusinessesService {
             });
         }
 
-        return staleClaims.length;
+        return {
+            expiredCount: staleClaims.length,
+            affectedBusinesses,
+        };
     }
 
     async listClaimRequests(query: BusinessClaimRequestQueryDto) {
-        await this.expireStaleClaimRequests(this.prisma);
+        const staleClaimExpiration = await this.expireStaleClaimRequests(this.prisma);
+        this.publishBusinessChangedEventsForBusinesses(staleClaimExpiration.affectedBusinesses);
 
         const limit = clampClaimRequestLimit(query.limit);
         const status = query.status ?? 'PENDING';
@@ -662,7 +685,8 @@ export class BusinessesService {
         requesterUserId: string,
         query: BusinessClaimRequestQueryDto,
     ) {
-        await this.expireStaleClaimRequests(this.prisma);
+        const staleClaimExpiration = await this.expireStaleClaimRequests(this.prisma);
+        this.publishBusinessChangedEventsForBusinesses(staleClaimExpiration.affectedBusinesses);
 
         const limit = clampClaimRequestLimit(query.limit);
         const where: Prisma.BusinessClaimRequestWhereInput = {
@@ -695,7 +719,8 @@ export class BusinessesService {
     }
 
     async getClaimRequestAdmin(claimRequestId: string) {
-        await this.expireStaleClaimRequests(this.prisma);
+        const staleClaimExpiration = await this.expireStaleClaimRequests(this.prisma);
+        this.publishBusinessChangedEventsForBusinesses(staleClaimExpiration.affectedBusinesses);
 
         const claimRequest = assertExistingAdminClaimRequest(await this.prisma.businessClaimRequest.findUnique({
             where: { id: claimRequestId },
@@ -716,8 +741,8 @@ export class BusinessesService {
         const canonicalEvidenceType = toCanonicalClaimEvidenceType(dto.evidenceType);
 
         try {
-            const claimRequest = await this.prisma.$transaction(async (tx) => {
-                await this.expireStaleClaimRequests(tx, businessId);
+            const claimRequestResult = await this.prisma.$transaction(async (tx) => {
+                const staleClaimExpiration = await this.expireStaleClaimRequests(tx, businessId);
 
                 const business = assertClaimRequestableBusiness(await tx.business.findUnique({
                     where: { id: businessId },
@@ -816,8 +841,22 @@ export class BusinessesService {
                     },
                 });
 
-                return createdRequest;
+                return {
+                    claimRequest: createdRequest,
+                    expiredBusinesses: staleClaimExpiration.affectedBusinesses,
+                };
             });
+
+            const claimRequest = claimRequestResult.claimRequest;
+            for (const business of this.toUniqueBusinessChangedTargets([
+                ...claimRequestResult.expiredBusinesses,
+                {
+                    id: claimRequest.business.id,
+                    slug: claimRequest.business.slug,
+                },
+            ])) {
+                this.publishBusinessChangedEvent(business.id, business.slug, 'updated');
+            }
 
             this.domainEventsService.publishClaimRequestCreated({
                 claimRequestId: claimRequest.id,
@@ -846,8 +885,8 @@ export class BusinessesService {
         const reviewedAt = new Date();
 
         try {
-            const reviewedClaim = await this.prisma.$transaction(async (tx) => {
-                await this.expireStaleClaimRequests(tx, undefined, reviewedAt);
+            const reviewedClaimResult = await this.prisma.$transaction(async (tx) => {
+                const staleClaimExpiration = await this.expireStaleClaimRequests(tx, undefined, reviewedAt);
 
                 const claimRequest = assertReviewableBusinessClaimRequest(await tx.businessClaimRequest.findUnique({
                     where: { id: claimRequestId },
@@ -919,13 +958,16 @@ export class BusinessesService {
                     });
 
                     return {
-                        id: claimRequest.id,
-                        status: 'UNDER_REVIEW' as const,
-                        businessId: claimRequest.businessId,
-                        businessSlug: claimRequest.business.slug,
-                        requesterUserId: claimRequest.requesterUserId,
-                        requesterOrganizationId: claimRequest.requesterOrganizationId,
-                        organizationId: claimRequest.requesterOrganizationId,
+                        reviewedClaim: {
+                            id: claimRequest.id,
+                            status: 'UNDER_REVIEW' as const,
+                            businessId: claimRequest.businessId,
+                            businessSlug: claimRequest.business.slug,
+                            requesterUserId: claimRequest.requesterUserId,
+                            requesterOrganizationId: claimRequest.requesterOrganizationId,
+                            organizationId: claimRequest.requesterOrganizationId,
+                        },
+                        expiredBusinesses: staleClaimExpiration.affectedBusinesses,
                     };
                 }
 
@@ -1033,14 +1075,17 @@ export class BusinessesService {
                     });
 
                     return {
-                        id: claimRequest.id,
-                        status: 'APPROVED' as const,
-                        businessId: claimRequest.businessId,
-                        businessSlug: claimRequest.business.slug,
-                        requesterUserId: claimRequest.requesterUserId,
-                        requesterOrganizationId: effectiveOrganizationId,
-                        organizationId: effectiveOrganizationId,
-                        ownershipId: ownership.id,
+                        reviewedClaim: {
+                            id: claimRequest.id,
+                            status: 'APPROVED' as const,
+                            businessId: claimRequest.businessId,
+                            businessSlug: claimRequest.business.slug,
+                            requesterUserId: claimRequest.requesterUserId,
+                            requesterOrganizationId: effectiveOrganizationId,
+                            organizationId: effectiveOrganizationId,
+                            ownershipId: ownership.id,
+                        },
+                        expiredBusinesses: staleClaimExpiration.affectedBusinesses,
                     };
                 }
 
@@ -1109,21 +1154,29 @@ export class BusinessesService {
                 });
 
                 return {
-                    id: claimRequest.id,
-                    status: 'REJECTED' as const,
-                    businessId: claimRequest.businessId,
-                    businessSlug: claimRequest.business.slug,
-                    requesterUserId: claimRequest.requesterUserId,
-                    requesterOrganizationId: claimRequest.requesterOrganizationId,
-                    organizationId: claimRequest.requesterOrganizationId,
+                    reviewedClaim: {
+                        id: claimRequest.id,
+                        status: 'REJECTED' as const,
+                        businessId: claimRequest.businessId,
+                        businessSlug: claimRequest.business.slug,
+                        requesterUserId: claimRequest.requesterUserId,
+                        requesterOrganizationId: claimRequest.requesterOrganizationId,
+                        organizationId: claimRequest.requesterOrganizationId,
+                    },
+                    expiredBusinesses: staleClaimExpiration.affectedBusinesses,
                 };
             });
 
-            this.publishBusinessChangedEvent(
-                reviewedClaim.businessId,
-                reviewedClaim.businessSlug,
-                'updated',
-            );
+            const reviewedClaim = reviewedClaimResult.reviewedClaim;
+            for (const business of this.toUniqueBusinessChangedTargets([
+                ...reviewedClaimResult.expiredBusinesses,
+                {
+                    id: reviewedClaim.businessId,
+                    slug: reviewedClaim.businessSlug,
+                },
+            ])) {
+                this.publishBusinessChangedEvent(business.id, business.slug, 'updated');
+            }
 
             this.domainEventsService.publishClaimRequestReviewed({
                 claimRequestId: reviewedClaim.id,
@@ -3531,7 +3584,8 @@ export class BusinessesService {
     }
 
     async getCatalogQuality(limit = 25) {
-        await this.expireStaleClaimRequests(this.prisma);
+        const staleClaimExpiration = await this.expireStaleClaimRequests(this.prisma);
+        this.publishBusinessChangedEventsForBusinesses(staleClaimExpiration.affectedBusinesses);
 
         const safeLimit = Math.min(Math.max(limit, 1), 100);
         const now = new Date();
@@ -4086,6 +4140,26 @@ export class BusinessesService {
             slug,
             operation,
         });
+    }
+
+    private publishBusinessChangedEventsForBusinesses(
+        businesses: BusinessChangedTarget[],
+    ): void {
+        for (const business of this.toUniqueBusinessChangedTargets(businesses)) {
+            this.publishBusinessChangedEvent(business.id, business.slug, 'updated');
+        }
+    }
+
+    private toUniqueBusinessChangedTargets(
+        businesses: BusinessChangedTarget[],
+    ): BusinessChangedTarget[] {
+        const targetsById = new Map<string, BusinessChangedTarget>();
+
+        for (const business of businesses) {
+            targetsById.set(business.id, business);
+        }
+
+        return [...targetsById.values()];
     }
 
     private async syncBusinessLocation(

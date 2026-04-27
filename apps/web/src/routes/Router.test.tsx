@@ -98,4 +98,38 @@ describe('AppRouter auth routes', () => {
 
         expect(await screen.findByText('admin security page')).toBeInTheDocument();
     });
+
+    it('allows every authenticated role to reach /app/invite', async () => {
+        const users = [
+            {
+                id: 'user-1',
+                name: 'Usuario RD',
+                email: 'user@aquita.do',
+                role: 'USER' as const,
+            },
+            {
+                id: 'owner-1',
+                name: 'Owner RD',
+                email: 'owner@aquita.do',
+                role: 'BUSINESS_OWNER' as const,
+            },
+            {
+                id: 'admin-1',
+                name: 'Admin RD',
+                email: 'admin@aquita.do',
+                role: 'ADMIN' as const,
+            },
+        ];
+
+        for (const user of users) {
+            const { unmount } = renderWithProviders(<AppRouter />, {
+                isAuthenticated: true,
+                user,
+                router: { initialEntries: ['/app/invite'] },
+            });
+
+            expect(await screen.findByText('invite page')).toBeInTheDocument();
+            unmount();
+        }
+    });
 });

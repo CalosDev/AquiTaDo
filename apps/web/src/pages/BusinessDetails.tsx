@@ -14,6 +14,8 @@ import { formatPublicCategoryIcon, formatPublicCategoryPath } from '../lib/categ
 import { calculateBusinessTrustScore } from '../lib/trust';
 import { applySeoMeta, removeJsonLd, upsertJsonLd } from '../seo/meta';
 import { featureFlags } from '../config/features';
+import { BusinessCheckInStatsGrid } from './business-details/BusinessCheckInStatsGrid';
+import { BusinessFeaturesSection } from './business-details/BusinessFeaturesSection';
 import { MobileContactBar } from './business-details/MobileContactBar';
 import { SidebarPanel } from './business-details/SidebarPanel';
 import {
@@ -1726,32 +1728,7 @@ export function BusinessDetails() {
                                     <span className="text-xs text-gray-500">Actualizando...</span>
                                 ) : null}
                             </div>
-                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                <div className="rounded-lg bg-white border border-accent-100 px-3 py-2">
-                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Check-ins</p>
-                                    <p className="text-base font-semibold text-gray-900">
-                                        {checkInStats?.totalCheckIns ?? 0}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-white border border-accent-100 px-3 py-2">
-                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Ult 24h</p>
-                                    <p className="text-base font-semibold text-gray-900">
-                                        {checkInStats?.last24HoursCheckIns ?? 0}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-white border border-accent-100 px-3 py-2">
-                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">GPS verif.</p>
-                                    <p className="text-base font-semibold text-gray-900">
-                                        {checkInStats?.verifiedCheckIns ?? 0}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-white border border-accent-100 px-3 py-2">
-                                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Usuarios</p>
-                                    <p className="text-base font-semibold text-gray-900">
-                                        {checkInStats?.uniqueUsers ?? 0}
-                                    </p>
-                                </div>
-                            </div>
+                            <BusinessCheckInStatsGrid stats={checkInStats} />
 
                             {isAuthenticated && isCustomerRole ? (
                                 <div className="mt-3 space-y-2">
@@ -1780,19 +1757,7 @@ export function BusinessDetails() {
 
                         {/* Features */}
                         {business.features && business.features.length > 0 && (
-                            <div className="mt-6">
-                                <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Caracteristicas</h2>
-                                <div className="flex flex-wrap gap-2">
-                                    {business.features.map((bf, i) => (
-                                        <span
-                                            key={i}
-                                            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700"
-                                        >
-                                            {bf.feature.name}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
+                            <BusinessFeaturesSection features={business.features} />
                         )}
                     </div>
 

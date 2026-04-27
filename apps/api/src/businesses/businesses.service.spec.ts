@@ -8,6 +8,24 @@ function createBusinessesService() {
     const tx = {
         business: {
             findUnique: vi.fn(),
+            update: vi.fn(),
+        },
+        businessClaimRequest: {
+            findMany: vi.fn(),
+            updateMany: vi.fn(),
+            groupBy: vi.fn(),
+            findFirst: vi.fn(),
+            create: vi.fn(),
+        },
+        businessOwnership: {
+            findMany: vi.fn(),
+            findFirst: vi.fn(),
+        },
+        auditLog: {
+            create: vi.fn(),
+        },
+        growthEvent: {
+            create: vi.fn(),
         },
     };
     const prisma = {
@@ -28,12 +46,21 @@ function createBusinessesService() {
             }
         }),
     };
+    const domainEventsService = {
+        publishBusinessChanged: vi.fn(),
+        publishClaimRequestCreated: vi.fn(),
+        publishClaimRequestReviewed: vi.fn(),
+        publishBusinessLinkedToOrganization: vi.fn(),
+        publishBusinessDuplicatesMerged: vi.fn(),
+        publishCatalogBusinessCreated: vi.fn(),
+        publishPotentialDuplicateDetected: vi.fn(),
+    };
 
     const service = new (BusinessesService as any)(
         prisma as unknown as PrismaService,
         {},
         {},
-        {},
+        domainEventsService,
         {},
         {},
         {},
@@ -57,6 +84,7 @@ function createBusinessesService() {
         service,
         prisma,
         tx,
+        domainEventsService,
         organizationAccessService,
     };
 }
@@ -153,5 +181,104 @@ describe('BusinessesService organization access', () => {
             'STAFF',
             'No tienes permisos para eliminar este negocio',
         );
+    });
+
+    it('expires stale claims during createClaimRequest and publishes deduped business.changed after commit', async () => {
+        const { service, prisma, tx, domainEventsService } = createBusinessesService();
+        const events: string[] = [];
+        const createdAt = new Date('2026-04-25T12:00:00.000Z');
+
+        prisma.$transaction.mockImplementationOnce(async (callback: (client: typeof tx) => Promise<unknown>) => {
+            events.push('transaction:start');
+            const result = await callback(tx);
+            events.push('transaction:commit');
+            return result;
+        });
+        domainEventsService.publishBusinessChanged.mockImplementation(() => {
+            events.push('business.changed');
+        });
+        domainEventsService.publishClaimRequestCreated.mockImplementation(() => {
+            events.push('claim.created');
+        });
+        tx.businessClaimRequest.findMany.mockResolvedValue([
+            {
+                id: 'stale-claim-1',
+                businessId: 'business-1',
+                requesterOrganizationId: null,
+                business: {
+                    slug: 'negocio-test',
+                },
+            },
+            {
+                id: 'stale-claim-2',
+                businessId: 'business-1',
+                requesterOrganizationId: 'org-stale',
+                business: {
+                    slug: 'negocio-test',
+                },
+            },
+        ]);
+        tx.businessClaimRequest.updateMany.mockResolvedValue({ count: 2 });
+        tx.auditLog.create.mockResolvedValue({});
+        tx.businessOwnership.findMany.mockResolvedValue([]);
+        tx.businessClaimRequest.groupBy.mockResolvedValue([]);
+        tx.business.update.mockResolvedValue({ id: 'business-1' });
+        tx.business.findUnique.mockResolvedValue({
+            id: 'business-1',
+            name: 'Negocio Test',
+            slug: 'negocio-test',
+            provinceId: 'province-1',
+            cityId: 'city-1',
+            claimStatus: 'UNCLAIMED',
+            isClaimable: true,
+            deletedAt: null,
+        });
+        tx.businessOwnership.findFirst.mockResolvedValue(null);
+        tx.businessClaimRequest.findFirst.mockResolvedValue(null);
+        tx.businessClaimRequest.create.mockResolvedValue({
+            id: 'claim-new',
+            status: 'PENDING',
+            createdAt,
+            business: {
+                id: 'business-1',
+                name: 'Negocio Test',
+                slug: 'negocio-test',
+            },
+        });
+        tx.growthEvent.create.mockResolvedValue({});
+
+        const result = await service.createClaimRequest(
+            'business-1',
+            {
+                evidenceType: 'MANUAL',
+                evidenceValue: 'Documento enviado',
+                notes: 'Solicitud con claims vencidos previos.',
+            },
+            'user-1',
+        );
+
+        expect(domainEventsService.publishBusinessChanged).toHaveBeenCalledTimes(1);
+        expect(domainEventsService.publishBusinessChanged).toHaveBeenCalledWith({
+            businessId: 'business-1',
+            slug: 'negocio-test',
+            operation: 'updated',
+        });
+        expect(events.indexOf('transaction:commit')).toBeGreaterThan(-1);
+        expect(events.indexOf('business.changed')).toBeGreaterThan(events.indexOf('transaction:commit'));
+        expect(domainEventsService.publishClaimRequestCreated).toHaveBeenCalledWith({
+            claimRequestId: 'claim-new',
+            businessId: 'business-1',
+            businessSlug: 'negocio-test',
+            requesterUserId: 'user-1',
+            requesterOrganizationId: null,
+        });
+        expect(result).toMatchObject({
+            id: 'claim-new',
+            status: 'PENDING',
+            business: {
+                id: 'business-1',
+                slug: 'negocio-test',
+            },
+        });
     });
 });

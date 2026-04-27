@@ -117,6 +117,28 @@ describe('Role access matrix (e2e)', () => {
             .expect(403);
     });
 
+    it('enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role', async () => {
+        const user = await createUser('USER');
+        const owner = await createUser('BUSINESS_OWNER');
+        const admin = await createUser('ADMIN');
+        const missingInviteToken = `missing-invite-${makeSeed()}`;
+
+        await request(app.getHttpServer())
+            .post(`/api/organizations/invites/${missingInviteToken}/accept`)
+            .set('Authorization', `Bearer ${signToken(admin.id, admin.role)}`)
+            .expect(403);
+
+        await request(app.getHttpServer())
+            .post(`/api/organizations/invites/${missingInviteToken}/accept`)
+            .set('Authorization', `Bearer ${signToken(user.id, user.role)}`)
+            .expect(404);
+
+        await request(app.getHttpServer())
+            .post(`/api/organizations/invites/${missingInviteToken}/accept`)
+            .set('Authorization', `Bearer ${signToken(owner.id, owner.role)}`)
+            .expect(404);
+    });
+
     it('allows ADMIN on admin endpoints and blocks tenant-owner flows', async () => {
         const admin = await createUser('ADMIN');
         const token = signToken(admin.id, admin.role);

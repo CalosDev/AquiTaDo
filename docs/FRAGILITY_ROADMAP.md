@@ -48,7 +48,7 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 | `/register-business` | partial | Alto: formulario multi-step, org context, uploads y validacion. | `playwright/specs/acceptance-business.spec.ts` | Characterization por pasos con datos invalidos y sin cambiar backend. |
 | `/dashboard/businesses/:businessId/edit` | not-covered | Alto: ownership, org context, mutaciones y cache. | No encontrada. | Acceptance con negocio seed propiedad del usuario y caso no autorizado. |
 | `/suggest-business` | not-covered | Medio: usuario final crea sugerencia y evita spam/errores. | No encontrada. | Acceptance USER con formulario vacio, validacion y submit mock/seed. |
-| `/app/invite` | not-covered | Alto: token de invitacion, membresia y org context. | No encontrada. | Acceptance con token invalido y token valido seed. |
+| `/app/invite` | partial | Alto: token de invitacion, membresia, roles frontend/backend y org context. | `apps/web/src/routes/Router.test.tsx` caracteriza que `USER`, `BUSINESS_OWNER` y `ADMIN` autenticados llegan a la ruta. `apps/api/src/auth/role-access.e2e.spec.ts` agrega caracterizacion backend/API pendiente de validacion runtime. | Ejecutar el test backend/API en entorno QA/CI con DB disponible; luego acceptance con token invalido y token valido seed. |
 | `/admin` consola | partial | Alto: permisos ADMIN, tabla operacional y acciones sensibles. | `acceptance-admin.spec.ts`, `visual.spec.ts`, `auth.e2e.spec.ts` | Acceptance de estados vacio/error y una accion admin no destructiva. |
 | `/security` admin security | not-covered | Alto: 2FA/admin security y permisos. | No encontrada. | Acceptance basica ADMIN y bloqueo USER/BUSINESS_OWNER. |
 | Observability metrics | pass | Alto: endpoint sensible debe bloquear anonimo/no-admin. | `playwright/specs/admin-observability.e2e.spec.ts`, `apps/api/src/observability/observability.e2e.spec.ts` | Agregar summary/reset si se modifican metricas publicas. |
@@ -97,14 +97,216 @@ Fase 1 queda cerrada con tres tests de bajo riesgo: recuperacion de slug inexist
 | Fase 1.2 | `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/acceptance-auth.spec.ts -g "forgot password shows the recovery form"` | Pass: `1 passed`. |
 | Fase 1.3 | `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/acceptance-public.spec.ts -g "businesses loads the public directory shell"` | Pass: `1 passed`. |
 
+## Avance de Fase 2: extracciones visuales puras
+
+Fase 2 inicio con extracciones presentacionales de bajo riesgo. No se movio logica de producto, `useEffect`, `searchParams`, API calls, auth, permisos, tracking, rutas, formularios complejos ni cache. Las constantes/datos resueltos permanecen en las paginas padre y se pasan como props.
+
+### Componentes extraidos
+
+| Fase | Componente extraido | Bloque original | Archivos tocados | Limite de seguridad |
+| --- | --- | --- | --- | --- |
+| 2.1 | `HowItWorksSection` | `Home.tsx` - seccion `Como funciona AquiTa.do` | `apps/web/src/pages/Home.tsx`, `apps/web/src/pages/home/HowItWorksSection.tsx` | Solo JSX presentacional; `HOW_IT_WORKS_STEPS` permanece en `Home.tsx`. |
+| 2.2 | `HomeDifferenceSection` | `Home.tsx` - seccion `Por que AquiTa.do es diferente` | `apps/web/src/pages/Home.tsx`, `apps/web/src/pages/home/HomeDifferenceSection.tsx` | Solo JSX presentacional; `OPERATING_POINTS` permanece en `Home.tsx`. |
+| 2.3 | `BusinessFeaturesSection` | `BusinessDetails.tsx` - seccion `Caracteristicas` | `apps/web/src/pages/BusinessDetails.tsx`, `apps/web/src/pages/business-details/BusinessFeaturesSection.tsx` | Solo render de chips; el guard `business.features && business.features.length > 0` permanece en `BusinessDetails.tsx`. |
+| 2.4 | `BusinessCheckInStatsGrid` | `BusinessDetails.tsx` - grilla de metricas en `Actividad local` | `apps/web/src/pages/BusinessDetails.tsx`, `apps/web/src/pages/business-details/BusinessCheckInStatsGrid.tsx` | Solo render de metricas; el guard de check-ins, auth, boton y mensajes permanecen en `BusinessDetails.tsx`. |
+
+### QA focalizado ejecutado
+
+| Fase | Comando | Resultado |
+| --- | --- | --- |
+| 2.1 | `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 test / 1 file`. |
+| 2.2 | `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 test / 1 file`. |
+| 2.3 | `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/BusinessDetails.test.tsx` | Pass: `1 test / 1 file`. |
+| 2.4 | `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/BusinessDetails.test.tsx` | Pass: `1 test / 1 file`. |
+
+### QA amplio ejecutado
+
+| Fase | Comando | Resultado |
+| --- | --- | --- |
+| 2.1 | `pnpm --filter @aquita/web typecheck` | Pass. |
+| 2.1 | `pnpm --filter @aquita/web test` | Pass: unit `19 files / 53 tests`, integration `22 files / 65 tests`. |
+| 2.1 | `pnpm qa:smoke` | Pass: lint, typecheck y unit tests. Web `19 files / 53 tests`; API `24 files / 113 tests`. |
+| 2.2 | `pnpm --filter @aquita/web typecheck` | Pass. |
+| 2.2 | `pnpm --filter @aquita/web test` | Pass: unit `19 files / 53 tests`, integration `22 files / 65 tests`. |
+| 2.2 | `pnpm qa:smoke` | Pass: lint, typecheck y unit tests. Web `19 files / 53 tests`; API `24 files / 113 tests`. |
+| 2.3 | `pnpm --filter @aquita/web typecheck` | Pass. |
+| 2.3 | `pnpm --filter @aquita/web test` | Pass: unit `19 files / 53 tests`, integration `22 files / 65 tests`. |
+| 2.3 | `pnpm qa:smoke` | Pass: lint, typecheck y unit tests. Web `19 files / 53 tests`; API `24 files / 113 tests`. |
+| 2.4 | `pnpm --filter @aquita/web typecheck` | Pass. |
+| 2.4 | `pnpm --filter @aquita/web test` | Pass: unit `19 files / 53 tests`, integration `22 files / 65 tests`. |
+| 2.4 | `pnpm qa:smoke` | Pass: lint, typecheck y unit tests. Web `19 files / 53 tests`; API `24 files / 113 tests`. |
+
+### Nota de QA
+
+En los cierres amplios aparecio el warning conocido `Geoapify geocoding failed (HTTP 503)` dentro de tests unitarios de API. Es no bloqueante: las suites terminaron en pass y el warning no esta relacionado con las extracciones visuales de Fase 2.1, 2.2, 2.3 o 2.4.
+
+## Avance de Fase 3: contrato frontend/API
+
+Fase 3 inicio como auditoria sin modificar producto. El foco fue detectar riesgo de drift entre `apps/web/src/api/endpoints.ts`, los controllers criticos del API y los DTOs backend, especialmente en el contrato publico `GET /businesses`.
+
+### Fase 3.4: check manual report-only
+
+| Item | Detalle |
+| --- | --- |
+| Check agregado | `scripts/check-businesses-contract.mjs` |
+| Contrato cubierto | `businessApi.getAll(params)` contra `BusinessQueryDto` para `GET /businesses` |
+| Comando | `node scripts/check-businesses-contract.mjs` |
+| Resultado actual | `Findings: none` |
+| Modo | Manual/report-only; no esta conectado a CI y no bloquea builds |
+
+Hallazgos actuales del check:
+
+- `view` existe como param UI en `useBusinessesListFilters`, pero no se envia a `GET /businesses`.
+- `search/q` esta controlado para este contrato: el listado envia `search`, no `q`.
+- `latitude/lat` y `longitude/lng` estan controlados para este contrato: el listado envia `latitude`/`longitude`, no `lat`/`lng`.
+
+Limites deliberados:
+
+- No valida response shape.
+- No hace requests reales.
+- No depende de seeds.
+- No cubre `/search/businesses`.
+- No cubre auth, admin, roles ni org context.
+- No cubre cache, ranking ni paginacion real.
+- No esta conectado a CI.
+
+Recomendacion: mantener este check fuera de CI hasta cerrar la tanda completa de checks manuales y decidir un gate con bajo ruido.
+
+### Fase 3.6: check manual report-only
+
+| Item | Detalle |
+| --- | --- |
+| Check agregado | `scripts/check-telemetry-growth-contract.mjs` |
+| Contrato cubierto | `analyticsApi.trackGrowthEvent` contra `TrackGrowthEventDto` y `GrowthEventType` para `POST /telemetry/growth` |
+| Comando | `node scripts/check-telemetry-growth-contract.mjs` |
+| Resultado actual | `Findings: none` |
+| Modo | Manual/report-only; no esta conectado a CI y no bloquea builds |
+
+Hallazgos actuales del check:
+
+- `/telemetry/growth` esta alineado con el controller alias: `@Controller` incluye `telemetry` y existe `@Post("growth")`.
+- `TrackGrowthEventDto` importa, valida y tipa `eventType` con `GrowthEventType`.
+- Los 20 valores frontend de `eventType` coinciden con los 20 valores backend de `GrowthEventType`.
+
+Limites deliberados:
+
+- No valida response shape.
+- No valida metadata shape.
+- No valida persistencia en DB.
+- No valida rate limit.
+- No inspecciona `AnalyticsService`.
+- No hace requests reales.
+- No esta conectado a CI.
+
+Recomendacion: mantener este check fuera de CI hasta cerrar la tanda completa de checks manuales y decidir un gate con bajo ruido.
+
+### Fase 3.7: check manual report-only
+
+| Item | Detalle |
+| --- | --- |
+| Check agregado | `scripts/check-business-detail-contract.mjs` |
+| Contrato cubierto | Wrappers publicos de detalle contra `GET /businesses/:identifier` |
+| Comando | `node scripts/check-business-detail-contract.mjs` |
+| Resultado actual | `Findings: none` |
+| Modo | Manual/report-only; no esta conectado a CI y no bloquea builds |
+
+Hallazgos actuales del check:
+
+- `businessApi.getByIdentifier`, `businessApi.getById` y `businessApi.getBySlug` apuntan a `/businesses/${...}`.
+- `prefetchPublicDetail` prefiere `slug`, usa `id` como fallback si falla el prefetch por slug y usa `id` cuando no hay `slug`.
+- El backend expone `@Get(":identifier")` y usa `@Param("identifier")`.
+- El detalle publico mantiene `OptionalJwtAuthGuard` y `OptionalOrgContextGuard`.
+- No hay `JwtAuthGuard`, `RolesGuard` ni `@Roles` obligatorios en el detalle publico.
+
+Limites deliberados:
+
+- No valida response shape.
+- No hace requests reales.
+- No depende de seeds.
+- No valida cache.
+- No valida SEO, imagenes, reviews ni favoritos.
+- No inspecciona Prisma/DB.
+- No esta conectado a CI.
+
+### Cierre de Fase 3
+
+Fase 3 queda con tres checks estaticos manuales/report-only:
+
+- `scripts/check-businesses-contract.mjs`: `GET /businesses`.
+- `scripts/check-telemetry-growth-contract.mjs`: `POST /telemetry/growth`.
+- `scripts/check-business-detail-contract.mjs`: `GET /businesses/:identifier`.
+
+Los tres tienen resultado actual `Findings: none` y siguen fuera de CI. No se modificaron contratos, endpoints, controllers, DTOs ni `package.json`.
+
 ## Riesgos pendientes
 
+- Fase 4.4 agrego `scripts/check-business-cache-events.mjs`, un check manual/read-only/report-only para mutaciones de negocio que cambian campos publicos sin publicar `business.changed`.
+- Comando de ejecucion: `node scripts/check-business-cache-events.mjs`.
+- Resultado inicial de Fase 4.4: `Findings (3)` report-only.
+- Fase 4.6 corrigio `createClaimRequest` con `business.changed` despues de una claim request exitosa.
+- `ClaimRequestCreated` sigue intacto en `createClaimRequest`.
+- Resultado actual posterior a Fase 4.6: `Findings (1)` report-only.
+- `scripts/check-business-cache-events.mjs` ahora reporta `publishBusinessChangedEvent: yes` para `createClaimRequest`.
+- Fase 4.8 corrigio `expireStaleClaimRequests` con un patron diferido: el helper retorna `affectedBusinesses`, no publica eventos internamente, y sus callers publican `business.changed` despues de commit/operacion exitosa.
+- Fase 4.9 ajusto `scripts/check-business-cache-events.mjs` para reconocer ese patron seguro.
+- Resultado actual posterior a Fase 4.9: `Findings: none`.
+- `scripts/check-business-cache-events.mjs` reporta `publishBusinessChangedEvent: no` y `deferred business.changed via callers: yes` para `expireStaleClaimRequests`.
+- Fase 4.10 agrego un test unitario en `apps/api/src/businesses/businesses.service.spec.ts`: `expires stale claims during createClaimRequest and publishes deduped business.changed after commit`.
+- El test protege que `createClaimRequest` publique `business.changed` una sola vez cuando hay claims stale del mismo negocio, con `businessId`, `slug`, `operation: "updated"` y despues del commit.
+- El test confirma que `publishClaimRequestCreated` sigue llamandose y que la operacion retorna la claim request creada.
+- Controles positivos detectados con `business.changed`: `createClaimRequest`, `reviewClaimRequest`, `updateAdminPublicationState`, `markBusinessClaimedAdmin`, `unclaimBusinessAdmin`, `revokeBusinessOwnership`, `delete`, `verify`, `update`, `create` y `resolveDuplicateCase`.
+- El check sale con exit code `0`, no esta conectado a CI y no bloquea builds.
+- QA de Fase 4.6: `node scripts/check-business-cache-events.mjs` pass; `pnpm --filter @aquita/api test` pass (`24 files / 113 tests`); `pnpm qa:smoke` pass.
+- QA de Fase 4.8/4.9: `node scripts/check-business-cache-events.mjs` pass (`Findings: none`); `pnpm --filter @aquita/api typecheck` pass; `pnpm --filter @aquita/api test` pass en Fase 4.8 (`24 files / 113 tests`); `pnpm qa:smoke` pass.
+- QA de Fase 4.10: `pnpm --filter @aquita/api exec vitest run src/businesses/businesses.service.spec.ts` pass (`1 file / 4 tests`); `pnpm --filter @aquita/api test` pass (`24 files / 114 tests`); `pnpm qa:smoke` pass.
+- Warning conocido no bloqueante: `Geoapify geocoding failed (HTTP 503)` en tests de `IntegrationsService`.
+- Estado actual: `check-business-cache-events` queda en `Findings: none` y el test unitario protege el cruce `createClaimRequest` / `expireStaleClaimRequests` para dedupe y publicacion post-commit.
+- Proxima fase recomendada: cubrir `reviewClaimRequest` o un caller no transaccional de `expireStaleClaimRequests` antes de tocar TTLs, Redis real, response shape o CI.
+- Fase 5.2 agrego `docs/AUTH_ORG_CONTEXT_RISK_MAP.md`, un mapa documental de riesgo de auth, permisos, roles y contexto de organizacion.
+- Fase 5.4 agrego `scripts/check-auth-org-routes.mjs`, un check manual/read-only/report-only para mapear rutas protegidas, guards, roles y org context.
+- Comando de ejecucion: `node scripts/check-auth-org-routes.mjs`.
+- Resultado actual de Fase 5.4: backend routes mapeadas `181`, frontend routes mapeadas `25`, findings report-only `4`.
+- `scripts/check-auth-org-routes.mjs` sale con exit code `0`, no esta conectado a CI y no bloquea builds.
+- Findings actuales de Fase 5.4: `GET /businesses/:identifier` usa `OptionalJwtAuthGuard + OptionalOrgContextGuard`; `/app/invite` es authenticated-only en frontend con posible choque por rol backend; `/app/invite` puede chocar con `POST /organizations/invites/:token/accept` restringido a `USER` y `BUSINESS_OWNER`; `api/client.ts` inyecta `x-organization-id` globalmente desde `localStorage.activeOrganizationId`.
+- Fase 5.6 agrego el test `allows every authenticated role to reach /app/invite` en `apps/web/src/routes/Router.test.tsx`.
+- Comportamiento caracterizado en Fase 5.6: `USER`, `BUSINESS_OWNER` y `ADMIN` autenticados llegan a `/app/invite` en frontend.
+- El backend mantiene la aceptacion de invitaciones restringida por rol en `POST /organizations/invites/:token/accept`: `USER` y `BUSINESS_OWNER`.
+- El mismatch de `/app/invite` no se resolvio todavia; solo quedo caracterizado el comportamiento frontend actual.
+- QA de Fase 5.6: `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/routes/Router.test.tsx -t "allows every authenticated role to reach /app/invite"` -> pass (`1 passed`, `3 skipped`, `1 file passed`).
+- Fase 5.8 agrego el test `enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role` en `apps/api/src/auth/role-access.e2e.spec.ts`.
+- Contrato caracterizado en Fase 5.8: `POST /api/organizations/invites/:token/accept` debe devolver `403` para `ADMIN`; `USER` y `BUSINESS_OWNER` no deben fallar por rol y, con invite token inexistente, deben recibir `404`.
+- Resultado local de Fase 5.8: no validado por infraestructura.
+- Causa del intento local: DB local no disponible, `ECONNREFUSED localhost:5432`.
+- Intento con `node scripts/run-with-qa-stack.mjs -- pnpm --filter @aquita/api exec vitest run src/auth/role-access.e2e.spec.ts -t "enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role"` fallo porque Docker daemon no esta disponible (`dockerDesktopLinuxEngine` no encontrado).
+- Estado de Fase 5.8: test implementado, pendiente de ejecutar en entorno con DB/Docker disponible.
+- No hay evidencia de fallo del assert nuevo; el fallo local ocurrio antes de ejecutar el cuerpo del test.
+- Fase 5.10 reforzo `scripts/check-auth-org-routes.mjs` para cubrir `/app/invite` de forma estatica/manual/report-only, sin DB runtime.
+- El check reforzado valida estaticamente que `/app/invite` existe en `Router.tsx`, esta protegida por `ProtectedRoute` sin roles explicitos, `AcceptOrganizationInvite` usa `organizationApi.acceptInvite`, `organizationApi.acceptInvite` apunta a `POST /organizations/invites/${token}/accept`, `OrganizationsController` expone `@Post("invites/:token/accept")`, el endpoint usa `JwtAuthGuard` y `RolesGuard`, permite `USER` y `BUSINESS_OWNER`, y `RolesGuard` usa `getAllAndOverride`.
+- Findings actuales de Fase 5.10: `4`.
+- `/app/invite` mismatch queda explicito: frontend authenticated-only incluye `ADMIN`, pero backend accept invite excluye `ADMIN` y permite `USER`, `BUSINESS_OWNER`.
+- El check de Fase 5.10 complementa, no sustituye, el e2e de `apps/api/src/auth/role-access.e2e.spec.ts`.
+- El e2e `role-access` sigue pendiente por infraestructura DB/Docker; no hay validacion runtime de `403/404` todavia.
+- QA de Fase 5.10: `node scripts/check-auth-org-routes.mjs` -> pass, exit `0`, findings report-only `4`.
+- QA de Fase 5.10: `node --check scripts/check-auth-org-routes.mjs` -> pass, sintaxis valida.
+- QA de Fase 5.10: `pnpm qa:smoke` -> pass.
+- Warning conocido no bloqueante de Fase 5.10: `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API.
+- Proximo paso recomendado de Fase 5: ejecutar el test backend/API en entorno QA/CI con DB disponible antes de decidir si se ajusta frontend, backend o permisos.
+- Riesgos pendientes de Fase 5: `/app/invite` rol mismatch, `x-organization-id` global, combinacion `OptionalJwtAuthGuard + OptionalOrgContextGuard`, y session sync/refresh.
 - `/reset-password` sigue `not-covered`; antes de implementarlo hay que confirmar si un token invalido puede cubrirse sin backend real ni cambios de producto.
 - `/businesses` sigue `partial mejorado`, no `pass`; faltan filtros complejos, paginacion, errores API, SEO routes y no-results con URL estable.
 - `/businesses/:slug` valido sigue bloqueado por falta de negocio seed real; no crear fixtures ni tocar Prisma solo para habilitarlo.
+- El check 3.4 no cubre response shape, `/search/businesses`, auth/admin, cache, ranking ni paginacion real.
+- El check 3.6 no cubre response shape, metadata shape, persistencia, rate limit, `AnalyticsService` ni CI gate.
+- El check 3.7 no cubre response shape, requests reales, seeds, cache, SEO, imagenes, reviews, favoritos, Prisma/DB ni CI gate.
 - Auth avanzado sigue incompleto: refresh expirado, refresh ausente, 2FA y throttling deben abordarse en fases separadas por riesgo.
 - Rutas protegidas y permisos siguen siendo zona de alto riesgo: `/app/customer`, `/suggest-business`, `/security` y casos por rol no deben mezclarse con refactors.
 - PWA/service worker, Redis/cache, Prisma/PostGIS y Docker siguen fuera de alcance hasta tener una fase dedicada y validacion mas amplia.
+- Antes de tocar logica en `Home.tsx` o `BusinessDetails.tsx`, agregar caracterizacion del flujo que se vaya a modificar. Las extracciones actuales solo prueban que el render sigue compilando y que las rutas cubiertas siguen verdes.
+- Antes de tocar `searchParams`, SEO routes o filtros, mantener una fase dedicada para `BusinessesList` y sus pruebas de URL/canonical/dependent cleanup.
+- Antes de tocar auth o permisos, validar matriz por rol y no mezclar cambios con refactors visuales.
+- Antes de tocar guards, `AuthContext`, `OrganizationContext`, `ProtectedRoute`, `api/client.ts` o `x-organization-id`, usar la salida de `scripts/check-auth-org-routes.mjs` y agregar caracterizacion acotada del flujo afectado.
+- Antes de tocar API o cache, agregar contratos de respuesta e invalidacion especifica; no asumir que `qa:smoke` cubre datos stale o Redis.
+- Riesgos pendientes de contrato tras Fase 3: response shape, auth avanzado, admin, cache, ranking, paginacion real, seeds y CI gate.
 
 ## QA recomendado para futuras fases
 
