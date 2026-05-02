@@ -503,11 +503,14 @@ function inspectAppInviteStaticContract({
     addContractSignal({
         notes,
         findings,
-        ok: appInvite?.protection === 'authenticated-only',
+        ok: appInvite?.protection === 'role-gated'
+            && frontendAllowedRoles.includes('USER')
+            && frontendAllowedRoles.includes('BUSINESS_OWNER')
+            && !frontendAllowedRoles.includes('ADMIN'),
         risk: 'medium',
         route: '/app/invite',
-        message: '/app/invite is not protected by ProtectedRoute without explicit roles.',
-        passNote: '/app/invite is protected by ProtectedRoute without explicit roles.',
+        message: '/app/invite is not protected by ProtectedRoute with explicit USER and BUSINESS_OWNER roles.',
+        passNote: '/app/invite is protected by ProtectedRoute with explicit USER and BUSINESS_OWNER roles.',
     });
     addContractSignal({
         notes,
@@ -573,6 +576,14 @@ function inspectAppInviteStaticContract({
             recommendation: 'Keep report-only; the e2e/API characterization is still needed to validate runtime 403/404 behavior.',
         });
         notes.push('Mismatch confirmed: frontend authenticated-only includes ADMIN; backend accept invite excludes ADMIN.');
+    } else if (
+        appInvite?.protection === 'role-gated'
+        && frontendAllowedRoles.includes('USER')
+        && frontendAllowedRoles.includes('BUSINESS_OWNER')
+        && !frontendIncludesAdmin
+        && excludesAdminBackend
+    ) {
+        notes.push('App invite frontend roles align with backend invite accept roles: USER and BUSINESS_OWNER only; ADMIN excluded.');
     }
 
     return { findings, notes };
