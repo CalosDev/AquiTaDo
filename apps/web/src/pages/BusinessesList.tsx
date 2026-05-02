@@ -681,13 +681,14 @@ export function BusinessesList() {
                 }
             />
 
+            <div className="space-y-4 md:space-y-5">
             <section className="page-section">
                 <PageIntroCompact
                     eyebrow="Discovery público"
                     title={listingHeading}
                     description={listingDescription}
                     actions={(
-                        <ActionBar>
+                        <ActionBar className="gap-1.5">
                             <span className="chip !bg-white !text-slate-700">{resultsCountLabel}</span>
                             {activeFilterChips.length > 0 ? (
                                 <span className="chip !bg-white !text-slate-700">{activeFilterChips.length} filtros activos</span>
@@ -700,6 +701,7 @@ export function BusinessesList() {
                 />
             </section>
 
+            <div>
             <ListingControlsBar
                 activeFilterCount={activeFilterChips.length}
                 currentProvince={currentProvince}
@@ -718,6 +720,8 @@ export function BusinessesList() {
                 sortKey={sortKey}
                 totalVisibleResults={sortedBusinesses.length}
             />
+            </div>
+            </div>
 
             <div className="discovery-layout">
                 <FiltersSidebar
@@ -747,13 +751,13 @@ export function BusinessesList() {
                 />
 
                 <div className="min-w-0">
-                    <AppCard className="mb-4">
+                    <div className="mb-4 rounded-[22px] border border-slate-200/80 bg-white/90 px-5 py-4 shadow-sm shadow-slate-900/5 md:px-6 md:py-5">
                         <PageIntroCompact
                             eyebrow="Resultados"
                             title="Directorio listo para explorar"
                             description={pageSummary || listingDescription}
                             actions={(
-                                <ActionBar>
+                                <ActionBar className="gap-1.5">
                                     {activeCategoryDisplayName ? (
                                         <span className="chip !bg-white !text-slate-700">{activeCategoryDisplayName}</span>
                                     ) : null}
@@ -765,7 +769,7 @@ export function BusinessesList() {
                                 </ActionBar>
                             )}
                         />
-                    </AppCard>
+                    </div>
                     {shouldShowInitialLoading ? (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

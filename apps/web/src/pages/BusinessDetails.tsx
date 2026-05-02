@@ -1265,7 +1265,7 @@ export function BusinessDetails() {
                     {/* Image Gallery */}
                     <div className="panel-premium overflow-hidden">
                         <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1.7fr)_15rem]">
-                        <div className="relative min-h-[340px] overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary-900 via-primary-700 to-accent-700 md:min-h-[420px] lg:min-h-[460px]">
+                        <div className="relative min-h-[400px] overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary-900 via-primary-700 to-accent-700 sm:min-h-[420px] lg:min-h-[460px]">
                             {featuredImage ? (
                                 <OptimizedImage
                                     src={featuredImage.url}
@@ -1281,14 +1281,14 @@ export function BusinessDetails() {
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-slate-950/10"></div>
                             {business.images.length > 1 ? (
-                                <div className="absolute right-4 top-4 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md">
+                                <div className="absolute right-3 top-3 rounded-full border border-white/20 bg-slate-950/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md sm:right-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-[11px]">
                                     Galeria {business.images.length} fotos
                                 </div>
                             ) : null}
-                            <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
-                                <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+                            <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 md:p-8">
+                                <div className="flex flex-col items-start gap-4 sm:gap-5 md:flex-row md:items-end md:justify-between">
                                     <div className="max-w-3xl">
-                                        <div className="mb-3 flex flex-wrap gap-2">
+                                        <div className="mb-4 flex flex-wrap gap-2.5 sm:mb-3 sm:gap-2">
                                             {business.verified && (
                                                 <span className="rounded-full bg-primary-700 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
                                                     Verificado
@@ -1330,7 +1330,7 @@ export function BusinessDetails() {
                                         )}
                                     </div>
                                     {averageRating && (
-                                        <div className="w-fit rounded-[1.5rem] border border-white/12 bg-amber-500/95 px-5 py-4 text-center text-white shadow-lg shadow-amber-900/30 backdrop-blur-sm">
+                                        <div className="w-fit self-start rounded-[1.25rem] border border-white/12 bg-amber-500/95 px-4 py-3 text-center text-white shadow-lg shadow-amber-900/30 backdrop-blur-sm sm:rounded-[1.5rem] sm:px-5 sm:py-4">
                                             <div className="font-display text-4xl font-bold leading-none">{averageRating}</div>
                                             {reviewStarsLabel && (
                                                 <div className="mt-1 text-xs tracking-[0.22em] text-white/90">{reviewStarsLabel}</div>
