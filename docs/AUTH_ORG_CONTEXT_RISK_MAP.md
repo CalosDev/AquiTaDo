@@ -138,12 +138,11 @@ Permisos especialmente sensibles:
 | Multi-tab/session sync | Parcial | Hay logica en `AuthContext`, pero falta caracterizacion completa por escenario. |
 | Admin con/sin org context | Parcial | Hay cobertura indirecta en negocios/admin; falta matriz dedicada por guard. |
 | Optional auth/org public routes | Parcial | Detalle publico conserva guards opcionales; falta caso token expirado/stale org. |
-| `/app/invite` frontend route | Parcial | `apps/web/src/routes/Router.test.tsx` caracteriza que `USER`, `BUSINESS_OWNER` y `ADMIN` autenticados llegan a la ruta. |
-| `/app/invite` backend accept roles | Pendiente de validacion runtime | `apps/api/src/auth/role-access.e2e.spec.ts` incluye el test `enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role`, pero no se pudo validar localmente por infraestructura. |
+| `/app/invite` frontend route | Cubierto | `apps/web/src/routes/Router.test.tsx` ya valida que `USER` y `BUSINESS_OWNER` llegan a la ruta y que `ADMIN` redirige temprano a `/admin`. |
+| `/app/invite` backend accept roles | Cubierto | `apps/api/src/auth/role-access.e2e.spec.ts` fue validado runtime con `node scripts/run-with-qa-stack.mjs -- pnpm --filter @aquita/api exec vitest run src/auth/role-access.e2e.spec.ts -t "enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role"`; `ADMIN` recibe `403`, `USER` y `BUSINESS_OWNER` reciben `404`, no `403`. |
 
 ## Posibles inconsistencias frontend/backend
 
-- `/app/invite` puede ser visible para cualquier usuario autenticado, pero el backend de invitaciones no acepta `ADMIN`.
 - `canManageOrganizations` no marca `BUSINESS_OWNER` como capability general, mientras `OrganizationContext` si special-casea `BUSINESS_OWNER` para cargar organizaciones.
 - El frontend envia `x-organization-id` de forma global; el backend solo lo acepta para contextos validos segun rol/membresia o bypass admin.
 - El interceptor de refresh puede actualizar token/storage sin que el estado React cambie inmediatamente.
@@ -171,7 +170,7 @@ Se agrego un check estatico manual/read-only/report-only para mapear rutas prote
 - Exit code actual: `0`, incluso con findings reportados.
 - Backend routes mapeadas: `181`.
 - Frontend routes mapeadas: `25`.
-- Findings report-only actuales: `4`.
+- Findings report-only actuales: `2`.
 
 El check reporta:
 
@@ -184,8 +183,6 @@ Findings actuales:
 | Finding | Riesgo | Detalle | Estado |
 | --- | --- | --- | --- |
 | `GET /businesses/:identifier` usa `OptionalJwtAuthGuard + OptionalOrgContextGuard` | Info | Token invalido/expirado puede degradar a anonimo con contexto org opcional. | Report-only; no corregir sin caracterizacion. |
-| `/app/invite` es authenticated-only en frontend | Medio | La ruta frontend permite usuario autenticado generico, pero el backend de accept invite esta restringido por rol. | Report-only; caracterizar antes de cambiar UX o backend. |
-| `/app/invite` puede chocar con `POST /organizations/invites/:token/accept` | Medio | El frontend no expresa la misma restriccion de roles que el backend (`USER`, `BUSINESS_OWNER`). | Report-only; decidir comportamiento de `ADMIN` en una fase dedicada. |
 | `api/client.ts` inyecta `x-organization-id` globalmente desde `localStorage.activeOrganizationId` | Info | Un org id stale puede viajar en requests no esperados hasta que el contexto lo limpie. | Report-only; no cambiar sin test de session/org sync. |
 
 Limites deliberados:
@@ -197,23 +194,27 @@ Limites deliberados:
 - No valida permisos efectivos dentro de services.
 - No conecta nada a CI.
 
-## Test frontend agregado en Fase 5.6
+## Test frontend actualizado en Fase 5.12
 
-Se agrego un test unitario de caracterizacion en `apps/web/src/routes/Router.test.tsx`.
+`apps/web/src/routes/Router.test.tsx` quedo actualizado para alinear el contrato frontend de `/app/invite` con el backend.
 
-- Test: `allows every authenticated role to reach /app/invite`.
-- Comando ejecutado: `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/routes/Router.test.tsx -t "allows every authenticated role to reach /app/invite"`.
-- Resultado: pass (`1 passed`, `3 skipped`, `1 file passed`).
-- Comportamiento caracterizado: `USER`, `BUSINESS_OWNER` y `ADMIN` autenticados llegan a `/app/invite` en el frontend.
-- El backend mantiene la aceptacion de invitaciones restringida por rol en `POST /organizations/invites/:token/accept`: `USER` y `BUSINESS_OWNER`.
-- El mismatch no se resolvio todavia; solo quedo caracterizado el comportamiento frontend actual.
+- Tests relevantes:
+  - `allows USER to reach /app/invite`
+  - `allows BUSINESS_OWNER to reach /app/invite`
+  - `redirects ADMIN away from /app/invite to the admin home`
+- Comando ejecutado: `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/routes/Router.test.tsx`.
+- Resultado: pass (`1 file passed`, `6 tests passed`).
+- Contrato frontend actual:
+  - `USER` llega a `/app/invite`.
+  - `BUSINESS_OWNER` llega a `/app/invite`.
+  - `ADMIN` no llega a `/app/invite` y redirige a `/admin` via `resolveRoleHomePath`.
+- Estado: `/app/invite` queda alineado con el backend sin tocar `AcceptOrganizationInvite`, backend, guards ni roles backend.
 
 Limites del test:
 
 - No valida token real de invitacion.
-- No llama `organizationApi.acceptInvite`.
-- No valida `POST /organizations/invites/:token/accept`.
-- No valida 403 real de `ADMIN`.
+- No valida invitacion valida/invalida a nivel de submit o UX completa.
+- No valida `POST /organizations/invites/:token/accept` en este archivo.
 - No usa DB, cookies, JWT real ni submit del formulario.
 
 ## Test backend/API agregado en Fase 5.8
@@ -223,13 +224,19 @@ Se agrego un test e2e/API de caracterizacion en `apps/api/src/auth/role-access.e
 - Test: `enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role`.
 - Contrato caracterizado: `POST /api/organizations/invites/:token/accept` debe bloquear `ADMIN` por rol con `403`, mientras que `USER` y `BUSINESS_OWNER` no deben fallar por rol; con invite token inexistente deben llegar al service y recibir `404`.
 - No valida invitacion valida, email del invite, membership final, cambio de rol, auditoria, frontend `/app/invite`, cookies/refresh/session sync ni `x-organization-id`.
-- Resultado local: no validado por infraestructura.
-- Causa del primer intento: DB local no disponible, `ECONNREFUSED localhost:5432`.
-- Intento con `node scripts/run-with-qa-stack.mjs -- pnpm --filter @aquita/api exec vitest run src/auth/role-access.e2e.spec.ts -t "enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role"` fallo porque Docker daemon no esta disponible (`dockerDesktopLinuxEngine` no encontrado).
-- Estado: test implementado, pendiente de ejecutar en un entorno con DB/Docker disponible.
-- No hay evidencia de fallo del assert nuevo; el fallo local ocurrio antes de ejecutar el cuerpo del test, durante setup/cleanup de fixtures.
+- Comando ejecutado: `node scripts/run-with-qa-stack.mjs -- pnpm --filter @aquita/api exec vitest run src/auth/role-access.e2e.spec.ts -t "enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role"`.
+- Resultado runtime: pass.
+- `ADMIN` recibe `403`.
+- `USER` recibe `404`, no `403`.
+- `BUSINESS_OWNER` recibe `404`, no `403`.
+- Docker levanto DB y Redis correctamente.
+- Migraciones, seed, build API/web y e2e completaron sin fallo.
+- Aviso no bloqueante: Prisma `7.4.1 -> 7.8.0`.
+- Estado: el contrato `/app/invite` queda caracterizado en frontend, backend y check estatico.
 
-Proximo paso recomendado: ejecutar el test en entorno QA/CI con DB disponible antes de decidir si se ajusta frontend, backend o permisos.
+El e2e backend sigue valido sin cambios: el contrato de `POST /api/organizations/invites/:token/accept` sigue siendo la fuente de verdad runtime para `ADMIN -> 403` y `USER`/`BUSINESS_OWNER` sin bloqueo por rol.
+
+Proximo paso recomendado: acceptance acotado para token invalido/valido de `/app/invite` si se quiere cubrir UX, sin volver a tocar roles ni backend.
 
 ## Check reforzado en Fase 5.10
 
@@ -238,7 +245,7 @@ Se reforzo `scripts/check-auth-org-routes.mjs` con una regla estatica/manual/rep
 El check valida estaticamente:
 
 - `/app/invite` existe en `apps/web/src/routes/Router.tsx`.
-- `/app/invite` esta protegida por `ProtectedRoute` sin roles explicitos.
+- `/app/invite` esta protegida por `ProtectedRoute` con roles explicitos `USER` y `BUSINESS_OWNER`.
 - `AcceptOrganizationInvite` usa `organizationApi.acceptInvite`.
 - `organizationApi.acceptInvite` apunta a `POST /organizations/invites/${token}/accept`.
 - `OrganizationsController` expone `@Post("invites/:token/accept")`.
@@ -246,24 +253,23 @@ El check valida estaticamente:
 - El endpoint permite `USER` y `BUSINESS_OWNER`.
 - `RolesGuard` usa `getAllAndOverride`, por lo que los roles del handler sobrescriben los roles de clase.
 
-Findings actuales del check reforzado: `4`.
+Findings actuales del check reforzado: `2`.
 
 | Finding | Riesgo | Estado |
 | --- | --- | --- |
 | `GET /businesses/:identifier` usa `OptionalJwtAuthGuard + OptionalOrgContextGuard` | Info | Report-only. |
-| `/app/invite` es authenticated-only en frontend | Medio | Report-only. |
-| `/app/invite -> POST /organizations/invites/:token/accept` mismatch estatico: frontend authenticated-only incluye `ADMIN`, backend accept invite excluye `ADMIN` y permite `USER`, `BUSINESS_OWNER` | Medio | Report-only; mismatch explicito. |
 | `api/client.ts` inyecta `x-organization-id` globalmente desde `localStorage.activeOrganizationId` | Info | Report-only. |
 
-El check complementa, no sustituye, el e2e de `apps/api/src/auth/role-access.e2e.spec.ts`. El e2e sigue pendiente por infraestructura DB/Docker y es necesario para validar runtime `403/404`, JWT real, guards ejecutados por Nest y service behavior.
+El check complementa, no sustituye, el e2e de `apps/api/src/auth/role-access.e2e.spec.ts`. El e2e ya quedo validado runtime con QA stack y el check sigue siendo util para detectar drift sin depender de DB/Docker; no reemplaza la validacion real de `403/404`, JWT y guards ejecutados por Nest.
 
 Comandos ejecutados en Fase 5.10:
 
 | Comando | Resultado |
 | --- | --- |
-| `node scripts/check-auth-org-routes.mjs` | Pass, exit `0`, findings report-only `4`. |
+| `node scripts/check-auth-org-routes.mjs` | Pass, exit `0`, findings report-only `2`; el finding de mismatch `/app/invite` desaparecio. |
 | `node --check scripts/check-auth-org-routes.mjs` | Pass, sintaxis valida. |
-| `pnpm qa:smoke` | Pass. |
+| `pnpm qa:smoke` | Pass; el primer intento local agoto timeout, el rerun amplio termino verde y no estuvo relacionado con producto. |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/routes/Router.test.tsx` | Pass (`1 file passed`, `6 tests passed`). |
 
 Warning conocido no bloqueante: `Geoapify geocoding failed (HTTP 503)` en tests unitarios de `IntegrationsService`. La suite termino en pass.
 
@@ -292,19 +298,18 @@ El objetivo sigue siendo no bloquear CI ni declarar bugs automaticamente, sino d
 | Global `x-organization-id` injection | Unit frontend | Confirmar cuando se envia header y cuando se limpia tras 401/logout/cambio de cuenta. |
 | Refresh interceptor + AuthContext | Integration frontend | Caracterizar refresh exitoso/fallido y sincronizacion de estado React/storage. |
 | Logout failure | Integration frontend/API mock | Confirmar comportamiento client-first y evento de unauthorized si aplica. |
-| `/app/invite` ADMIN | API/backend | Test implementado en Fase 5.8; pendiente validarlo en runtime con DB/Docker disponible. |
+| `/app/invite` ADMIN | API/backend | Contrato ya validado runtime en Fase 5.8; siguiente paso recomendado: acceptance con token invalido/valido para revisar UX, no rol backend. |
 | Role matrix org endpoints | E2E backend | bookings, messaging, payments, ads, promotions, verification para USER/BUSINESS_OWNER/ADMIN. |
 | Admin no org context | E2E backend | Confirmar endpoints admin esperados sin `x-organization-id` y bloquear donde no corresponda. |
 | Business owner org switch | Acceptance frontend | Cambiar organizacion activa y verificar header, dashboard y requests siguientes. |
 
-## Riesgos pendientes despues de Fase 5.10
+## Riesgos pendientes despues de Fase 5.12
 
-- `/app/invite` rol mismatch: frontend authenticated-only frente a backend restringido a `USER` y `BUSINESS_OWNER`.
 - `x-organization-id` global desde `localStorage.activeOrganizationId`: riesgo de org context stale en requests no esperados.
 - `OptionalJwtAuthGuard + OptionalOrgContextGuard`: rutas opcionales pueden degradar token invalido/expirado a anonimo.
 - Session sync/refresh: el modelo con access token en memoria/sessionStorage, user/session hint en localStorage y refresh cookie todavia necesita caracterizacion dedicada.
-- El test backend/API de `/organizations/invites/:token/accept` ya fue implementado, pero sigue pendiente de validacion runtime por infraestructura local no disponible.
-- El check estatico reforzado cubre el mismatch de `/app/invite`, pero no valida requests reales, JWT real, `403/404` runtime, DB, Prisma, Redis, cookies/refresh, invitacion valida ni membership final.
+- `/app/invite` ya no tiene mismatch de roles; el riesgo pendiente de esa ruta pasa a UX de token valido/invalido, membership final y refresh de organizaciones tras aceptar.
+- El check estatico reforzado ya refleja la alineacion de `/app/invite`, pero no valida requests reales, JWT real, `403/404` runtime, DB, Prisma, Redis, cookies/refresh, invitacion valida ni membership final.
 - El check es manual/report-only y debe permanecer fuera de CI hasta tener una fase dedicada de estabilizacion.
 
 ## QA sugerido para esta documentacion

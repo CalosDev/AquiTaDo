@@ -27,9 +27,9 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 | Ruta o flujo | Estado actual | Riesgo | Prueba existente | Prueba faltante recomendada |
 | --- | --- | --- | --- | --- |
 | `/` home publico | partial | Medio: primera impresion, SEO, CTAs y datos dinamicos. | `playwright/specs/acceptance-public.spec.ts`, `navigation.e2e.spec.ts`, `a11y.spec.ts`, `visual.spec.ts`, `apps/web/src/pages/Home.test.tsx` | Caracterizar mobile y estados con datos vacios/lentos para secciones dinamicas. |
-| `/businesses` listado publico | partial mejorado | Alto: filtros, mapa, paginacion, tracking y contrato API. | `playwright/specs/acceptance-public.spec.ts` cubre shell inicial publico y vista mapa; `apps/web/src/tests/integration/BusinessesList.integration.test.tsx`, `apps/web/src/pages/businesses-list/*.test.tsx` cubren partes de estado/filtros. | Browser test para combinaciones de filtros, paginacion, error API y no-results con URL estable. |
+| `/businesses` listado publico | partial mejorado | Alto: filtros, mapa, paginacion, tracking y contrato API. | `playwright/specs/acceptance-public.spec.ts` cubre shell inicial publico y vista mapa; `apps/web/src/tests/integration/BusinessesList.integration.test.tsx`, `apps/web/src/pages/businesses-list/*.test.tsx` cubren partes de estado/filtros; `playwright/specs/visual.spec.ts` ahora cubre baseline visual desktop y mobile. | Browser test para combinaciones de filtros, paginacion, error API y no-results con URL estable. |
 | `/businesses?view=map` vista mapa | partial | Alto: sincroniza URL, listado, seleccion y negocios sin coordenadas. | `acceptance-public.spec.ts`, `BusinessesList.integration.test.tsx` | Caracterizar seleccion de negocio, retorno a lista y edge case sin coordenadas. |
-| `/businesses/:slug` detalle valido | partial | Alto: detalle publico, SEO, imagenes, reviews, favoritos y tracking. | `apps/web/src/pages/BusinessDetails.test.tsx`, `business-details/helpers.test.ts` | Acceptance con slug seed real y contrato minimo de contenido visible. |
+| `/businesses/:slug` detalle valido | partial mejorado | Alto: detalle publico, SEO, imagenes, reviews, favoritos y tracking. | `apps/web/src/pages/BusinessDetails.test.tsx`, `business-details/helpers.test.ts`, `playwright/specs/visual.spec.ts` ahora cubre baseline visual desktop y mobile con mocks deterministas. | Acceptance con slug seed real y contrato minimo de contenido visible; luego ampliar a estados con reviews reales/favoritos si se toca esa UX. |
 | `/businesses/:slug` slug inexistente | pass | Medio: recuperacion publica sin pantalla rota. | `playwright/specs/acceptance-public.spec.ts` reforzado con URL estable y href de CTAs. | No hay siguiente test inmediato; si cambia el contrato de error, agregar status/API y estado de tracking. |
 | `/negocios/provincia/:provinceSlug` | partial | Alto: SEO route sincroniza slug a `provinceId` y query. | `BusinessesList.integration.test.tsx`, `useBusinessesListFilters.test.tsx`, `useBusinessesSeo.test.tsx` | Acceptance browser para provincia seed real y filtros persistentes. |
 | `/negocios/categoria/:categorySlug` | partial | Alto: SEO, canonical y filtro fijo. | `useBusinessesListFilters.test.tsx`, `useBusinessesSeo.test.tsx` | Acceptance browser para categoria seed real, clear filters y canonical esperado. |
@@ -48,12 +48,12 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 | `/register-business` | partial | Alto: formulario multi-step, org context, uploads y validacion. | `playwright/specs/acceptance-business.spec.ts` | Characterization por pasos con datos invalidos y sin cambiar backend. |
 | `/dashboard/businesses/:businessId/edit` | not-covered | Alto: ownership, org context, mutaciones y cache. | No encontrada. | Acceptance con negocio seed propiedad del usuario y caso no autorizado. |
 | `/suggest-business` | not-covered | Medio: usuario final crea sugerencia y evita spam/errores. | No encontrada. | Acceptance USER con formulario vacio, validacion y submit mock/seed. |
-| `/app/invite` | partial | Alto: token de invitacion, membresia, roles frontend/backend y org context. | `apps/web/src/routes/Router.test.tsx` caracteriza que `USER`, `BUSINESS_OWNER` y `ADMIN` autenticados llegan a la ruta. `apps/api/src/auth/role-access.e2e.spec.ts` agrega caracterizacion backend/API pendiente de validacion runtime. | Ejecutar el test backend/API en entorno QA/CI con DB disponible; luego acceptance con token invalido y token valido seed. |
+| `/app/invite` | partial | Alto: token de invitacion, membresia, roles frontend/backend y org context. | `apps/web/src/routes/Router.test.tsx` ya valida que `USER` y `BUSINESS_OWNER` llegan a la ruta y que `ADMIN` redirige a `/admin`. `apps/api/src/auth/role-access.e2e.spec.ts` sigue validando runtime: `ADMIN` recibe `403`, `USER` y `BUSINESS_OWNER` reciben `404`, no `403`, con token inexistente. | Siguiente paso: acceptance con token invalido y token valido seed para cerrar UX, sin tocar roles ni backend. |
 | `/admin` consola | partial | Alto: permisos ADMIN, tabla operacional y acciones sensibles. | `acceptance-admin.spec.ts`, `visual.spec.ts`, `auth.e2e.spec.ts` | Acceptance de estados vacio/error y una accion admin no destructiva. |
 | `/security` admin security | not-covered | Alto: 2FA/admin security y permisos. | No encontrada. | Acceptance basica ADMIN y bloqueo USER/BUSINESS_OWNER. |
 | Observability metrics | pass | Alto: endpoint sensible debe bloquear anonimo/no-admin. | `playwright/specs/admin-observability.e2e.spec.ts`, `apps/api/src/observability/observability.e2e.spec.ts` | Agregar summary/reset si se modifican metricas publicas. |
-| PWA offline/reconnect | partial | Alto: contenido stale, SW activo y refetch. | `offline.e2e.spec.ts`, `AppRuntimeStatus.integration.test.tsx` | Caracterizar update disponible y navegacion offline a ruta no cacheada. |
-| Visual baselines | partial | Medio: protege cambios accidentales en home, login mobile y admin. | `playwright/specs/visual.spec.ts` | Agregar businesses desktop/mobile antes de refactors visuales. |
+| PWA offline/reconnect | partial | Alto: contenido stale, SW activo y refetch. | `offline.e2e.spec.ts`, `AppRuntimeStatus.integration.test.tsx`, `scripts/check-pwa-offline-contract.mjs` como check estatico report-only. | Caracterizar hard refresh offline en `/` y `/businesses`, luego offline privado con sesion valida. |
+| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home, login mobile, admin, `/businesses` desktop/mobile y `BusinessDetails` desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual publica a otras rutas antes de refactors visuales mayores. |
 | Accessibility baseline | partial | Medio: solo home y login. | `playwright/specs/a11y.spec.ts` | Agregar businesses, register-business y admin. |
 | Public API businesses/search | partial | Alto: contratos publicos, filtros y ranking. | `apps/api/src/businesses/businesses.e2e.spec.ts`, `apps/api/src/search/discovery-ranking.spec.ts` | Snapshot contractual de shape publico para lista/detalle/search. |
 | Claims, ownership y catalogo admin | partial | Alto: permisos, auditoria, org ownership y mutaciones. | `apps/api/src/businesses/*helpers.spec.ts`, `businesses.e2e.spec.ts` | E2E de permisos por rol y org con payload minimo por endpoint critico. |
@@ -265,33 +265,86 @@ Los tres tienen resultado actual `Findings: none` y siguen fuera de CI. No se mo
 - Fase 5.2 agrego `docs/AUTH_ORG_CONTEXT_RISK_MAP.md`, un mapa documental de riesgo de auth, permisos, roles y contexto de organizacion.
 - Fase 5.4 agrego `scripts/check-auth-org-routes.mjs`, un check manual/read-only/report-only para mapear rutas protegidas, guards, roles y org context.
 - Comando de ejecucion: `node scripts/check-auth-org-routes.mjs`.
-- Resultado actual de Fase 5.4: backend routes mapeadas `181`, frontend routes mapeadas `25`, findings report-only `4`.
+- Resultado actual del check: backend routes mapeadas `181`, frontend routes mapeadas `25`, findings report-only `2`.
 - `scripts/check-auth-org-routes.mjs` sale con exit code `0`, no esta conectado a CI y no bloquea builds.
-- Findings actuales de Fase 5.4: `GET /businesses/:identifier` usa `OptionalJwtAuthGuard + OptionalOrgContextGuard`; `/app/invite` es authenticated-only en frontend con posible choque por rol backend; `/app/invite` puede chocar con `POST /organizations/invites/:token/accept` restringido a `USER` y `BUSINESS_OWNER`; `api/client.ts` inyecta `x-organization-id` globalmente desde `localStorage.activeOrganizationId`.
-- Fase 5.6 agrego el test `allows every authenticated role to reach /app/invite` en `apps/web/src/routes/Router.test.tsx`.
-- Comportamiento caracterizado en Fase 5.6: `USER`, `BUSINESS_OWNER` y `ADMIN` autenticados llegan a `/app/invite` en frontend.
-- El backend mantiene la aceptacion de invitaciones restringida por rol en `POST /organizations/invites/:token/accept`: `USER` y `BUSINESS_OWNER`.
-- El mismatch de `/app/invite` no se resolvio todavia; solo quedo caracterizado el comportamiento frontend actual.
-- QA de Fase 5.6: `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/routes/Router.test.tsx -t "allows every authenticated role to reach /app/invite"` -> pass (`1 passed`, `3 skipped`, `1 file passed`).
+- Findings actuales del check: `GET /businesses/:identifier` usa `OptionalJwtAuthGuard + OptionalOrgContextGuard`; `api/client.ts` inyecta `x-organization-id` globalmente desde `localStorage.activeOrganizationId`.
+- Fase 5.12 alineo el contrato frontend de `/app/invite` con backend sin tocar backend ni auth global.
+- Roles frontend permitidos en `/app/invite`: `USER` y `BUSINESS_OWNER`.
+- `ADMIN` ya no llega a `/app/invite` y redirige temprano a `/admin` mediante `ProtectedRoute` / `resolveRoleHomePath`.
+- `apps/web/src/routes/Router.test.tsx` quedo actualizado y verde.
+- QA de Fase 5.12: `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/routes/Router.test.tsx` -> pass (`1 file passed`, `6 tests passed`).
 - Fase 5.8 agrego el test `enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role` en `apps/api/src/auth/role-access.e2e.spec.ts`.
 - Contrato caracterizado en Fase 5.8: `POST /api/organizations/invites/:token/accept` debe devolver `403` para `ADMIN`; `USER` y `BUSINESS_OWNER` no deben fallar por rol y, con invite token inexistente, deben recibir `404`.
-- Resultado local de Fase 5.8: no validado por infraestructura.
-- Causa del intento local: DB local no disponible, `ECONNREFUSED localhost:5432`.
-- Intento con `node scripts/run-with-qa-stack.mjs -- pnpm --filter @aquita/api exec vitest run src/auth/role-access.e2e.spec.ts -t "enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role"` fallo porque Docker daemon no esta disponible (`dockerDesktopLinuxEngine` no encontrado).
-- Estado de Fase 5.8: test implementado, pendiente de ejecutar en entorno con DB/Docker disponible.
-- No hay evidencia de fallo del assert nuevo; el fallo local ocurrio antes de ejecutar el cuerpo del test.
-- Fase 5.10 reforzo `scripts/check-auth-org-routes.mjs` para cubrir `/app/invite` de forma estatica/manual/report-only, sin DB runtime.
-- El check reforzado valida estaticamente que `/app/invite` existe en `Router.tsx`, esta protegida por `ProtectedRoute` sin roles explicitos, `AcceptOrganizationInvite` usa `organizationApi.acceptInvite`, `organizationApi.acceptInvite` apunta a `POST /organizations/invites/${token}/accept`, `OrganizationsController` expone `@Post("invites/:token/accept")`, el endpoint usa `JwtAuthGuard` y `RolesGuard`, permite `USER` y `BUSINESS_OWNER`, y `RolesGuard` usa `getAllAndOverride`.
-- Findings actuales de Fase 5.10: `4`.
-- `/app/invite` mismatch queda explicito: frontend authenticated-only incluye `ADMIN`, pero backend accept invite excluye `ADMIN` y permite `USER`, `BUSINESS_OWNER`.
+- Validacion runtime ejecutada con: `node scripts/run-with-qa-stack.mjs -- pnpm --filter @aquita/api exec vitest run src/auth/role-access.e2e.spec.ts -t "enforces invite acceptance roles without blocking USER or BUSINESS_OWNER by role"`.
+- Resultado runtime de Fase 5.8: pass.
+- `ADMIN` recibe `403`.
+- `USER` recibe `404`, no `403`.
+- `BUSINESS_OWNER` recibe `404`, no `403`.
+- Docker levanto DB y Redis correctamente.
+- Migraciones, seed, build API/web y e2e completaron sin fallo.
+- Aviso no bloqueante: Prisma `7.4.1 -> 7.8.0`.
+- El e2e backend sigue conceptualmente valido y no cambio en Fase 5.12.
+- Fase 5.10/5.12 dejan `scripts/check-auth-org-routes.mjs` alineado con el contrato actual de `/app/invite`.
+- El check estatico valida ahora que `/app/invite` usa `ProtectedRoute` con roles explicitos `USER` y `BUSINESS_OWNER`, mientras `AcceptOrganizationInvite` sigue usando `organizationApi.acceptInvite` y el backend mantiene `JwtAuthGuard`, `RolesGuard` y roles `USER`, `BUSINESS_OWNER`.
+- El finding de mismatch de `/app/invite` desaparecio del check.
 - El check de Fase 5.10 complementa, no sustituye, el e2e de `apps/api/src/auth/role-access.e2e.spec.ts`.
-- El e2e `role-access` sigue pendiente por infraestructura DB/Docker; no hay validacion runtime de `403/404` todavia.
-- QA de Fase 5.10: `node scripts/check-auth-org-routes.mjs` -> pass, exit `0`, findings report-only `4`.
-- QA de Fase 5.10: `node --check scripts/check-auth-org-routes.mjs` -> pass, sintaxis valida.
-- QA de Fase 5.10: `pnpm qa:smoke` -> pass.
-- Warning conocido no bloqueante de Fase 5.10: `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API.
-- Proximo paso recomendado de Fase 5: ejecutar el test backend/API en entorno QA/CI con DB disponible antes de decidir si se ajusta frontend, backend o permisos.
-- Riesgos pendientes de Fase 5: `/app/invite` rol mismatch, `x-organization-id` global, combinacion `OptionalJwtAuthGuard + OptionalOrgContextGuard`, y session sync/refresh.
+- El e2e `role-access` ya quedo validado runtime; el check estatico sigue siendo complementario y no sustituye la validacion real de `403/404`.
+- QA de Fase 5.12: `node scripts/check-auth-org-routes.mjs` -> pass, exit `0`, findings report-only `2`.
+- QA de Fase 5.12: `pnpm qa:smoke` -> pass.
+- Warning conocido no bloqueante de Fase 5.12: `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API.
+- Nota no bloqueante de Fase 5.12: el primer intento local de `pnpm qa:smoke` agoto timeout; el rerun amplio termino en pass y no estuvo relacionado con producto.
+- Estado actual de Fase 5: el contrato `/app/invite` queda caracterizado en frontend, backend y check estatico.
+- Riesgos pendientes de Fase 5: `x-organization-id` global, combinacion `OptionalJwtAuthGuard + OptionalOrgContextGuard`, session sync/refresh y UX de token valido/invalido en `/app/invite`.
+- Fase 6.2 agrego `docs/PWA_OFFLINE_RISK_MAP.md`, un mapa documental de riesgo PWA/cache/offline.
+- Fase 6.4 agrego `scripts/check-pwa-offline-contract.mjs`, un check manual/read-only/report-only para caracterizar el contrato PWA/offline actual.
+- Fase 6.6 corrigio el header de `service-worker.js` en `apps/web/nginx.conf` con una `location = /service-worker.js` dedicada.
+- Politica esperada actual para `service-worker.js`: `Cache-Control: no-cache, no-store, must-revalidate` y `expires -1`.
+- Comando de ejecucion: `node scripts/check-pwa-offline-contract.mjs`.
+- Resultado actual: `exit 0`, report-only.
+- Findings actuales del check:
+  - `HIGH`: `CACHE_VERSION` fijo en `aquita-v1`.
+  - `HIGH`: `APP_SHELL_ASSETS` no incluye bundles Vite hashados.
+  - `INFO`: el service worker excluye `/api/*`.
+  - `INFO`: `service-worker.js` tiene override dedicada en `nginx.conf`.
+  - `MEDIUM`: el registro del service worker se difiere hasta `window.load`.
+- El check no bloquea CI y no esta conectado a CI.
+- Desaparecio el finding `HIGH` de `service-worker.js` heredando `immutable`.
+- Fase 6.6 no corrigio todavia `CACHE_VERSION`, precache de bundles, timing de registro, offline privado ni hard refresh offline.
+- QA de Fase 6.6: `node scripts/check-pwa-offline-contract.mjs` -> pass; `pnpm qa:smoke` -> pass.
+- Warnings no bloqueantes de Fase 6.6: timeout local inicial de `pnpm qa:smoke`, `Geoapify geocoding failed (HTTP 503)` y warning `LF/CRLF` en `apps/web/nginx.conf`.
+- Proxima fase recomendada de PWA/offline: caracterizar hard refresh offline en `/` y `/businesses`, y luego offline privado con sesion valida antes de tocar runtime.
+- Fase 7.2 agrego baseline visual determinista para `/businesses` desktop y mobile en `playwright/specs/visual.spec.ts`.
+- Snapshots creados en Fase 7.2: `playwright/specs/__snapshots__/visual.spec.ts/businesses-desktop.png` y `playwright/specs/__snapshots__/visual.spec.ts/businesses-mobile.png`.
+- Mocks deterministas agregados en Fase 7.2 para `GET /api/businesses?*`, `GET /api/categories`, `GET /api/provinces` y `GET /api/ads/**` defensivo.
+- Comando de generacion inicial de snapshots: `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses (desktop|mobile) baseline" --update-snapshots` -> pass (`2 passed`).
+- Comando de verificacion normal: `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses (desktop|mobile) baseline"` -> pass (`2 passed`).
+- Fase 7.2 no toco UI, estilos, filtros, `searchParams`, map view, tracking, API real ni seed; solo agrego caracterizacion visual.
+- Fase 7.3 aplico una mejora visual minima en `apps/web/src/pages/BusinessesList.tsx` para limpiar el primer viewport sin tocar logica.
+- Bloques tocados en Fase 7.3: intro superior, wrapper inmediato de `ListingControlsBar` y results header.
+- Ajustes visuales aplicados en Fase 7.3: agrupacion local de intro + controls con spacing consistente, compactacion local de chips en `ActionBar` y reemplazo del wrapper pesado del results header por una superficie mas liviana.
+- Comportamiento preservado en Fase 7.3: filtros, `searchParams`, mapa/view mode, tracking, API, hooks de datos y `BusinessCard`.
+- QA de Fase 7.3: `pnpm --filter @aquita/web exec vitest run --config vitest.integration.config.ts src/tests/integration/BusinessesList.integration.test.tsx` -> pass (`8/8`).
+- QA visual inicial de Fase 7.3: `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses (desktop|mobile) baseline"` -> diff esperado contra baseline previo.
+- Snapshots actualizados en Fase 7.3 con `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses (desktop|mobile) baseline" --update-snapshots` -> pass (`2/2`).
+- QA visual final de Fase 7.3: `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses (desktop|mobile) baseline"` -> pass (`2/2`).
+- Warning no bloqueante de Fase 7.3: el primer rerun del wrapper `run-with-qa-stack` agoto timeout local durante el cierre del stack, pero el rerun con mas margen termino en pass limpio.
+- Fase 7.4 agrego baseline visual determinista para `BusinessDetails` desktop y mobile en `playwright/specs/visual.spec.ts`, usando la ruta publica `/businesses/cafe-aquita`.
+- Snapshots creados en Fase 7.4: `playwright/specs/__snapshots__/visual.spec.ts/business-details-desktop.png` y `playwright/specs/__snapshots__/visual.spec.ts/business-details-mobile.png`.
+- Mocks deterministas agregados en Fase 7.4 para `GET /api/businesses/cafe-aquita`, fallback defensivo `GET /api/businesses/biz-1`, `POST /api/telemetry/business`, `GET /api/reputation/business/biz-1`, `GET /api/checkins/business/biz-1/stats`, `GET /api/promotions?businessId=biz-1&limit=6`, `GET /api/businesses/nearby?*` y `GET /api/reviews/business/biz-1`.
+- Fase 7.4 tambien agrego un stub defensivo para `export/embed.html?*` para evitar ruido de red del mapa embebido durante el baseline visual.
+- QA inicial de Fase 7.4 con snapshots: `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop|mobile) baseline" --update-snapshots` -> pass (`2/2`).
+- QA final de Fase 7.4: `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop|mobile) baseline"` -> pass (`2/2`).
+- Fase 7.4 no toco UI, estilos, logica, API real, seed, favoritos, reviews, claim states, `MobileContactBar` ni tracking; solo agrego caracterizacion visual determinista.
+- Nota de Fase 7.4: hubo una ambiguedad de selector dentro del propio test visual y se corrigio solo en `playwright/specs/visual.spec.ts`, sin tocar producto.
+- Fase 7.6 aplico una mejora visual minima al hero mobile de `BusinessDetails` en `apps/web/src/pages/BusinessDetails.tsx`.
+- Cambios principales de Fase 7.6: `min-height` mobile ajustado, pill de galeria mas compacta, overlay inferior con mejor padding, layout interno mobile mas respirable y rating card mas controlada en mobile.
+- Comportamiento preservado en Fase 7.6: logica, copy, handlers, estados, tracking, API, favoritos, reviews, claim states, `SidebarPanel`, `MobileContactBar` y thumbnails.
+- QA de Fase 7.6: `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/BusinessDetails.test.tsx` -> pass (`1/1`).
+- QA visual inicial de Fase 7.6: `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop|mobile) baseline"` -> diff esperado contra baseline previo.
+- Snapshots actualizados en Fase 7.6 con `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop|mobile) baseline" --update-snapshots` -> pass (`2/2`).
+- QA visual final de Fase 7.6: `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop|mobile) baseline"` -> pass (`2/2`).
+- Snapshots actualizados en Fase 7.6: `playwright/specs/__snapshots__/visual.spec.ts/business-details-desktop.png` y `playwright/specs/__snapshots__/visual.spec.ts/business-details-mobile.png`.
+- Fase 7.6 no toco CSS global, API real, seed, favoritos, reviews, claim states, `SidebarPanel`, `MobileContactBar`, tarjeta de resumen, tracking, thumbnails ni logica de producto.
 - `/reset-password` sigue `not-covered`; antes de implementarlo hay que confirmar si un token invalido puede cubrirse sin backend real ni cambios de producto.
 - `/businesses` sigue `partial mejorado`, no `pass`; faltan filtros complejos, paginacion, errores API, SEO routes y no-results con URL estable.
 - `/businesses/:slug` valido sigue bloqueado por falta de negocio seed real; no crear fixtures ni tocar Prisma solo para habilitarlo.
@@ -301,12 +354,48 @@ Los tres tienen resultado actual `Findings: none` y siguen fuera de CI. No se mo
 - Auth avanzado sigue incompleto: refresh expirado, refresh ausente, 2FA y throttling deben abordarse en fases separadas por riesgo.
 - Rutas protegidas y permisos siguen siendo zona de alto riesgo: `/app/customer`, `/suggest-business`, `/security` y casos por rol no deben mezclarse con refactors.
 - PWA/service worker, Redis/cache, Prisma/PostGIS y Docker siguen fuera de alcance hasta tener una fase dedicada y validacion mas amplia.
+- PWA/offline sigue sin caracterizacion de hard refresh offline, primer arranque offline, update real del SW y bootstrap offline de `AuthContext`.
 - Antes de tocar logica en `Home.tsx` o `BusinessDetails.tsx`, agregar caracterizacion del flujo que se vaya a modificar. Las extracciones actuales solo prueban que el render sigue compilando y que las rutas cubiertas siguen verdes.
 - Antes de tocar `searchParams`, SEO routes o filtros, mantener una fase dedicada para `BusinessesList` y sus pruebas de URL/canonical/dependent cleanup.
 - Antes de tocar auth o permisos, validar matriz por rol y no mezclar cambios con refactors visuales.
 - Antes de tocar guards, `AuthContext`, `OrganizationContext`, `ProtectedRoute`, `api/client.ts` o `x-organization-id`, usar la salida de `scripts/check-auth-org-routes.mjs` y agregar caracterizacion acotada del flujo afectado.
 - Antes de tocar API o cache, agregar contratos de respuesta e invalidacion especifica; no asumir que `qa:smoke` cubre datos stale o Redis.
 - Riesgos pendientes de contrato tras Fase 3: response shape, auth avanzado, admin, cache, ranking, paginacion real, seeds y CI gate.
+
+## Cierre temporal de Fase 7 visual
+
+Fase 7 queda cerrada temporalmente como una tanda visual acotada y verificable. No se recomienda abrir otra fase visual grande antes de dejar este lote limpio, revisado y commiteable.
+
+### Trabajo completado
+
+| Item | Resultado |
+| --- | --- |
+| Baseline visual de `/businesses` | Agregado para desktop y mobile en `playwright/specs/visual.spec.ts`. Snapshots: `businesses-desktop.png` y `businesses-mobile.png`. |
+| Baseline visual de `BusinessDetails` | Agregado para desktop y mobile en `playwright/specs/visual.spec.ts`. Snapshots: `business-details-desktop.png` y `business-details-mobile.png`. |
+| Mejora visual en `BusinessesList` | Aplicada en el primer viewport: intro superior, wrapper de `ListingControlsBar` y results header. Se preservaron filtros, `searchParams`, mapa/view mode, tracking, API, hooks de datos y `BusinessCard`. |
+| Mejora visual en `BusinessDetails` | Aplicada solo al hero mobile: mas aire vertical, pill de galeria mas compacta, overlay inferior con mejor padding, layout interno mas respirable y rating card mas controlada. Se preservaron logica, copy, handlers, estados, tracking, API, favoritos, reviews, claim states, `SidebarPanel`, `MobileContactBar` y thumbnails. |
+
+### QA amplio ejecutado
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `pnpm --filter @aquita/web test` | Pass: unit `19 files / 56 tests`, integration `22 files / 68 tests`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck, web unit tests y API unit tests. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses|business details"` | Pass: `4 passed` (`/businesses` desktop/mobile y `BusinessDetails` desktop/mobile). |
+
+Warnings no bloqueantes:
+
+- `Geoapify geocoding failed (HTTP 503)` sigue apareciendo en tests unitarios de API y no esta relacionado con Fase 7.
+
+Estado: Fase 7 visual cerrada temporalmente, con snapshots actualizados y sin regresiones detectadas por QA amplio.
+
+### Riesgos visuales pendientes
+
+- `Home` sigue combinando varios lenguajes visuales; no tocar sin una fase visual dedicada.
+- `AdminDashboard` no debe tocarse sin fase dedicada por riesgo de permisos, datos operacionales y estados admin.
+- `BusinessesList` no debe tocar filtros, `searchParams`, mapa/view mode, tracking ni API sin fase especifica.
+- `BusinessDetails` no debe tocar reviews, claim states, sidebar, `MobileContactBar`, favoritos ni tracking sin fase especifica.
 
 ## QA recomendado para futuras fases
 
