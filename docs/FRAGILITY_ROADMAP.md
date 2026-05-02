@@ -397,6 +397,61 @@ Estado: Fase 7 visual cerrada temporalmente, con snapshots actualizados y sin re
 - `BusinessesList` no debe tocar filtros, `searchParams`, mapa/view mode, tracking ni API sin fase especifica.
 - `BusinessDetails` no debe tocar reviews, claim states, sidebar, `MobileContactBar`, favoritos ni tracking sin fase especifica.
 
+## Avance de Fase 8: response shapes frontend/backend
+
+Fase 8 inicio con auditoria y documentacion de response shapes sin modificar runtime. El objetivo es proteger contratos de salida antes de tocar envelopes, `endpoints.ts`, auth, admin dashboards o response DTOs.
+
+### Fase 8.2: mapa documental
+
+| Item | Resultado |
+| --- | --- |
+| Documento agregado | `docs/API_RESPONSE_SHAPE_RISK_MAP.md` |
+| Alcance | Riesgos de response shape entre frontend y backend. |
+| Runtime | Sin cambios. |
+
+### Fase 8.4: check manual para GET /businesses
+
+| Item | Resultado |
+| --- | --- |
+| Check agregado | `scripts/check-businesses-response-shape.mjs` |
+| Comando de ejecucion | `node scripts/check-businesses-response-shape.mjs` |
+| Resultado actual | Pass, `Findings: none`. |
+| Modo | Manual/read-only/report-only; exit `0`; no conectado a CI. |
+
+Contrato `GET /businesses` validado y alineado:
+
+- `data`
+- `total`
+- `page`
+- `limit`
+- `totalPages`
+
+Notas del check:
+
+- `source` aparece como metadata extra permitida y no requerida por `BusinessesList`.
+- `JSON_API_RESPONSE_ENABLED` se reporta como warning informativo: si se activa sin adaptadores frontend, `GET /businesses` podria pasar de `response.data.data` a `response.data.data.data`.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/check-businesses-response-shape.mjs` | Pass. |
+| `pnpm qa:smoke` | Pass: lint, typecheck, web unit tests y API unit tests. |
+
+Warning no bloqueante:
+
+- `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.4.
+
+Riesgos pendientes antes de tocar response shapes:
+
+- Auth session shape para `POST /auth/login`, `POST /auth/register` y `POST /auth/refresh`.
+- Detalle publico `GET /businesses/:identifier` como objeto directo.
+- Admin paginado `GET /businesses/admin/all`.
+- `GET /verification/admin/moderation-queue` con shape `{ items }`.
+- Activacion futura de `JSON_API_RESPONSE_ENABLED` sin adaptadores frontend.
+
+Proximo paso recomendado: Fase 8.5, disenar el check manual/report-only para auth session shape.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
