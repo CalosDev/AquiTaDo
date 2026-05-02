@@ -99,37 +99,49 @@ describe('AppRouter auth routes', () => {
         expect(await screen.findByText('admin security page')).toBeInTheDocument();
     });
 
-    it('allows every authenticated role to reach /app/invite', async () => {
-        const users = [
-            {
+    it('allows USER to reach /app/invite', async () => {
+        renderWithProviders(<AppRouter />, {
+            isAuthenticated: true,
+            user: {
                 id: 'user-1',
                 name: 'Usuario RD',
                 email: 'user@aquita.do',
-                role: 'USER' as const,
+                role: 'USER',
             },
-            {
+            router: { initialEntries: ['/app/invite'] },
+        });
+
+        expect(await screen.findByText('invite page')).toBeInTheDocument();
+    });
+
+    it('allows BUSINESS_OWNER to reach /app/invite', async () => {
+        renderWithProviders(<AppRouter />, {
+            isAuthenticated: true,
+            user: {
                 id: 'owner-1',
                 name: 'Owner RD',
                 email: 'owner@aquita.do',
-                role: 'BUSINESS_OWNER' as const,
+                role: 'BUSINESS_OWNER',
             },
-            {
+            router: { initialEntries: ['/app/invite'] },
+        });
+
+        expect(await screen.findByText('invite page')).toBeInTheDocument();
+    });
+
+    it('redirects ADMIN away from /app/invite to the admin home', async () => {
+        renderWithProviders(<AppRouter />, {
+            isAuthenticated: true,
+            user: {
                 id: 'admin-1',
                 name: 'Admin RD',
                 email: 'admin@aquita.do',
-                role: 'ADMIN' as const,
+                role: 'ADMIN',
             },
-        ];
+            router: { initialEntries: ['/app/invite'] },
+        });
 
-        for (const user of users) {
-            const { unmount } = renderWithProviders(<AppRouter />, {
-                isAuthenticated: true,
-                user,
-                router: { initialEntries: ['/app/invite'] },
-            });
-
-            expect(await screen.findByText('invite page')).toBeInTheDocument();
-            unmount();
-        }
+        expect(await screen.findByText('admin dashboard page')).toBeInTheDocument();
+        expect(screen.queryByText('invite page')).not.toBeInTheDocument();
     });
 });

@@ -165,7 +165,14 @@ export function AppRouter() {
                 >
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/app" element={<AppHome />} />
-                    <Route path="/app/invite" element={<AcceptOrganizationInvite />} />
+                    <Route
+                        path="/app/invite"
+                        element={(
+                            <ProtectedRoute roles={['USER', 'BUSINESS_OWNER']}>
+                                <AcceptOrganizationInvite />
+                            </ProtectedRoute>
+                        )}
+                    />
                     <Route
                         path="/app/customer"
                         element={
