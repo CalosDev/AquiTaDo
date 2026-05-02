@@ -170,34 +170,86 @@ Warning no bloqueante:
 
 - `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.4.
 
-## Primera Mejora Segura Recomendada
+## Fase 8.6: Check Manual para Auth Session Shape
 
-El primer check seguro ya existe para `GET /businesses`. La siguiente mejora segura recomendada es disenar el check manual/report-only para auth session shape:
+Fase 8.6 implemento un check manual/read-only/report-only para el response shape de sesion auth:
 
 - `POST /auth/login`
 - `POST /auth/register`
 - `POST /auth/refresh`
 
-Debe validar que el frontend espera `accessToken` y `user` en la raiz de `response.data`, y que el backend mantiene ese shape sin activar envelopes globales.
+| Item | Detalle |
+| --- | --- |
+| Check agregado | `scripts/check-auth-response-shape.mjs` |
+| Comando | `node scripts/check-auth-response-shape.mjs` |
+| Resultado actual | Pass, `Findings: none` |
+| Modo | Manual/report-only; sale exit `0` y no esta conectado a CI |
+
+El contrato actual queda alineado entre frontend y backend para el shape raiz:
+
+- `accessToken`
+- `user`
+- `securityWarnings` como extra opcional permitido
+
+El check confirma:
+
+- `authApi.login` llama a `api.post('/auth/login', ...)`.
+- `authApi.register` llama a `api.post('/auth/register', ...)`.
+- `authApi.refresh` llama a `api.post('/auth/refresh', ...)`.
+- Los wrappers no transforman `response.data` antes de devolverlo.
+- `AuthContext.login`, `AuthContext.register` y los flujos de refresh consumen `accessToken` y `user` desde la raiz de `response.data`.
+- `applySession` espera `accessToken` y `user`.
+- `AuthController` expone `@Post('login')`, `@Post('register')` y `@Post('refresh')`.
+- Los controller methods delegan a `AuthService`.
+- `AuthService.login`, `AuthService.register` y `AuthService.refresh` usan `issueAuthSession`.
+- `issueAuthSession` retorna `accessToken` y `user` en la raiz.
+- `issueAuthSession.user` conserva los campos actuales de sesion: `id`, `name`, `email`, `phone`, `avatarUrl`, `role`, `twoFactorEnabled`, `createdAt` y `updatedAt`.
+
+Warning informativo:
+
+- `JSON_API_RESPONSE_ENABLED` existe en `JsonApiResponseInterceptor`. Si se activa sin adaptadores frontend, auth podria pasar de `response.data.accessToken` / `response.data.user` a `response.data.data.accessToken` / `response.data.data.user`.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/check-auth-response-shape.mjs` | Pass, `Findings: none`. |
+| `node --check scripts/check-auth-response-shape.mjs` | Pass. |
+| `pnpm qa:smoke` | Pass: lint, typecheck, web unit tests y API unit tests. |
+
+Warning no bloqueante:
+
+- `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.6.
+
+## Primera Mejora Segura Recomendada
+
+Los checks seguros ya existen para `GET /businesses` y auth session shape. La siguiente mejora segura recomendada es disenar el check manual/report-only para detalle publico:
+
+- `GET /businesses/:identifier`
+
+Debe validar que el frontend espera un objeto negocio directo en `response.data`, y que el backend mantiene ese shape sin activar envelopes globales.
 
 ## Candidatos Futuros para Checks o Tests de Contrato
 
 | Orden | Check/test candidato | Tipo | Por que |
 | --- | --- | --- | --- |
 | 1 | `GET /businesses` response shape | Check estatico manual | Implementado en `scripts/check-businesses-response-shape.mjs`; resultado actual pass, `Findings: none`. |
-| 2 | `POST /auth/login/register/refresh` session shape | Check estatico + e2e focalizado posterior | Protege la sesion antes de cualquier cambio de envelope. |
+| 2 | `POST /auth/login/register/refresh` session shape | Check estatico manual | Implementado en `scripts/check-auth-response-shape.mjs`; resultado actual pass, `Findings: none`. |
 | 3 | `GET /businesses/:identifier` detalle directo | Check estatico manual | Evita romper `BusinessDetails` con envelope adicional. |
 | 4 | `GET /businesses/admin/all` paginado admin | Check estatico manual | Protege admin list sin tocar acciones admin. |
 | 5 | `GET /verification/admin/moderation-queue` `{ items }` | Check estatico manual | Shape distinto y facil de romper por normalizacion. |
 | 6 | `JSON_API_RESPONSE_ENABLED` safety check | Check config/report-only | Alertar si se activa sin adaptador frontend. |
-| 7 | Contract tests runtime con QA stack para `GET /businesses` y auth session | API/e2e focalizados | Segundo nivel despues de checks estaticos. |
+| 7 | Contract tests runtime con QA stack para `GET /businesses` y auth session | API/e2e focalizados | Segundo nivel despues de checks estaticos, cuando haya baja volatilidad. |
 
 ## Estado Actual
 
 - Fase 8.1 queda documentada.
 - Fase 8.4 queda documentada con check manual para `GET /businesses` response shape.
+- Fase 8.6 queda documentada con check manual para auth session shape.
 - No hay cambios de runtime.
 - No hay tests nuevos.
 - El check `scripts/check-businesses-response-shape.mjs` queda manual/report-only y fuera de CI.
+- El check `scripts/check-auth-response-shape.mjs` queda manual/report-only y fuera de CI.
 - `GET /businesses` queda alineado para `data`, `total`, `page`, `limit` y `totalPages`.
-- Riesgo principal pendiente: auth session shape y otros response shapes criticos aun no estan protegidos de punta a punta por TypeScript ni por tests de contrato.
+- Auth session queda alineado para `accessToken`, `user` y `securityWarnings` opcional.
+- Riesgo principal pendiente: detalle publico, admin, moderation queue y otros response shapes criticos aun no estan protegidos de punta a punta por TypeScript ni por tests de contrato.

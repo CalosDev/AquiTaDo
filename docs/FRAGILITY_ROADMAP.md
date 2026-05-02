@@ -442,15 +442,59 @@ Warning no bloqueante:
 
 - `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.4.
 
+### Fase 8.6: check manual para auth session shape
+
+| Item | Resultado |
+| --- | --- |
+| Check agregado | `scripts/check-auth-response-shape.mjs` |
+| Comando de ejecucion | `node scripts/check-auth-response-shape.mjs` |
+| Resultado actual | Pass, `Findings: none`. |
+| Modo | Manual/read-only/report-only; exit `0`; no conectado a CI. |
+
+Contratos auth validados y alineados:
+
+- `POST /auth/login`
+- `POST /auth/register`
+- `POST /auth/refresh`
+
+Shape validado:
+
+- `accessToken`
+- `user`
+- `securityWarnings` como extra opcional permitido
+
+Notas del check:
+
+- `authApi.login`, `authApi.register` y `authApi.refresh` apuntan a las rutas esperadas.
+- Los wrappers no transforman `response.data`.
+- `AuthContext` consume `accessToken` y `user` desde la raiz de `response.data`.
+- `applySession` espera `accessToken` y `user`.
+- `AuthController` expone `@Post("login")`, `@Post("register")` y `@Post("refresh")`.
+- Los controller methods delegan a `AuthService`.
+- `AuthService.login`, `AuthService.register` y `AuthService.refresh` usan `issueAuthSession`.
+- `issueAuthSession` retorna `accessToken` y `user` en la raiz.
+- `JSON_API_RESPONSE_ENABLED` se reporta como warning informativo: si se activa sin adaptadores frontend, auth podria pasar de `response.data.accessToken` / `response.data.user` a `response.data.data.accessToken` / `response.data.data.user`.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/check-auth-response-shape.mjs` | Pass, `Findings: none`. |
+| `node --check scripts/check-auth-response-shape.mjs` | Pass. |
+| `pnpm qa:smoke` | Pass: lint, typecheck, web unit tests y API unit tests. |
+
+Warning no bloqueante:
+
+- `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.6.
+
 Riesgos pendientes antes de tocar response shapes:
 
-- Auth session shape para `POST /auth/login`, `POST /auth/register` y `POST /auth/refresh`.
 - Detalle publico `GET /businesses/:identifier` como objeto directo.
 - Admin paginado `GET /businesses/admin/all`.
 - `GET /verification/admin/moderation-queue` con shape `{ items }`.
 - Activacion futura de `JSON_API_RESPONSE_ENABLED` sin adaptadores frontend.
 
-Proximo paso recomendado: Fase 8.5, disenar el check manual/report-only para auth session shape.
+Proximo paso recomendado: disenar el check manual/report-only para `GET /businesses/:identifier` response shape.
 
 ## QA recomendado para futuras fases
 
