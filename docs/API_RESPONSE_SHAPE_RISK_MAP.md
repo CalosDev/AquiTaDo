@@ -221,13 +221,72 @@ Warning no bloqueante:
 
 - `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.6.
 
-## Primera Mejora Segura Recomendada
+## Fase 8.8: Check Manual para GET /businesses/:identifier
 
-Los checks seguros ya existen para `GET /businesses` y auth session shape. La siguiente mejora segura recomendada es disenar el check manual/report-only para detalle publico:
+Fase 8.8 implemento un check manual/read-only/report-only para el response shape de detalle publico:
 
 - `GET /businesses/:identifier`
 
-Debe validar que el frontend espera un objeto negocio directo en `response.data`, y que el backend mantiene ese shape sin activar envelopes globales.
+| Item | Detalle |
+| --- | --- |
+| Check agregado | `scripts/check-business-detail-response-shape.mjs` |
+| Comando | `node scripts/check-business-detail-response-shape.mjs` |
+| Resultado actual | Pass, `Findings: none` |
+| Modo | Manual/report-only; sale exit `0` y no esta conectado a CI |
+
+El contrato actual queda alineado para el shape esperado por `BusinessDetails`:
+
+- `response.data` es un objeto `Business` directo.
+- `response.data.data` no se usa para el payload principal de detalle.
+
+El check confirma:
+
+- `businessApi.getByIdentifier` llama a `/businesses/${identifier}`.
+- `businessApi.getById` llama a `/businesses/${id}`.
+- `businessApi.getBySlug` llama a `/businesses/${slug}`.
+- Los wrappers no transforman `response.data`.
+- `BusinessDetails` usa `getBySlug` y fallback `getByIdentifier`.
+- `BusinessDetails` carga el negocio principal con `setBusiness(res.data)`.
+- `BusinessDetails` no consume `res.data.data` para el negocio principal.
+- `BusinessesController` expone `@Get(':identifier')`.
+- El controller usa `@Param('identifier')`.
+- El branch UUID delega a `findById`.
+- El branch no UUID delega a `findBySlug`.
+- La ruta mantiene `OptionalJwtAuthGuard` y `OptionalOrgContextGuard`.
+- `findById` y `findBySlug` retornan `decorateBusinessProfile(...)` directamente.
+- `findBusinessDetail` usa `businessDetailBaseSelect`.
+- `decorateBusinessProfile` conserva el objeto con `...business` y agrega extras derivados sin envolver en `{ data }`.
+
+Extras derivados permitidos:
+
+- `profileCompletenessScore`
+- `missingCoreFields`
+- `openNow`
+- `todayHoursLabel`
+
+Warning informativo:
+
+- `JSON_API_RESPONSE_ENABLED` existe en `JsonApiResponseInterceptor`. Si se activa sin adaptadores frontend, detalle publico podria pasar de `response.data` a `response.data.data`.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/check-business-detail-response-shape.mjs` | Pass, `Findings: none`. |
+| `node --check scripts/check-business-detail-response-shape.mjs` | Pass. |
+| `pnpm qa:smoke` | Pass: lint, typecheck, web unit tests y API unit tests. |
+
+Warning no bloqueante:
+
+- `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.8.
+
+## Primera Mejora Segura Recomendada
+
+Los checks seguros ya existen para `GET /businesses`, auth session shape y detalle publico. La siguiente mejora segura recomendada es disenar el check manual/report-only para admin paginado:
+
+- `GET /businesses/admin/all`
+
+Debe validar que el frontend admin espera un envelope paginado compatible y que el backend no cambia `data`, `total`, `page`, `limit` ni `totalPages`.
 
 ## Candidatos Futuros para Checks o Tests de Contrato
 
@@ -235,7 +294,7 @@ Debe validar que el frontend espera un objeto negocio directo en `response.data`
 | --- | --- | --- | --- |
 | 1 | `GET /businesses` response shape | Check estatico manual | Implementado en `scripts/check-businesses-response-shape.mjs`; resultado actual pass, `Findings: none`. |
 | 2 | `POST /auth/login/register/refresh` session shape | Check estatico manual | Implementado en `scripts/check-auth-response-shape.mjs`; resultado actual pass, `Findings: none`. |
-| 3 | `GET /businesses/:identifier` detalle directo | Check estatico manual | Evita romper `BusinessDetails` con envelope adicional. |
+| 3 | `GET /businesses/:identifier` detalle directo | Check estatico manual | Implementado en `scripts/check-business-detail-response-shape.mjs`; resultado actual pass, `Findings: none`. |
 | 4 | `GET /businesses/admin/all` paginado admin | Check estatico manual | Protege admin list sin tocar acciones admin. |
 | 5 | `GET /verification/admin/moderation-queue` `{ items }` | Check estatico manual | Shape distinto y facil de romper por normalizacion. |
 | 6 | `JSON_API_RESPONSE_ENABLED` safety check | Check config/report-only | Alertar si se activa sin adaptador frontend. |
@@ -246,10 +305,13 @@ Debe validar que el frontend espera un objeto negocio directo en `response.data`
 - Fase 8.1 queda documentada.
 - Fase 8.4 queda documentada con check manual para `GET /businesses` response shape.
 - Fase 8.6 queda documentada con check manual para auth session shape.
+- Fase 8.8 queda documentada con check manual para `GET /businesses/:identifier` response shape.
 - No hay cambios de runtime.
 - No hay tests nuevos.
 - El check `scripts/check-businesses-response-shape.mjs` queda manual/report-only y fuera de CI.
 - El check `scripts/check-auth-response-shape.mjs` queda manual/report-only y fuera de CI.
+- El check `scripts/check-business-detail-response-shape.mjs` queda manual/report-only y fuera de CI.
 - `GET /businesses` queda alineado para `data`, `total`, `page`, `limit` y `totalPages`.
 - Auth session queda alineado para `accessToken`, `user` y `securityWarnings` opcional.
-- Riesgo principal pendiente: detalle publico, admin, moderation queue y otros response shapes criticos aun no estan protegidos de punta a punta por TypeScript ni por tests de contrato.
+- `GET /businesses/:identifier` queda alineado como objeto `Business` directo en `response.data`.
+- Riesgo principal pendiente: admin, moderation queue y otros response shapes criticos aun no estan protegidos de punta a punta por TypeScript ni por tests de contrato.

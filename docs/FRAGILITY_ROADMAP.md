@@ -487,14 +487,58 @@ Warning no bloqueante:
 
 - `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.6.
 
+### Fase 8.8: check manual para GET /businesses/:identifier response shape
+
+| Item | Resultado |
+| --- | --- |
+| Check agregado | `scripts/check-business-detail-response-shape.mjs` |
+| Comando de ejecucion | `node scripts/check-business-detail-response-shape.mjs` |
+| Resultado actual | Pass, `Findings: none`. |
+| Modo | Manual/read-only/report-only; exit `0`; no conectado a CI. |
+
+Contrato validado y alineado:
+
+- `GET /businesses/:identifier`
+
+Shape validado:
+
+- `response.data` es un objeto `Business` directo.
+- `response.data.data` no se usa para el payload principal de `BusinessDetails`.
+
+Notas del check:
+
+- `businessApi.getByIdentifier`, `businessApi.getById` y `businessApi.getBySlug` apuntan a `/businesses/${...}`.
+- Los wrappers no transforman `response.data`.
+- `BusinessDetails` usa `getBySlug` con fallback `getByIdentifier`.
+- `BusinessDetails` carga el negocio principal con `setBusiness(res.data)`.
+- `BusinessesController` expone `@Get(":identifier")` y usa `@Param("identifier")`.
+- El branch UUID delega a `findById`; el branch no UUID delega a `findBySlug`.
+- La ruta mantiene `OptionalJwtAuthGuard` y `OptionalOrgContextGuard`.
+- `findById` y `findBySlug` retornan `decorateBusinessProfile(...)` directamente.
+- `businessDetailBaseSelect` existe y mantiene los campos principales de detalle.
+- `decorateBusinessProfile` conserva el objeto con `...business` y agrega extras derivados sin envolver en `{ data }`.
+- Extras permitidos actuales: `profileCompletenessScore`, `missingCoreFields`, `openNow`, `todayHoursLabel`.
+- `JSON_API_RESPONSE_ENABLED` se reporta como warning informativo: si se activa sin adaptadores frontend, detalle publico podria pasar de `response.data` a `response.data.data`.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/check-business-detail-response-shape.mjs` | Pass, `Findings: none`. |
+| `node --check scripts/check-business-detail-response-shape.mjs` | Pass. |
+| `pnpm qa:smoke` | Pass: lint, typecheck, web unit tests y API unit tests. |
+
+Warning no bloqueante:
+
+- `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.8.
+
 Riesgos pendientes antes de tocar response shapes:
 
-- Detalle publico `GET /businesses/:identifier` como objeto directo.
 - Admin paginado `GET /businesses/admin/all`.
 - `GET /verification/admin/moderation-queue` con shape `{ items }`.
 - Activacion futura de `JSON_API_RESPONSE_ENABLED` sin adaptadores frontend.
 
-Proximo paso recomendado: disenar el check manual/report-only para `GET /businesses/:identifier` response shape.
+Proximo paso recomendado: disenar el check manual/report-only para `GET /businesses/admin/all` response shape.
 
 ## QA recomendado para futuras fases
 
