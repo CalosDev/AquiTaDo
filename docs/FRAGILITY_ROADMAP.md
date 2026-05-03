@@ -532,13 +532,80 @@ Warning no bloqueante:
 
 - `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 8.8.
 
+### Fase 9.2: mapa documental de admin/dashboard response shapes
+
+| Item | Resultado |
+| --- | --- |
+| Documento agregado | `docs/ADMIN_RESPONSE_SHAPE_RISK_MAP.md` |
+| Alcance | Solo documentacion; no se modifico producto. |
+
+El mapa registra los riesgos de response shape en `AdminDashboard`:
+
+- `GET /businesses/admin/all` como envelope paginado `{ data, total, page, limit, totalPages }`.
+- `GET /verification/admin/moderation-queue` como `{ summary, items }`.
+- Arrays directos en pending businesses, market reports y flagged reviews.
+- Snapshots directos en catalog quality, market/growth insights, observability y health dashboard.
+- Envelopes `{ data, summary }` en claim requests, business suggestions y duplicate cases.
+- Riesgo transversal de `JSON_API_RESPONSE_ENABLED` para admin.
+
+No se tocaron `AdminDashboard`, `endpoints.ts`, backend, controllers, DTOs, tests, runtime ni `JSON_API_RESPONSE_ENABLED`.
+
+### Fase 9.4: check manual para GET /businesses/admin/all response shape
+
+| Item | Resultado |
+| --- | --- |
+| Check agregado | `scripts/check-admin-businesses-response-shape.mjs` |
+| Comando de ejecucion | `node scripts/check-admin-businesses-response-shape.mjs` |
+| Resultado actual | Pass, `Findings: none`. |
+| Modo | Manual/read-only/report-only; exit `0`; no conectado a CI. |
+
+Contrato validado y alineado:
+
+- `GET /businesses/admin/all`
+
+Shape validado:
+
+- `data`
+- `total`
+- `page`
+- `limit`
+- `totalPages`
+
+Notas del check:
+
+- `businessApi.getAllAdmin` apunta a `api.get('/businesses/admin/all', { params })`.
+- El wrapper no transforma `response.data`.
+- `AdminDashboard.loadData` llama a `businessApi.getAllAdmin({ limit: 100 })`.
+- `AdminDashboard.loadData` consume `businessesResponse.data.data`.
+- `AdminDashboard.loadData` no consume `businessesResponse.data.items` ni array directo para este endpoint.
+- `BusinessesController.findAllAdmin` expone `@Get('admin/all')`.
+- `BusinessesController.findAllAdmin` mantiene `JwtAuthGuard`, `RolesGuard` y `@Roles('ADMIN')` como contexto informativo.
+- El controller delega a `businessesService.findAllAdmin(query)`.
+- `BusinessesService.findAllAdmin` retorna `data`, `total`, `page`, `limit` y `totalPages`.
+- `data` deriva de `decorateBusinessProfiles(...)`.
+- `JSON_API_RESPONSE_ENABLED` se reporta como warning informativo: si se activa sin adaptadores frontend, admin businesses podria pasar de `response.data.data` a `response.data.data.data`.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/check-admin-businesses-response-shape.mjs` | Pass, `Findings: none`. |
+| `node --check scripts/check-admin-businesses-response-shape.mjs` | Pass. |
+| `pnpm qa:smoke` | Pass: lint, typecheck, web unit tests y API unit tests. |
+
+Warnings no bloqueantes:
+
+- Primer intento local de `pnpm qa:smoke` supero el timeout de 120s; rerun con timeout ampliado paso.
+- `Geoapify geocoding failed (HTTP 503)` en tests unitarios de API. Es conocido y no esta relacionado con Fase 9.4.
+
 Riesgos pendientes antes de tocar response shapes:
 
-- Admin paginado `GET /businesses/admin/all`.
 - `GET /verification/admin/moderation-queue` con shape `{ items }`.
+- Endpoints admin con `{ data, summary }`: claim requests, business suggestions y duplicate cases.
+- Snapshots admin directos: catalog quality, market/growth insights, observability y health dashboard.
 - Activacion futura de `JSON_API_RESPONSE_ENABLED` sin adaptadores frontend.
 
-Proximo paso recomendado: disenar el check manual/report-only para `GET /businesses/admin/all` response shape.
+Proximo paso recomendado: disenar el check manual/report-only para `GET /verification/admin/moderation-queue` response shape.
 
 ## QA recomendado para futuras fases
 
