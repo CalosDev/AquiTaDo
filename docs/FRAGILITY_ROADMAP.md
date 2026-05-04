@@ -26,7 +26,7 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 
 | Ruta o flujo | Estado actual | Riesgo | Prueba existente | Prueba faltante recomendada |
 | --- | --- | --- | --- | --- |
-| `/` home publico | partial | Medio: primera impresion, SEO, CTAs y datos dinamicos. | `playwright/specs/acceptance-public.spec.ts`, `navigation.e2e.spec.ts`, `a11y.spec.ts`, `visual.spec.ts`, `apps/web/src/pages/Home.test.tsx` | Caracterizar mobile y estados con datos vacios/lentos para secciones dinamicas. |
+| `/` home publico | partial mejorado | Medio: primera impresion, SEO, CTAs y datos dinamicos. | `playwright/specs/acceptance-public.spec.ts`, `navigation.e2e.spec.ts`, `a11y.spec.ts`, `visual.spec.ts` ahora cubre baseline visual desktop y mobile, `apps/web/src/pages/Home.test.tsx` | Caracterizar estados con datos vacios/lentos para secciones dinamicas y cualquier cambio futuro en busqueda/tracking. |
 | `/businesses` listado publico | partial mejorado | Alto: filtros, mapa, paginacion, tracking y contrato API. | `playwright/specs/acceptance-public.spec.ts` cubre shell inicial publico y vista mapa; `apps/web/src/tests/integration/BusinessesList.integration.test.tsx`, `apps/web/src/pages/businesses-list/*.test.tsx` cubren partes de estado/filtros; `playwright/specs/visual.spec.ts` ahora cubre baseline visual desktop y mobile. | Browser test para combinaciones de filtros, paginacion, error API y no-results con URL estable. |
 | `/businesses?view=map` vista mapa | partial | Alto: sincroniza URL, listado, seleccion y negocios sin coordenadas. | `acceptance-public.spec.ts`, `BusinessesList.integration.test.tsx` | Caracterizar seleccion de negocio, retorno a lista y edge case sin coordenadas. |
 | `/businesses/:slug` detalle valido | partial mejorado | Alto: detalle publico, SEO, imagenes, reviews, favoritos y tracking. | `apps/web/src/pages/BusinessDetails.test.tsx`, `business-details/helpers.test.ts`, `playwright/specs/visual.spec.ts` ahora cubre baseline visual desktop y mobile con mocks deterministas. | Acceptance con slug seed real y contrato minimo de contenido visible; luego ampliar a estados con reviews reales/favoritos si se toca esa UX. |
@@ -53,7 +53,7 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 | `/security` admin security | not-covered | Alto: 2FA/admin security y permisos. | No encontrada. | Acceptance basica ADMIN y bloqueo USER/BUSINESS_OWNER. |
 | Observability metrics | pass | Alto: endpoint sensible debe bloquear anonimo/no-admin. | `playwright/specs/admin-observability.e2e.spec.ts`, `apps/api/src/observability/observability.e2e.spec.ts` | Agregar summary/reset si se modifican metricas publicas. |
 | PWA offline/reconnect | partial | Alto: contenido stale, SW activo y refetch. | `offline.e2e.spec.ts`, `AppRuntimeStatus.integration.test.tsx`, `scripts/check-pwa-offline-contract.mjs` como check estatico report-only. | Caracterizar hard refresh offline en `/` y `/businesses`, luego offline privado con sesion valida. |
-| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home, login mobile, admin, `/businesses` desktop/mobile y `BusinessDetails` desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual publica a otras rutas antes de refactors visuales mayores. |
+| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home desktop/mobile, login mobile, admin, `/businesses` desktop/mobile y `BusinessDetails` desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual publica a otras rutas antes de refactors visuales mayores. |
 | Accessibility baseline | partial | Medio: solo home y login. | `playwright/specs/a11y.spec.ts` | Agregar businesses, register-business y admin. |
 | Public API businesses/search | partial | Alto: contratos publicos, filtros y ranking. | `apps/api/src/businesses/businesses.e2e.spec.ts`, `apps/api/src/search/discovery-ranking.spec.ts` | Snapshot contractual de shape publico para lista/detalle/search. |
 | Claims, ownership y catalogo admin | partial | Alto: permisos, auditoria, org ownership y mutaciones. | `apps/api/src/businesses/*helpers.spec.ts`, `businesses.e2e.spec.ts` | E2E de permisos por rol y org con payload minimo por endpoint critico. |
@@ -606,6 +606,71 @@ Riesgos pendientes antes de tocar response shapes:
 - Activacion futura de `JSON_API_RESPONSE_ENABLED` sin adaptadores frontend.
 
 Proximo paso recomendado: disenar el check manual/report-only para `GET /verification/admin/moderation-queue` response shape.
+
+## Fase 10.2: baseline visual de Home mobile
+
+Fase 10.2 agrego el baseline visual faltante de Home mobile antes de cualquier rediseño. El alcance fue solo testing visual; no se modifico UI, estilos, logica, busqueda, tracking, rutas, copy, API real ni seed.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo modificado | `playwright/specs/visual.spec.ts` |
+| Snapshot creado | `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png` |
+| Viewport | `390 x 844` |
+| Mock reutilizado | `mockHomeVisualApi(page)` |
+
+El test reutiliza los helpers visuales existentes del spec: `forceImmediateIntersections`, `stabilizeVisualRuntime`, `disableMotionForVisuals` y `disableDeferredRenderingForVisuals`.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home mobile baseline" --update-snapshots` | Pass: `1 passed`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home mobile baseline"` | Pass: `1 passed`. |
+
+Warning no bloqueante:
+
+- Aviso de actualizacion Prisma `7.4.1 -> 7.8.0`; no esta relacionado con Fase 10.2.
+
+## Fase 10.3: rediseño visual controlado de Home
+
+Fase 10.3 aplico el primer slice de rediseño visual controlado de Home. El alcance fue visual-only: estructura local, spacing, jerarquia y superficies. No se modifico busqueda, tracking, rutas, copy, API, handlers, estado ni logica de producto.
+
+| Item | Resultado |
+| --- | --- |
+| Archivos de UI tocados | `apps/web/src/pages/Home.tsx`, `apps/web/src/pages/home/HowItWorksSection.tsx`, `apps/web/src/pages/home/HomeDifferenceSection.tsx` |
+| Snapshots actualizados | `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png` |
+| Bloques visuales tocados | Hero, radar local, `HowItWorksSection`, tarjetas de intencion, categorias/provincias, ranking, negocios recientes, `HomeDifferenceSection` y CTA final. |
+| Comportamiento preservado | Busqueda, sugerencias, tracking, rutas, copy, API, carga de datos, estados, handlers y links existentes. |
+
+Cambios principales:
+
+- Hero mas compacto y respirable en desktop/mobile, sin cambiar el formulario ni el submit.
+- CTAs del hero apilados en mobile y alineados en desktop sin cambiar destino ni copy.
+- Radar local con padding y ritmo interno mas controlados.
+- `HowItWorksSection` y `HomeDifferenceSection` con spacing y jerarquia mas consistentes.
+- Bloques de intencion, categorias, provincias, ranking y negocios recientes compactados para reducir exceso de tarjetas apiladas.
+- CTA final corregido a una superficie clara y estable; se corrigio antes de aceptar snapshots porque el primer diff visual exponia un problema de contraste.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop|mobile) baseline"` | Diff esperado contra baseline previo antes de actualizar snapshots. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots `home-desktop.png` y `home-mobile.png` actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop|mobile) baseline"` | Pass: `2 passed` con baseline actualizado. |
+
+Warnings no bloqueantes:
+
+- Aviso de actualizacion Prisma `7.4.1 -> 7.8.0`; no esta relacionado con Fase 10.3.
+- Warning local de Git `LF will be replaced by CRLF` en archivos tocados; no esta relacionado con runtime ni producto.
+
+Riesgos pendientes antes de continuar rediseño:
+
+- No tocar busqueda, tracking, rutas, copy, API ni carga de datos de Home sin fase especifica.
+- No tocar `AdminDashboard` sin baseline visual y fase dedicada.
+- No extender el rediseño a Login/Register, Profile o Dashboard sin baseline y QA focalizado por vista.
+- Si se sigue con Home, el proximo slice debe ser pequeno y visual-only, preferiblemente estados dinamicos o responsive edge cases.
 
 ## QA recomendado para futuras fases
 

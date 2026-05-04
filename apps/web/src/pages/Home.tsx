@@ -417,10 +417,10 @@ export function Home() {
             <section className="gradient-hero relative overflow-hidden">
                 <div className="absolute inset-x-0 top-0 flag-ribbon opacity-90"></div>
                 <div className="absolute inset-0 opacity-20 subtle-grid-bg"></div>
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20">
-                    <div className="grid gap-8 xl:gap-10 lg:grid-cols-12 lg:items-center">
+                <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8 md:py-16">
+                    <div className="grid gap-6 lg:grid-cols-12 lg:items-center xl:gap-10">
                         <div className="lg:col-span-7">
-                            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 backdrop-blur-md px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100/90 shadow-sm shadow-blue-900/10">
+                            <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100/90 shadow-sm shadow-blue-900/10 backdrop-blur-md sm:px-4 sm:py-2">
                                 <span className="flex items-center gap-1.5" aria-hidden="true">
                                     <span className="h-2 w-2 rounded-full bg-primary-950 ring-1 ring-white/35"></span>
                                     <span className="h-2 w-2 rounded-full bg-white ring-1 ring-white/50"></span>
@@ -433,36 +433,36 @@ export function Home() {
                                     confianza local
                                 </span>
                             </div>
-                            <h1 className="mt-6 font-display text-4xl sm:text-5xl xl:text-7xl font-black leading-[1.1] tracking-tight text-white">
+                            <h1 className="mt-5 max-w-4xl font-display text-4xl font-black leading-[1.08] tracking-tight text-white sm:text-5xl xl:text-6xl">
                                 Descubre negocios <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">reales</span>
                                 <span className="block mt-2 text-accent-300 drop-shadow-sm">por zona, categoría y confianza en RD</span>
                             </h1>
-                            <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-blue-100">
+                            <p className="mt-4 max-w-2xl text-base leading-relaxed text-blue-100 md:text-lg">
                                 AquiTa.do te ayuda a encontrar negocios locales útiles, comparables y confiables en República Dominicana,
                                 con mejor contexto por categoría, ubicación y calidad de ficha.
                             </p>
 
-                            <div className="mt-5 flex flex-wrap gap-2.5">
+                            <div className="mt-4 flex flex-wrap gap-2">
                                 <span className="chip !border-white/30 !bg-white/10 !text-white">Enfocado 100% en RD</span>
                                 <span className="chip !border-white/30 !bg-white/10 !text-white">Discovery por ubicación</span>
                                 <span className="chip !border-white/30 !bg-white/10 !text-white">Catalogo confiable</span>
                             </div>
 
-                            <div className="mt-6 flex flex-wrap gap-3">
-                                <Link to="/businesses" className="btn-accent">
+                            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                                <Link to="/businesses" className="btn-accent justify-center sm:justify-start">
                                     Explorar negocios
                                 </Link>
                                 <Link
                                     to={registerBusinessPath}
-                                    className="btn-secondary !bg-white/92 !text-primary-800 hover:!bg-white"
+                                    className="btn-secondary justify-center !bg-white/92 !text-primary-800 hover:!bg-white sm:justify-start"
                                 >
                                     {registerBusinessLabel}
                                 </Link>
                             </div>
 
-                            <form onSubmit={handleSearch} className="mt-8 max-w-3xl">
-                                <div className="hero-glass-card p-2.5 md:p-4 bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl shadow-blue-900/20 rounded-[2rem]">
-                                    <div className="flex flex-col gap-3 md:flex-row">
+                            <form onSubmit={handleSearch} className="mt-6 max-w-3xl">
+                                <div className="hero-glass-card rounded-[1.5rem] border border-white/20 bg-white/10 p-2.5 shadow-2xl shadow-blue-900/20 backdrop-blur-xl md:rounded-[2rem] md:p-4">
+                                    <div className="flex flex-col gap-2.5 md:flex-row md:gap-3">
                                         <div className="relative flex-1">
                                             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
                                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -475,14 +475,14 @@ export function Home() {
                                                 onChange={(event) => setSearchQuery(event.target.value)}
                                                 placeholder="Busca restaurantes, colmados, salones..."
                                                 aria-label="Buscar negocios"
-                                                className="input-field w-full pl-12 !rounded-2xl !border-transparent !bg-white/95 !shadow-inner text-sm md:text-base focus:!bg-white transition-all"
+                                                className="input-field w-full pl-12 !rounded-2xl !border-transparent !bg-white/95 !shadow-inner text-sm transition-all focus:!bg-white md:text-base"
                                             />
                                         </div>
-                                        <button type="submit" className="btn-accent !rounded-2xl !px-8 !py-3.5 shadow-lg shadow-accent-600/30 whitespace-nowrap font-bold">
+                                        <button type="submit" className="btn-accent whitespace-nowrap !rounded-2xl !px-8 !py-3.5 font-bold shadow-lg shadow-accent-600/30">
                                             Buscar ahora
                                         </button>
                                     </div>
-                                    <div className="mt-3 flex flex-wrap gap-2 px-1">
+                                    <div className="mt-2.5 flex flex-wrap gap-2 px-1 md:mt-3">
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200/80 mr-1 self-center">Sugerencias:</span>
                                         {['Comida criolla', 'Farmacia 24h', 'Taller'].map((preset) => (
                                             <button
@@ -498,7 +498,7 @@ export function Home() {
                                 </div>
                             </form>
 
-                            <div className="mt-6 flex flex-wrap gap-2.5">
+                            <div className="mt-4 flex flex-wrap gap-2.5 md:mt-5">
                                 <span className="kpi-chip-soft">
                                     {loading ? '...' : formatNumberDo(totalBusinesses)} negocios
                                 </span>
@@ -512,11 +512,11 @@ export function Home() {
                         </div>
 
                         <div className="lg:col-span-5">
-                            <div className="hero-accent-ring min-h-[420px] p-6 md:min-h-[460px] md:p-7 text-white">
-                                <p className="text-xs uppercase tracking-[0.18em] text-blue-200 font-semibold">Radar local</p>
-                                <h2 className="mt-2 font-display text-2xl font-bold">Qué está moviendo el mercado</h2>
+                            <div className="hero-accent-ring p-4 text-white sm:p-5 md:min-h-[430px] md:p-7">
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">Radar local</p>
+                                <h2 className="mt-2 font-display text-xl font-bold sm:text-2xl">Qué está moviendo el mercado</h2>
 
-                                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:mt-5">
                                     <div className="hero-metric-card">
                                         <p className="hero-metric-label">Top categoría</p>
                                         <p className="hero-metric-value truncate">
@@ -531,7 +531,7 @@ export function Home() {
                                     </div>
                                 </div>
 
-                                <div className="mt-5 space-y-3">
+                                <div className="mt-4 space-y-2.5 md:mt-5 md:space-y-3">
                                     {loading ? (
                                         <SkeletonLoader variant="radar-item" count={4} />
                                     ) : topRadarCategories.length > 0 ? topRadarCategories.map((category, index) => (
@@ -562,7 +562,7 @@ export function Home() {
                                     )}
                                 </div>
 
-                                <div className="mt-5 rounded-2xl border border-white/20 bg-white/10 p-4">
+                                <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 md:mt-5">
                                     <p className="text-xs uppercase tracking-wide text-blue-100">Cobertura</p>
                                     <p className="mt-1 font-semibold">
                                         {topProvinces.length > 0
@@ -582,7 +582,7 @@ export function Home() {
 
             <HowItWorksSection steps={HOW_IT_WORKS_STEPS} />
 
-            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
+            <section className="defer-render-section mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 md:py-10">
                 <div className="section-shell p-5 md:p-7">
                     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>
@@ -590,7 +590,7 @@ export function Home() {
                             <p className="section-subtitle">Rutas rápidas para encontrar justo lo que necesitas.</p>
                         </div>
                     </div>
-                    <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                         {INTENT_LINKS.map((intent) => (
                             <Link
                                 key={intent.slug}
@@ -601,7 +601,7 @@ export function Home() {
                                         metadata: { source: 'home-intent-card', intent: intent.slug },
                                     });
                                 }}
-                                className="panel-premium p-4"
+                                className="panel-premium p-4 lg:min-h-[8.5rem]"
                             >
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
@@ -617,19 +617,19 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
-                <div className="grid gap-8 lg:grid-cols-2">
-                    <div className="section-shell p-6">
-                        <div className="flex items-end justify-between gap-4">
+            <section className="defer-render-section mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8 md:py-8">
+                <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
+                    <div className="section-shell p-5 md:p-6">
+                        <div className="flex items-start justify-between gap-4">
                             <div>
-                                <h3 className="font-display text-2xl font-bold text-slate-900">Categorías top en RD</h3>
+                                <h3 className="font-display text-xl font-bold text-slate-900 md:text-2xl">Categorías top en RD</h3>
                                 <p className="mt-1 text-sm text-slate-600">Taxonomía local para descubrir negocios dominicanos sin fricción.</p>
                             </div>
                             <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
                                 Ver todo
                             </Link>
                         </div>
-                        <div className="mt-5 grid grid-cols-2 gap-3">
+                        <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:gap-3">
                             {topCategoryCards.map((category) => (
                                 <Link
                                     key={category.key}
@@ -654,10 +654,10 @@ export function Home() {
                         </div>
                     </div>
 
-                    <div className="section-shell p-6">
-                        <div className="flex items-end justify-between gap-4">
+                    <div className="section-shell p-5 md:p-6">
+                        <div className="flex items-start justify-between gap-4">
                             <div>
-                                <h3 className="font-display text-2xl font-bold text-slate-900">Provincias activas</h3>
+                                <h3 className="font-display text-xl font-bold text-slate-900 md:text-2xl">Provincias activas</h3>
                                 <p className="mt-1 text-sm text-slate-600">Cobertura local con enfoque en demanda real.</p>
                             </div>
                         </div>
@@ -703,11 +703,11 @@ export function Home() {
                 </div>
             </section>
 
-            <section ref={rankingsSectionRef} className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-7">
-                <div className="section-shell p-6">
+            <section ref={rankingsSectionRef} className="defer-render-section mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8 md:py-8">
+                <div className="section-shell p-5 md:p-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                         <div>
-                            <h3 className="font-display text-2xl font-bold text-slate-900">Ranking de reputación</h3>
+                            <h3 className="font-display text-xl font-bold text-slate-900 md:text-2xl">Ranking de reputación</h3>
                             <p className="mt-1 text-sm text-slate-600">
                                 Negocios verificados con mejor desempeño por provincia.
                             </p>
@@ -715,7 +715,7 @@ export function Home() {
                         <select
                             value={rankingProvinceId}
                             onChange={(event) => setRankingProvinceId(event.target.value)}
-                            className="input-field text-sm max-w-xs"
+                            className="input-field w-full text-sm md:max-w-xs"
                             aria-label="Filtrar ranking por provincia"
                         >
                             <option value="">Toda República Dominicana</option>
@@ -788,10 +788,10 @@ export function Home() {
                 </div>
             </section>
 
-            <section className="defer-render-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
+            <section className="defer-render-section mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 md:py-10">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <h2 className="section-title !text-3xl">Negocios recientes</h2>
+                        <h2 className="section-title !text-2xl md:!text-3xl">Negocios recientes</h2>
                         <p className="section-subtitle">Perfiles nuevos listos para recibir clientes.</p>
                     </div>
                     <Link
@@ -805,11 +805,11 @@ export function Home() {
                 </div>
 
                 {loading ? (
-                    <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="mt-5 grid grid-cols-1 gap-4 md:mt-6 md:grid-cols-2 xl:grid-cols-3">
                         <SkeletonLoader variant="card" count={3} />
                     </div>
                 ) : recentBusinesses.length === 0 ? (
-                    <div className="mt-6 p-6">
+                    <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-5 md:mt-6 md:p-6">
                         <EmptyState
                             title="Aún no hay negocios registrados."
                             body="Aporta la primera ficha útil para esa zona o categoría."
@@ -821,7 +821,7 @@ export function Home() {
                         />
                     </div>
                 ) : (
-                    <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="mt-5 grid grid-cols-1 gap-4 md:mt-6 md:grid-cols-2 xl:grid-cols-3">
                         {recentBusinesses.map((business, index) => (
                             <Link
                                 key={business.id}
@@ -868,28 +868,28 @@ export function Home() {
 
             <HomeDifferenceSection points={OPERATING_POINTS} />
 
-            <section className="defer-render-section gradient-hero relative mt-14 overflow-hidden">
-                <div className="absolute inset-x-0 top-0 flag-ribbon opacity-90"></div>
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
-                    <p className="chip !bg-white/10 !text-white !border-white/30 mx-auto flex w-fit items-center gap-2">
+            <section className="defer-render-section relative mt-10 overflow-hidden border-y border-slate-200 bg-white md:mt-14">
+                <div className="absolute inset-x-0 top-0 flag-ribbon opacity-80"></div>
+                <div className="relative mx-auto max-w-5xl px-4 py-12 text-center sm:px-6 lg:px-8 md:py-14">
+                    <p className="chip mx-auto flex w-fit items-center gap-2 !border-primary-100 !bg-primary-50 !text-primary-700">
                         <span className="flex items-center gap-1.5" aria-hidden="true">
-                            <span className="h-2 w-2 rounded-full bg-primary-950 ring-1 ring-white/35"></span>
-                            <span className="h-2 w-2 rounded-full bg-white ring-1 ring-white/50"></span>
-                            <span className="h-2 w-2 rounded-full bg-accent-500 ring-1 ring-white/25"></span>
+                            <span className="h-2 w-2 rounded-full bg-primary-900"></span>
+                            <span className="h-2 w-2 rounded-full bg-white ring-1 ring-slate-300"></span>
+                            <span className="h-2 w-2 rounded-full bg-accent-500"></span>
                         </span>
                         Impulsa tu presencia local
                     </p>
-                    <h2 className="mt-4 font-display text-3xl md:text-5xl font-extrabold text-white">
-                        Lleva tu negocio del barrio al <span className="text-amber-200">siguiente nivel</span>
+                    <h2 className="mx-auto mt-4 max-w-3xl font-display text-3xl font-extrabold text-slate-950 md:text-5xl">
+                        Lleva tu negocio del barrio al <span className="text-accent-600">siguiente nivel</span>
                     </h2>
-                    <p className="mt-4 text-base md:text-lg text-blue-100 max-w-2xl mx-auto">
+                    <p className="mx-auto mt-4 max-w-2xl text-base text-slate-600 md:text-lg">
                         Crea una ficha mas completa, mejora tu visibilidad local y ayuda a que mas personas te encuentren.
                     </p>
-                    <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-                        <Link to={registerBusinessPath} className="btn-accent inline-flex text-base md:text-lg px-8">
+                    <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap md:mt-8">
+                        <Link to={registerBusinessPath} className="btn-accent inline-flex justify-center px-8 text-base md:text-lg">
                             {registerBusinessLabel}
                         </Link>
-                        <Link to="/businesses" className="btn-secondary !bg-white/90 !text-primary-800 hover:!bg-white">
+                        <Link to="/businesses" className="btn-secondary justify-center">
                             Ver directorio público
                         </Link>
                     </div>

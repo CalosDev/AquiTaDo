@@ -455,6 +455,22 @@ test.describe('Visual baselines @visual', () => {
         await expect(page.locator('body')).toHaveScreenshot('home-desktop.png');
     });
 
+    test('home mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await forceImmediateIntersections(page);
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await mockHomeVisualApi(page);
+        await page.goto('/', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /Descubre negocios/i })).toBeVisible();
+        await expect(page.getByRole('heading', { name: /Negocios recientes/i })).toBeVisible();
+        await expect(page.getByText(/Aun no hay ranking disponible para ese filtro/i)).toBeVisible();
+        await expect(page.getByText(/no hay negocios registrados/i)).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('home-mobile.png', { fullPage: true });
+    });
+
     test('login mobile baseline @visual', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await disableMotionForVisuals(page);
