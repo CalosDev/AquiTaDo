@@ -751,6 +751,34 @@ Riesgos pendientes antes de continuar `BusinessesList`:
 - No tocar filtros, `searchParams`, SEO routes, mapa/view mode, tracking, API ni hooks de datos sin fase especifica.
 - No tocar `BusinessCard` para cambios funcionales sin caracterizacion focalizada de favorito, link, seleccion de mapa y prefetch.
 
+## Mantenimiento Prisma 7.8.0
+
+Se actualizo Prisma dentro del mismo major para eliminar el warning recurrente de `7.4.1 -> 7.8.0`. El cambio fue acotado a dependencias/tooling; no se modifico Prisma schema, migraciones, queries, `PrismaService`, controllers, services, DTOs, cache, Redis ni contratos API.
+
+| Item | Resultado |
+| --- | --- |
+| Paquetes actualizados | `prisma`, `@prisma/client`, `@prisma/adapter-pg` de `7.4.1` a `7.8.0`. |
+| Archivos tocados | `apps/api/package.json`, `pnpm-lock.yaml`, `apps/web/src/vite-env.d.ts`, `docs/FRAGILITY_ROADMAP.md`. |
+| Ajuste auxiliar | `apps/web/src/vite-env.d.ts` declara `VITE_DISCOVERY_CORE_MODE` y `VITE_FEATURE_MESSAGING`, ya usadas por `apps/web/src/config/features.ts`; es type-only y no cambia runtime. |
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/api prisma:generate` | Pass; genero Prisma Client `7.8.0`. |
+| `pnpm --filter @aquita/api typecheck` | Pass. |
+| `pnpm --filter @aquita/api test` | Pass: `24 files / 114 tests`. |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm --filter @aquita/api exec prisma migrate status` | Pass; levanto DB y Redis, ejecuto `prisma generate`, `migrate deploy`, seed, build API/web, API start y `migrate status`; schema al dia. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests web/API. |
+
+Warnings no bloqueantes:
+
+- Durante `pnpm up` hubo warnings de red lenta/`ECONNRESET` recuperados por retry.
+- `pnpm install` mantiene el warning conocido de build scripts ignorados para `@nestjs/core`, `@prisma/engines` y `prisma`; `prisma generate`, migraciones, seed y build pasaron despues.
+- Warning local `Failed to create bin ... @sentry/node/node.exe.EXE`; no bloqueo install ni QA.
+- `Geoapify geocoding failed (HTTP 503)` sigue apareciendo en tests unitarios de API y no esta relacionado con Prisma.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
