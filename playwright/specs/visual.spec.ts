@@ -295,6 +295,160 @@ const VISUAL_PROFILE_DETAILS = {
     },
 } as const;
 
+const VISUAL_OWNER_USER = {
+    id: 'user-owner-visual',
+    name: 'Owner Visual',
+    email: 'owner.visual@aquita.do',
+    phone: '+1 809-555-0120',
+    avatarUrl: null,
+    role: 'BUSINESS_OWNER',
+    createdAt: '2025-03-10T12:00:00.000Z',
+    updatedAt: '2026-04-20T12:00:00.000Z',
+} as const;
+
+const VISUAL_OWNER_ORGANIZATION = {
+    id: 'org-owner-visual',
+    name: 'Grupo AquiTa Visual',
+    slug: 'grupo-aquita-visual',
+    membership: {
+        role: 'OWNER',
+        joinedAt: '2025-03-10T12:00:00.000Z',
+    },
+    _count: {
+        businesses: 2,
+        members: 3,
+        invites: 1,
+    },
+} as const;
+
+const VISUAL_OWNER_BUSINESSES = [
+    {
+        id: 'biz-owner-cafe',
+        slug: 'cafe-aquita-owner',
+        name: 'Cafe AquiTa Owner',
+        verified: true,
+        verificationStatus: 'PENDING',
+        claimStatus: 'CLAIMED',
+        publicStatus: 'PUBLISHED',
+        source: 'OWNER',
+        catalogSource: 'OWNER',
+        lifecycleStatus: 'PUBLISHED',
+        isActive: true,
+        primaryManagingOrganizationId: VISUAL_OWNER_ORGANIZATION.id,
+        profileCompletenessScore: 86,
+        missingCoreFields: [],
+        openNow: true,
+    },
+    {
+        id: 'biz-owner-market',
+        slug: 'market-aquita-owner',
+        name: 'Market AquiTa Owner',
+        verified: false,
+        verificationStatus: 'UNVERIFIED',
+        claimStatus: 'PENDING_CLAIM',
+        publicStatus: 'PUBLISHED',
+        source: 'OWNER',
+        catalogSource: 'OWNER',
+        lifecycleStatus: 'PUBLISHED',
+        isActive: true,
+        primaryManagingOrganizationId: VISUAL_OWNER_ORGANIZATION.id,
+        profileCompletenessScore: 62,
+        missingCoreFields: ['telefono', 'horario', 'imagenes'],
+        openNow: false,
+    },
+] as const;
+
+const VISUAL_OWNER_METRICS = {
+    totals: {
+        views: 2480,
+        clicks: 318,
+        conversions: 74,
+        grossRevenue: 0,
+        conversionRate: 13,
+    },
+} as const;
+
+const VISUAL_OWNER_CLAIM_REQUESTS = {
+    data: [
+        {
+            id: 'claim-owner-1',
+            status: 'UNDER_REVIEW',
+            createdAt: '2026-04-18T14:30:00.000Z',
+            reviewedAt: null,
+            approvedAt: null,
+            rejectedAt: null,
+            expiredAt: null,
+            canceledAt: null,
+            evidenceType: 'DOCUMENT',
+            business: {
+                id: VISUAL_OWNER_BUSINESSES[0].id,
+                name: VISUAL_OWNER_BUSINESSES[0].name,
+                slug: VISUAL_OWNER_BUSINESSES[0].slug,
+                claimStatus: VISUAL_OWNER_BUSINESSES[0].claimStatus,
+                lifecycleStatus: VISUAL_OWNER_BUSINESSES[0].lifecycleStatus,
+            },
+        },
+        {
+            id: 'claim-owner-2',
+            status: 'PENDING',
+            createdAt: '2026-04-16T10:15:00.000Z',
+            reviewedAt: null,
+            approvedAt: null,
+            rejectedAt: null,
+            expiredAt: null,
+            canceledAt: null,
+            evidenceType: 'PHONE',
+            business: {
+                id: VISUAL_OWNER_BUSINESSES[1].id,
+                name: VISUAL_OWNER_BUSINESSES[1].name,
+                slug: VISUAL_OWNER_BUSINESSES[1].slug,
+                claimStatus: VISUAL_OWNER_BUSINESSES[1].claimStatus,
+                lifecycleStatus: VISUAL_OWNER_BUSINESSES[1].lifecycleStatus,
+            },
+        },
+    ],
+    summary: {
+        PENDING: 1,
+        UNDER_REVIEW: 1,
+    },
+} as const;
+
+const VISUAL_OWNER_VERIFICATION_STATUS = {
+    id: VISUAL_OWNER_BUSINESSES[0].id,
+    verificationStatus: 'PENDING',
+    verified: false,
+    verificationSubmittedAt: '2026-04-19T09:00:00.000Z',
+    verificationReviewedAt: null,
+    verificationNotes: null,
+} as const;
+
+const VISUAL_OWNER_DOCUMENTS = [
+    {
+        id: 'doc-owner-1',
+        documentType: 'BUSINESS_LICENSE',
+        fileUrl: 'https://example.test/license.pdf',
+        status: 'APPROVED',
+        submittedAt: '2026-04-17T12:00:00.000Z',
+        rejectionReason: null,
+        business: {
+            id: VISUAL_OWNER_BUSINESSES[0].id,
+            name: VISUAL_OWNER_BUSINESSES[0].name,
+        },
+    },
+    {
+        id: 'doc-owner-2',
+        documentType: 'TAX_CERTIFICATE',
+        fileUrl: 'https://example.test/tax.pdf',
+        status: 'PENDING',
+        submittedAt: '2026-04-18T12:00:00.000Z',
+        rejectionReason: null,
+        business: {
+            id: VISUAL_OWNER_BUSINESSES[0].id,
+            name: VISUAL_OWNER_BUSINESSES[0].name,
+        },
+    },
+] as const;
+
 async function forceImmediateIntersections(page: Page): Promise<void> {
     await page.addInitScript(() => {
         class ImmediateIntersectionObserver {
@@ -539,6 +693,52 @@ async function mockProfileVisualApi(page: Page): Promise<void> {
     });
 }
 
+async function seedOwnerDashboardVisualSession(page: Page): Promise<void> {
+    await page.addInitScript(
+        ({ token, user, organizationId }) => {
+            sessionStorage.setItem('accessToken', token);
+            localStorage.setItem('aquita_has_session', '1');
+            localStorage.setItem('user', JSON.stringify(user));
+            localStorage.setItem('activeOrganizationId', organizationId);
+        },
+        {
+            token: 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.visual',
+            user: VISUAL_OWNER_USER,
+            organizationId: VISUAL_OWNER_ORGANIZATION.id,
+        },
+    );
+}
+
+async function mockOwnerDashboardVisualApi(page: Page): Promise<void> {
+    await page.route('**/api/users/me', async (route) => {
+        await route.fulfill(json(VISUAL_OWNER_USER));
+    });
+
+    await page.route('**/api/organizations/mine', async (route) => {
+        await route.fulfill(json([VISUAL_OWNER_ORGANIZATION]));
+    });
+
+    await page.route('**/api/businesses/my', async (route) => {
+        await route.fulfill(json(VISUAL_OWNER_BUSINESSES));
+    });
+
+    await page.route(/\/api\/analytics\/dashboard\/my(?:\?.*)?$/, async (route) => {
+        await route.fulfill(json(VISUAL_OWNER_METRICS));
+    });
+
+    await page.route(/\/api\/businesses\/me\/claim-requests(?:\?.*)?$/, async (route) => {
+        await route.fulfill(json(VISUAL_OWNER_CLAIM_REQUESTS));
+    });
+
+    await page.route(`**/api/verification/businesses/${VISUAL_OWNER_BUSINESSES[0].id}/status`, async (route) => {
+        await route.fulfill(json(VISUAL_OWNER_VERIFICATION_STATUS));
+    });
+
+    await page.route(/\/api\/verification\/documents\/my(?:\?.*)?$/, async (route) => {
+        await route.fulfill(json(VISUAL_OWNER_DOCUMENTS));
+    });
+}
+
 test.describe('Visual baselines @visual', () => {
     test('home desktop baseline @visual', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 1400 });
@@ -610,6 +810,36 @@ test.describe('Visual baselines @visual', () => {
         await loginAsAdmin(page);
         await expect(page.getByText(/Estado del sistema|Negocios/i).first()).toBeVisible();
         await expect(page).toHaveScreenshot('admin-dashboard-desktop.png', { fullPage: true });
+    });
+
+    test('owner dashboard desktop baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 1200 });
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await seedOwnerDashboardVisualSession(page);
+        await mockOwnerDashboardVisualApi(page);
+        await page.goto('/dashboard', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /^Cafe AquiTa Owner$/i })).toBeVisible();
+        await expect(page.getByText(/Dashboard negocio/i).first()).toBeVisible();
+        await expect(page.getByText(/Control del negocio/i)).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('dashboard-owner-desktop.png', { fullPage: true });
+    });
+
+    test('owner dashboard mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await seedOwnerDashboardVisualSession(page);
+        await mockOwnerDashboardVisualApi(page);
+        await page.goto('/dashboard', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /^Cafe AquiTa Owner$/i })).toBeVisible();
+        await expect(page.getByText(/Visitas al perfil/i)).toBeVisible();
+        await expect(page.getByText(/Control del negocio/i)).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('dashboard-owner-mobile.png', { fullPage: true });
     });
 
     test('profile desktop baseline @visual', async ({ page }) => {

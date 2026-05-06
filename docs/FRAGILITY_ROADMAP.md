@@ -1052,6 +1052,65 @@ Proximo paso recomendado:
 
 - Hacer commit/push de este slice antes de abrir otra vista. Si se continua con `Profile`, disenar una fase separada para la zona admin profunda (`Seguridad y acceso`, `Vista operativa`, reviews y organizaciones recientes`) o cerrar temporalmente Profile y pasar a otra vista con baseline.
 
+## Fase 15.1: diagnostico visual de Dashboard owner
+
+Fase 15.1 reviso `/dashboard` owner sin modificar archivos. El objetivo fue confirmar riesgo antes de tocar una pantalla protegida por rol `BUSINESS_OWNER`.
+
+Hallazgos:
+
+- `/dashboard` esta protegido para `BUSINESS_OWNER`.
+- No existia baseline visual para dashboard owner antes de Fase 15.2.
+- `DashboardBusiness.tsx` combina `searchParams` para workspaces, `useOrganization`, organizacion activa, varios endpoints y workspaces lazy.
+- La primera mejora segura no es tocar UI, sino capturar baseline visual determinista.
+
+No tocar todavia:
+
+- `DashboardBusiness.tsx`.
+- `searchParams`, tabs/workspaces, `OrganizationContext`, `AuthContext`, `api/client.ts`, `endpoints.ts`, backend, permisos, org context ni contratos API.
+
+## Fase 15.2: baseline visual de Dashboard owner
+
+Fase 15.2 agrego baseline visual determinista para `/dashboard` owner en desktop y mobile. El alcance fue solo test visual; no se modifico producto, UI runtime, rutas, auth real, `searchParams`, backend, API real ni seed.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo modificado | `playwright/specs/visual.spec.ts` |
+| Snapshots creados | `playwright/specs/__snapshots__/visual.spec.ts/dashboard-owner-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/dashboard-owner-mobile.png` |
+| Viewports | Desktop `1440 x 1200`; mobile `390 x 844` |
+| Ruta | `/dashboard` |
+| Sesion | Sesion visual local con token no vencido y usuario `BUSINESS_OWNER`; sin login real ni seed. |
+| Mocking determinista | `GET /api/users/me`, `GET /api/organizations/mine`, `GET /api/businesses/my`, `GET /api/analytics/dashboard/my`, `GET /api/businesses/me/claim-requests`, `GET /api/verification/businesses/:businessId/status` y `GET /api/verification/documents/my`. |
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots creados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | Pass final: `2 passed` con baseline estable. |
+
+No se toco:
+
+- `DashboardBusiness.tsx`, `Router.tsx`, `AuthContext`, `OrganizationContext`, `api/client.ts`, `endpoints.ts`, backend, permisos, org context, `searchParams`, rutas, copy, estilos runtime, handlers, API real ni seed.
+
+Warnings:
+
+- En el primer run, el seed uso fallback de provincias por fuente externa abortada; no bloqueante.
+- Git puede avisar LF/CRLF en `visual.spec.ts`; no bloqueante.
+
+Riesgo visual/IA pendiente:
+
+- Los dashboards de los tres roles (`DashboardBusiness`, `CustomerDashboard`, `AdminDashboard`) se perciben demasiado amplios, con exceso de informacion y jerarquia visual poco clara.
+- El producto aun necesita sentirse menos como pantallas con colores y mas como una experiencia de producto: flujos por prioridad, menos ruido, acciones principales claras y paneles con proposito.
+- No corregir esto dentro de una fase puntual sin baseline y sin separar por rol. Debe abordarse como redisenio por vistas y por rol, empezando por diagnostico/baseline antes de cualquier UI.
+
+Proximo paso recomendado:
+
+- Cerrar/commitear Fase 15.2 antes de tocar dashboard UI.
+- Luego iniciar una fase separada de diagnostico IA/visual para dashboards por rol:
+  - owner dashboard primero por impacto operativo.
+  - customer dashboard despues por menor riesgo.
+  - admin dashboard al final, con baseline dedicado y contratos mas fuertes.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
