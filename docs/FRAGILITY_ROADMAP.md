@@ -871,14 +871,52 @@ Proximo paso recomendado:
 
 - Hacer QA amplio de auth visual o pasar a una fase de diseno para `Login/Register` desktop sin tocar comportamiento.
 
+## Fase 13.6: reduccion de peso visual del panel lateral auth
+
+Fase 13.6 aplico la Opcion A del diseno visual de Login/Register: bajar el peso del panel lateral desktop para que el formulario sea el foco principal, manteniendo la estructura y comportamiento existentes.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo de estilo tocado | `apps/web/src/styles/blueprint.css` |
+| Snapshots actualizados | `playwright/specs/__snapshots__/visual.spec.ts/login-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/register-desktop.png` |
+| Bloques visuales tocados | `.auth-grid`, `.auth-aside-card`, `.auth-aside-card::after`, `.auth-mini-card`, `.auth-point` |
+| Comportamiento preservado | Auth, rutas, API, tracking, copy, validaciones, Google auth, refresh/logout/session sync, roles, links y handlers. |
+
+Cambios principales:
+
+- El grid desktop reduce el peso relativo del panel lateral frente al formulario.
+- El panel lateral cambia a un gradiente lineal mas sobrio.
+- Se elimina el pseudo-elemento decorativo radial del panel lateral.
+- Se suaviza el shadow del panel lateral.
+- `auth-point` y `auth-mini-card` bajan ligeramente su intensidad visual.
+- Mobile queda estable porque el panel lateral sigue oculto bajo `lg`.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline"` | Primer intento: timeout local esperando `/api/health/ready`; no ejecuto Playwright. Reintento: mobile pass, desktop diff esperado. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline" --update-snapshots` | Pass: `4 passed`; snapshots desktop actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline"` | Pass final: `4 passed`. |
+
+No se toco:
+
+- `Login.tsx`, `Register.tsx`, `AuthPageShell.tsx`, `AuthContext`, `api/client.ts`, `endpoints.ts`, Google auth, validaciones, handlers, rutas, copy ni backend.
+
+Warnings:
+
+- Timeout local inicial de `run-with-qa-stack` esperando `/api/health/ready`; el reintento levanto DB/Redis, migraciones, seed, build API/web y previews correctamente.
+- Git puede avisar LF/CRLF en `blueprint.css`; no bloqueante.
+
 ## Cierre temporal Fase 13: auth visual
 
-El bloque visual de auth queda cerrado temporalmente con baselines para `/login` y `/register` en mobile y desktop, mas el ajuste visual minimo del CTA final de `/register` mobile.
+El bloque visual de auth queda cerrado temporalmente con baselines para `/login` y `/register` en mobile y desktop, el ajuste visual minimo del CTA final de `/register` mobile y la reduccion controlada del peso visual del panel lateral desktop.
 
 | Item | Resultado |
 | --- | --- |
 | Baselines cubiertos | `login-mobile.png`, `login-desktop.png`, `register-mobile.png`, `register-desktop.png` |
-| Cambio visual aplicado | CTA final de `/register` mobile deja de usar el contenedor sticky global y queda al final logico del formulario. |
+| Cambio visual aplicado | CTA final de `/register` mobile deja de usar el contenedor sticky global y queda al final logico del formulario; el panel lateral auth desktop baja su peso visual frente al formulario. |
 | Estado del runtime | Sin cambios de auth, rutas, API, tracking, copy, validaciones, Google auth ni estilos globales. |
 
 QA amplio ejecutado:
@@ -886,11 +924,11 @@ QA amplio ejecutado:
 | Comando | Resultado |
 | --- | --- |
 | `pnpm --filter @aquita/web typecheck` | Pass. |
-| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline"` | Pass: `4 passed`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline"` | Pass final: `4 passed`. |
 
 Warnings:
 
-- No se observaron warnings bloqueantes en el cierre. La pila QA levanto DB/Redis, migraciones, seed, build API/web y previews correctamente.
+- No se observaron warnings bloqueantes en el cierre. Hubo un timeout local inicial de `run-with-qa-stack` esperando readiness del API, pero el reintento y el baseline final pasaron. La pila QA levanto DB/Redis, migraciones, seed, build API/web y previews correctamente.
 
 Estado:
 

@@ -563,29 +563,18 @@
   }
 
   .auth-grid {
-    @apply grid items-start gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(420px,520px)];
+    @apply grid items-start gap-5 lg:grid-cols-[minmax(0,0.78fr)_minmax(420px,520px)];
   }
 
   .auth-aside-card {
     @apply relative hidden overflow-hidden rounded-[34px] border p-7 text-white lg:flex lg:flex-col lg:gap-6;
-    background:
-      radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 34%),
-      radial-gradient(circle at 86% 20%, rgba(255, 45, 93, 0.22) 0%, rgba(255, 45, 93, 0) 34%),
-      linear-gradient(155deg, #08183f 0%, #0f2d6d 54%, #0f5ec6 100%);
-    border-color: rgba(191, 219, 254, 0.16);
-    box-shadow: 0 30px 70px -42px rgba(15, 23, 42, 0.68);
+    background: linear-gradient(155deg, #0b1f4f 0%, #123f8f 58%, #185bc2 100%);
+    border-color: rgba(191, 219, 254, 0.2);
+    box-shadow: 0 24px 58px -44px rgba(15, 23, 42, 0.54);
   }
 
   .auth-aside-card::after {
-    content: '';
-    position: absolute;
-    right: -78px;
-    bottom: -96px;
-    width: 220px;
-    height: 220px;
-    border-radius: 999px;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 72%);
-    pointer-events: none;
+    display: none;
   }
 
   .auth-form-card {
@@ -595,11 +584,11 @@
   }
 
   .auth-mini-card {
-    @apply rounded-[24px] border border-white/12 bg-white/10 p-4 backdrop-blur-md;
+    @apply rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-md;
   }
 
   .auth-point {
-    @apply flex items-start gap-3 rounded-[20px] border border-white/12 bg-white/8 px-4 py-3 text-sm text-blue-50;
+    @apply flex items-start gap-3 rounded-[20px] border border-white/12 bg-white/6 px-4 py-3 text-sm text-blue-50;
   }
 
   .app-topbar {
