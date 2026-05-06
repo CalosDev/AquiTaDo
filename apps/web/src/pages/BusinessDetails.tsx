@@ -1415,8 +1415,8 @@ export function BusinessDetails() {
                     </div>
 
                     {/* Info */}
-                    <div className="panel-premium p-6 md:p-7">
-                        <div className="mb-6 flex flex-wrap gap-3">
+                    <div className="panel-premium p-5 sm:p-6 md:p-7">
+                        <div className="mb-5 flex flex-wrap gap-2.5">
                             {isAuthenticated && isCustomerRole ? (
                                 <button
                                     type="button"
@@ -1470,7 +1470,7 @@ export function BusinessDetails() {
                             </div>
                         )}
 
-                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-4">
+                        <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-5 md:flex-row md:items-start md:justify-between">
                             <div>
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                     {business.verified && (
@@ -1505,26 +1505,26 @@ export function BusinessDetails() {
                                     </div>
                                 </div>
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Resumen del negocio</p>
-                                <h2 className="mt-2 font-display text-2xl font-bold text-gray-900 leading-tight md:text-3xl">{business.name}</h2>
-                                <p className="text-gray-500 mt-2 flex items-center gap-1">
+                                <h2 className="mt-1.5 font-display text-xl font-bold leading-tight text-gray-900 md:text-2xl">{business.name}</h2>
+                                <p className="mt-2 flex items-center gap-1 text-sm text-gray-500">
                                     Dirección: {business.address}
                                     {business.province && ` - ${business.province.name}`}
                                     {business.city && `, ${business.city.name}`}
                                     {business.sector && `, ${business.sector.name}`}
                                 </p>
                                 {business.todayHoursLabel && (
-                                    <p className="text-sm text-gray-500 mt-1">Hoy: {business.todayHoursLabel}</p>
+                                    <p className="mt-1 text-sm text-gray-500">Hoy: {business.todayHoursLabel}</p>
                                 )}
                             </div>
                             {averageRating && (
-                                <div className="text-center bg-accent-50 border border-accent-100 px-4 py-2 rounded-xl md:min-w-[110px]">
-                                    <div className="text-2xl font-bold text-accent-600">* {averageRating}</div>
+                                <div className="rounded-2xl border border-accent-100 bg-accent-50/70 px-3 py-2 text-left md:min-w-[104px] md:text-center">
+                                    <div className="text-xl font-bold text-accent-600">* {averageRating}</div>
                                     <div className="text-xs text-gray-500">{business._count?.reviews} reseñas</div>
                                 </div>
                             )}
                         </div>
 
-                        <div className="rounded-2xl border border-primary-200 bg-primary-50/60 px-5 py-4">
+                        <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 px-4 py-4 sm:px-5">
                             <p className="text-sm leading-7 text-slate-800 whitespace-pre-line">{business.description}</p>
                             {memberSinceYear && Number.isFinite(memberSinceYear) && (
                                 <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-700">

@@ -672,6 +672,46 @@ Riesgos pendientes antes de continuar rediseño:
 - No extender el rediseño a Login/Register, Profile o Dashboard sin baseline y QA focalizado por vista.
 - Si se sigue con Home, el proximo slice debe ser pequeno y visual-only, preferiblemente estados dinamicos o responsive edge cases.
 
+## Fase 11.3: mejora visual controlada de BusinessDetails summary
+
+Fase 11.3 aplico un slice visual acotado al summary card de `BusinessDetails`. El objetivo fue reducir la duplicacion visual entre hero y resumen sin tocar comportamiento, datos ni flujos sensibles.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo de UI tocado | `apps/web/src/pages/BusinessDetails.tsx` |
+| Snapshots actualizados | `playwright/specs/__snapshots__/visual.spec.ts/business-details-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/business-details-mobile.png` |
+| Bloque visual tocado | Summary card bajo el hero: CTAs, metadata, nombre repetido, rating secundario y caja de descripcion. |
+| Comportamiento preservado | Logica, copy, handlers, estados, tracking, API, auth, favoritos, reviews, claim states, `SidebarPanel`, `MobileContactBar`, thumbnails y rutas. |
+
+Cambios principales:
+
+- Summary card con padding y spacing mas compactos.
+- Nombre repetido con menor jerarquia que el hero.
+- Rating secundario menos dominante y mas contenido.
+- Separador interno antes de descripcion para ordenar metadata vs contenido.
+- Descripcion en superficie neutral para no competir con el hero ni con el sidebar.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/BusinessDetails.test.tsx` | Pass: `1 file / 1 test`. |
+| `pnpm --filter @aquita/web build` | Pass. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop\|mobile) baseline"` con `PLAYWRIGHT_BASE_URL=http://localhost:4173` | Diff esperado contra baseline previo antes de actualizar snapshots. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop\|mobile) baseline" --update-snapshots` con `PLAYWRIGHT_BASE_URL=http://localhost:4173` | Pass: `2 passed`; snapshots actualizados. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop\|mobile) baseline"` con `PLAYWRIGHT_BASE_URL=http://localhost:4173` | Pass: `2 passed` con baseline actualizado. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "business details (desktop\|mobile) baseline"` | Pass: `2 passed`; levanto DB y Redis, ejecuto migraciones, seed, build API/web y visual baseline. |
+
+Warnings no bloqueantes:
+
+- Aviso de actualizacion Prisma `7.4.1 -> 7.8.0`; no esta relacionado con Fase 11.3.
+- Warning local de Git `LF will be replaced by CRLF` en `apps/web/src/pages/BusinessDetails.tsx`; no esta relacionado con runtime ni producto.
+
+Riesgos pendientes antes de continuar `BusinessDetails`:
+
+- No tocar hero gallery, thumbnails, `SidebarPanel`, `MobileContactBar`, favoritos, reviews, claim states, contact/booking/message forms, tracking, API, auth ni `searchParams` sin fase especifica.
+- Si se sigue con `BusinessDetails`, el proximo slice debe ser solo diagnostico o una mejora visual muy acotada sobre sidebar/contacto con baseline y caracterizacion previa.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
