@@ -822,39 +822,47 @@ export function Profile() {
                             </div>
                         )}
                         secondary={(
-                            <div className="space-y-5">
+                            <div className="space-y-4 md:space-y-5">
                                 <StatusCard
+                                    className="!p-4 md:!p-5 [&_.app-card__header]:mb-3"
                                     title="Resumen de tu cuenta"
                                     description="Una vista corta para saber como esta tu acceso ahora mismo."
                                 >
-                                    <div className="mb-4 flex items-center gap-4">
+                                    <div className="mb-3 flex items-center gap-3 md:gap-4">
                                         {currentAvatarUrl ? (
                                             <img
                                                 src={currentAvatarUrl}
                                                 alt={payload.user.name}
-                                                className="h-16 w-16 rounded-full border border-slate-200 object-cover"
+                                                className="h-14 w-14 rounded-full border border-slate-200 object-cover md:h-16 md:w-16"
                                             />
                                         ) : (
-                                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-lg font-semibold text-primary-700">
+                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-100 text-base font-semibold text-primary-700 md:h-16 md:w-16 md:text-lg">
                                                 {initials}
                                             </div>
                                         )}
-                                        <div>
+                                        <div className="min-w-0">
                                             <p className="text-sm font-semibold text-slate-900">
                                                 {form.name.trim() || payload.user.name}
                                             </p>
-                                            <p className="text-sm text-slate-500">{payload.user.email}</p>
+                                            <p className="break-all text-sm text-slate-500">{payload.user.email}</p>
                                         </div>
                                     </div>
 
-                                    <InfoList items={profileInfoItems} />
+                                    <InfoList
+                                        className="[&_.info-list__item]:bg-white/70 [&_.info-list__item]:px-3 [&_.info-list__item]:py-2.5"
+                                        items={profileInfoItems}
+                                    />
                                 </StatusCard>
 
                                 <InsightCard
+                                    className="!p-4 !shadow-none md:!p-5 [&_.app-card__header]:mb-3"
                                     title="Panorama rapido"
                                     description="Tres puntos para ubicarte rapido sin leer demasiado."
                                 >
-                                    <StatGroup items={profileSnapshot} />
+                                    <StatGroup
+                                        className="!grid-cols-1 gap-2 sm:!grid-cols-2 xl:!grid-cols-2 [&_.stat-group__detail]:text-xs [&_.stat-group__item]:px-3 [&_.stat-group__item]:py-3 [&_.stat-group__item]:shadow-none [&_.stat-group__value]:mt-2 [&_.stat-group__value]:text-xl"
+                                        items={profileSnapshot}
+                                    />
                                 </InsightCard>
                             </div>
                         )}

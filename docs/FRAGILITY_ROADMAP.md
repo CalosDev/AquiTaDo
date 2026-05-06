@@ -1012,6 +1012,46 @@ Proximo paso recomendado:
 
 - Antes de seguir puliendo `/profile`, disenar un slice separado para reducir duplicacion entre `Resumen de tu cuenta`, `Panorama rapido` y `Vista operativa`; no tocar formularios ni auth en esa fase.
 
+## Fase 14.5: compactacion visual del lateral de Profile
+
+Fase 14.5 aplico un ajuste visual acotado al lateral de `/profile` para reducir peso visual entre `Resumen de tu cuenta` y `Panorama rapido`. El alcance fue solo layout/clases locales; no se tocaron formularios, auth, API, roles ni secciones admin profundas.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo de UI tocado | `apps/web/src/pages/Profile.tsx` |
+| Snapshots actualizados | `playwright/specs/__snapshots__/visual.spec.ts/profile-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/profile-mobile.png` |
+| Bloque visual tocado | `secondary` del `DashboardContentLayout`: `StatusCard` de resumen, avatar/resumen, `InfoList`, `InsightCard` y `StatGroup` de panorama rapido. |
+| Comportamiento preservado | CTAs, handlers, copy, roles, auth, API, rutas, avatar upload/remove, update profile, cambio de contrasena, `ChangePasswordCard` y secciones admin profundas. |
+
+Cambios principales:
+
+- El bloque lateral reduce spacing vertical entre cards en mobile.
+- `Resumen de tu cuenta` usa padding local mas contenido y avatar ligeramente mas compacto en mobile.
+- `InfoList` del resumen baja peso visual con items mas compactos y fondo mas ligero.
+- `Panorama rapido` conserva su contenido, pero usa cards internas menos pesadas.
+- En desktop, `Panorama rapido` queda en dos columnas dentro del lateral para no alargar demasiado la vista; en mobile mantiene una columna legible.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Profile.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "profile (desktop\|mobile) baseline"` | Diff esperado en `profile-desktop` y `profile-mobile`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "profile (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots desktop/mobile actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "profile (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+
+No se toco:
+
+- `AuthContext`, `api/client.ts`, `endpoints.ts`, `Router.tsx`, backend, auth, roles, permisos, API real, seed, formularios, `ChangePasswordCard`, avatar upload/remove, submit de perfil, `Seguridad y acceso`, `Vista operativa`, reviews ni organizaciones recientes.
+
+Warnings:
+
+- No se observaron warnings bloqueantes. La pila QA levanto DB/Redis, migraciones, seed, build API/web y preview correctamente.
+
+Proximo paso recomendado:
+
+- Hacer commit/push de este slice antes de abrir otra vista. Si se continua con `Profile`, disenar una fase separada para la zona admin profunda (`Seguridad y acceso`, `Vista operativa`, reviews y organizaciones recientes`) o cerrar temporalmente Profile y pasar a otra vista con baseline.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
