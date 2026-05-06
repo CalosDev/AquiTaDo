@@ -43,7 +43,7 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 | `/reset-password` | not-covered | Medio: token invalido/expirado y cambio de password. | No encontrada. | Acceptance para token invalido y contrato visual del formulario. |
 | `/app` shell autenticado | partial | Medio: landing post-login y redireccion por rol. | `Login.integration.test.tsx`, helpers de auth Playwright. | Acceptance por rol para destino final tras login. |
 | `/app/customer` | not-covered | Medio: panel cliente y permisos USER. | No encontrada. | Acceptance con USER seed y bloqueo para roles no esperados. |
-| `/profile` | partial | Medio: perfil autenticado, avatar y datos de usuario. | `apps/web/src/pages/Profile.test.tsx` | Acceptance autenticada con render basico, update error y estado vacio. |
+| `/profile` | partial mejorado | Medio: perfil autenticado, avatar y datos de usuario. | `apps/web/src/pages/Profile.test.tsx`, `playwright/specs/visual.spec.ts` ahora cubre baseline visual desktop y mobile con payload determinista. | Acceptance autenticada con update error, estado vacio y roles USER/BUSINESS_OWNER si se redisenan secciones especificas. |
 | `/dashboard` fresh business owner | partial | Alto: rol BUSINESS_OWNER, organizacion activa y CTA inicial. | `playwright/specs/acceptance-business.spec.ts` | Caracterizar dashboard con organizacion/negocio existente. |
 | `/register-business` | partial | Alto: formulario multi-step, org context, uploads y validacion. | `playwright/specs/acceptance-business.spec.ts` | Characterization por pasos con datos invalidos y sin cambiar backend. |
 | `/dashboard/businesses/:businessId/edit` | not-covered | Alto: ownership, org context, mutaciones y cache. | No encontrada. | Acceptance con negocio seed propiedad del usuario y caso no autorizado. |
@@ -53,7 +53,7 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 | `/security` admin security | not-covered | Alto: 2FA/admin security y permisos. | No encontrada. | Acceptance basica ADMIN y bloqueo USER/BUSINESS_OWNER. |
 | Observability metrics | pass | Alto: endpoint sensible debe bloquear anonimo/no-admin. | `playwright/specs/admin-observability.e2e.spec.ts`, `apps/api/src/observability/observability.e2e.spec.ts` | Agregar summary/reset si se modifican metricas publicas. |
 | PWA offline/reconnect | partial | Alto: contenido stale, SW activo y refetch. | `offline.e2e.spec.ts`, `AppRuntimeStatus.integration.test.tsx`, `scripts/check-pwa-offline-contract.mjs` como check estatico report-only. | Caracterizar hard refresh offline en `/` y `/businesses`, luego offline privado con sesion valida. |
-| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home desktop/mobile, Login/Register desktop/mobile, admin, `/businesses` desktop/mobile y `BusinessDetails` desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual publica a otras rutas antes de refactors visuales mayores. |
+| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home desktop/mobile, Login/Register desktop/mobile, admin, `/profile` desktop/mobile, `/businesses` desktop/mobile y `BusinessDetails` desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual a Dashboard, RegisterBusiness y vistas auth/profile por rol antes de refactors visuales mayores. |
 | Accessibility baseline | partial | Medio: solo home y login. | `playwright/specs/a11y.spec.ts` | Agregar businesses, register-business y admin. |
 | Public API businesses/search | partial | Alto: contratos publicos, filtros y ranking. | `apps/api/src/businesses/businesses.e2e.spec.ts`, `apps/api/src/search/discovery-ranking.spec.ts` | Snapshot contractual de shape publico para lista/detalle/search. |
 | Claims, ownership y catalogo admin | partial | Alto: permisos, auditoria, org ownership y mutaciones. | `apps/api/src/businesses/*helpers.spec.ts`, `businesses.e2e.spec.ts` | E2E de permisos por rol y org con payload minimo por endpoint critico. |
@@ -940,6 +940,38 @@ Riesgos pendientes:
 - No redisenar `Login`/`Register` completo sin fase dedicada y baseline visual comparado.
 - No tocar `AuthContext`, `api/client.ts`, `endpoints.ts`, Google auth, refresh/logout/session sync ni roles desde una fase visual.
 - Si se continua con auth, el siguiente paso seguro es diseno visual desktop/mobile antes de otro cambio.
+
+## Fase 14.1: baseline visual de Profile
+
+Fase 14.1 agrego un baseline visual autenticado para `/profile` antes de redisenar la vista. El alcance fue solo test visual; no se modifico UI, estilos, logica, auth, rutas, backend, API real ni seed.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo modificado | `playwright/specs/visual.spec.ts` |
+| Snapshots creados | `playwright/specs/__snapshots__/visual.spec.ts/profile-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/profile-mobile.png` |
+| Viewports | Desktop `1440 x 1200`; mobile `390 x 844` |
+| Ruta | `/profile` |
+| Sesion | `loginAsAdmin(page)` para usar el flujo autenticado existente. |
+| Mocking determinista | `GET /api/users/me` y `GET /api/users/me/profile` para evitar variabilidad de seed en los datos visibles del perfil. |
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "profile (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots creados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "profile (desktop\|mobile) baseline"` | Pass: `2 passed` con baseline estable. |
+
+No se toco:
+
+- `apps/web/src/pages/Profile.tsx`, `AuthContext`, `api/client.ts`, `endpoints.ts`, `Router.tsx`, backend, auth, roles, rutas, copy, estilos, handlers, API real ni seed.
+
+Warnings:
+
+- No se observaron warnings bloqueantes. La pila QA levanto DB/Redis, migraciones, seed, build API/web y preview correctamente.
+
+Proximo paso recomendado:
+
+- Auditar visualmente `/profile` desktop/mobile con los nuevos baselines antes de tocar UI. Si se mejora, empezar por un slice pequeno del primer viewport o de la jerarquia de cards, sin tocar avatar upload, update profile, auth ni permisos.
 
 ## QA recomendado para futuras fases
 

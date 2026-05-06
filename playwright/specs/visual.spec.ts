@@ -204,6 +204,97 @@ const VISUAL_BUSINESS_REPUTATION = {
     },
 } as const;
 
+const VISUAL_PROFILE_USER = {
+    id: 'user-admin-visual',
+    name: 'Admin Visual',
+    email: 'admin@aquita.do',
+    phone: '+1 809-555-0100',
+    avatarUrl: null,
+    role: 'ADMIN',
+    createdAt: '2025-01-10T12:00:00.000Z',
+    updatedAt: '2026-04-20T12:00:00.000Z',
+} as const;
+
+const VISUAL_PROFILE_DETAILS = {
+    profileType: 'ADMIN',
+    user: VISUAL_PROFILE_USER,
+    userProfile: {
+        reviewCount: 4,
+        bookingCount: 2,
+        recentReviews: [
+            {
+                id: 'review-profile-1',
+                rating: 5,
+                comment: 'Atencion rapida y datos claros.',
+                moderationStatus: 'APPROVED',
+                createdAt: '2026-04-10T14:30:00.000Z',
+                business: {
+                    id: 'biz-cafe-aquita',
+                    name: 'Cafe AquiTa',
+                    slug: 'cafe-aquita',
+                },
+            },
+        ],
+        recentBookings: [
+            {
+                id: 'booking-profile-1',
+                status: 'CONFIRMED',
+                scheduledFor: '2026-04-22T16:00:00.000Z',
+                quotedAmount: '1800',
+                depositAmount: '500',
+                currency: 'DOP',
+                createdAt: '2026-04-12T12:00:00.000Z',
+                business: {
+                    id: 'biz-estudio-norte',
+                    name: 'Estudio Norte',
+                    slug: 'estudio-norte',
+                },
+            },
+        ],
+    },
+    adminProfile: {
+        metrics: {
+            totalUsers: 1240,
+            totalOrganizations: 86,
+            totalBusinesses: 312,
+            totalReviews: 1540,
+            totalBookings: 428,
+            totalTransactions: 96,
+        },
+        flaggedReviews: [
+            {
+                id: 'flagged-review-1',
+                rating: 2,
+                comment: 'Comentario pendiente de revision por lenguaje sensible.',
+                moderationReason: 'Lenguaje reportado',
+                createdAt: '2026-04-18T10:15:00.000Z',
+                user: {
+                    id: 'user-reviewer-1',
+                    name: 'Laura Mendez',
+                },
+                business: {
+                    id: 'biz-colmado-27',
+                    name: 'Colmado 27',
+                },
+            },
+        ],
+        latestOrganizations: [
+            {
+                id: 'org-visual-1',
+                name: 'Grupo Norte RD',
+                slug: 'grupo-norte-rd',
+                createdAt: '2026-04-16T09:00:00.000Z',
+                subscriptionStatus: 'ACTIVE',
+                plan: 'PRO',
+                _count: {
+                    businesses: 3,
+                    members: 5,
+                },
+            },
+        ],
+    },
+} as const;
+
 async function forceImmediateIntersections(page: Page): Promise<void> {
     await page.addInitScript(() => {
         class ImmediateIntersectionObserver {
@@ -438,6 +529,16 @@ async function mockBusinessDetailsVisualApi(page: Page): Promise<void> {
     });
 }
 
+async function mockProfileVisualApi(page: Page): Promise<void> {
+    await page.route('**/api/users/me', async (route) => {
+        await route.fulfill(json(VISUAL_PROFILE_USER));
+    });
+
+    await page.route('**/api/users/me/profile', async (route) => {
+        await route.fulfill(json(VISUAL_PROFILE_DETAILS));
+    });
+}
+
 test.describe('Visual baselines @visual', () => {
     test('home desktop baseline @visual', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 1400 });
@@ -509,6 +610,34 @@ test.describe('Visual baselines @visual', () => {
         await loginAsAdmin(page);
         await expect(page.getByText(/Estado del sistema|Negocios/i).first()).toBeVisible();
         await expect(page).toHaveScreenshot('admin-dashboard-desktop.png', { fullPage: true });
+    });
+
+    test('profile desktop baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 1200 });
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await loginAsAdmin(page);
+        await mockProfileVisualApi(page);
+        await page.goto('/profile', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /^Mi perfil$/i })).toBeVisible();
+        await expect(page.getByText(/Usuarios activos/i).first()).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('profile-desktop.png', { fullPage: true });
+    });
+
+    test('profile mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await loginAsAdmin(page);
+        await mockProfileVisualApi(page);
+        await page.goto('/profile', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /^Mi perfil$/i })).toBeVisible();
+        await expect(page.getByText(/Usuarios activos/i).first()).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('profile-mobile.png', { fullPage: true });
     });
 
     test('businesses desktop baseline @visual', async ({ page }) => {
