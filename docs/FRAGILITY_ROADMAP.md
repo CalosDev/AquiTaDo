@@ -53,7 +53,7 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 | `/security` admin security | not-covered | Alto: 2FA/admin security y permisos. | No encontrada. | Acceptance basica ADMIN y bloqueo USER/BUSINESS_OWNER. |
 | Observability metrics | pass | Alto: endpoint sensible debe bloquear anonimo/no-admin. | `playwright/specs/admin-observability.e2e.spec.ts`, `apps/api/src/observability/observability.e2e.spec.ts` | Agregar summary/reset si se modifican metricas publicas. |
 | PWA offline/reconnect | partial | Alto: contenido stale, SW activo y refetch. | `offline.e2e.spec.ts`, `AppRuntimeStatus.integration.test.tsx`, `scripts/check-pwa-offline-contract.mjs` como check estatico report-only. | Caracterizar hard refresh offline en `/` y `/businesses`, luego offline privado con sesion valida. |
-| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home desktop/mobile, login mobile, admin, `/businesses` desktop/mobile y `BusinessDetails` desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual publica a otras rutas antes de refactors visuales mayores. |
+| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home desktop/mobile, Login/Register desktop/mobile, admin, `/businesses` desktop/mobile y `BusinessDetails` desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual publica a otras rutas antes de refactors visuales mayores. |
 | Accessibility baseline | partial | Medio: solo home y login. | `playwright/specs/a11y.spec.ts` | Agregar businesses, register-business y admin. |
 | Public API businesses/search | partial | Alto: contratos publicos, filtros y ranking. | `apps/api/src/businesses/businesses.e2e.spec.ts`, `apps/api/src/search/discovery-ranking.spec.ts` | Snapshot contractual de shape publico para lista/detalle/search. |
 | Claims, ownership y catalogo admin | partial | Alto: permisos, auditoria, org ownership y mutaciones. | `apps/api/src/businesses/*helpers.spec.ts`, `businesses.e2e.spec.ts` | E2E de permisos por rol y org con payload minimo por endpoint critico. |
@@ -870,6 +870,38 @@ No se toco:
 Proximo paso recomendado:
 
 - Hacer QA amplio de auth visual o pasar a una fase de diseno para `Login/Register` desktop sin tocar comportamiento.
+
+## Cierre temporal Fase 13: auth visual
+
+El bloque visual de auth queda cerrado temporalmente con baselines para `/login` y `/register` en mobile y desktop, mas el ajuste visual minimo del CTA final de `/register` mobile.
+
+| Item | Resultado |
+| --- | --- |
+| Baselines cubiertos | `login-mobile.png`, `login-desktop.png`, `register-mobile.png`, `register-desktop.png` |
+| Cambio visual aplicado | CTA final de `/register` mobile deja de usar el contenedor sticky global y queda al final logico del formulario. |
+| Estado del runtime | Sin cambios de auth, rutas, API, tracking, copy, validaciones, Google auth ni estilos globales. |
+
+QA amplio ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline"` | Pass: `4 passed`. |
+
+Warnings:
+
+- No se observaron warnings bloqueantes en el cierre. La pila QA levanto DB/Redis, migraciones, seed, build API/web y previews correctamente.
+
+Estado:
+
+- Fase 13 auth visual cerrada temporalmente.
+- Worktree limpio tras la validacion.
+
+Riesgos pendientes:
+
+- No redisenar `Login`/`Register` completo sin fase dedicada y baseline visual comparado.
+- No tocar `AuthContext`, `api/client.ts`, `endpoints.ts`, Google auth, refresh/logout/session sync ni roles desde una fase visual.
+- Si se continua con auth, el siguiente paso seguro es diseno visual desktop/mobile antes de otro cambio.
 
 ## QA recomendado para futuras fases
 
