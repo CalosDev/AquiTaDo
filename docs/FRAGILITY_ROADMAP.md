@@ -807,6 +807,34 @@ Proximo paso recomendado:
 
 - Agregar baselines desktop para Login/Register antes de cualquier rediseño auth.
 
+## Fase 13.3: baseline visual desktop de Login/Register
+
+Fase 13.3 agrego baselines visuales desktop para `/login` y `/register` antes de tocar UI/auth. El alcance fue solo test visual; no se modifico UI, estilos, copy, auth, tracking, rutas, API real ni seed.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo modificado | `playwright/specs/visual.spec.ts` |
+| Snapshots creados | `playwright/specs/__snapshots__/visual.spec.ts/login-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/register-desktop.png` |
+| Viewport | `1440 x 1200` |
+| Rutas | `/login`, `/register` |
+| Mocking | No hizo falta mocking adicional; los baselines no dependen de API real ni seed. |
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) desktop baseline" --update-snapshots` | Pass: `2 passed`; snapshots creados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) desktop baseline"` | Pass: `2 passed` con baseline actualizado. |
+
+No se toco:
+
+- UI, estilos, copy, busqueda, tracking, rutas, API real ni seed.
+- `Register.tsx`, `Login.tsx`, `AuthPageShell`, `AuthContext`, `api/client.ts`, Google auth, formularios ni validaciones.
+
+Proximo paso recomendado:
+
+- Auditar visualmente Login/Register con los cuatro baselines existentes antes de cualquier cambio de UI.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
