@@ -479,6 +479,14 @@ test.describe('Visual baselines @visual', () => {
         await expect(page).toHaveScreenshot('login-mobile.png', { fullPage: true });
     });
 
+    test('register mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await disableMotionForVisuals(page);
+        await page.goto('/register');
+        await expect(page.getByRole('heading', { name: /Crea tu cuenta/i })).toBeVisible();
+        await expect(page).toHaveScreenshot('register-mobile.png', { fullPage: true });
+    });
+
     test('admin dashboard baseline @visual', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 1200 });
         await disableMotionForVisuals(page);

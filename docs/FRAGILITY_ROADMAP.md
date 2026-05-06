@@ -779,6 +779,34 @@ Warnings no bloqueantes:
 - Warning local `Failed to create bin ... @sentry/node/node.exe.EXE`; no bloqueo install ni QA.
 - `Geoapify geocoding failed (HTTP 503)` sigue apareciendo en tests unitarios de API y no esta relacionado con Prisma.
 
+## Fase 13.2: baseline visual de Register mobile
+
+Fase 13.2 agrego un baseline visual mobile para `/register` antes de tocar UI/auth. El alcance fue solo test visual; no se modifico UI, estilos, copy, auth, tracking, rutas, API real ni seed.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo modificado | `playwright/specs/visual.spec.ts` |
+| Snapshot creado | `playwright/specs/__snapshots__/visual.spec.ts/register-mobile.png` |
+| Viewport | `390 x 844` |
+| Ruta | `/register` |
+| Mocking | No hizo falta mocking adicional; el baseline no depende de API real ni seed. |
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register mobile baseline" --update-snapshots` | Pass: `1 passed`; snapshot creado. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register mobile baseline"` | Pass: `1 passed` con baseline actualizado. |
+
+No se toco:
+
+- UI, estilos, copy, busqueda, tracking, rutas, API real ni seed.
+- `Register.tsx`, `Login.tsx`, `AuthPageShell`, `AuthContext`, `api/client.ts`, Google auth, formularios ni validaciones.
+
+Proximo paso recomendado:
+
+- Agregar baselines desktop para Login/Register antes de cualquier rediseño auth.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
