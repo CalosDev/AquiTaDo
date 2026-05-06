@@ -712,6 +712,45 @@ Riesgos pendientes antes de continuar `BusinessDetails`:
 - No tocar hero gallery, thumbnails, `SidebarPanel`, `MobileContactBar`, favoritos, reviews, claim states, contact/booking/message forms, tracking, API, auth ni `searchParams` sin fase especifica.
 - Si se sigue con `BusinessDetails`, el proximo slice debe ser solo diagnostico o una mejora visual muy acotada sobre sidebar/contacto con baseline y caracterizacion previa.
 
+## Fase 12.3: mejora visual controlada de BusinessCard
+
+Fase 12.3 aplico un slice visual acotado a las cards del listado publico de negocios. El objetivo fue reducir ruido visual en badges/chips y mejorar jerarquia interna sin tocar filtros, URL state, mapa, tracking ni datos.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo de UI tocado | `apps/web/src/pages/businesses-list/BusinessCard.tsx` |
+| Snapshots actualizados | `playwright/specs/__snapshots__/visual.spec.ts/businesses-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/businesses-mobile.png` |
+| Bloque visual tocado | Contenido textual de la card: titulo, precio, categoria, ubicacion/distancia y fila de badges. |
+| Comportamiento preservado | Props, handlers, favoritos, seleccion de mapa, `Link`, prefetch, rutas, filtros, `searchParams`, tracking, API, copy y estados. |
+
+Cambios principales:
+
+- Titulo y precio con jerarquia mas controlada.
+- Categoria principal truncada y menos dominante.
+- Ubicacion/distancia con alineacion mas estable.
+- Badges secundarios mas compactos y separados del contenido principal.
+- Trust chip con peso visual menor y ring contextual.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/businesses-list/BusinessCard.test.tsx` | Pass: `1 file / 2 tests`. |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.integration.config.ts src/tests/integration/BusinessesList.integration.test.tsx` | Pass: `1 file / 8 tests`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses (desktop\|mobile) baseline"` | Diff esperado contra baseline previo antes de actualizar snapshots. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "businesses (desktop\|mobile) baseline"` | Pass: `2 passed` con baseline actualizado. |
+
+Warnings no bloqueantes:
+
+- Aviso de actualizacion Prisma `7.4.1 -> 7.8.0`; no esta relacionado con Fase 12.3.
+- Warning local de Git `LF will be replaced by CRLF` en `apps/web/src/pages/businesses-list/BusinessCard.tsx`; no esta relacionado con runtime ni producto.
+
+Riesgos pendientes antes de continuar `BusinessesList`:
+
+- No tocar filtros, `searchParams`, SEO routes, mapa/view mode, tracking, API ni hooks de datos sin fase especifica.
+- No tocar `BusinessCard` para cambios funcionales sin caracterizacion focalizada de favorito, link, seleccion de mapa y prefetch.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

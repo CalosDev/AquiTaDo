@@ -134,20 +134,20 @@ export function BusinessCard({
                 ) : null}
             </div>
 
-            <div className="mt-3 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                    <h2 className="truncate text-base font-semibold text-slate-900 transition group-hover:text-primary-700">
+            <div className="mt-3 flex flex-1 flex-col gap-2.5">
+                <div className="flex items-start justify-between gap-3">
+                    <h2 className="min-w-0 truncate text-[15px] font-semibold leading-snug text-slate-900 transition group-hover:text-primary-700">
                         {business.name}
                     </h2>
                     {priceChip ? (
-                        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                             {priceChip}
                         </span>
                     ) : null}
                 </div>
 
                 {primaryCategoryPath ? (
-                    <p className="text-xs text-slate-500">
+                    <p className="-mt-1 truncate text-xs text-slate-500">
                         {primaryCategoryPath}
                     </p>
                 ) : null}
@@ -162,43 +162,43 @@ export function BusinessCard({
                     <span>({reviewCount})</span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <div className="flex items-start gap-2 text-xs text-slate-500">
+                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path d="M12 21s-6-4.35-6-10a6 6 0 0 1 12 0c0 5.65-6 10-6 10z" />
                         <circle cx="12" cy="11" r="2.5" />
                     </svg>
-                    <span>{locationLabel || business.province?.name || business.address}</span>
+                    <span className="min-w-0 flex-1 leading-relaxed">{locationLabel || business.province?.name || business.address}</span>
                     {business.distanceKm ? (
                         <>
-                            <span className="text-slate-400">|</span>
-                            <span>{business.distanceKm.toFixed(1)} km</span>
+                            <span className="mt-0.5 text-slate-300">|</span>
+                            <span className="mt-0.5 shrink-0">{business.distanceKm.toFixed(1)} km</span>
                         </>
                     ) : null}
                 </div>
-                <div className="flex flex-wrap gap-2 pt-1">
+                <div className="mt-auto flex flex-wrap gap-1.5 border-t border-slate-100 pt-2.5">
                     {secondaryCategoryName ? (
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                        <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-slate-200/80">
                             {secondaryCategoryName}
                         </span>
                     ) : null}
                     {business.todayHoursLabel ? (
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                        <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-slate-200/80">
                             Hoy: {business.todayHoursLabel}
                         </span>
                     ) : null}
                     {trust ? (
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
                             trust.level === 'ALTA'
-                                ? 'bg-primary-50 text-primary-700'
+                                ? 'bg-primary-50 text-primary-700 ring-primary-100'
                                 : trust.level === 'MEDIA'
-                                    ? 'bg-amber-50 text-amber-700'
-                                    : 'bg-red-50 text-red-700'
+                                    ? 'bg-amber-50 text-amber-700 ring-amber-100'
+                                    : 'bg-red-50 text-red-700 ring-red-100'
                         }`}>
                             Confianza {trust.score}
                         </span>
                     ) : null}
                     {currentView === 'map' && !isMappable ? (
-                        <span className="rounded-full border border-dashed border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                        <span className="rounded-full border border-dashed border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500">
                             Sin punto en mapa
                         </span>
                     ) : null}
