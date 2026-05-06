@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PageFeedbackStack } from '../components/PageFeedbackStack';
 import { AuthPageShell } from '../components/auth/AuthPageShell';
 import { GoogleIdentityButton } from '../components/auth/GoogleIdentityButton';
-import { FieldHint, InlineChoiceGroup, InlineNotice, StickyFormActions } from '../components/ui';
+import { FieldHint, InlineChoiceGroup, InlineNotice } from '../components/ui';
 import { useAuth } from '../context/useAuth';
 import { trackGrowthEvent } from '../lib/growthTracking';
 import { useTimedMessage } from '../hooks/useTimedMessage';
@@ -303,11 +303,11 @@ export function Register() {
                     </span>
                 </label>
 
-                <StickyFormActions>
+                <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
                     <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto">
                         {loading ? 'Creando cuenta...' : 'Crear cuenta'}
                     </button>
-                </StickyFormActions>
+                </div>
             </form>
         </AuthPageShell>
     );

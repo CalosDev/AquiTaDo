@@ -835,6 +835,42 @@ Proximo paso recomendado:
 
 - Auditar visualmente Login/Register con los cuatro baselines existentes antes de cualquier cambio de UI.
 
+## Fase 13.5: ajuste visual minimo de Register mobile
+
+Fase 13.5 aplico un ajuste visual acotado al CTA final de `/register`. El objetivo fue evitar que el boton principal aparezca como accion adelantada en el baseline mobile por el contenedor sticky global, manteniendo el CTA en su posicion logica al final del formulario.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo de UI tocado | `apps/web/src/pages/Register.tsx` |
+| Snapshot actualizado | `playwright/specs/__snapshots__/visual.spec.ts/register-mobile.png` |
+| Bloque visual tocado | CTA final del formulario de registro. |
+| Comportamiento preservado | Auth, validaciones, submit handler, estado `loading`, Google auth, tracking, rutas, API, copy, campos y enlaces. |
+
+Cambios principales:
+
+- `Register` deja de usar `StickyFormActions` global para su CTA final.
+- El boton queda en un contenedor local no sticky con separador superior y el mismo ancho responsive.
+- Mobile muestra el CTA despues de contrasena, confirmacion y terminos, sin competir con campos pendientes.
+- Desktop se mantuvo estable en el baseline visual.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register (desktop\|mobile) baseline"` | Diff esperado inicial en `register-mobile`; `register-desktop` pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshot mobile actualizado. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register (desktop\|mobile) baseline"` | Pass: `2 passed` con baseline actualizado. |
+
+No se toco:
+
+- `AuthContext`, `api/client.ts`, `endpoints.ts`, handlers, validaciones, Google auth, tracking, rutas, copy ni estilos globales.
+- `StickyFormActions` global ni otras pantallas que lo usan.
+
+Proximo paso recomendado:
+
+- Hacer QA amplio de auth visual o pasar a una fase de diseno para `Login/Register` desktop sin tocar comportamiento.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
