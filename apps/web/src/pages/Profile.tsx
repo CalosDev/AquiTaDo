@@ -653,7 +653,7 @@ export function Profile() {
                 ]}
             />
 
-            <AppCard className="space-y-5">
+            <AppCard className="space-y-4 md:space-y-5">
                 <PageIntroCompact
                     eyebrow={heroProfileType ? getProfileTypeLabel(heroProfileType) : 'Tu cuenta'}
                     title="Mi perfil"
@@ -661,6 +661,7 @@ export function Profile() {
                 />
 
                 <Toolbar
+                    className="border-transparent bg-transparent p-0 shadow-none md:border-slate-200/80 md:bg-slate-50/70 md:p-3"
                     leading={(
                         <p className="max-w-3xl text-sm leading-6 text-slate-600">
                             Desde aqui puedes mantener tus datos al dia, cuidar tu acceso y revisar el contexto que mas importa segun tu rol.
@@ -672,9 +673,16 @@ export function Profile() {
                 {loading ? (
                     <LoadingState label="Cargando tu perfil..." />
                 ) : payload ? (
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3 md:gap-3">
                         {profileHighlights.map((item) => (
-                            <MetricCard key={item.label} label={item.label} value={item.value} delta={item.delta} />
+                            <MetricCard
+                                key={item.label}
+                                label={item.label}
+                                value={item.value}
+                                delta={item.delta}
+                                className="bg-slate-50/70 shadow-none"
+                                density="compact"
+                            />
                         ))}
                     </div>
                 ) : null}

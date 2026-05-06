@@ -973,6 +973,45 @@ Proximo paso recomendado:
 
 - Auditar visualmente `/profile` desktop/mobile con los nuevos baselines antes de tocar UI. Si se mejora, empezar por un slice pequeno del primer viewport o de la jerarquia de cards, sin tocar avatar upload, update profile, auth ni permisos.
 
+## Fase 14.3: mejora visual minima del top section de Profile
+
+Fase 14.3 aplico un ajuste visual acotado al top section de `/profile`. El objetivo fue reducir la sensacion de card anidada en mobile y bajar el peso visual de las metricas iniciales sin tocar comportamiento ni formularios.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo de UI tocado | `apps/web/src/pages/Profile.tsx` |
+| Snapshot actualizado | `playwright/specs/__snapshots__/visual.spec.ts/profile-mobile.png` |
+| Bloque visual tocado | `AppCard` superior, `Toolbar` del top section y grid de metricas iniciales. |
+| Comportamiento preservado | CTAs, handlers, copy, roles, auth, API, rutas, avatar upload/remove, update profile, cambio de contrasena y secciones admin profundas. |
+
+Cambios principales:
+
+- El `AppCard` superior reduce ligeramente su separacion vertical en mobile.
+- El `Toolbar` deja de verse como card anidada en mobile; en desktop conserva una superficie suave.
+- Las metricas iniciales usan una superficie mas liviana y sin shadow adicional.
+- El baseline mobile queda mas corto y respirable; desktop se mantuvo estable.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Profile.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "profile (desktop\|mobile) baseline"` | Diff esperado en `profile-mobile`; desktop pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "profile (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshot mobile actualizado. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "profile (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+
+No se toco:
+
+- `AuthContext`, `api/client.ts`, `endpoints.ts`, `Router.tsx`, backend, auth, roles, permisos, API real, seed, `ChangePasswordCard`, avatar upload/remove ni submit de perfil.
+
+Warnings:
+
+- No se observaron warnings bloqueantes. La pila QA levanto DB/Redis, migraciones, seed, build API/web y preview correctamente.
+
+Proximo paso recomendado:
+
+- Antes de seguir puliendo `/profile`, disenar un slice separado para reducir duplicacion entre `Resumen de tu cuenta`, `Panorama rapido` y `Vista operativa`; no tocar formularios ni auth en esa fase.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
