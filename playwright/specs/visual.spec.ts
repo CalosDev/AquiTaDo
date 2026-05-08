@@ -1044,7 +1044,7 @@ test.describe('Visual baselines @visual', () => {
         await expect(page.getByText(/Aun no hay ranking disponible para ese filtro/i)).toBeVisible();
         await expect(page.getByText(/no hay negocios registrados/i)).toBeVisible();
         await page.waitForTimeout(250);
-        await expect(page.locator('body')).toHaveScreenshot('home-desktop.png');
+        await expect(page).toHaveScreenshot('home-desktop.png', { fullPage: true });
     });
 
     test('home mobile baseline @visual', async ({ page }) => {

@@ -417,10 +417,10 @@ export function Home() {
             <section className="gradient-hero relative overflow-hidden">
                 <div className="absolute inset-x-0 top-0 flag-ribbon opacity-90"></div>
                 <div className="absolute inset-0 opacity-20 subtle-grid-bg"></div>
-                <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8 md:py-16">
-                    <div className="grid gap-6 lg:grid-cols-12 lg:items-center xl:gap-10">
+                <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-11 lg:px-8 md:py-14">
+                    <div className="grid gap-5 lg:grid-cols-12 lg:items-center xl:gap-8">
                         <div className="lg:col-span-7">
-                            <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100/90 shadow-sm shadow-blue-900/10 backdrop-blur-md sm:px-4 sm:py-2">
+                            <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100/85 shadow-none backdrop-blur-md sm:px-3.5">
                                 <span className="flex items-center gap-1.5" aria-hidden="true">
                                     <span className="h-2 w-2 rounded-full bg-primary-950 ring-1 ring-white/35"></span>
                                     <span className="h-2 w-2 rounded-full bg-white ring-1 ring-white/50"></span>
@@ -433,35 +433,17 @@ export function Home() {
                                     confianza local
                                 </span>
                             </div>
-                            <h1 className="mt-5 max-w-4xl font-display text-4xl font-black leading-[1.08] tracking-tight text-white sm:text-5xl xl:text-6xl">
+                            <h1 className="mt-4 max-w-4xl font-display text-4xl font-black leading-[1.06] text-white sm:text-5xl xl:text-6xl">
                                 Descubre negocios <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">reales</span>
-                                <span className="block mt-2 text-accent-300 drop-shadow-sm">por zona, categoría y confianza en RD</span>
+                                <span className="block mt-1.5 text-accent-300 drop-shadow-sm">por zona, categoría y confianza en RD</span>
                             </h1>
                             <p className="mt-4 max-w-2xl text-base leading-relaxed text-blue-100 md:text-lg">
                                 AquiTa.do te ayuda a encontrar negocios locales útiles, comparables y confiables en República Dominicana,
                                 con mejor contexto por categoría, ubicación y calidad de ficha.
                             </p>
 
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                <span className="chip !border-white/30 !bg-white/10 !text-white">Enfocado 100% en RD</span>
-                                <span className="chip !border-white/30 !bg-white/10 !text-white">Discovery por ubicación</span>
-                                <span className="chip !border-white/30 !bg-white/10 !text-white">Catalogo confiable</span>
-                            </div>
-
-                            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                                <Link to="/businesses" className="btn-accent justify-center sm:justify-start">
-                                    Explorar negocios
-                                </Link>
-                                <Link
-                                    to={registerBusinessPath}
-                                    className="btn-secondary justify-center !bg-white/92 !text-primary-800 hover:!bg-white sm:justify-start"
-                                >
-                                    {registerBusinessLabel}
-                                </Link>
-                            </div>
-
-                            <form onSubmit={handleSearch} className="mt-6 max-w-3xl">
-                                <div className="hero-glass-card rounded-[1.5rem] border border-white/20 bg-white/10 p-2.5 shadow-2xl shadow-blue-900/20 backdrop-blur-xl md:rounded-[2rem] md:p-4">
+                            <form onSubmit={handleSearch} className="mt-5 max-w-3xl">
+                                <div className="hero-glass-card rounded-[1.35rem] border border-white/20 bg-white/10 p-2.5 shadow-xl shadow-blue-900/16 backdrop-blur-xl md:rounded-[1.75rem] md:p-3">
                                     <div className="flex flex-col gap-2.5 md:flex-row md:gap-3">
                                         <div className="relative flex-1">
                                             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
@@ -478,11 +460,11 @@ export function Home() {
                                                 className="input-field w-full pl-12 !rounded-2xl !border-transparent !bg-white/95 !shadow-inner text-sm transition-all focus:!bg-white md:text-base"
                                             />
                                         </div>
-                                        <button type="submit" className="btn-accent whitespace-nowrap !rounded-2xl !px-8 !py-3.5 font-bold shadow-lg shadow-accent-600/30">
+                                        <button type="submit" className="btn-accent whitespace-nowrap !rounded-2xl !px-8 !py-3.5 font-bold shadow-md shadow-accent-600/25">
                                             Buscar ahora
                                         </button>
                                     </div>
-                                    <div className="mt-2.5 flex flex-wrap gap-2 px-1 md:mt-3">
+                                    <div className="mt-2.5 flex flex-wrap gap-1.5 px-1 md:mt-3">
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200/80 mr-1 self-center">Sugerencias:</span>
                                         {['Comida criolla', 'Farmacia 24h', 'Taller'].map((preset) => (
                                             <button
@@ -498,7 +480,25 @@ export function Home() {
                                 </div>
                             </form>
 
-                            <div className="mt-4 flex flex-wrap gap-2.5 md:mt-5">
+                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                                <Link to="/businesses" className="btn-accent justify-center sm:justify-start">
+                                    Explorar negocios
+                                </Link>
+                                <Link
+                                    to={registerBusinessPath}
+                                    className="btn-secondary justify-center !bg-white/92 !text-primary-800 hover:!bg-white sm:justify-start"
+                                >
+                                    {registerBusinessLabel}
+                                </Link>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Enfocado 100% en RD</span>
+                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Discovery por ubicación</span>
+                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Catalogo confiable</span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2.5 md:mt-4">
                                 <span className="kpi-chip-soft">
                                     {loading ? '...' : formatNumberDo(totalBusinesses)} negocios
                                 </span>
@@ -512,11 +512,11 @@ export function Home() {
                         </div>
 
                         <div className="lg:col-span-5">
-                            <div className="hero-accent-ring p-4 text-white sm:p-5 md:min-h-[430px] md:p-7">
+                            <div className="hero-accent-ring p-3.5 text-white sm:p-4 md:p-5">
                                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">Radar local</p>
-                                <h2 className="mt-2 font-display text-xl font-bold sm:text-2xl">Qué está moviendo el mercado</h2>
+                                <h2 className="mt-2 font-display text-lg font-bold sm:text-xl">Qué está moviendo el mercado</h2>
 
-                                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:mt-5">
+                                <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:mt-4">
                                     <div className="hero-metric-card">
                                         <p className="hero-metric-label">Top categoría</p>
                                         <p className="hero-metric-value truncate">
@@ -531,7 +531,7 @@ export function Home() {
                                     </div>
                                 </div>
 
-                                <div className="mt-4 space-y-2.5 md:mt-5 md:space-y-3">
+                                <div className="mt-3 space-y-2 md:mt-4">
                                     {loading ? (
                                         <SkeletonLoader variant="radar-item" count={4} />
                                     ) : topRadarCategories.length > 0 ? topRadarCategories.map((category, index) => (
@@ -562,7 +562,7 @@ export function Home() {
                                     )}
                                 </div>
 
-                                <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 md:mt-5">
+                                <div className="mt-3 rounded-2xl border border-white/20 bg-white/10 p-3.5 md:mt-4">
                                     <p className="text-xs uppercase tracking-wide text-blue-100">Cobertura</p>
                                     <p className="mt-1 font-semibold">
                                         {topProvinces.length > 0
