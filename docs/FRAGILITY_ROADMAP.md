@@ -1167,6 +1167,68 @@ Proximo paso recomendado:
 - Commit/push de Fase 15.4 antes de tocar UI.
 - Luego disenar una fase documental de arquitectura de informacion de dashboards por rol, con owner como primer candidato de redisenio controlado.
 
+## Fase 15.5: arquitectura de informacion para dashboards por rol
+
+Fase 15.5 convirtio el diagnostico visual de dashboards en una ruta documental de arquitectura de informacion. El objetivo fue evitar redisenar por estetica aislada y ordenar cada dashboard por el trabajo real del rol.
+
+Documento creado:
+
+- `docs/DASHBOARD_INFORMATION_ARCHITECTURE_PLAN.md`
+
+Alcance:
+
+- Solo documentacion.
+- No se toco UI runtime, componentes, estilos, copy, rutas, auth, permisos, `searchParams`, API, backend, seed ni snapshots.
+
+Hallazgos consolidados:
+
+- El problema transversal de dashboards no es solo visual; es exceso de informacion con poca prioridad de accion.
+- Owner debe responder primero: "que necesita atencion en mi negocio hoy".
+- Customer debe responder primero: "que negocio guardado, lista o actividad debo retomar".
+- Admin debe responder primero: "que riesgo operativo necesita revision o accion ahora".
+- Mobile debe mostrar prioridad antes que amplitud; no basta con apilar todo el desktop.
+- Desktop debe usar el espacio para comparacion y decision, no para sumar mas modulos con el mismo peso.
+
+Modelo IA recomendado:
+
+| Orden | Bloque | Proposito |
+| --- | --- | --- |
+| 1 | Contexto actual | Rol, negocio/usuario/consola activa. |
+| 2 | Siguiente accion primaria | Una tarea clara, no varias CTAs equivalentes. |
+| 3 | Estado critico | Solo blockers o senales que cambian la decision. |
+| 4 | Area principal de trabajo | Contenido del rol o workspace activo. |
+| 5 | Historial/detalle secundario | Debajo de la decision principal. |
+
+Orden seguro propuesto:
+
+| Fase | Objetivo | Alcance |
+| --- | --- | --- |
+| 15.6 | Disenar slice visual owner first viewport | Solo diseno; elegir bloques exactos y QA. |
+| 15.7 | Implementar slice visual owner overview | `DashboardBusiness.tsx` local layout/classes, sin tocar `searchParams` ni workspaces. |
+| 15.8 | QA/documentacion owner | Visual baseline, tests focalizados si existen, docs. |
+| 15.9 | Disenar slice customer saved-discovery | Solo diseno; mantener `CustomerActivityWorkspace` intacto. |
+| 15.10 | Implementar slice customer visual-only | `CustomerDashboard.tsx` local layout/classes. |
+| 15.11 | Agregar admin mobile baseline | Test-only antes de tocar consola admin. |
+| 15.12+ | Disenar IA admin por tab | Sin codigo hasta reforzar baseline/contratos. |
+
+Que NO tocar todavia:
+
+- `AdminDashboard.tsx`, tablas admin, acciones destructivas, permisos, roles, auth, org context, `x-organization-id`, `searchParams`, endpoints/API, contratos backend, workspaces lazy, tracking, seed ni PWA.
+- En owner: no tocar `readWorkspace`, `handleWorkspaceChange`, `useOrganization`, llamadas API, verification upload/submit ni selector de negocio.
+- En customer: no tocar favorite/list mutations, inbox, booking payment, conversation reply, React Query keys ni `CustomerActivityWorkspace` en el primer slice.
+
+QA documental ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm check:encoding` | Pass: no suspicious mojibake patterns found. |
+
+Proximo paso recomendado:
+
+- Ejecutar QA documental.
+- Commit/push de Fase 15.5 si el worktree queda limitado a docs.
+- Luego iniciar Fase 15.6: diseno del primer slice owner first viewport, sin codigo todavia.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
