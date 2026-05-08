@@ -1229,6 +1229,71 @@ Proximo paso recomendado:
 - Commit/push de Fase 15.5 si el worktree queda limitado a docs.
 - Luego iniciar Fase 15.6: diseno del primer slice owner first viewport, sin codigo todavia.
 
+## Fase 15.6: diseno del slice owner first viewport
+
+Fase 15.6 definio el primer cambio seguro para el dashboard owner sin modificar archivos. El objetivo fue elegir una mejora visual pequena antes de tocar una vista protegida por `BUSINESS_OWNER`.
+
+Slice aprobado:
+
+- Vista: `/dashboard`.
+- Archivo candidato: `apps/web/src/pages/DashboardBusiness.tsx`.
+- Bloques: header principal, grid de `SummaryCard`, y seccion `Control de claim y readiness`.
+- Tipo de cambio: solo layout/clases locales para reducir ruido visual del primer viewport.
+
+No tocar:
+
+- `useSearchParams`, `readWorkspace`, `handleWorkspaceChange`, `useOrganization`, `activeOrganizationId`, API calls, response parsing, handlers, copy, rutas, workspaces lazy, selector de negocio, upload/submit de verificacion ni permisos.
+
+QA recomendado:
+
+- `pnpm --filter @aquita/web typecheck`
+- `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop|mobile) baseline"`
+
+## Fase 15.7: ajuste visual owner first viewport
+
+Fase 15.7 implemento el slice visual aprobado para `/dashboard` owner. El cambio fue local y visual-only.
+
+Archivo UI tocado:
+
+- `apps/web/src/pages/DashboardBusiness.tsx`
+
+Snapshots actualizados:
+
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-owner-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-owner-mobile.png`
+
+Cambios principales:
+
+- Header owner mas compacto y con acciones alineadas de forma mas estable en mobile/desktop.
+- Chips de contexto con menor peso visual.
+- Grid de metricas con menos separacion y menor sombra.
+- `Control del negocio` y `Documentos y sello` con menos peso de card y padding interno mas contenido.
+- Checklist rapido mas compacto y respirable, especialmente en mobile.
+- Altura total del snapshot owner se redujo sin ocultar contenido.
+
+Comportamiento preservado:
+
+- Rutas, links, CTAs, copy, handlers, estados, `searchParams`, workspace activo, selector de negocio, `OrganizationContext`, `AuthContext`, API calls, response parsing, verificacion, documentos, workspaces lazy, permisos y backend.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots: desktop/mobile cambiaron por ajuste visual. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | Primer rerun: desktop pass, mobile diff pequeno `0.01` por render; segundo rerun final pass: `2 passed`. |
+
+Notas:
+
+- No existe `apps/web/src/pages/DashboardBusiness.test.tsx`; por eso el gate focalizado fue typecheck + baseline visual con QA stack.
+- La pila QA levanto DB/Redis, migraciones, seed, build API/web y preview correctamente.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 15.7.
+- Luego iniciar Fase 15.8 solo para QA amplio/cierre owner, o pasar a Fase 15.9: diseno del slice customer saved-discovery sin tocar `CustomerActivityWorkspace`.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

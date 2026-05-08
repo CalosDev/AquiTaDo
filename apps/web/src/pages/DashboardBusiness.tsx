@@ -554,32 +554,32 @@ export function DashboardBusiness() {
             />
 
             {/* ── Page Header ───────────────────────────── */}
-            <AppCard className="app-page-header">
-                <div className="min-w-0">
+            <AppCard className="app-page-header flex-col !items-stretch !gap-4 !px-5 !py-4 lg:flex-row lg:!items-start">
+                <div className="min-w-0 lg:max-w-3xl">
                     <p className="page-kicker">Dashboard negocio</p>
                     <h1 className="app-page-header__title">
                         {selectedBusiness?.name ?? activeOrganization?.name ?? 'Mi negocio'}
                     </h1>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                         {activeWorkspaceMeta.description}
                     </p>
-                    <ActionBar className="mt-3">
+                    <ActionBar className="mt-3 gap-2">
                         {activeOrganization?.name ? (
-                            <span className="chip !bg-white !text-slate-700">
+                            <span className="chip !bg-slate-50 !text-slate-700">
                                 Organizacion: {activeOrganization.name}
                             </span>
                         ) : null}
                         {selectedBusiness ? (
-                            <span className="chip !bg-white !text-slate-700">
+                            <span className="chip !bg-slate-50 !text-slate-700">
                                 Perfil: {selectedBusiness.profileCompletenessScore ?? 0}% completo
                             </span>
                         ) : null}
-                        <span className="chip !bg-white !text-slate-700">
+                        <span className="chip !bg-slate-50 !text-slate-700">
                             {businesses.length} negocio{businesses.length !== 1 ? 's' : ''} gestionados
                         </span>
                     </ActionBar>
                 </div>
-                <ActionBar className="justify-end">
+                <ActionBar className="justify-start gap-2 lg:justify-end">
                     {selectedBusinessEditPath ? (
                         <Link to={selectedBusinessEditPath} className="btn-secondary text-xs px-4 py-2">
                             Editar perfil
@@ -603,25 +603,29 @@ export function DashboardBusiness() {
 
             {/* ═══ FILA 1: Contexto del negocio + estado rápido (§ 9.4) ═══ */}
             <section aria-label="Estado del negocio">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                     <SummaryCard
                         label="Visitas al perfil"
                         value={(totals.views ?? 0).toLocaleString('es-DO')}
                         delta="+12% vs periodo previo"
+                        className="shadow-none"
                     />
                     <SummaryCard
                         label="Contactos recibidos"
                         value={(totals.clicks ?? 0).toLocaleString('es-DO')}
                         delta={`${activeClaimRequests.length} solicitudes abiertas`}
+                        className="shadow-none"
                     />
                     <SummaryCard
                         label="Conversión"
                         value={`${totals.conversionRate ?? 0}%`}
+                        className="shadow-none"
                         delta={verificationStatus?.verified ? 'Sello activo' : 'Completar verificación'}
                     />
                     <SummaryCard
                         label="Perfiles completos"
                         value={`${completeProfiles}`}
+                        className="shadow-none"
                         delta={`${openNowCount} abiertos ahora`}
                     />
                 </div>
@@ -630,19 +634,20 @@ export function DashboardBusiness() {
             {/* Estado del negocio seleccionado (claim + verificación + salud) */}
             {selectedBusiness && activeWorkspace === 'overview' && (
                 <section aria-label="Control de claim y readiness">
-                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.8fr)]">
                         <SectionCard
                             title="Control del negocio"
                             description="Confirma si el negocio ya está vinculado a tu organización y si queda algo pendiente."
                             density="compact"
+                            className="shadow-none"
                             actions={(
                                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${businessClaimStatusClass(selectedBusiness.claimStatus)}`}>
                                     {businessClaimStatusLabel(selectedBusiness.claimStatus)}
                                 </span>
                             )}
                         >
-                            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3.5">
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Estado actual</p>
                                     <p className="mt-2 text-sm font-semibold text-slate-900">
                                         {selectedBusiness.claimStatus === 'CLAIMED'
@@ -658,9 +663,9 @@ export function DashboardBusiness() {
                                     </p>
                                 </div>
 
-                                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5">
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Checklist rapido</p>
-                                    <div className="mt-3 space-y-2">
+                                    <div className="mt-3 grid gap-2 md:grid-cols-3 lg:grid-cols-1">
                                         {[
                                             {
                                                 label: 'Negocio vinculado',
@@ -684,7 +689,7 @@ export function DashboardBusiness() {
                                                 done: (selectedBusiness.profileCompletenessScore ?? 0) >= 80,
                                             },
                                         ].map((item) => (
-                                            <div key={item.label} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                            <div key={item.label} className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                                                 <span
                                                     className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                                                         item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
@@ -703,7 +708,7 @@ export function DashboardBusiness() {
                             </div>
 
                             {selectedBusinessClaimRequests.length > 0 ? (
-                                <div className="card-list mt-4">
+                                <div className="card-list mt-3">
                                     <div className="card-list__header">
                                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Movimientos recientes</p>
                                         <p className="text-xs text-slate-500">{selectedBusinessClaimRequests.length} registro(s)</p>
@@ -735,8 +740,9 @@ export function DashboardBusiness() {
                             title="Documentos y sello"
                             description="Revisa si ya tienes base suficiente y entra a verificación solo cuando haga falta."
                             density="compact"
+                            className="shadow-none"
                             actions={(
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
                                     <Link to="/dashboard?workspace=verification" className="btn-secondary text-xs px-3 py-1.5">
                                         Abrir verificación
                                     </Link>
@@ -747,14 +753,14 @@ export function DashboardBusiness() {
                             )}
                         >
                             <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3.5">
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Documentos</p>
                                     <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{documentSummary.total}</p>
                                     <p className="mt-1 text-xs text-slate-500">
                                         {documentSummary.approved} aprobados · {documentSummary.pending} pendientes · {documentSummary.rejected} rechazados
                                     </p>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3.5">
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Perfil actual</p>
                                     <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
                                         {selectedBusiness.profileCompletenessScore ?? 0}%
@@ -767,7 +773,7 @@ export function DashboardBusiness() {
                                 </div>
                             </div>
 
-                            <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                            <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Siguiente paso sugerido</p>
                                 <p className="mt-2 text-sm font-semibold text-slate-900">
                                     {verificationStatus?.verified
