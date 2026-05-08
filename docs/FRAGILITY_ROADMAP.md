@@ -1375,6 +1375,94 @@ Proximo paso recomendado:
 - Commit/push de Fase 15.10.
 - Luego no tocar `AdminDashboard` todavia. Primero agregar baseline visual dedicado si se decide avanzar con la consola admin.
 
+## Fase 16.2: ajuste visual del hero de Home
+
+Fase 16.2 aplico un ajuste visual controlado al hero de Home para que la pantalla se sienta mas producto de discovery y menos landing cargada. El cambio fue visual-only.
+
+Archivo UI tocado:
+
+- `apps/web/src/pages/Home.tsx`
+
+Archivo de QA visual tocado:
+
+- `playwright/specs/visual.spec.ts`
+
+Snapshots actualizados:
+
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Cambios principales:
+
+- Buscador reposicionado como accion central del hero.
+- CTAs ubicados debajo del buscador con menor competencia visual.
+- Chips decorativos con menor peso.
+- Radar lateral mas compacto y menos dominante.
+- Baseline desktop estabilizado usando captura `fullPage`, consistente con Home mobile.
+
+Comportamiento preservado:
+
+- Busqueda, rutas, tracking, handlers, API, datos, copy, auth, `searchParams`, backend y estilos globales.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+
+Estado:
+
+- Commit/push realizado en `f5eb31f style: refine home hero visual hierarchy`.
+
+## Fase 16.3: ajuste visual de Explora por intencion
+
+Fase 16.3 aplico un segundo slice visual pequeno sobre Home, limitado a la seccion `Explora por intencion`. El objetivo fue reducir la sensacion de cards anidadas y hacer mas escaneables las rutas de discovery.
+
+Archivo UI tocado:
+
+- `apps/web/src/pages/Home.tsx`
+
+Snapshots actualizados:
+
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Cambios principales:
+
+- Contenedor de la seccion menos pesado que `section-shell`.
+- Grid con spacing mas compacto.
+- Cards de intencion mas livianas, sin `panel-premium`.
+- Etiqueta repetida `Intencion` con menor peso visual.
+- Altura de cards reducida sin cambiar contenido.
+
+Comportamiento preservado:
+
+- Links, rutas, tracking `SEARCH_QUERY`, metadata, copy, busqueda, API, datos, hooks, auth, backend y estilos globales.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | No ejecutado por infraestructura local: Docker Desktop no estaba disponible. |
+| `pnpm --filter @aquita/web build` | Pass. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` con `PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173` | Diff esperado antes de actualizar snapshots. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline" --update-snapshots` con `PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173` | Pass: `2 passed`; snapshots actualizados. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` con `PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173` | Pass final: `2 passed`. |
+
+Notas:
+
+- El fallback visual uso Vite preview local y mocks deterministas del spec; no hizo requests reales a API.
+- Warning no bloqueante: Docker API no disponible en `npipe:////./pipe/dockerDesktopLinuxEngine`.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 16.3.
+- Si se continua con Home, disenar primero el siguiente slice. Candidato seguro: estados vacios/dinamicos de `Ranking de reputacion` y `Negocios recientes`, sin tocar API ni carga de datos.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
