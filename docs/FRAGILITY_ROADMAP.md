@@ -1111,6 +1111,62 @@ Proximo paso recomendado:
   - customer dashboard despues por menor riesgo.
   - admin dashboard al final, con baseline dedicado y contratos mas fuertes.
 
+## Fase 15.3: diagnostico IA/visual de dashboards por rol
+
+Fase 15.3 reviso los dashboards de los tres roles sin modificar archivos. El objetivo fue separar el problema visual de fondo antes de seguir aplicando cambios de UI.
+
+Hallazgos:
+
+- El problema principal no es solo color o componentes; es arquitectura de informacion.
+- `DashboardBusiness` muestra demasiadas prioridades juntas: negocio activo, metricas, claim, verificacion, documentos, selector, tabs y siguientes pasos.
+- `CustomerDashboard` combina favoritos, listas, reservas, check-ins e inbox en una vista larga; aun necesitaba baseline visual antes de tocar UI.
+- `AdminDashboard` sigue siendo el mas riesgoso por tabs, permisos, contratos, tablas y acciones administrativas sensibles.
+- Los dashboards deben migrar desde "todo visible" hacia "que hago ahora" por rol.
+
+Principio de producto:
+
+- Cliente: descubrir, guardar, comparar y volver a negocios.
+- Owner: operar negocio, completar perfil, resolver claim/verificacion y atender clientes.
+- Admin: revisar cola, resolver riesgo, mantener catalogo sano y observar sistema.
+
+No tocar todavia:
+
+- `AdminDashboard.tsx`, permisos, auth, `searchParams`, org context, `x-organization-id`, endpoints/API, tablas admin, acciones destructivas ni workspaces lazy.
+
+## Fase 15.4: baseline visual de CustomerDashboard
+
+Fase 15.4 agrego baseline visual determinista para `/app/customer` en desktop y mobile. El alcance fue solo test visual; no se modifico producto, UI runtime, rutas, auth real, backend, API real ni seed.
+
+| Item | Resultado |
+| --- | --- |
+| Archivo modificado | `playwright/specs/visual.spec.ts` |
+| Snapshots creados | `playwright/specs/__snapshots__/visual.spec.ts/dashboard-customer-desktop.png`, `playwright/specs/__snapshots__/visual.spec.ts/dashboard-customer-mobile.png` |
+| Viewports | Desktop `1440 x 1200`; mobile `390 x 844` |
+| Ruta | `/app/customer` |
+| Sesion | Sesion visual local con token no vencido y usuario `USER`; sin login real ni seed. |
+| Mocking determinista | `GET /api/users/me`, `GET /api/favorites/businesses/my`, `GET /api/favorites/lists/my`, `GET /api/bookings/me`, `GET /api/checkins/my`, `GET /api/messaging/conversations/me` y `GET /api/messaging/conversations/me/:id`. |
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots creados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline"` | Pass final: `2 passed` con baseline estable. |
+
+No se toco:
+
+- `CustomerDashboard.tsx`, `CustomerActivityWorkspace.tsx`, `Router.tsx`, `AuthContext`, `api/client.ts`, `endpoints.ts`, backend, permisos, rutas, copy, estilos runtime, handlers, API real ni seed.
+
+Hallazgo visual pendiente:
+
+- Mobile queda muy largo y evidencia que el panel cliente tambien necesita priorizacion: primero continuidad de busqueda/favoritos, luego listas, y despues actividad profunda.
+- La vista mezcla herramientas de decision (`favoritos/listas`) con historial operativo (`reservas/check-ins/inbox`) sin una jerarquia de producto clara.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 15.4 antes de tocar UI.
+- Luego disenar una fase documental de arquitectura de informacion de dashboards por rol, con owner como primer candidato de redisenio controlado.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

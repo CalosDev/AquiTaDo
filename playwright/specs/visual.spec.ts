@@ -449,6 +449,240 @@ const VISUAL_OWNER_DOCUMENTS = [
     },
 ] as const;
 
+const VISUAL_CUSTOMER_USER = {
+    id: 'user-customer-visual',
+    name: 'Carla Visual',
+    email: 'carla.visual@aquita.do',
+    phone: '+1 809-555-0140',
+    avatarUrl: null,
+    role: 'USER',
+    createdAt: '2025-06-10T12:00:00.000Z',
+    updatedAt: '2026-04-20T12:00:00.000Z',
+} as const;
+
+const VISUAL_CUSTOMER_FAVORITES = [
+    {
+        businessId: 'biz-customer-cafe',
+        createdAt: '2026-04-14T10:00:00.000Z',
+        business: {
+            id: 'biz-customer-cafe',
+            name: 'Cafe AquiTa Cliente',
+            slug: 'cafe-aquita-cliente',
+            address: 'Av. Lincoln 45',
+            province: {
+                id: 'prov-dn',
+                name: 'Distrito Nacional',
+                slug: 'distrito-nacional',
+            },
+        },
+    },
+    {
+        businessId: 'biz-customer-spa',
+        createdAt: '2026-04-16T15:30:00.000Z',
+        business: {
+            id: 'biz-customer-spa',
+            name: 'Spa Norte Visual',
+            slug: 'spa-norte-visual',
+            address: 'Calle Sol 12',
+            province: {
+                id: 'prov-santiago',
+                name: 'Santiago',
+                slug: 'santiago',
+            },
+        },
+    },
+] as const;
+
+const VISUAL_CUSTOMER_LISTS = [
+    {
+        id: 'list-customer-1',
+        name: 'Opciones para brunch',
+        slug: 'opciones-para-brunch',
+        description: 'Lugares guardados para comparar este fin de semana.',
+        _count: { items: 2 },
+        items: [
+            {
+                businessId: 'biz-customer-cafe',
+                addedAt: '2026-04-14T10:05:00.000Z',
+                business: {
+                    id: 'biz-customer-cafe',
+                    name: 'Cafe AquiTa Cliente',
+                    slug: 'cafe-aquita-cliente',
+                },
+            },
+            {
+                businessId: 'biz-customer-market',
+                addedAt: '2026-04-15T10:05:00.000Z',
+                business: {
+                    id: 'biz-customer-market',
+                    name: 'Market Local Visual',
+                    slug: 'market-local-visual',
+                },
+            },
+        ],
+    },
+] as const;
+
+const VISUAL_CUSTOMER_BOOKINGS = {
+    data: [
+        {
+            id: 'booking-customer-1',
+            status: 'CONFIRMED',
+            scheduledFor: '2026-04-24T18:30:00.000Z',
+            partySize: 2,
+            notes: null,
+            quotedAmount: '1800',
+            depositAmount: '500',
+            currency: 'DOP',
+            createdAt: '2026-04-18T12:00:00.000Z',
+            business: {
+                id: 'biz-customer-cafe',
+                name: 'Cafe AquiTa Cliente',
+                slug: 'cafe-aquita-cliente',
+                verified: true,
+            },
+            promotion: {
+                id: 'promo-customer-1',
+                title: 'Brunch visual',
+                couponCode: 'VISUAL10',
+            },
+            transactions: [],
+        },
+        {
+            id: 'booking-customer-2',
+            status: 'COMPLETED',
+            scheduledFor: '2026-04-12T16:00:00.000Z',
+            partySize: 1,
+            notes: null,
+            quotedAmount: null,
+            depositAmount: null,
+            currency: 'DOP',
+            createdAt: '2026-04-10T12:00:00.000Z',
+            business: {
+                id: 'biz-customer-spa',
+                name: 'Spa Norte Visual',
+                slug: 'spa-norte-visual',
+                verified: true,
+            },
+            promotion: null,
+            transactions: [],
+        },
+    ],
+    total: 2,
+    page: 1,
+    limit: 6,
+    totalPages: 1,
+} as const;
+
+const VISUAL_CUSTOMER_CHECKINS = {
+    data: [
+        {
+            id: 'checkin-customer-1',
+            createdAt: '2026-04-18T09:30:00.000Z',
+            verifiedLocation: true,
+            pointsAwarded: 25,
+            streakApplied: 3,
+            distanceMeters: 42,
+            business: {
+                id: 'biz-customer-cafe',
+                name: 'Cafe AquiTa Cliente',
+                slug: 'cafe-aquita-cliente',
+                address: 'Av. Lincoln 45',
+                province: {
+                    id: 'prov-dn',
+                    name: 'Distrito Nacional',
+                    slug: 'distrito-nacional',
+                },
+                city: {
+                    id: 'city-sdq',
+                    name: 'Santo Domingo',
+                },
+            },
+        },
+    ],
+    total: 1,
+    page: 1,
+    limit: 6,
+    totalPages: 1,
+    summary: {
+        loyaltyPoints: 320,
+        checkinCount: 9,
+        checkinStreak: 3,
+        lastCheckinAt: '2026-04-18T09:30:00.000Z',
+        loyaltyTier: 'EXPLORADOR',
+    },
+} as const;
+
+const VISUAL_CUSTOMER_CONVERSATIONS = {
+    data: [
+        {
+            id: 'conversation-customer-1',
+            subject: 'Consulta sobre horario',
+            status: 'OPEN',
+            lastMessageAt: '2026-04-19T13:20:00.000Z',
+            business: {
+                id: 'biz-customer-cafe',
+                name: 'Cafe AquiTa Cliente',
+                slug: 'cafe-aquita-cliente',
+                verified: true,
+            },
+            customerUser: {
+                id: VISUAL_CUSTOMER_USER.id,
+                name: VISUAL_CUSTOMER_USER.name,
+                email: VISUAL_CUSTOMER_USER.email,
+            },
+            convertedBooking: null,
+            messages: [],
+            _count: {
+                messages: 3,
+            },
+        },
+    ],
+    total: 1,
+    page: 1,
+    limit: 8,
+    totalPages: 1,
+} as const;
+
+const VISUAL_CUSTOMER_CONVERSATION_THREAD = {
+    id: 'conversation-customer-1',
+    subject: 'Consulta sobre horario',
+    status: 'OPEN',
+    lastMessageAt: '2026-04-19T13:20:00.000Z',
+    business: {
+        id: 'biz-customer-cafe',
+        name: 'Cafe AquiTa Cliente',
+        slug: 'cafe-aquita-cliente',
+        verified: true,
+    },
+    customerUser: {
+        id: VISUAL_CUSTOMER_USER.id,
+        name: VISUAL_CUSTOMER_USER.name,
+        email: VISUAL_CUSTOMER_USER.email,
+    },
+    convertedBooking: null,
+    messages: [
+        {
+            id: 'message-customer-1',
+            content: 'Hola, queria confirmar si tienen disponibilidad temprano.',
+            senderRole: 'CUSTOMER',
+            createdAt: '2026-04-19T13:00:00.000Z',
+            senderUser: {
+                id: VISUAL_CUSTOMER_USER.id,
+                name: VISUAL_CUSTOMER_USER.name,
+                email: VISUAL_CUSTOMER_USER.email,
+            },
+        },
+        {
+            id: 'message-customer-2',
+            content: 'Si, tenemos espacio a partir de las 8:30 a. m.',
+            senderRole: 'BUSINESS_STAFF',
+            createdAt: '2026-04-19T13:20:00.000Z',
+            senderUser: null,
+        },
+    ],
+} as const;
+
 async function forceImmediateIntersections(page: Page): Promise<void> {
     await page.addInitScript(() => {
         class ImmediateIntersectionObserver {
@@ -739,6 +973,63 @@ async function mockOwnerDashboardVisualApi(page: Page): Promise<void> {
     });
 }
 
+async function seedCustomerDashboardVisualSession(page: Page): Promise<void> {
+    await page.addInitScript(
+        ({ token, user }) => {
+            sessionStorage.setItem('accessToken', token);
+            localStorage.setItem('aquita_has_session', '1');
+            localStorage.setItem('user', JSON.stringify(user));
+            localStorage.removeItem('activeOrganizationId');
+        },
+        {
+            token: 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.customer',
+            user: VISUAL_CUSTOMER_USER,
+        },
+    );
+}
+
+async function mockCustomerDashboardVisualApi(page: Page): Promise<void> {
+    await page.route('**/api/users/me', async (route) => {
+        await route.fulfill(json(VISUAL_CUSTOMER_USER));
+    });
+
+    await page.route(/\/api\/favorites\/businesses\/my(?:\?.*)?$/, async (route) => {
+        await route.fulfill(json({
+            data: VISUAL_CUSTOMER_FAVORITES,
+            total: VISUAL_CUSTOMER_FAVORITES.length,
+            page: 1,
+            limit: 8,
+            totalPages: 1,
+        }));
+    });
+
+    await page.route(/\/api\/favorites\/lists\/my(?:\?.*)?$/, async (route) => {
+        await route.fulfill(json({
+            data: VISUAL_CUSTOMER_LISTS,
+            total: VISUAL_CUSTOMER_LISTS.length,
+            page: 1,
+            limit: 8,
+            totalPages: 1,
+        }));
+    });
+
+    await page.route(/\/api\/bookings\/me(?:\?.*)?$/, async (route) => {
+        await route.fulfill(json(VISUAL_CUSTOMER_BOOKINGS));
+    });
+
+    await page.route(/\/api\/checkins\/my(?:\?.*)?$/, async (route) => {
+        await route.fulfill(json(VISUAL_CUSTOMER_CHECKINS));
+    });
+
+    await page.route(/\/api\/messaging\/conversations\/me(?:\?.*)?$/, async (route) => {
+        await route.fulfill(json(VISUAL_CUSTOMER_CONVERSATIONS));
+    });
+
+    await page.route(`**/api/messaging/conversations/me/${VISUAL_CUSTOMER_CONVERSATION_THREAD.id}`, async (route) => {
+        await route.fulfill(json(VISUAL_CUSTOMER_CONVERSATION_THREAD));
+    });
+}
+
 test.describe('Visual baselines @visual', () => {
     test('home desktop baseline @visual', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 1400 });
@@ -840,6 +1131,36 @@ test.describe('Visual baselines @visual', () => {
         await expect(page.getByText(/Control del negocio/i)).toBeVisible();
         await page.waitForTimeout(250);
         await expect(page).toHaveScreenshot('dashboard-owner-mobile.png', { fullPage: true });
+    });
+
+    test('customer dashboard desktop baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 1200 });
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await seedCustomerDashboardVisualSession(page);
+        await mockCustomerDashboardVisualApi(page);
+        await page.goto('/app/customer', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /^Hola, Carla$/i })).toBeVisible();
+        await expect(page.getByText(/Tus favoritos/i)).toBeVisible();
+        await expect(page.getByText(/Reservas, check-ins e inbox/i)).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('dashboard-customer-desktop.png', { fullPage: true });
+    });
+
+    test('customer dashboard mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await seedCustomerDashboardVisualSession(page);
+        await mockCustomerDashboardVisualApi(page);
+        await page.goto('/app/customer', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /^Hola, Carla$/i })).toBeVisible();
+        await expect(page.getByText(/Favoritos guardados/i)).toBeVisible();
+        await expect(page.getByText(/Reservas, check-ins e inbox/i)).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('dashboard-customer-mobile.png', { fullPage: true });
     });
 
     test('profile desktop baseline @visual', async ({ page }) => {
