@@ -1294,6 +1294,87 @@ Proximo paso recomendado:
 - Commit/push de Fase 15.7.
 - Luego iniciar Fase 15.8 solo para QA amplio/cierre owner, o pasar a Fase 15.9: diseno del slice customer saved-discovery sin tocar `CustomerActivityWorkspace`.
 
+## Fase 15.8: QA amplio de cierre owner
+
+Fase 15.8 cerro el slice visual owner sin modificar archivos. El objetivo fue confirmar que el ajuste de Fase 15.7 no introdujo regresiones antes de pasar al dashboard customer.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+
+Estado:
+
+- No se hicieron cambios adicionales sobre `DashboardBusiness.tsx`.
+- El bloque owner quedo listo para commit/push antes de abrir el slice customer.
+
+## Fase 15.9: diseno del slice customer first viewport
+
+Fase 15.9 definio el primer cambio seguro para el dashboard customer sin modificar archivos. El objetivo fue reducir ruido visual en `/app/customer` manteniendo intacta la zona profunda de actividad.
+
+Slice aprobado:
+
+- Vista: `/app/customer`.
+- Archivo candidato: `apps/web/src/pages/CustomerDashboard.tsx`.
+- Bloques: header principal, CTAs, metricas, `Tus favoritos` y `Tus listas`.
+- Tipo de cambio: solo layout/clases locales para reducir cards apiladas y compactar el primer viewport.
+
+No tocar:
+
+- `CustomerActivityWorkspace.tsx`, React Query keys, `favoritesApi`, favorite/list mutations, inbox, bookings, check-ins, payments, rutas, auth, API, backend, copy, estilos globales ni snapshots fuera del baseline customer.
+
+QA recomendado:
+
+- `pnpm --filter @aquita/web typecheck`
+- `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop|mobile) baseline"`
+
+## Fase 15.10: ajuste visual customer first viewport
+
+Fase 15.10 implemento el slice visual aprobado para `/app/customer`. El cambio fue local y visual-only.
+
+Archivo UI tocado:
+
+- `apps/web/src/pages/CustomerDashboard.tsx`
+
+Snapshots actualizados:
+
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-customer-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-customer-mobile.png`
+
+Cambios principales:
+
+- Header customer mas compacto con menos padding y sin sombra adicional.
+- CTAs del top section con spacing mas contenido.
+- Metricas iniciales con menor separacion y menor peso de sombra.
+- Cards de favoritos y listas mas compactas, con radios y padding reducidos.
+- Skeletons de carga alineados al nuevo peso visual.
+- Altura total del snapshot customer se redujo sin ocultar contenido.
+
+Comportamiento preservado:
+
+- Rutas, links, CTAs, copy, handlers, estados, React Query, favorite/list mutations, inbox, bookings, check-ins, payments, `CustomerActivityWorkspace`, auth, API, backend y estilos globales.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots: desktop/mobile cambiaron por ajuste visual. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+
+Notas:
+
+- La pila QA levanto DB/Redis, migraciones, seed, build API/web y preview correctamente.
+- `git diff --check` solo reporto el warning conocido LF/CRLF en `CustomerDashboard.tsx`; no bloqueante.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 15.10.
+- Luego no tocar `AdminDashboard` todavia. Primero agregar baseline visual dedicado si se decide avanzar con la consola admin.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

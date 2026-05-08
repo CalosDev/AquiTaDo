@@ -67,7 +67,7 @@ function FavoriteRow({
     onRemove: () => Promise<void>;
 }) {
     return (
-        <div className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-sm shadow-slate-900/5">
+        <div className="rounded-[20px] border border-slate-200/80 bg-white px-3.5 py-3.5 shadow-none">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{favorite.business.name}</p>
@@ -88,7 +88,7 @@ function FavoriteRow({
                 </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
                 <Link to={`/businesses/${favorite.business.slug}`} className="text-sm font-semibold text-primary-700 hover:text-primary-800">
                     Ver negocio
                 </Link>
@@ -111,7 +111,7 @@ function ListRow({
     const itemCount = list._count?.items ?? list.items.length;
 
     return (
-        <div className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-sm shadow-slate-900/5">
+        <div className="rounded-[20px] border border-slate-200/80 bg-white px-3.5 py-3.5 shadow-none">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -134,11 +134,11 @@ function ListRow({
             </div>
 
             {list.items.length > 0 ? (
-                <div className="mt-4 space-y-2">
+                <div className="mt-3 space-y-2">
                     {list.items.slice(0, 3).map((item) => (
                         <div
                             key={item.businessId}
-                            className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-slate-200/70 bg-slate-50 px-3 py-3"
+                            className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-200/70 bg-slate-50 px-3 py-2.5"
                         >
                             <div className="min-w-0">
                                 <Link
@@ -254,7 +254,7 @@ export function CustomerDashboard() {
     };
 
     return (
-        <PageShell width="wide" className="py-10 animate-fade-in">
+        <PageShell width="wide" className="py-8 md:py-10 animate-fade-in">
             <PageFeedbackStack
                 items={[
                     { id: 'customer-dashboard-error', tone: 'danger', text: error },
@@ -263,14 +263,14 @@ export function CustomerDashboard() {
                 ]}
             />
 
-            <AppCard className="space-y-5">
+            <AppCard className="space-y-4 !px-5 !py-5 shadow-none">
                 <PageIntroCompact
                     eyebrow="Panel cliente"
                     title={`Hola, ${firstName}`}
                     description="Guarda negocios, arma listas por zona y vuelve rapido a los perfiles que quieres comparar con calma."
                 />
 
-                <ActionBar>
+                <ActionBar className="gap-2">
                     <Link className="btn-primary" to="/businesses">
                         Explorar negocios
                     </Link>
@@ -282,27 +282,30 @@ export function CustomerDashboard() {
                 {loading ? (
                     <LoadingState label="Cargando tu panel..." />
                 ) : (
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
                         <MetricCard
                             label="Favoritos guardados"
                             value={favorites.length}
                             delta={favorites.length > 0 ? 'Negocios que quieres revisar despues' : 'Empieza guardando tus lugares clave'}
+                            className="shadow-none"
                         />
                         <MetricCard
                             label="Listas activas"
                             value={lists.length}
                             delta={lists.length > 0 ? 'Colecciones listas para comparar opciones' : 'Crea una lista para ordenar tu busqueda'}
+                            className="shadow-none"
                         />
                     </div>
                 )}
             </AppCard>
 
             <SplitPanelLayout
+                className="gap-3"
                 primary={loading ? (
-                    <AppCard title="Tus favoritos" description="Una vista corta de los negocios que quieres revisar, comparar o retomar mas tarde.">
-                        <div className="space-y-3">
+                    <AppCard title="Tus favoritos" description="Una vista corta de los negocios que quieres revisar, comparar o retomar mas tarde." className="shadow-none">
+                        <div className="space-y-2.5">
                             {Array.from({ length: 3 }).map((_, index) => (
-                                <div key={index} className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-sm shadow-slate-900/5">
+                                <div key={index} className="rounded-[20px] border border-slate-200/80 bg-white px-3.5 py-3.5 shadow-none">
                                     <div className="h-4 w-40 rounded-full bg-slate-100 animate-pulse" />
                                     <div className="mt-3 h-3 w-28 rounded-full bg-slate-100 animate-pulse" />
                                     <div className="mt-4 h-10 rounded-2xl bg-slate-50 animate-pulse" />
@@ -314,6 +317,7 @@ export function CustomerDashboard() {
                     <AppCard
                         title="Tus favoritos"
                         description="Una vista corta de los negocios que quieres revisar, comparar o retomar mas tarde."
+                        className="shadow-none"
                         actions={(
                             <Link to="/businesses" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
                                 Ver directorio
@@ -331,7 +335,7 @@ export function CustomerDashboard() {
                                 )}
                             />
                         ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                                 {favorites.map((favorite) => (
                                     <FavoriteRow
                                         key={favorite.businessId}
@@ -345,10 +349,10 @@ export function CustomerDashboard() {
                     </AppCard>
                 )}
                 secondary={loading ? (
-                    <AppCard title="Tus listas" description="Agrupa opciones por zona, plan o tipo de negocio para decidir mejor.">
-                        <div className="space-y-3">
+                    <AppCard title="Tus listas" description="Agrupa opciones por zona, plan o tipo de negocio para decidir mejor." className="shadow-none">
+                        <div className="space-y-2.5">
                             {Array.from({ length: 2 }).map((_, index) => (
-                                <div key={index} className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-sm shadow-slate-900/5">
+                                <div key={index} className="rounded-[20px] border border-slate-200/80 bg-white px-3.5 py-3.5 shadow-none">
                                     <div className="h-4 w-32 rounded-full bg-slate-100 animate-pulse" />
                                     <div className="mt-3 h-3 w-24 rounded-full bg-slate-100 animate-pulse" />
                                     <div className="mt-4 h-20 rounded-2xl bg-slate-50 animate-pulse" />
@@ -360,6 +364,7 @@ export function CustomerDashboard() {
                     <AppCard
                         title="Tus listas"
                         description="Agrupa opciones por zona, plan o tipo de negocio para decidir mejor."
+                        className="shadow-none"
                         actions={<span className="chip">{lists.length} activas</span>}
                     >
                         {lists.length === 0 ? (
@@ -373,7 +378,7 @@ export function CustomerDashboard() {
                                 )}
                             />
                         ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                                 {lists.map((list) => (
                                     <ListRow
                                         key={list.id}
