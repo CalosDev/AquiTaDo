@@ -32,8 +32,9 @@ import {
     AppCard,
     DataTableWrapper,
     EmptyState,
-    KPIHeader,
     PageShell,
+    SectionHeader,
+    SummaryCard,
 } from '../components/ui';
 import { useTimedMessage } from '../hooks/useTimedMessage';
 
@@ -1564,34 +1565,57 @@ export function AdminDashboard() {
     ] as const;
 
     return (
-        <PageShell className="app-page-inner animate-fade-in space-y-6" width="full">
+        <PageShell className="app-page-inner animate-fade-in" width="full">
             <PageFeedbackStack
                 items={[
                     { id: 'admin-dashboard-error', tone: 'danger', text: errorMessage },
                     { id: 'admin-dashboard-success', tone: 'info', text: successMessage },
                 ]}
             />
-            
-            <KPIHeader
-                eyebrow="Panel admin"
-                title="Control de plataforma"
-                description={activeTabMeta.description}
-                metrics={[
-                    { label: 'Total negocios', value: businessStatusSummary.total, delta: 'Inventario visible' },
-                    { label: 'Verificados', value: businessStatusSummary.verified, delta: 'Listos para operar' },
-                    { label: 'Pendientes de revision', value: businessStatusSummary.pending, delta: 'En cola o con observaciones' },
-                    { label: 'Categorias', value: categories.length, delta: 'Taxonomia activa' },
-                ]}
-            />
 
-            <div className="workspace-strip border border-slate-200 bg-white/88 p-2 shadow-sm shadow-slate-900/5">
+            <div className="space-y-4">
+                <SectionHeader
+                    eyebrow="Panel admin"
+                    title="Control de plataforma"
+                    description={activeTabMeta.description}
+                    className="page-intro-compact"
+                />
+                <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">
+                    <SummaryCard
+                        label="Total negocios"
+                        value={businessStatusSummary.total}
+                        delta="Inventario visible"
+                        className="min-h-[104px]"
+                    />
+                    <SummaryCard
+                        label="Verificados"
+                        value={businessStatusSummary.verified}
+                        delta="Listos para operar"
+                        className="min-h-[104px]"
+                    />
+                    <SummaryCard
+                        label="Pendientes de revision"
+                        value={businessStatusSummary.pending}
+                        delta="En cola o con observaciones"
+                        className="min-h-[104px]"
+                    />
+                    <SummaryCard
+                        label="Categorias"
+                        value={categories.length}
+                        delta="Taxonomia activa"
+                        className="min-h-[104px]"
+                    />
+                </div>
+            </div>
+
+            <div className="workspace-strip flex-nowrap overflow-x-auto border border-slate-200 bg-white/88 p-1.5 shadow-sm shadow-slate-900/5 md:flex-wrap md:p-2">
                 {tabs.map((tab) => (
                     <button
                         type="button"
                         key={tab.key}
                         onClick={() => handleActiveTabChange(tab.key)}
                         aria-current={activeTab === tab.key ? 'page' : undefined}
-                        className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-medium transition-all ${
+                        className={`inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition-all sm:px-5 sm:py-2.5 ${
                             activeTab === tab.key
                                 ? 'bg-primary-700 text-white shadow-sm shadow-primary-700/30'
                                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'

@@ -1664,6 +1664,57 @@ Proximo paso recomendado:
 
 - Fase 17.2 solo diseno/auditoria visual de AdminDashboard desktop/mobile, enfocada en primer viewport, densidad de informacion, tabs y jerarquia. No tocar UI admin todavia.
 
+## Fase 17.3: ajuste visual del primer viewport de AdminDashboard
+
+Fase 17.3 aplico un slice visual minimo sobre el primer viewport de `AdminDashboard`. El objetivo fue reducir densidad inicial y hacer mas legibles las metricas y tabs sin tocar contratos, permisos, acciones ni carga de datos.
+
+Archivos tocados:
+
+- `apps/web/src/pages/AdminDashboard.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/admin-dashboard-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/admin-dashboard-mobile.png`
+
+Cambios principales:
+
+- Reemplazo del header KPI pesado por un bloque local con `SectionHeader` y `SummaryCard`.
+- Metricas admin en 2 columnas mobile y 4 columnas desktop.
+- `PageShell` sin spacing duplicado del primer viewport.
+- Tabs admin con wrapper mas compacto y scroll horizontal controlado en mobile.
+
+Comportamiento preservado:
+
+- No se tocaron handlers, `useEffect`, `searchParams`, comportamiento de tabs, filtros, tablas internas, acciones admin, API, `endpoints.ts`, auth, roles, permisos, backend, DTOs, controllers ni seed.
+- No se cambiaron rutas ni contratos.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard.*baseline"` | Diff visual esperado antes de actualizar snapshots |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard.*baseline" --update-snapshots` | 2 passed |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard.*baseline"` | 2 passed |
+| `pnpm qa:smoke` | Pass |
+
+Resultado:
+
+- Desktop queda mas sobrio en el primer viewport.
+- Mobile reduce la altura inicial y muestra antes el contenido operativo.
+- Snapshots actualizados para desktop y mobile.
+
+Warnings no bloqueantes:
+
+- `Geoapify geocoding failed (HTTP 503)` durante unit tests.
+
+Riesgos pendientes:
+
+- La tabla admin en mobile sigue dependiendo de scroll horizontal y necesita una fase dedicada.
+- No tocar acciones destructivas, permisos, contratos, lazy workspaces ni response shapes dentro de ajustes visuales.
+
+Proximo paso recomendado:
+
+- Fase 17.4 solo diseno para la tabla/listado admin mobile o, alternativamente, cierre documental/commit de Fase 17.3 antes de tocar otro bloque.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
