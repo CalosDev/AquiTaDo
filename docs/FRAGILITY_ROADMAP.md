@@ -1715,6 +1715,58 @@ Proximo paso recomendado:
 
 - Fase 17.4 solo diseno para la tabla/listado admin mobile o, alternativamente, cierre documental/commit de Fase 17.3 antes de tocar otro bloque.
 
+## Fase 17.5: ajuste visual del listado admin
+
+Fase 17.5 aplico un slice visual minimo sobre el listado de negocios del `AdminDashboard`. El objetivo fue bajar la sensacion de tabla tecnica en el primer bloque operativo, agrupar filtros y hacer mas clara la superficie de scroll sin tocar acciones, permisos, contratos ni carga de datos.
+
+Archivos tocados:
+
+- `apps/web/src/pages/AdminDashboard.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/admin-dashboard-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/admin-dashboard-mobile.png`
+
+Bloques tocados:
+
+- Wrapper visual de filtros del tab de negocios.
+- Input de busqueda y selector de estado solo a nivel de clases locales.
+- Chips de estado para mantener wrap limpio en mobile.
+- Wrapper de scroll de la tabla y estilos del header.
+- Boton secundario de actualizar conservando handler y jerarquia local.
+
+Comportamiento preservado:
+
+- Handlers, `useEffect`, `searchParams`, comportamiento de tabs, filtros reales, columnas de tabla, contenido de filas, acciones admin, `InlineDangerConfirm`, API, `endpoints.ts`, auth, roles, permisos, backend, DTOs, controllers y seed.
+- No se cambiaron rutas, contratos, response shapes ni datos.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard.*baseline"` | Diff visual esperado antes de actualizar snapshots |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard.*baseline" --update-snapshots` | 2 passed |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard.*baseline"` | 2 passed |
+| `pnpm qa:smoke` | Pass |
+
+Resultado:
+
+- Los filtros quedan agrupados en una banda mas clara.
+- La tabla queda contenida en una superficie de scroll mas evidente.
+- Mobile conserva el contenido operativo sin cortar chips ni cambiar acciones.
+
+Warnings no bloqueantes:
+
+- `Geoapify geocoding failed (HTTP 503)` durante unit tests.
+
+Riesgos pendientes:
+
+- El listado admin sigue dependiendo de tabla con scroll horizontal; un rediseño real a cards responsive o vista compacta requiere fase dedicada.
+- No tocar acciones destructivas, permisos, roles, contratos, response shapes, filtros reales ni backend dentro de ajustes visuales.
+
+Proximo paso recomendado:
+
+- Antes de seguir puliendo dashboard, hacer una auditoria read-only de duplicacion y exceso de informacion en los dashboards de los tres roles. No redisenar mas pantallas complejas sin baseline y contrato de datos claro.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

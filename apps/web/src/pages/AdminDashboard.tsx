@@ -1646,7 +1646,7 @@ export function AdminDashboard() {
                             actions={(
                                 <button
                                     type="button"
-                                    className="btn-secondary text-xs w-fit"
+                                    className="btn-secondary w-fit text-xs"
                                     onClick={() => void loadData()}
                                     disabled={loading}
                                 >
@@ -1654,14 +1654,14 @@ export function AdminDashboard() {
                                 </button>
                             )}
                         >
-                            <div className="border-b border-gray-100 pb-4">
+                            <div className="border-y border-slate-100 bg-slate-50/70 px-4 py-4 md:px-5">
                                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                         <input
                                             type="text"
                                             value={businessSearch}
                                             onChange={(event) => setBusinessSearch(event.target.value)}
-                                            className="input-field text-sm sm:w-80"
+                                            className="input-field w-full text-sm sm:w-80"
                                             placeholder="Buscar por negocio, propietario, organización o provincia"
                                         />
                                         <select
@@ -1671,7 +1671,7 @@ export function AdminDashboard() {
                                                     event.target.value as 'ALL' | 'VERIFIED' | 'PENDING' | 'SUSPENDED' | 'REJECTED',
                                                 )
                                             }
-                                            className="input-field text-sm sm:w-52"
+                                            className="input-field w-full text-sm sm:w-52"
                                         >
                                             <option value="ALL">Todos los estados</option>
                                             <option value="VERIFIED">Verificados</option>
@@ -1684,44 +1684,44 @@ export function AdminDashboard() {
                                 </div>
 
                                 <div className="mt-3 flex flex-wrap gap-2">
-                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                                         Total {businessStatusSummary.total}
                                     </span>
-                                    <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700">
+                                    <span className="shrink-0 rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700">
                                         Verificados {businessStatusSummary.verified}
                                     </span>
-                                    <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">
+                                    <span className="shrink-0 rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">
                                         Pendientes {businessStatusSummary.pending}
                                     </span>
-                                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
                                         Suspendidos {businessStatusSummary.suspended}
                                     </span>
-                                    <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
+                                    <span className="shrink-0 rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
                                         Rechazados {businessStatusSummary.rejected}
                                     </span>
                                 </div>
                             </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-gray-50 border-b">
+                            <div className="overflow-x-auto rounded-[22px] border border-slate-200 bg-white shadow-inner shadow-slate-900/[0.03]">
+                                <table className="min-w-[860px] w-full">
+                                    <thead className="border-b border-slate-200 bg-slate-50/90">
                                         <tr>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                            <th className="p-4 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                 Negocio
                                             </th>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                            <th className="p-4 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                 Propietario
                                             </th>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                            <th className="p-4 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                 Organizacion
                                             </th>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                            <th className="p-4 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                 Estado
                                             </th>
-                                            <th className="text-left text-xs font-semibold text-gray-500 uppercase p-4">
+                                            <th className="p-4 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                 Fecha
                                             </th>
-                                            <th className="text-right text-xs font-semibold text-gray-500 uppercase p-4">
+                                            <th className="p-4 text-right text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                 Acciones
                                             </th>
                                         </tr>
