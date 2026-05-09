@@ -1463,6 +1463,161 @@ Proximo paso recomendado:
 - Commit/push de Fase 16.3.
 - Si se continua con Home, disenar primero el siguiente slice. Candidato seguro: estados vacios/dinamicos de `Ranking de reputacion` y `Negocios recientes`, sin tocar API ni carga de datos.
 
+## Fase 16.4: ajuste visual de estados vacios de Home
+
+Fase 16.4 aplico un slice visual pequeno sobre Home, limitado a los estados vacios de `Ranking de reputacion` y `Negocios recientes`. El objetivo fue reducir peso visual cuando no hay datos sin cambiar condiciones, carga, API ni copy.
+
+Archivo UI tocado:
+
+- `apps/web/src/pages/Home.tsx`
+
+Snapshots actualizados:
+
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Cambios principales:
+
+- Empty state del ranking mas compacto y con menor peso visual.
+- Wrapper de negocios recientes mas contenido.
+- Empty state de negocios recientes con menor altura y padding.
+- Reduccion de altura total de Home en desktop/mobile cuando esos bloques no tienen data.
+
+Comportamiento preservado:
+
+- Copy, condiciones de render, `EmptyState`, CTAs, rutas, tracking, API, carga de datos, busqueda, backend, estilos globales y snapshots ajenos a Home.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `pnpm --filter @aquita/web build` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Primer intento detecto diff visual esperado, pero el preview no pudo iniciar porque el puerto `4173` estaba ocupado por un proceso local previo. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+
+Notas:
+
+- Para los runs exitosos, `run-with-qa-stack` levanto DB/Redis, migraciones, seed, build API/web y preview correctamente.
+- El conflicto inicial de puerto `4173` fue local y no relacionado con producto; se libero el listener antes de regenerar snapshots.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 16.4.
+- Si se continua con Home, disenar primero el siguiente slice. Candidato seguro: consolidar visualmente la narrativa de confianza o el bloque owner/CTA final, sin tocar API, ranking real, geolocalizacion ni busqueda.
+
+## Fase 16.5: ajuste visual de confianza de Home
+
+Fase 16.5 aplico el primer slice posterior a los estados vacios: la seccion `Por que AquiTa.do es diferente`. El objetivo fue reducir la sensacion de otra card premium pesada y hacer que las senales de confianza se lean como un bloque sobrio de producto.
+
+Archivo UI tocado:
+
+- `apps/web/src/pages/home/HomeDifferenceSection.tsx`
+
+Cambios principales:
+
+- Wrapper de confianza mas liviano que `section-shell`.
+- Cards internas reemplazadas por paneles simples con borde y fondo suave.
+- Spacing de grid mas compacto.
+- Titulos internos con menor salto de escala.
+
+Comportamiento preservado:
+
+- Copy, orden de puntos, props, render condicional, rutas, tracking, API, datos, busqueda, backend y estilos globales.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Diff esperado: desktop cambio por el ajuste visual; mobile quedo estable. |
+
+## Fase 16.6: ajuste visual del CTA owner de Home
+
+Fase 16.6 aplico el segundo slice solicitado, limitado al CTA final para duenos de negocio. El objetivo fue bajar peso de landing, compactar jerarquia y mantener una llamada a accion clara sin cambiar enlaces ni copy.
+
+Archivo UI tocado:
+
+- `apps/web/src/pages/Home.tsx`
+
+Snapshots actualizados:
+
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Cambios principales:
+
+- Banda final mas sobria con fondo `slate` suave.
+- Ribbon decorativo con menor opacidad.
+- Contenido centrado en un ancho mas controlado.
+- Titulo desktop reducido de `5xl` a `4xl`.
+- Spacing y padding del bloque final compactados.
+- CTA principal conserva destino y label, con padding y escala mas controlados.
+
+Comportamiento preservado:
+
+- Copy, enlaces, labels dinamicos, condiciones de auth, rutas, tracking, API, datos, busqueda, backend, estilos globales y componentes compartidos.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `pnpm --filter @aquita/web build` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Diff esperado: desktop/mobile cambiaron por los slices visuales. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+
+Notas:
+
+- `run-with-qa-stack` levanto DB/Redis, migraciones, seed, build API/web y preview correctamente en las corridas finales.
+- No se tocaron API, ranking real, geolocalizacion, busqueda, rutas ni tracking.
+
+Proximo paso recomendado:
+
+- Commit/push de Fases 16.4, 16.5 y 16.6 juntas como bloque Home visual.
+- Antes de seguir con otra seccion de Home, revisar manualmente `/` desktop/mobile para confirmar que la reduccion de ruido visual conserva suficiente separacion entre secciones.
+
+## Fase 16.7: revision visual manual de cierre Home
+
+Fase 16.7 reviso visualmente los snapshots actualizados de Home desktop/mobile antes de commit/push. No se hicieron cambios de UI en esta fase.
+
+Archivos revisados:
+
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Hallazgos:
+
+- Desktop mantiene jerarquia clara: hero, como funciona, intenciones, taxonomia/provincias, ranking, recientes, confianza, CTA owner y footer.
+- La seccion de confianza quedo mas sobria y menos parecida a otra capa de cards premium.
+- El CTA owner final bajo peso visual y conserva CTA principal/secundario sin competir tanto con las secciones previas.
+- Mobile no muestra solapamientos ni perdida de acciones principales.
+- Mobile sigue siendo largo por acumulacion de secciones; eso queda como riesgo visual pendiente, no como regresion de esta fase.
+
+Comportamiento preservado:
+
+- No se tocaron UI, copy, rutas, tracking, busqueda, API, datos, geolocalizacion, backend, estilos globales ni snapshots fuera de Home.
+
+QA usado como evidencia:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `pnpm --filter @aquita/web build` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+
+Riesgos pendientes:
+
+- Home mobile sigue teniendo muchas secciones antes del footer.
+- No tocar ranking real, recientes reales, geolocalizacion, busqueda, tracking ni API sin fase dedicada.
+- Si se sigue refinando Home, conviene hacerlo con un slice por seccion y mantener baseline visual actualizado.
+
+Estado:
+
+- Bloque Home visual listo para commit/push.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

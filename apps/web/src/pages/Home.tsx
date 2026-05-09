@@ -746,6 +746,7 @@ export function Home() {
                             <EmptyState
                                 title="Aun no hay ranking disponible para ese filtro."
                                 body="Prueba otra provincia o vuelve cuando existan suficientes señales para comparar."
+                                className="min-h-[8.5rem] border-slate-200/80 bg-white/70 px-4 py-6 md:py-7"
                             />
                         </div>
                     ) : (
@@ -809,10 +810,11 @@ export function Home() {
                         <SkeletonLoader variant="card" count={3} />
                     </div>
                 ) : recentBusinesses.length === 0 ? (
-                    <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-5 md:mt-6 md:p-6">
+                    <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white/90 p-3 md:mt-6 md:p-4">
                         <EmptyState
                             title="Aún no hay negocios registrados."
                             body="Aporta la primera ficha útil para esa zona o categoría."
+                            className="min-h-[9rem] bg-slate-50/70 px-4 py-6"
                             action={
                                 <Link to={registerBusinessPath} className="btn-primary mt-3 inline-flex">
                                     {registerBusinessLabel}
@@ -868,9 +870,9 @@ export function Home() {
 
             <HomeDifferenceSection points={OPERATING_POINTS} />
 
-            <section className="defer-render-section relative mt-10 overflow-hidden border-y border-slate-200 bg-white md:mt-14">
-                <div className="absolute inset-x-0 top-0 flag-ribbon opacity-80"></div>
-                <div className="relative mx-auto max-w-5xl px-4 py-12 text-center sm:px-6 lg:px-8 md:py-14">
+            <section className="defer-render-section relative mt-8 overflow-hidden border-y border-slate-200 bg-slate-50/80 md:mt-10">
+                <div className="absolute inset-x-0 top-0 flag-ribbon opacity-45"></div>
+                <div className="relative mx-auto max-w-4xl px-4 py-10 text-center sm:px-6 lg:px-8 md:py-12">
                     <p className="chip mx-auto flex w-fit items-center gap-2 !border-primary-100 !bg-primary-50 !text-primary-700">
                         <span className="flex items-center gap-1.5" aria-hidden="true">
                             <span className="h-2 w-2 rounded-full bg-primary-900"></span>
@@ -879,14 +881,14 @@ export function Home() {
                         </span>
                         Impulsa tu presencia local
                     </p>
-                    <h2 className="mx-auto mt-4 max-w-3xl font-display text-3xl font-extrabold text-slate-950 md:text-5xl">
+                    <h2 className="mx-auto mt-4 max-w-3xl font-display text-3xl font-extrabold text-slate-950 md:text-4xl">
                         Lleva tu negocio del barrio al <span className="text-accent-600">siguiente nivel</span>
                     </h2>
-                    <p className="mx-auto mt-4 max-w-2xl text-base text-slate-600 md:text-lg">
+                    <p className="mx-auto mt-3 max-w-2xl text-base text-slate-600 md:text-lg">
                         Crea una ficha mas completa, mejora tu visibilidad local y ayuda a que mas personas te encuentren.
                     </p>
-                    <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap md:mt-8">
-                        <Link to={registerBusinessPath} className="btn-accent inline-flex justify-center px-8 text-base md:text-lg">
+                    <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
+                        <Link to={registerBusinessPath} className="btn-accent inline-flex justify-center px-7 text-base">
                             {registerBusinessLabel}
                         </Link>
                         <Link to="/businesses" className="btn-secondary justify-center">
