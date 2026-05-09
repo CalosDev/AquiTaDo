@@ -1618,6 +1618,52 @@ Estado:
 
 - Bloque Home visual listo para commit/push.
 
+## Fase 17.1: baseline visual de AdminDashboard mobile
+
+Fase 17.1 agrego el baseline visual faltante de AdminDashboard en mobile antes de cualquier rediseno del panel admin. La fase se limito a test visual y snapshots; no se modifico runtime del dashboard.
+
+Archivos tocados:
+
+- `playwright/specs/visual.spec.ts`
+- `playwright/specs/__snapshots__/visual.spec.ts/admin-dashboard-mobile.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/admin-dashboard-desktop.png`
+
+Cambios principales:
+
+- Nuevo test `admin dashboard mobile baseline @visual`.
+- Viewport mobile: `390 x 844`.
+- Ruta cubierta: `/admin`.
+- Sesion admin levantada con `loginAsAdmin(page)` contra QA stack.
+- Helper local `waitForAdminBusinessTabReady(page)` para capturar despues del estado final del tab de negocios, no durante loading.
+- Snapshot desktop admin refrescado para alinear el baseline con la UI admin actual (`Consola activa`, `Acceso sensible`, `Acceso rapido`).
+
+Comportamiento preservado:
+
+- No se tocaron `AdminDashboard.tsx`, UI runtime, rutas, auth, permisos, roles, API, backend, `endpoints.ts`, DTOs, controllers, `searchParams`, acciones admin, tablas admin ni seed.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard mobile baseline" --update-snapshots` | Pass: `1 passed`; snapshot mobile creado. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard mobile baseline"` | Detecto que el snapshot mobile inicial capturaba loading; corregido esperando estado final del tab. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard mobile baseline" --update-snapshots` | Pass: `1 passed`; snapshot mobile regenerado con estado final. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard baseline" --update-snapshots` | Pass: `1 passed`; snapshot desktop admin actualizado al estado visual actual. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "admin dashboard.*baseline"` | Pass final: `2 passed`. |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `pnpm qa:smoke` | Pass. |
+
+Notas:
+
+- `run-with-qa-stack` levanto DB/Redis, migraciones, seed, build API/web y preview en las corridas finales.
+- La primera verificacion combinada fallo por drift de snapshot, no por cambio de producto.
+- Warning no bloqueante: Geoapify geocoding failed `(HTTP 503)` durante unit tests.
+- AdminDashboard sigue siendo zona de alto riesgo por contratos, tabs, permisos, acciones y volumen de informacion.
+
+Proximo paso recomendado:
+
+- Fase 17.2 solo diseno/auditoria visual de AdminDashboard desktop/mobile, enfocada en primer viewport, densidad de informacion, tabs y jerarquia. No tocar UI admin todavia.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

@@ -828,6 +828,11 @@ async function disableDeferredRenderingForVisuals(page: Page): Promise<void> {
     });
 }
 
+async function waitForAdminBusinessTabReady(page: Page): Promise<void> {
+    await expect(page.getByText(/Negocios en revision y publicados/i)).toBeVisible();
+    await expect(page.getByText(/Sin negocios para este filtro/i)).toBeVisible();
+}
+
 function json(body: unknown) {
     return {
         status: 200,
@@ -1097,10 +1102,24 @@ test.describe('Visual baselines @visual', () => {
 
     test('admin dashboard baseline @visual', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 1200 });
+        await stabilizeVisualRuntime(page);
         await disableMotionForVisuals(page);
         await loginAsAdmin(page);
-        await expect(page.getByText(/Estado del sistema|Negocios/i).first()).toBeVisible();
+        await disableDeferredRenderingForVisuals(page);
+        await waitForAdminBusinessTabReady(page);
+        await page.waitForTimeout(250);
         await expect(page).toHaveScreenshot('admin-dashboard-desktop.png', { fullPage: true });
+    });
+
+    test('admin dashboard mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await loginAsAdmin(page);
+        await disableDeferredRenderingForVisuals(page);
+        await waitForAdminBusinessTabReady(page);
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('admin-dashboard-mobile.png', { fullPage: true });
     });
 
     test('owner dashboard desktop baseline @visual', async ({ page }) => {
