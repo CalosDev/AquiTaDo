@@ -1046,8 +1046,8 @@ test.describe('Visual baselines @visual', () => {
         await disableDeferredRenderingForVisuals(page);
         await expect(page.getByRole('heading', { name: /Descubre negocios/i })).toBeVisible();
         await expect(page.getByRole('heading', { name: /Negocios recientes/i })).toBeVisible();
-        await expect(page.getByText(/Aun no hay ranking disponible para ese filtro/i)).toBeVisible();
-        await expect(page.getByText(/no hay negocios registrados/i)).toBeVisible();
+        await expect(page.getByText(/Aun estamos reuniendo señales confiables/i)).toBeVisible();
+        await expect(page.getByText(/Aún no hay perfiles recientes para mostrar/i)).toBeVisible();
         await page.waitForTimeout(250);
         await expect(page).toHaveScreenshot('home-desktop.png', { fullPage: true });
     });
@@ -1062,8 +1062,8 @@ test.describe('Visual baselines @visual', () => {
         await disableDeferredRenderingForVisuals(page);
         await expect(page.getByRole('heading', { name: /Descubre negocios/i })).toBeVisible();
         await expect(page.getByRole('heading', { name: /Negocios recientes/i })).toBeVisible();
-        await expect(page.getByText(/Aun no hay ranking disponible para ese filtro/i)).toBeVisible();
-        await expect(page.getByText(/no hay negocios registrados/i)).toBeVisible();
+        await expect(page.getByText(/Aun estamos reuniendo señales confiables/i)).toBeVisible();
+        await expect(page.getByText(/Aún no hay perfiles recientes para mostrar/i)).toBeVisible();
         await page.waitForTimeout(250);
         await expect(page).toHaveScreenshot('home-mobile.png', { fullPage: true });
     });

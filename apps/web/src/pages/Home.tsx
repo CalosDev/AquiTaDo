@@ -681,13 +681,13 @@ export function Home() {
                 </div>
             </section>
 
-            <section ref={rankingsSectionRef} className="defer-render-section mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8 md:py-8">
+            <section ref={rankingsSectionRef} className="defer-render-section mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 md:py-8">
                 <div className="section-shell p-5 md:p-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                         <div>
                             <h3 className="font-display text-xl font-bold text-slate-900 md:text-2xl">Ranking de reputación</h3>
                             <p className="mt-1 text-sm text-slate-600">
-                                Negocios verificados con mejor desempeño por provincia.
+                                Señales de confianza para comparar opciones cuando haya suficientes datos.
                             </p>
                         </div>
                         <select
@@ -722,9 +722,14 @@ export function Home() {
                     ) : rankings.length === 0 ? (
                         <div className="mt-5">
                             <EmptyState
-                                title="Aun no hay ranking disponible para ese filtro."
-                                body="Prueba otra provincia o vuelve cuando existan suficientes señales para comparar."
-                                className="min-h-[8.5rem] border-slate-200/80 bg-white/70 px-4 py-6 md:py-7"
+                                title="Aun estamos reuniendo señales confiables."
+                                body="Mientras crece la actividad, puedes explorar negocios por categoría o provincia sin depender de un ranking."
+                                className="min-h-[8.5rem] border-slate-200/80 bg-white/75 px-4 py-6 md:py-7"
+                                action={
+                                    <Link to="/businesses" className="btn-secondary mt-3 inline-flex">
+                                        Explorar directorio
+                                    </Link>
+                                }
                             />
                         </div>
                     ) : (
@@ -771,7 +776,7 @@ export function Home() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h2 className="section-title !text-2xl md:!text-3xl">Negocios recientes</h2>
-                        <p className="section-subtitle">Perfiles nuevos listos para recibir clientes.</p>
+                        <p className="section-subtitle">Nuevas fichas publicadas para descubrir opciones locales.</p>
                     </div>
                     <Link
                         to="/businesses"
@@ -790,8 +795,8 @@ export function Home() {
                 ) : recentBusinesses.length === 0 ? (
                     <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white/90 p-3 md:mt-6 md:p-4">
                         <EmptyState
-                            title="Aún no hay negocios registrados."
-                            body="Aporta la primera ficha útil para esa zona o categoría."
+                            title="Aún no hay perfiles recientes para mostrar."
+                            body="El directorio se irá llenando con negocios publicados. Mientras tanto, puedes registrar una ficha o explorar categorías."
                             className="min-h-[9rem] bg-slate-50/70 px-4 py-6"
                             action={
                                 <Link to={registerBusinessPath} className="btn-primary mt-3 inline-flex">

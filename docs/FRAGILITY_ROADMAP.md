@@ -2176,6 +2176,63 @@ Proximo paso recomendado:
 
 - Commit/push de Fase 19.4 antes de continuar con otra pantalla.
 
+## Fase 19.5: estados vacios de Home product-first
+
+Fase 19.5 aplico un slice visual/copy acotado a los estados vacios de `Ranking de reputacion` y `Negocios recientes` para que Home comunique un producto vivo aun cuando no haya suficiente data publica. No se modificaron condiciones, carga de datos, API, tracking ni rutas.
+
+Archivos tocados:
+
+- `apps/web/src/pages/Home.tsx`
+- `playwright/specs/visual.spec.ts`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Cambio aplicado:
+
+- El subtitulo de `Ranking de reputacion` ahora explica que el ranking depende de senales suficientes.
+- El empty state de ranking dejo de sonar como filtro fallido y comunica que se estan reuniendo senales confiables.
+- Se agrego un CTA existente hacia `/businesses` en el empty state de ranking: `Explorar directorio`.
+- El subtitulo de `Negocios recientes` ahora habla de fichas publicadas y opciones locales.
+- El empty state de negocios recientes comunica que el directorio se llenara con perfiles publicados y conserva el CTA existente para registrar negocio.
+- `playwright/specs/visual.spec.ts` actualizo solo los anchors textuales del baseline Home para el nuevo copy.
+- Home desktop subio de 3845px a 3927px por el nuevo contexto y CTA de empty states.
+- Home mobile subio de 6040px a 6182px por el nuevo contexto y CTA de empty states.
+
+Comportamiento preservado:
+
+- `handleSearch`, sugerencias, tracking `home-hero-search`, tracking `home-intent-card`, rutas de intencion, ruta `/businesses`, `registerBusinessPath`, carga de ranking, cambio de provincia, render con ranking real, render con negocios recientes reales, API calls, auth, backend y estilos globales.
+- No se tocaron `searchParams`, filtros, mapa, endpoints, hooks de datos, geolocalizacion, service worker, PWA ni contratos.
+- No se agregaron metricas falsas, negocios inventados, testimonios ni nuevas secciones.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots. Stack levanto DB, Redis, migraciones, seed, build API/web y visual. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests. |
+
+Warnings no bloqueantes:
+
+- El primer visual fallo por diff esperado del cambio visual.
+- `run-with-qa-stack` actualizo Prisma Client 7.8.0 durante `prisma generate`, sin cambios de schema.
+- Geoapify 503 conocido en unit tests de API como warning no bloqueante.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- Home sigue siendo larga en mobile por acumulacion de secciones; cualquier reduccion adicional debe ser otro slice por seccion.
+- Footer y owner CTA aun pueden simplificarse mas si se decide continuar con Home.
+- No agregar `cerca de mi`, geolocalizacion, ranking real nuevo, mapas, testimonios o datos simulados sin fase especifica.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 19.5.
+- Luego disenar el siguiente slice visual antes de tocar otra pantalla; candidato seguro: footer/CTA final de Home o cierre temporal de Home y pasar a Login/Register/Profile segun prioridad de lanzamiento.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
