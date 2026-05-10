@@ -220,7 +220,6 @@ export function Home() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [recentBusinesses, setRecentBusinesses] = useState<Business[]>([]);
     const [provinces, setProvinces] = useState<Province[]>([]);
-    const [totalBusinesses, setTotalBusinesses] = useState(0);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const [rankingProvinceId, setRankingProvinceId] = useState('');
@@ -329,7 +328,6 @@ export function Home() {
             ]);
             setCategories(catRes.data);
             setRecentBusinesses(bizRes.data.data || []);
-            setTotalBusinesses(Number(bizRes.data.total || 0));
             setProvinces(provRes.data);
         } catch (error) {
             setLoadError(getApiErrorMessage(error, 'No se pudo cargar la información inicial'));
@@ -417,9 +415,9 @@ export function Home() {
             <section className="gradient-hero relative overflow-hidden">
                 <div className="absolute inset-x-0 top-0 flag-ribbon opacity-90"></div>
                 <div className="absolute inset-0 opacity-20 subtle-grid-bg"></div>
-                <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-11 lg:px-8 md:py-14">
+                <div className="relative mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10 lg:px-8 md:py-12">
                     <div className="grid gap-5 lg:grid-cols-12 lg:items-center xl:gap-8">
-                        <div className="lg:col-span-7">
+                        <div className="lg:col-span-8">
                             <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100/85 shadow-none backdrop-blur-md sm:px-3.5">
                                 <span className="flex items-center gap-1.5" aria-hidden="true">
                                     <span className="h-2 w-2 rounded-full bg-primary-950 ring-1 ring-white/35"></span>
@@ -428,25 +426,25 @@ export function Home() {
                                         <span className="animate-ping absolute inset-0 rounded-full bg-accent-400 opacity-75"></span>
                                     </span>
                                 </span>
-                                Ecosistema local dominicano
-                                <span className="rounded-full border border-amber-300/30 bg-amber-300/12 px-2 py-0.5 text-[9px] tracking-[0.18em] text-amber-100">
-                                    confianza local
-                                </span>
+                                Directorio local en Republica Dominicana
                             </div>
-                            <h1 className="mt-4 max-w-4xl font-display text-4xl font-black leading-[1.06] text-white sm:text-5xl xl:text-6xl">
-                                Descubre negocios <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">reales</span>
-                                <span className="block mt-1.5 text-accent-300 drop-shadow-sm">por zona, categoría y confianza en RD</span>
+                            <h1 className="mt-4 max-w-4xl font-display text-4xl font-black leading-[1.04] text-white sm:text-5xl xl:text-[4.6rem]">
+                                Descubre negocios locales
+                                <span className="block mt-1.5 text-accent-300 drop-shadow-sm">confiables en RD</span>
                             </h1>
                             <p className="mt-4 max-w-2xl text-base leading-relaxed text-blue-100 md:text-lg">
-                                AquiTa.do te ayuda a encontrar negocios locales útiles, comparables y confiables en República Dominicana,
-                                con mejor contexto por categoría, ubicación y calidad de ficha.
+                                Busca restaurantes, colmados, salones, delivery y servicios cerca de ti. Compara horarios,
+                                ubicacion, reputacion y formas de contacto en un solo lugar.
                             </p>
 
                             <form onSubmit={handleSearch} className="mt-5 max-w-3xl">
-                                <div className="hero-glass-card rounded-[1.35rem] border border-white/20 bg-white/10 p-2.5 shadow-xl shadow-blue-900/16 backdrop-blur-xl md:rounded-[1.75rem] md:p-3">
+                                <div className="rounded-[1.35rem] border border-white/25 bg-white/95 p-3 shadow-2xl shadow-blue-950/20 backdrop-blur-xl md:rounded-[1.75rem] md:p-4">
+                                    <p className="mb-2 px-1 text-xs font-bold uppercase tracking-[0.16em] text-primary-800/75">
+                                        Que necesitas encontrar?
+                                    </p>
                                     <div className="flex flex-col gap-2.5 md:flex-row md:gap-3">
                                         <div className="relative flex-1">
-                                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-primary-700/55">
                                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                                 </svg>
@@ -455,23 +453,23 @@ export function Home() {
                                                 type="text"
                                                 value={searchQuery}
                                                 onChange={(event) => setSearchQuery(event.target.value)}
-                                                placeholder="Busca restaurantes, colmados, salones..."
+                                                placeholder="Restaurantes, colmados, salones, delivery..."
                                                 aria-label="Buscar negocios"
-                                                className="input-field w-full pl-12 !rounded-2xl !border-transparent !bg-white/95 !shadow-inner text-sm transition-all focus:!bg-white md:text-base"
+                                                className="input-field w-full pl-12 !rounded-2xl !border-slate-200 !bg-white text-sm transition-all focus:!bg-white md:text-base"
                                             />
                                         </div>
-                                        <button type="submit" className="btn-accent whitespace-nowrap !rounded-2xl !px-8 !py-3.5 font-bold shadow-md shadow-accent-600/25">
-                                            Buscar ahora
+                                        <button type="submit" className="btn-primary whitespace-nowrap !rounded-2xl !px-8 !py-3.5 font-bold shadow-md shadow-primary-950/18">
+                                            Buscar negocios
                                         </button>
                                     </div>
                                     <div className="mt-2.5 flex flex-wrap gap-1.5 px-1 md:mt-3">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200/80 mr-1 self-center">Sugerencias:</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1 self-center">Sugerencias:</span>
                                         {['Comida criolla', 'Farmacia 24h', 'Taller'].map((preset) => (
                                             <button
                                                 key={preset}
                                                 type="button"
                                                 onClick={() => setSearchQuery(preset)}
-                                                className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-white/90 transition-all hover:bg-white/15 hover:border-white/30 active:scale-95"
+                                                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-bold text-slate-700 transition-all hover:border-primary-200 hover:bg-primary-50 active:scale-95"
                                             >
                                                 {preset}
                                             </button>
@@ -493,47 +491,29 @@ export function Home() {
                             </div>
 
                             <div className="mt-3 flex flex-wrap gap-2">
-                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Enfocado 100% en RD</span>
-                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Discovery por ubicación</span>
-                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Catalogo confiable</span>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap gap-2.5 md:mt-4">
-                                <span className="kpi-chip-soft">
-                                    {loading ? '...' : formatNumberDo(totalBusinesses)} negocios
-                                </span>
-                                <span className="kpi-chip-soft">
-                                    {loading ? '...' : provinces.length} provincias
-                                </span>
-                                <span className="kpi-chip-soft">
-                                    {loading ? '...' : categories.length} categorías
-                                </span>
+                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Horarios visibles</span>
+                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Ubicacion local</span>
+                                <span className="rounded-full border border-white/20 bg-white/7 px-2.5 py-1 text-[11px] font-semibold text-white/88">Contacto directo</span>
                             </div>
                         </div>
 
-                        <div className="lg:col-span-5">
-                            <div className="hero-accent-ring p-3.5 text-white sm:p-4 md:p-5">
-                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">Radar local</p>
-                                <h2 className="mt-2 font-display text-lg font-bold sm:text-xl">Qué está moviendo el mercado</h2>
+                        <div className="hidden lg:col-span-4 lg:block">
+                            <div className="rounded-[1.75rem] border border-white/18 bg-white/8 p-4 text-white shadow-xl shadow-blue-950/15 backdrop-blur-xl">
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">Explora rapido</p>
+                                <h2 className="mt-2 font-display text-lg font-bold sm:text-xl">Categorias y cobertura local</h2>
 
-                                <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:mt-4">
+                                <div className="mt-3 grid grid-cols-1 gap-2.5 md:mt-4">
                                     <div className="hero-metric-card">
                                         <p className="hero-metric-label">Top categoría</p>
                                         <p className="hero-metric-value truncate">
                                             {topRadarCategories[0] ? formatPublicCategoryName(topRadarCategories[0].name) : 'Cargando'}
                                         </p>
                                     </div>
-                                    <div className="hero-metric-card">
-                                        <p className="hero-metric-label">Cobertura activa</p>
-                                        <p className="hero-metric-value">
-                                            {loading ? '...' : formatNumberDo(totalBusinesses)}
-                                        </p>
-                                    </div>
                                 </div>
 
                                 <div className="mt-3 space-y-2 md:mt-4">
                                     {loading ? (
-                                        <SkeletonLoader variant="radar-item" count={4} />
+                                        <SkeletonLoader variant="radar-item" count={3} />
                                     ) : topRadarCategories.length > 0 ? topRadarCategories.map((category, index) => (
                                         <Link
                                             key={category.id}
@@ -562,7 +542,7 @@ export function Home() {
                                     )}
                                 </div>
 
-                                <div className="mt-3 rounded-2xl border border-white/20 bg-white/10 p-3.5 md:mt-4">
+                                <div className="mt-3 rounded-2xl border border-white/18 bg-white/8 p-3.5 md:mt-4">
                                     <p className="text-xs uppercase tracking-wide text-blue-100">Cobertura</p>
                                     <p className="mt-1 font-semibold">
                                         {topProvinces.length > 0

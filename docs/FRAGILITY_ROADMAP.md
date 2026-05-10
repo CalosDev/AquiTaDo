@@ -2064,6 +2064,63 @@ Proximo paso recomendado:
 - Commit/push de Fase 18.12.
 - Luego hacer cierre temporal de dashboards o volver a Home con enfoque de producto real, pero no abrir mas cambios antes de revisar lote.
 
+## Fase 19.3: Home hero product-first
+
+Fase 19.3 aplico un slice visual/copy acotado al hero de Home para que la primera impresion se sienta mas producto de discovery y menos landing decorativa.
+
+Archivos tocados:
+
+- `apps/web/src/pages/Home.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Cambio aplicado:
+
+- El H1 se simplifico a una promesa mas directa: negocios locales confiables en RD.
+- El buscador paso a ser la superficie principal del hero, con mayor contraste y CTA `Buscar negocios`.
+- Se bajaron microtextos tecnicos/decorativos del hero.
+- Se quitaron contadores del hero para evitar mostrar `0 negocios` como senal primaria cuando la base real aun esta vacia.
+- Las senales visibles quedaron enfocadas en utilidad: horarios, ubicacion local y contacto directo.
+- El radar local bajo de peso y quedo como apoyo solo desktop.
+- Mobile redujo altura visual de Home de 6981px a 6170px en snapshot.
+- Desktop redujo altura visual de Home de 4039px a 3949px en snapshot.
+
+Comportamiento preservado:
+
+- `handleSearch`, `searchQuery`, sugerencias, tracking `home-hero-search`, rutas `/businesses` y `registerBusinessPath`, API calls, carga de datos, ranking, categorias, provincias, negocios recientes y backend.
+- No se tocaron `searchParams`, filtros, mapa, endpoints, hooks de datos, auth, permisos ni estilos globales.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Fallo por infraestructura: Docker daemon no disponible. |
+| `pnpm build:web` | Pass |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots por cambio visual. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home desktop baseline"` | Pass: `1 passed` tras un primer flake local de altura full-page. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| Browser local en `http://127.0.0.1:4173/` | DOM confirmo H1, buscador principal y CTAs esperados. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests. |
+
+Warnings no bloqueantes:
+
+- Docker Desktop no estuvo disponible para `run-with-qa-stack`; se uso build web + preview local porque el visual Home usa mocks deterministas y no depende de DB real.
+- El primer rerun desktop tuvo flake de altura full-page; el rerun focalizado y el rerun combinado final pasaron.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- Home sigue dependiendo de contenido real para sentirse viva; si la DB publica esta vacia, `/businesses` y `BusinessDetails` siguen comunicando poco valor.
+- El copy de Login/Register aun conserva lenguaje tecnico como SaaS/administracion/organizacion.
+- No agregar `cerca de mi`, geolocalizacion ni nuevas secciones sin fase propia.
+
+Proximo paso recomendado:
+
+- Decidir entre commit/push de Fase 19.3 o seguir con Fase 19.4: copy tecnico de Login/Register.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
