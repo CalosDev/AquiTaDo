@@ -586,104 +586,113 @@ export function CustomerActivityWorkspace() {
             </div>
 
             <SplitPanelLayout
+                className="gap-4"
                 primary={(
-                    <AppCard title="Mi inbox" description="Conversaciones con negocios y respuestas recientes.">
-                    <div className="mt-5 space-y-3">
-                        {conversations.data.length > 0 ? conversations.data.map((conversation) => (
-                            <button
-                                type="button"
-                                key={conversation.id}
-                                className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                                    selectedConversationId === conversation.id
-                                        ? 'border-primary-300 bg-primary-50'
-                                        : 'border-slate-200 bg-slate-50/70 hover:border-primary-200'
-                                }`}
-                                onClick={() => setSelectedConversationId(conversation.id)}
-                            >
-                                <EntityListItem
-                                    className="shadow-none"
-                                    title={conversation.business.name}
-                                    subtitle={conversation.subject || 'Consulta directa'}
-                                    badge={(
-                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConversationTone(conversation.status)}`}>
-                                            {getConversationLabel(conversation.status)}
-                                        </span>
-                                    )}
-                                    meta={`${formatNumberDo(conversation._count.messages)} mensajes`}
-                                    body={<p className="text-xs text-slate-500">{formatDateTimeDo(conversation.lastMessageAt)}</p>}
+                    <AppCard
+                        title="Mi inbox"
+                        description="Conversaciones con negocios y respuestas recientes."
+                        className="!p-4 shadow-none md:!p-5 [&_.app-card__header]:mb-3"
+                    >
+                        <div className="mt-4 space-y-2.5">
+                            {conversations.data.length > 0 ? conversations.data.map((conversation) => (
+                                <button
+                                    type="button"
+                                    key={conversation.id}
+                                    className={`w-full rounded-2xl border px-3.5 py-3 text-left transition-colors ${
+                                        selectedConversationId === conversation.id
+                                            ? 'border-primary-300 bg-primary-50'
+                                            : 'border-slate-200 bg-white hover:border-primary-200 hover:bg-slate-50'
+                                    }`}
+                                    onClick={() => setSelectedConversationId(conversation.id)}
+                                >
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="truncate text-sm font-semibold text-slate-900">{conversation.business.name}</p>
+                                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConversationTone(conversation.status)}`}>
+                                                    {getConversationLabel(conversation.status)}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-sm text-slate-600">{conversation.subject || 'Consulta directa'}</p>
+                                            <p className="mt-2 text-xs text-slate-500">{formatDateTimeDo(conversation.lastMessageAt)}</p>
+                                        </div>
+                                        <p className="shrink-0 text-xs font-medium text-slate-500">{formatNumberDo(conversation._count.messages)} mensajes</p>
+                                    </div>
+                                </button>
+                            )) : (
+                                <EmptyState
+                                    title="Sin conversaciones todavia"
+                                    body="Tus conversaciones apareceran aqui cuando escribas desde una ficha de negocio."
                                 />
-                            </button>
-                        )) : (
-                            <EmptyState
-                                title="Sin conversaciones todavia"
-                                body="Tus conversaciones apareceran aqui cuando escribas desde una ficha de negocio."
-                            />
-                        )}
-                    </div>
+                            )}
+                        </div>
                     </AppCard>
                 )}
                 secondary={(
-                    <AppCard title="Hilo seleccionado" description="Lee el historial y responde sin salir del panel.">
-
-                    {threadLoading ? (
-                        <div className="mt-5 space-y-3">
-                            <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
-                            <div className="h-40 rounded-2xl bg-slate-100 animate-pulse" />
-                        </div>
-                    ) : conversationThread ? (
-                        <div className="mt-5 space-y-4">
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <div>
-                                        <p className="font-medium text-slate-900">{conversationThread.business.name}</p>
-                                        <p className="mt-1 text-sm text-slate-600">{conversationThread.subject || 'Consulta directa'}</p>
+                    <AppCard
+                        title="Hilo seleccionado"
+                        description="Lee el historial y responde sin salir del panel."
+                        className="!p-4 shadow-none md:!p-5 [&_.app-card__header]:mb-3"
+                    >
+                        {threadLoading ? (
+                            <div className="mt-4 space-y-3">
+                                <div className="h-20 rounded-2xl bg-slate-100 animate-pulse" />
+                                <div className="h-40 rounded-2xl bg-slate-100 animate-pulse" />
+                            </div>
+                        ) : conversationThread ? (
+                            <div className="mt-4 space-y-3">
+                                <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <p className="font-medium text-slate-900">{conversationThread.business.name}</p>
+                                            <p className="mt-1 text-sm text-slate-600">{conversationThread.subject || 'Consulta directa'}</p>
+                                        </div>
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConversationTone(conversationThread.status)}`}>
+                                            {getConversationLabel(conversationThread.status)}
+                                        </span>
                                     </div>
-                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getConversationTone(conversationThread.status)}`}>
-                                        {getConversationLabel(conversationThread.status)}
-                                    </span>
                                 </div>
-                            </div>
 
-                            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                {conversationThread.messages.length > 0 ? conversationThread.messages.map((message) => (
-                                    <EntityListItem
-                                        key={message.id}
-                                        title={getSenderLabel(message.senderRole)}
-                                        meta={formatDateTimeDo(message.createdAt)}
-                                        body={<p className="text-sm text-slate-600">{message.content}</p>}
-                                        className="shadow-none"
+                                <div className="space-y-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                    {conversationThread.messages.length > 0 ? conversationThread.messages.map((message) => (
+                                        <EntityListItem
+                                            key={message.id}
+                                            title={getSenderLabel(message.senderRole)}
+                                            meta={formatDateTimeDo(message.createdAt)}
+                                            body={<p className="text-sm text-slate-600">{message.content}</p>}
+                                            className="!rounded-2xl !border-slate-200/70 !px-3 !py-3 shadow-none"
+                                        />
+                                    )) : (
+                                        <p className="text-sm text-slate-600">No hay mensajes en este hilo.</p>
+                                    )}
+                                </div>
+
+                                <form className="space-y-3" onSubmit={(event) => void handleSendReply(event)}>
+                                    <textarea
+                                        className="input-field min-h-[96px]"
+                                        value={replyDraft}
+                                        onChange={(event) => setReplyDraft(event.target.value)}
+                                        placeholder="Escribe tu respuesta para el negocio."
+                                        disabled={conversationThread.status === 'CLOSED'}
                                     />
-                                )) : (
-                                    <p className="text-sm text-slate-600">No hay mensajes en este hilo.</p>
-                                )}
+                                    <div className="flex justify-end">
+                                        <button
+                                            type="submit"
+                                            className="btn-primary text-sm"
+                                            disabled={actionKey === 'customer-reply' || !replyDraft.trim() || conversationThread.status === 'CLOSED'}
+                                        >
+                                            {actionKey === 'customer-reply' ? 'Enviando...' : 'Enviar mensaje'}
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
-
-                            <form className="space-y-3" onSubmit={(event) => void handleSendReply(event)}>
-                                <textarea
-                                    className="input-field min-h-[110px]"
-                                    value={replyDraft}
-                                    onChange={(event) => setReplyDraft(event.target.value)}
-                                    placeholder="Escribe tu respuesta para el negocio."
-                                    disabled={conversationThread.status === 'CLOSED'}
-                                />
-                                <div className="flex justify-end">
-                                    <button
-                                        type="submit"
-                                        className="btn-primary text-sm"
-                                        disabled={actionKey === 'customer-reply' || !replyDraft.trim() || conversationThread.status === 'CLOSED'}
-                                    >
-                                        {actionKey === 'customer-reply' ? 'Enviando...' : 'Enviar mensaje'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    ) : (
-                        <EmptyState
-                            title="Selecciona una conversacion"
-                            body="Cuando elijas un hilo, aqui veras el historial completo y podras responder."
-                            className="mt-5"
-                        />
-                    )}
+                        ) : (
+                            <EmptyState
+                                title="Selecciona una conversacion"
+                                body="Cuando elijas un hilo, aqui veras el historial completo y podras responder."
+                                className="mt-5"
+                            />
+                        )}
                     </AppCard>
                 )}
             />
