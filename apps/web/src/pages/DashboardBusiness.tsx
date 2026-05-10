@@ -929,60 +929,66 @@ export function DashboardBusiness() {
             {/* ═══ FILA 2: Operación diaria ═══ */}
             {activeWorkspace === 'overview' && selectedBusiness && (
                 <section aria-label="Siguientes pasos">
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <AppCard
-                            title="Completa tu perfil"
-                            description={(selectedBusiness.profileCompletenessScore ?? 0) >= 80
-                                ? 'Tu ficha ya tiene una presentación fuerte. Puedes retocar horarios, imágenes o categorías si hace falta.'
-                                : 'Todavía hay datos importantes por completar para que la ficha se vea clara y confiable.'}
-                        >
-                            <div className="mt-4 space-y-3">
-                                {selectedBusiness.missingCoreFields && selectedBusiness.missingCoreFields.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
-                                        {selectedBusiness.missingCoreFields.slice(0, 4).map((field) => (
-                                            <span key={field} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                                                {field}
-                                            </span>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-slate-600">No hay pendientes importantes en este momento.</p>
-                                )}
-                                {selectedBusinessEditPath ? (
+                    <AppCard
+                        title="Siguientes pasos"
+                        description={(selectedBusiness.profileCompletenessScore ?? 0) >= 80
+                            ? 'Tu ficha ya tiene una presentación fuerte. Puedes retocar horarios, imágenes o categorías si hace falta.'
+                            : 'Todavía hay datos importantes por completar para que la ficha se vea clara y confiable.'}
+                    >
+                        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Completa tu perfil</p>
+                                <div className="mt-3 space-y-3">
+                                    {selectedBusiness.missingCoreFields && selectedBusiness.missingCoreFields.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedBusiness.missingCoreFields.slice(0, 4).map((field) => (
+                                                <span key={field} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
+                                                    {field}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-slate-600">No hay pendientes importantes en este momento.</p>
+                                    )}
+                                    {selectedBusinessEditPath ? (
+                                        <ActionBar>
+                                            <Link to={selectedBusinessEditPath} className="btn-primary text-sm">
+                                                Editar negocio
+                                            </Link>
+                                        </ActionBar>
+                                    ) : null}
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Revisión y documentos</p>
+                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                        {claimRequests.length > 0
+                                            ? `${claimSummary.PENDING ?? 0} pendientes · ${claimSummary.UNDER_REVIEW ?? 0} en revisión`
+                                            : 'Sin solicitudes'}
+                                    </span>
+                                </div>
+                                <div className="mt-3 space-y-3 text-sm text-slate-600">
+                                    <p>
+                                        {documentSummary.total > 0
+                                            ? `${documentSummary.total} documento(s) cargado(s) para este negocio.`
+                                            : 'Todavía no hay documentos cargados para este negocio.'}
+                                    </p>
+                                    <p>
+                                        {verificationStatus?.verificationSubmittedAt
+                                            ? 'Ya existe una solicitud enviada. Revisa observaciones antes de volver a mandar algo.'
+                                            : 'Cuando termines de reunir los documentos, entra a verificación y envía la revisión.'}
+                                    </p>
                                     <ActionBar>
-                                        <Link to={selectedBusinessEditPath} className="btn-primary text-sm">
-                                            Editar negocio
+                                        <Link to="/dashboard?workspace=verification" className="btn-secondary text-sm">
+                                            Ir a verificación
                                         </Link>
                                     </ActionBar>
-                                ) : null}
+                                </div>
                             </div>
-                        </AppCard>
-
-                        <AppCard
-                            title="Revisión y documentos"
-                            description={claimRequests.length > 0
-                                ? `${claimSummary.PENDING ?? 0} solicitudes pendientes y ${claimSummary.UNDER_REVIEW ?? 0} en revisión.`
-                                : 'Mantiene juntos documentos, solicitud de revisión y respuesta del equipo.'}
-                        >
-                            <div className="mt-4 space-y-3 text-sm text-slate-600">
-                                <p>
-                                    {documentSummary.total > 0
-                                        ? `${documentSummary.total} documento(s) cargado(s) para este negocio.`
-                                        : 'Todavía no hay documentos cargados para este negocio.'}
-                                </p>
-                                <p>
-                                    {verificationStatus?.verificationSubmittedAt
-                                        ? 'Ya existe una solicitud enviada. Revisa observaciones antes de volver a mandar algo.'
-                                        : 'Cuando termines de reunir los documentos, entra a verificación y envía la revisión.'}
-                                </p>
-                                <ActionBar>
-                                    <Link to="/dashboard?workspace=verification" className="btn-secondary text-sm">
-                                        Ir a verificación
-                                    </Link>
-                                </ActionBar>
-                            </div>
-                        </AppCard>
-                    </div>
+                        </div>
+                    </AppCard>
                 </section>
             )}
 

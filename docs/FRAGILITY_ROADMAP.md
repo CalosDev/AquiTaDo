@@ -1855,6 +1855,60 @@ Proximo paso recomendado:
 - Commit/push de Fase 18.4.
 - Luego Fase 18.5 solo diseno para decidir si el siguiente recorte owner debe consolidar `Completa tu perfil` + `Revision y documentos`, o pasar a customer para reducir actividad profunda.
 
+## Fase 18.6: consolidacion de siguientes pasos owner
+
+Fase 18.6 implemento el segundo slice owner aprobado. El cambio fue visual/estructural local y consolido las dos superficies finales de accion de `/dashboard` en una sola seccion de siguientes pasos.
+
+Archivos tocados:
+
+- `apps/web/src/pages/DashboardBusiness.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-owner-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-owner-mobile.png`
+
+Cambio aplicado:
+
+- Se consolidaron `Completa tu perfil` y `Revision y documentos` dentro de una sola card `Siguientes pasos`.
+- El bloque interno mantiene dos paneles: perfil y revision/documentos.
+- Se preservaron los CTAs existentes `Editar negocio` e `Ir a verificacion`.
+- Se mantuvieron los datos existentes de perfil, documentos, claim summary y estado de verificacion sin crear nuevos calculos.
+
+Comportamiento preservado:
+
+- `searchParams`, `readWorkspace`, `handleWorkspaceChange`, tabs, workspaces lazy, estado seleccionado, handlers, rutas, auth, permisos, org context, API, backend, DTOs y seed.
+- No se tocaron contratos, endpoints, tracking, permisos, loaders ni logica de negocio.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots por consolidacion visual. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests verdes. |
+
+Resultado:
+
+- Owner dashboard queda menos repetitivo en la parte final.
+- La seccion final comunica un solo bloque de trabajo pendiente en lugar de dos cards competidoras.
+- Mobile queda mas claro, aunque el dashboard sigue siendo largo por volumen real de informacion.
+
+Warnings no bloqueantes:
+
+- `Geoapify geocoding failed (HTTP 503)` durante unit tests.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- `Control del negocio` y `Documentos y sello` siguen siendo bloques primarios separados; cualquier consolidacion adicional debe ir en otro slice.
+- `CustomerDashboard` sigue pendiente de una fase dedicada para reducir actividad profunda y evitar que parezca dos dashboards en uno.
+- No tocar workspaces lazy, `searchParams`, permisos, API ni backend sin fase especifica.
+
+Proximo paso recomendado:
+
+- Cerrar Fase 18.6 con `qa:smoke`, commit y push.
+- Luego pasar a diseno del siguiente slice customer, no seguir puliendo owner indefinidamente.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
