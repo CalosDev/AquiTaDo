@@ -2014,6 +2014,56 @@ Proximo paso recomendado:
 - Commit/push de Fase 18.10.
 - Luego Fase 18.11 solo diseno para decidir si el siguiente slice customer debe compactar reservas/check-ins o volver a Home con enfoque de producto mas claro.
 
+## Fase 18.12: compactacion visual de reservas y check-ins customer
+
+Fase 18.12 implemento el tercer slice visual customer aprobado. El cambio fue local y redujo el peso visual de `Mis reservas` y `Mis check-ins` sin tocar actividad runtime.
+
+Archivos tocados:
+
+- `apps/web/src/pages/customer-dashboard/CustomerActivityWorkspace.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-customer-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-customer-mobile.png`
+
+Cambio aplicado:
+
+- Se compactaron las cards de `Mis reservas` y `Mis check-ins` con menor gap, padding y sombra local.
+- Las reservas dejaron de usar `EntityListItem` pesado y pasaron a filas locales mas claras.
+- Los check-ins dejaron de usar `EntityListItem` pesado y pasaron a filas locales compactas.
+- Se mantuvieron negocio, fecha, estado, monto, promo, cantidad de personas, puntos y ubicacion/verificacion.
+- El CTA `Pagar reserva` conserva handler, disabled state y texto.
+- Mobile bajo de 3748px a 3690px de alto en snapshot.
+- Desktop bajo de 2288px a 2210px de alto en snapshot.
+
+Comportamiento preservado:
+
+- `loadCustomerActivity`, `handleBookingCheckout`, bookings/checkins API calls, response parsing, estados, checkout, inbox/thread, rutas, auth, permisos, backend y contratos.
+- No se tocaron messaging, API, checkout runtime ni copy funcional.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots por compactacion visual. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests verdes. |
+
+Warnings no bloqueantes:
+
+- `Geoapify geocoding failed (HTTP 503)` durante unit tests.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Estado:
+
+- Customer dashboard queda mas limpio en actividad, inbox, reservas y check-ins.
+- No quedan cambios funcionales pendientes para esta vista dentro de esta tanda.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 18.12.
+- Luego hacer cierre temporal de dashboards o volver a Home con enfoque de producto real, pero no abrir mas cambios antes de revisar lote.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

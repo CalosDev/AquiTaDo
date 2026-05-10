@@ -516,30 +516,42 @@ export function CustomerActivityWorkspace() {
                 </div>
             </section>
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <AppCard title="Mis reservas" description="Agenda y estados de las experiencias que ya apartaste o que siguen pendientes.">
-                    <div className="mt-5 space-y-3">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <AppCard
+                    title="Mis reservas"
+                    description="Agenda y estados de las experiencias que ya apartaste o que siguen pendientes."
+                    className="!p-4 shadow-none md:!p-5 [&_.app-card__header]:mb-3"
+                >
+                    <div className="mt-4 space-y-2.5">
                         {bookings.data.length > 0 ? bookings.data.map((booking) => (
-                            <EntityListItem
+                            <div
                                 key={booking.id}
-                                title={booking.business.name}
-                                subtitle={formatDateTimeDo(booking.scheduledFor)}
-                                badge={(
-                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingTone(booking.status)}`}>
-                                        {getBookingLabel(booking.status)}
-                                    </span>
-                                )}
-                                meta={booking.quotedAmount ? formatCurrencyDo(booking.quotedAmount, booking.currency) : 'Sin monto'}
-                                body={(
-                                    <div className="space-y-2">
-                                        {booking.promotion?.title ? (
-                                            <p className="text-xs text-slate-500">Promo aplicada: {booking.promotion.title}</p>
-                                        ) : null}
-                                        <p className="text-xs text-slate-500">{booking.partySize ? `${booking.partySize} personas` : 'Sin tamano definido'}</p>
+                                className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3"
+                            >
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <p className="font-semibold text-slate-900">{booking.business.name}</p>
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getBookingTone(booking.status)}`}>
+                                                {getBookingLabel(booking.status)}
+                                            </span>
+                                        </div>
+                                        <p className="mt-1 text-sm text-slate-600">{formatDateTimeDo(booking.scheduledFor)}</p>
                                     </div>
-                                )}
-                                actions={booking.quotedAmount ? (
-                                    <div className="flex justify-end">
+                                    <p className="shrink-0 text-xs font-medium text-slate-500">
+                                        {booking.quotedAmount ? formatCurrencyDo(booking.quotedAmount, booking.currency) : 'Sin monto'}
+                                    </p>
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                                    <div className="space-y-1 text-xs text-slate-500">
+                                        {booking.promotion?.title ? (
+                                            <p>Promo aplicada: {booking.promotion.title}</p>
+                                        ) : null}
+                                        <p>{booking.partySize ? `${booking.partySize} personas` : 'Sin tamano definido'}</p>
+                                    </div>
+
+                                    {booking.quotedAmount ? (
                                         <button
                                             type="button"
                                             className="btn-secondary text-sm"
@@ -548,9 +560,9 @@ export function CustomerActivityWorkspace() {
                                         >
                                             {actionKey === `booking-checkout-${booking.id}` ? 'Redirigiendo...' : 'Pagar reserva'}
                                         </button>
-                                    </div>
-                                ) : undefined}
-                            />
+                                    ) : null}
+                                </div>
+                            </div>
                         )) : (
                             <EmptyState
                                 title="Aun no tienes reservas"
@@ -560,21 +572,29 @@ export function CustomerActivityWorkspace() {
                     </div>
                 </AppCard>
 
-                <AppCard title="Mis check-ins" description="Actividad reciente y progreso de loyalty en negocios compatibles.">
-                    <div className="mt-5 space-y-3">
+                <AppCard
+                    title="Mis check-ins"
+                    description="Actividad reciente y progreso de loyalty en negocios compatibles."
+                    className="!p-4 shadow-none md:!p-5 [&_.app-card__header]:mb-3"
+                >
+                    <div className="mt-4 space-y-2.5">
                         {checkins.data.length > 0 ? checkins.data.map((checkin) => (
-                            <EntityListItem
+                            <div
                                 key={checkin.id}
-                                title={checkin.business.name}
-                                subtitle={formatDateTimeDo(checkin.createdAt)}
-                                meta={`+${formatNumberDo(checkin.pointsAwarded)} pts`}
-                                body={(
-                                    <div className="space-y-1 text-xs text-slate-500">
-                                        <p>{checkin.business.province?.name || checkin.business.address || 'Ubicacion registrada'}</p>
-                                        <p>{checkin.verifiedLocation ? 'Ubicacion verificada' : 'Sin verificacion GPS'}</p>
+                                className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3"
+                            >
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-slate-900">{checkin.business.name}</p>
+                                        <p className="mt-1 text-sm text-slate-600">{formatDateTimeDo(checkin.createdAt)}</p>
                                     </div>
-                                )}
-                            />
+                                    <p className="shrink-0 text-xs font-medium text-slate-500">+{formatNumberDo(checkin.pointsAwarded)} pts</p>
+                                </div>
+                                <div className="mt-3 space-y-1 text-xs text-slate-500">
+                                    <p>{checkin.business.province?.name || checkin.business.address || 'Ubicacion registrada'}</p>
+                                    <p>{checkin.verifiedLocation ? 'Ubicacion verificada' : 'Sin verificacion GPS'}</p>
+                                </div>
+                            </div>
                         )) : (
                             <EmptyState
                                 title="Sin check-ins por ahora"
