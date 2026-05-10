@@ -2119,7 +2119,62 @@ Riesgos pendientes:
 
 Proximo paso recomendado:
 
-- Decidir entre commit/push de Fase 19.3 o seguir con Fase 19.4: copy tecnico de Login/Register.
+- Decidir entre commit/push de Fase 19.3 o seguir con Fase 19.4: secciones debajo del hero en Home.
+
+## Fase 19.4: Home secciones debajo del hero
+
+Fase 19.4 aplico un slice visual/copy acotado a las primeras secciones debajo del hero para reducir ruido visual sin tocar busqueda, rutas, tracking ni data fetching.
+
+Archivos tocados:
+
+- `apps/web/src/pages/Home.tsx`
+- `apps/web/src/pages/home/HowItWorksSection.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Cambio aplicado:
+
+- `Como funciona AquiTa.do` dejo de vivir dentro de una card grande con ribbon decorativo.
+- La seccion de pasos quedo mas plana, con borde inferior, cards simples y copy menos tecnico.
+- `Explora por intencion` paso a `Explora por necesidad` con jerarquia mas humana.
+- Se elimino el wrapper tipo card grande alrededor de las rutas por necesidad para evitar cards dentro de cards.
+- Las cards de intencion quedaron mas limpias y orientadas a accion real.
+- Home desktop bajo de 3949px a 3845px en snapshot.
+- Home mobile bajo de 6170px a 6040px en snapshot.
+
+Comportamiento preservado:
+
+- `handleSearch`, sugerencias, tracking `home-hero-search`, tracking `home-intent-card`, rutas de intencion, API calls, ranking, categorias, provincias, negocios recientes, auth y backend.
+- No se tocaron `searchParams`, filtros, mapa, endpoints, hooks de datos, service worker, PWA ni estilos globales.
+- No se tocaron ranking, negocios recientes, footer ni CTA final en esta fase.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots. Stack levanto DB, Redis, migraciones, seed, build API/web y visual. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests. |
+
+Warnings no bloqueantes:
+
+- El primer visual fallo por diff esperado del cambio visual.
+- `run-with-qa-stack` actualizo Prisma Client 7.8.0 durante `prisma generate`, sin cambios de schema.
+- Geoapify 503 conocido en unit tests de API como warning no bloqueante.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- Ranking, negocios recientes y footer siguen pendientes de una fase visual propia.
+- Home aun puede sentirse larga en mobile si la data real esta vacia.
+- No agregar metricas falsas, negocios inventados ni mapas decorativos sin respaldo de datos reales.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 19.4 antes de continuar con otra pantalla.
 
 ## QA recomendado para futuras fases
 

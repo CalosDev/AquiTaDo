@@ -10,46 +10,38 @@ type HowItWorksSectionProps = {
 
 export function HowItWorksSection({ steps }: HowItWorksSectionProps) {
     return (
-        <section className="defer-render-section mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8 md:py-8">
-            <div className="section-shell overflow-hidden p-5 md:p-7">
-                <div className="flag-ribbon opacity-70"></div>
-                <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <section className="defer-render-section mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 md:py-10">
+            <div className="border-b border-slate-200 pb-5 md:pb-6">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">
-                            <span className="flex items-center gap-1.5" aria-hidden="true">
-                                <span className="h-2 w-2 rounded-full bg-primary-900"></span>
-                                <span className="h-2 w-2 rounded-full bg-white ring-1 ring-slate-300"></span>
-                                <span className="h-2 w-2 rounded-full bg-accent-600"></span>
-                            </span>
-                            confianza y accion
-                        </div>
-                        <h2 className="section-title mt-4 !text-2xl md:!text-3xl">Como funciona AquiTa.do</h2>
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-700">Como se usa</p>
+                        <h2 className="section-title mt-2 !text-2xl md:!text-3xl">Como funciona AquiTa.do</h2>
                         <p className="section-subtitle mt-2 max-w-3xl">
-                            Un flujo simple para descubrir mejor, comparar con criterio y llegar al negocio correcto sin vueltas.
+                            Un flujo simple para encontrar opciones locales, revisar senales utiles y llegar al negocio correcto.
                         </p>
                     </div>
-                    <p className="text-sm font-semibold text-slate-500 md:max-w-xs">
-                        Pensado para decisiones rapidas en RD, no para perderte entre listados planos.
+                    <p className="text-sm text-slate-500 md:max-w-xs">
+                        Pensado para resolver rapido sin abrir varias paginas ni perder contexto.
                     </p>
                 </div>
-                <div className="mt-5 grid grid-cols-1 gap-3 md:mt-6 md:grid-cols-3 md:gap-4">
-                    {steps.map((step, index) => (
-                        <article key={step.step} className="panel-premium relative p-4 md:p-5">
-                            <div className="flex items-start gap-3 md:gap-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-700 text-sm font-black text-white shadow-lg shadow-primary-900/15 md:h-12 md:w-12">
-                                    {step.step}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-600">
-                                        Paso {index + 1}
-                                    </p>
-                                    <h3 className="mt-1.5 font-display text-lg font-semibold text-slate-900 md:text-xl">{step.title}</h3>
-                                </div>
+            </div>
+            <div className="mt-5 grid grid-cols-1 gap-3 md:mt-6 md:grid-cols-3 md:gap-4">
+                {steps.map((step, index) => (
+                    <article key={step.step} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 md:p-5">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-700 text-sm font-black text-white shadow-sm shadow-primary-900/15">
+                                {step.step}
                             </div>
-                            <p className="mt-3 text-sm leading-relaxed text-slate-600 md:mt-4">{step.description}</p>
-                        </article>
-                    ))}
-                </div>
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary-600">
+                                    Paso {index + 1}
+                                </p>
+                                <h3 className="mt-1 font-display text-lg font-semibold text-slate-900">{step.title}</h3>
+                            </div>
+                        </div>
+                        <p className="mt-3 text-sm leading-relaxed text-slate-600">{step.description}</p>
+                    </article>
+                ))}
             </div>
         </section>
     );

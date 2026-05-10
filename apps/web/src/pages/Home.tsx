@@ -562,38 +562,36 @@ export function Home() {
 
             <HowItWorksSection steps={HOW_IT_WORKS_STEPS} />
 
-            <section className="defer-render-section mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 md:py-8">
-                <div className="rounded-[1.75rem] border border-slate-200/80 bg-white/85 p-4 shadow-sm md:p-6">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                        <div>
-                            <h2 className="section-title !text-2xl md:!text-3xl">Explora por intención</h2>
-                            <p className="section-subtitle">Rutas rápidas para encontrar justo lo que necesitas.</p>
-                        </div>
+            <section className="defer-render-section mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 md:py-9">
+                <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-700">Explora por necesidad</p>
+                        <h2 className="section-title mt-2 !text-2xl md:!text-3xl">Encuentra lo que necesitas hoy</h2>
+                        <p className="section-subtitle mt-2">Rutas rapidas para buscar por uso real, no solo por categoria.</p>
                     </div>
-                    <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
-                        {INTENT_LINKS.map((intent) => (
-                            <Link
-                                key={intent.slug}
-                                to={`/negocios/intencion/${intent.slug}`}
-                                onClick={() => {
-                                    void trackGrowthEvent({
-                                        eventType: 'SEARCH_QUERY',
-                                        metadata: { source: 'home-intent-card', intent: intent.slug },
-                                    });
-                                }}
-                                className="group rounded-[1.25rem] border border-slate-200 bg-slate-50/75 p-3.5 transition-colors hover:border-primary-200 hover:bg-white hover:shadow-sm lg:min-h-[7.5rem]"
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary-600/80">Intención</p>
-                                        <p className="mt-1.5 font-display text-base font-semibold text-slate-900 md:text-lg">{intent.label}</p>
-                                        <p className="mt-1 text-sm leading-snug text-slate-600">{intent.subtitle}</p>
-                                    </div>
-                                    <IntentIcon icon={intent.icon} />
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    {INTENT_LINKS.map((intent) => (
+                        <Link
+                            key={intent.slug}
+                            to={`/negocios/intencion/${intent.slug}`}
+                            onClick={() => {
+                                void trackGrowthEvent({
+                                    eventType: 'SEARCH_QUERY',
+                                    metadata: { source: 'home-intent-card', intent: intent.slug },
+                                });
+                            }}
+                            className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 transition-colors hover:border-primary-200 hover:bg-primary-50/35 lg:min-h-[7.25rem]"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="font-display text-base font-semibold text-slate-900 md:text-lg">{intent.label}</p>
+                                    <p className="mt-1.5 text-sm leading-snug text-slate-600">{intent.subtitle}</p>
                                 </div>
-                            </Link>
-                        ))}
-                    </div>
+                                <IntentIcon icon={intent.icon} />
+                            </div>
+                        </Link>
+                    ))}
                 </div>
             </section>
 
