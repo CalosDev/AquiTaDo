@@ -897,39 +897,11 @@ export function DashboardBusiness() {
             {/* ═══ Tabs de workspace ═══ */}
             {activeOrganizationId && (
                 <section className="page-section">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <p className="page-kicker">{activeWorkspaceMeta.label}</p>
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                                Cambia de area sin salir del negocio actual. El panel mantiene el mismo contexto mientras te mueves.
-                            </p>
-                        </div>
-                        {selectedBusiness ? (
-                            <div className="grid gap-3 sm:grid-cols-3">
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Control</p>
-                                    <p className="mt-2 text-sm font-semibold text-slate-900">
-                                        {selectedBusiness.claimStatus === 'CLAIMED'
-                                            ? 'Activo'
-                                            : selectedBusiness.claimStatus === 'PENDING_CLAIM'
-                                                ? 'En revisión'
-                                                : 'Pendiente'}
-                                    </p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Verificación</p>
-                                    <p className="mt-2 text-sm font-semibold text-slate-900">
-                                        {verificationStatus ? statusLabel(verificationStatus.verificationStatus) : 'Sin enviar'}
-                                    </p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Perfil</p>
-                                    <p className="mt-2 text-sm font-semibold text-slate-900">
-                                        {selectedBusiness.profileCompletenessScore ?? 0}% completo
-                                    </p>
-                                </div>
-                            </div>
-                        ) : null}
+                    <div className="max-w-2xl">
+                        <p className="page-kicker">{activeWorkspaceMeta.label}</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                            Cambia de area sin salir del negocio actual. El panel mantiene el mismo contexto mientras te mueves.
+                        </p>
                     </div>
 
                     <div className="workspace-strip mt-5" role="tablist" aria-label="Áreas de trabajo">

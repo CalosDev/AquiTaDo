@@ -1800,6 +1800,61 @@ Proximo paso recomendado:
 - Fase 18.3 solo diseno del primer slice owner para reducir duplicacion entre `Control del negocio`, `Documentos y sello`, `Negocio activo`, `Resumen del negocio`, `Completa tu perfil` y `Revision y documentos`.
 - No implementar todavia sin aprobar el slice exacto.
 
+## Fase 18.4: limpieza del resumen duplicado owner
+
+Fase 18.4 implemento el primer slice owner aprobado. El cambio fue visual/estructural local y redujo duplicacion en el bloque de workspaces de `/dashboard`.
+
+Archivos tocados:
+
+- `apps/web/src/pages/DashboardBusiness.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-owner-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-owner-mobile.png`
+
+Cambio aplicado:
+
+- Se removieron las tres mini-cards duplicadas `Control`, `Verificacion` y `Perfil` dentro del header de workspaces.
+- Se mantuvo el titulo del workspace y la descripcion de contexto.
+- Se mantuvo el `workspace-strip` y todos los tabs.
+
+Comportamiento preservado:
+
+- `searchParams`, `readWorkspace`, `handleWorkspaceChange`, tabs, workspaces lazy, estado seleccionado, handlers, rutas, auth, permisos, org context, API, backend, DTOs y seed.
+- No se eliminaron funciones ni acciones; solo se bajo repeticion visual.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | No ejecutado por infraestructura: Docker daemon no disponible. |
+| `pnpm --filter @aquita/web build` | Pass |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | Diff esperado: desktop/mobile reducen altura por eliminacion de cards duplicadas. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline" --update-snapshots` | 2 passed; snapshots actualizados. |
+| `pnpm exec playwright test playwright/specs/visual.spec.ts --grep "owner dashboard (desktop\|mobile) baseline"` | 2 passed final. |
+| `pnpm qa:smoke` | Pass. |
+
+Notas:
+
+- La verificacion visual se corrio contra preview local en `127.0.0.1:4173` porque el QA stack no pudo levantar Docker.
+- El preview local fue detenido al cerrar la validacion.
+- Warning no bloqueante conocido: `Geoapify geocoding failed (HTTP 503)` durante unit tests.
+
+Resultado:
+
+- Owner dashboard queda menos repetitivo.
+- Mobile reduce altura visible antes de los pasos finales.
+- Se conserva navegacion por workspaces sin tocar URL state.
+
+Riesgos pendientes:
+
+- `Control del negocio`, `Documentos y sello`, `Completa tu perfil` y `Revision y documentos` todavia pueden consolidarse mas, pero eso requiere otro slice separado.
+- No tocar workspaces lazy ni `searchParams` sin fase dedicada.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 18.4.
+- Luego Fase 18.5 solo diseno para decidir si el siguiente recorte owner debe consolidar `Completa tu perfil` + `Revision y documentos`, o pasar a customer para reducir actividad profunda.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
