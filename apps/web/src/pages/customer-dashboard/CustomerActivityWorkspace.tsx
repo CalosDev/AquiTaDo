@@ -6,7 +6,6 @@ import {
     AppCard,
     EmptyState,
     EntityListItem,
-    KPIHeader,
     PageShell,
     SplitPanelLayout,
 } from '../../components/ui';
@@ -471,38 +470,51 @@ export function CustomerActivityWorkspace() {
                 ]}
             />
 
-            <KPIHeader
-                eyebrow="Tu actividad"
-                title="Reservas, check-ins e inbox"
-                description="Sigue tus experiencias recientes, tu progreso de loyalty y las conversaciones abiertas con negocios."
-                actions={(
+            <section className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="max-w-3xl">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-700">Tu actividad</p>
+                        <h2 className="mt-2 text-2xl font-bold tracking-normal text-slate-950">Reservas, check-ins e inbox</h2>
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+                            Sigue tus experiencias recientes, tu progreso de loyalty y las conversaciones abiertas con negocios.
+                        </p>
+                    </div>
                     <button type="button" className="btn-secondary text-sm" onClick={() => void loadCustomerActivity()}>
                         Actualizar actividad
                     </button>
-                )}
-                metrics={[
-                    {
-                        label: 'Reservas',
-                        value: formatNumberDo(bookings.total),
-                        delta: `${formatNumberDo(completedBookings)} completadas`,
-                    },
-                    {
-                        label: 'Check-ins',
-                        value: formatNumberDo(checkinSummary?.checkinCount ?? checkins.total),
-                        delta: `Racha ${formatNumberDo(checkinSummary?.checkinStreak ?? 0)}`,
-                    },
-                    {
-                        label: 'Loyalty points',
-                        value: formatNumberDo(checkinSummary?.loyaltyPoints ?? 0),
-                        delta: checkinSummary?.loyaltyTier || 'Sin tier aun',
-                    },
-                    {
-                        label: 'Conversaciones',
-                        value: formatNumberDo(conversations.total),
-                        delta: 'Abiertas y recientes',
-                    },
-                ]}
-            />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {[
+                        {
+                            label: 'Reservas',
+                            value: formatNumberDo(bookings.total),
+                            delta: `${formatNumberDo(completedBookings)} completadas`,
+                        },
+                        {
+                            label: 'Check-ins',
+                            value: formatNumberDo(checkinSummary?.checkinCount ?? checkins.total),
+                            delta: `Racha ${formatNumberDo(checkinSummary?.checkinStreak ?? 0)}`,
+                        },
+                        {
+                            label: 'Loyalty points',
+                            value: formatNumberDo(checkinSummary?.loyaltyPoints ?? 0),
+                            delta: checkinSummary?.loyaltyTier || 'Sin tier aun',
+                        },
+                        {
+                            label: 'Conversaciones',
+                            value: formatNumberDo(conversations.total),
+                            delta: 'Abiertas y recientes',
+                        },
+                    ].map((metric) => (
+                        <div key={metric.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{metric.label}</p>
+                            <p className="mt-1.5 text-xl font-bold tracking-normal text-slate-950">{metric.value}</p>
+                            <p className="mt-1 text-xs font-medium text-slate-600">{metric.delta}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 <AppCard title="Mis reservas" description="Agenda y estados de las experiencias que ya apartaste o que siguen pendientes.">
