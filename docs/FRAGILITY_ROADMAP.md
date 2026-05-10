@@ -1767,6 +1767,39 @@ Proximo paso recomendado:
 
 - Antes de seguir puliendo dashboard, hacer una auditoria read-only de duplicacion y exceso de informacion en los dashboards de los tres roles. No redisenar mas pantallas complejas sin baseline y contrato de datos claro.
 
+## Fase 18.2: mapa de arquitectura de informacion de dashboards
+
+Fase 18.2 documento el problema transversal de dashboards por rol sin modificar runtime. El objetivo fue evitar seguir agregando ajustes visuales aislados y ordenar las proximas fases segun la funcion real de cada pantalla.
+
+Archivo creado:
+
+- `docs/DASHBOARD_INFORMATION_ARCHITECTURE_MAP.md`
+
+Hallazgos principales:
+
+- `CustomerDashboard` mezcla panel personal, favoritos, listas, reservas, check-ins, inbox e hilo seleccionado en una sola vista.
+- `DashboardBusiness` repite control, verificacion, perfil, negocio activo y revision documental en varias secciones.
+- `AdminDashboard` sigue siendo el mas sensible por tabs, permisos, acciones destructivas, tablas y multiples contratos de datos.
+- `DashboardLayout` suma contexto activo y accion rapida que pueden duplicar headers y CTAs locales.
+
+Principios definidos:
+
+- Una pantalla, una intencion principal.
+- Una seccion, una funcion.
+- Un CTA principal por viewport.
+- No duplicar estados en formatos distintos.
+- Bajar peso visual antes de eliminar funciones.
+- No tocar `searchParams`, permisos, API ni workspaces lazy en fases visuales.
+
+Que NO se toco:
+
+- `DashboardBusiness.tsx`, `CustomerDashboard.tsx`, `AdminDashboard.tsx`, `DashboardLayout.tsx`, rutas, auth, permisos, org context, `searchParams`, API, backend, DTOs, estilos runtime, snapshots ni tests.
+
+Proximo paso recomendado:
+
+- Fase 18.3 solo diseno del primer slice owner para reducir duplicacion entre `Control del negocio`, `Documentos y sello`, `Negocio activo`, `Resumen del negocio`, `Completa tu perfil` y `Revision y documentos`.
+- No implementar todavia sin aprobar el slice exacto.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
