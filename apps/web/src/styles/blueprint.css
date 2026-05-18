@@ -563,14 +563,14 @@
   }
 
   .auth-grid {
-    @apply grid items-start gap-5 lg:grid-cols-[minmax(0,0.78fr)_minmax(420px,520px)];
+    @apply grid items-start gap-6 lg:grid-cols-[minmax(0,0.72fr)_minmax(400px,500px)];
   }
 
   .auth-aside-card {
-    @apply relative hidden overflow-hidden rounded-[34px] border p-7 text-white lg:flex lg:flex-col lg:gap-6;
-    background: linear-gradient(155deg, #0b1f4f 0%, #123f8f 58%, #185bc2 100%);
-    border-color: rgba(191, 219, 254, 0.2);
-    box-shadow: 0 24px 58px -44px rgba(15, 23, 42, 0.54);
+    @apply relative hidden overflow-hidden rounded-[28px] border p-6 text-white lg:flex lg:flex-col lg:gap-5;
+    background: linear-gradient(155deg, #102a5f 0%, #16468b 58%, #1d5fa8 100%);
+    border-color: rgba(191, 219, 254, 0.18);
+    box-shadow: 0 20px 44px -36px rgba(15, 23, 42, 0.48);
   }
 
   .auth-aside-card::after {
@@ -578,17 +578,17 @@
   }
 
   .auth-form-card {
-    @apply rounded-[32px] border bg-white p-6 shadow-xl shadow-slate-900/5 md:p-8;
+    @apply rounded-[26px] border bg-white p-5 shadow-lg shadow-slate-900/5 md:p-7;
     border-color: rgba(226, 232, 240, 0.95);
     box-shadow: var(--shadow-panel);
   }
 
   .auth-mini-card {
-    @apply rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-md;
+    @apply rounded-[20px] border border-white/12 bg-white/6 p-4 backdrop-blur-md;
   }
 
   .auth-point {
-    @apply flex items-start gap-3 rounded-[20px] border border-white/12 bg-white/6 px-4 py-3 text-sm text-blue-50;
+    @apply flex items-start gap-3 rounded-[16px] border border-white/12 bg-white/5 px-3.5 py-2.5 text-sm text-blue-50;
   }
 
   .app-topbar {

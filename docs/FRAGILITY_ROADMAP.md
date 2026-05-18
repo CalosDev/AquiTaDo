@@ -2393,6 +2393,61 @@ Proximo paso recomendado:
 - Commit/push de Fase 20.2 como bloque separado.
 - Luego ejecutar Fase 20.3: simplificacion visual minima de `AuthPageShell`, solo clases/estilos compartidos y con QA visual de Login/Register/Forgot/Reset desktop/mobile.
 
+## Fase 20.3: AuthPageShell visual simplification
+
+Fase 20.3 aplico un ajuste visual minimo al shell compartido de auth para reducir la sensacion de landing pesada en desktop y mantener el foco de formulario en mobile. No se tocaron componentes React, copy, auth, formularios, handlers, validaciones, rutas, API, tracking ni backend.
+
+Archivo tocado:
+
+- `apps/web/src/styles/blueprint.css`
+
+Snapshots actualizados:
+
+- `playwright/specs/__snapshots__/visual.spec.ts/login-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/login-mobile.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-mobile.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/forgot-password-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/forgot-password-mobile.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/reset-password-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/reset-password-mobile.png`
+
+Cambios principales:
+
+- `auth-grid` ajusto proporcion y spacing para que el panel lateral no domine tanto el viewport desktop.
+- `auth-aside-card` redujo radio, padding, sombra y saturacion del gradiente.
+- `auth-form-card` redujo radio/padding y mantuvo card blanca limpia para foco en formulario.
+- `auth-mini-card` y `auth-point` redujeron peso visual sin cambiar contenido ni estructura funcional.
+
+Comportamiento preservado:
+
+- Login, Register, ForgotPassword y ResetPassword siguen usando las mismas rutas, formularios, props, submit handlers, validaciones, errores, auth flow, Google auth, 2FA, recovery flow, reset flow, API y tracking.
+- No se tocaron `AuthPageShell.tsx`, `Login.tsx`, `Register.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx`, `AuthContext`, `api/client.ts`, `endpoints.ts` ni backend.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register\|forgot password\|reset password) (desktop\|mobile) baseline"` | Diff esperado en los 8 snapshots antes de actualizar. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register\|forgot password\|reset password) (desktop\|mobile) baseline" --update-snapshots` | Pass: `8 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register\|forgot password\|reset password) (desktop\|mobile) baseline"` | Pass final: `8 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests verdes (`web 19 files / 56 tests`, `api 24 files / 114 tests`). |
+
+Warnings no bloqueantes:
+
+- El primer visual fallo por diff esperado del cambio de CSS.
+- `run-with-qa-stack` levanto DB/Redis, ejecuto migraciones, seed y build API/web.
+- Prisma Client 7.8.0 se genero durante QA sin cambios de schema.
+- Geoapify 503 conocido en `IntegrationsService` sigue siendo warning no bloqueante.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- El shell de auth ya esta mas sobrio, pero Login/Register/Forgot/Reset siguen siendo pantallas de formulario; no deben recibir mas adornos visuales sin necesidad.
+- No tocar auth, refresh/logout/session sync, Google auth, 2FA, recovery/reset backend ni validaciones sin fase dedicada.
+- Siguiente bloque visual recomendado: diagnostico de dashboards por rol, porque el usuario reporto pantallas amplias, cargadas y poco orientadas a producto.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
