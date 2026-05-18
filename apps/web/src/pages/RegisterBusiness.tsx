@@ -692,9 +692,9 @@ export function RegisterBusiness() {
 
         if (currentStep === 2) {
             return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="register-business-phone" className="text-sm font-medium text-gray-700 mb-1 block">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-phone" className="block text-sm font-semibold text-gray-800">
                             Teléfono
                         </label>
                         <input
@@ -708,8 +708,8 @@ export function RegisterBusiness() {
                             placeholder="+1 809-555-0000"
                         />
                     </div>
-                    <div>
-                        <label htmlFor="register-business-whatsapp" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-whatsapp" className="block text-sm font-semibold text-gray-800">
                             WhatsApp
                         </label>
                         <input
@@ -723,8 +723,8 @@ export function RegisterBusiness() {
                             placeholder="+1 809-555-0000"
                         />
                     </div>
-                    <div>
-                        <label htmlFor="register-business-website" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-website" className="block text-sm font-semibold text-gray-800">
                             Website
                         </label>
                         <input
@@ -738,8 +738,8 @@ export function RegisterBusiness() {
                             placeholder="https://negocio.do"
                         />
                     </div>
-                    <div>
-                        <label htmlFor="register-business-email" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-email" className="block text-sm font-semibold text-gray-800">
                             Email
                         </label>
                         <input
@@ -753,8 +753,8 @@ export function RegisterBusiness() {
                             placeholder="hola@negocio.do"
                         />
                     </div>
-                    <div>
-                        <label htmlFor="register-business-price-range" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-price-range" className="block text-sm font-semibold text-gray-800">
                             Rango de precio
                         </label>
                         <select
@@ -773,8 +773,8 @@ export function RegisterBusiness() {
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label htmlFor="register-business-instagram" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-instagram" className="block text-sm font-semibold text-gray-800">
                             Instagram
                         </label>
                         <input
@@ -788,8 +788,8 @@ export function RegisterBusiness() {
                             placeholder="https://instagram.com/tu-negocio"
                         />
                     </div>
-                    <div>
-                        <label htmlFor="register-business-facebook" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-facebook" className="block text-sm font-semibold text-gray-800">
                             Facebook
                         </label>
                         <input
@@ -803,8 +803,8 @@ export function RegisterBusiness() {
                             placeholder="https://facebook.com/tu-negocio"
                         />
                     </div>
-                    <div>
-                        <label htmlFor="register-business-tiktok" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-tiktok" className="block text-sm font-semibold text-gray-800">
                             TikTok
                         </label>
                         <input
@@ -818,11 +818,11 @@ export function RegisterBusiness() {
                             placeholder="https://tiktok.com/@tu-negocio"
                         />
                     </div>
-                    <p className="sm:col-span-2 text-xs text-gray-500">
+                    <p className="text-xs leading-relaxed text-gray-500 sm:col-span-2">
                         Completa al menos WhatsApp, website o email para que la ficha sea util desde el primer dia.
                     </p>
-                    <div className="sm:col-span-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-                        <p className="font-medium text-gray-900">Resumen de contacto</p>
+                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-gray-700 sm:col-span-2">
+                        <p className="font-semibold text-gray-900">Resumen de contacto</p>
                         <p className="mt-1">
                             {formData.whatsapp.trim() || formData.phone.trim() || formData.website.trim() || formData.email.trim()
                                 ? 'Ya hay al menos un canal claro para recibir contactos.'

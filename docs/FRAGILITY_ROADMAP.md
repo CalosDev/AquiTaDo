@@ -2773,6 +2773,52 @@ Proximo paso recomendado:
 - Commit/push de Fase 21.8 como bloque separado.
 - Luego elegir si el siguiente slice seguro es un ajuste visual de otro paso del formulario o una pausa para revisar el flujo completo antes de mas cambios.
 
+## Fase 21.10: RegisterBusiness step two contact cleanup
+
+Fase 21.10 aplico un slice visual minimo sobre el paso 2 de `RegisterBusiness`. El objetivo fue hacer mas consistente el bloque de contacto con el paso 1 sin cambiar estado, handlers, validaciones, navegacion ni envio.
+
+Archivos tocados:
+
+- `apps/web/src/pages/RegisterBusiness.tsx`
+
+Cambios principales:
+
+- Los labels del paso 2 quedaron alineados con la jerarquia visual del paso 1.
+- Cada campo de contacto usa spacing local consistente entre label e input.
+- El grid conserva dos columnas en desktop y una columna en mobile, con spacing ligeramente mas respirable.
+- El helper y el resumen de contacto bajaron el tono tecnico sin cambiar contenido ni condiciones.
+
+Comportamiento preservado:
+
+- No se tocaron `value`, `onChange`, `setFormData`, `formData`, validaciones, duplicate precheck, submit, navegacion de pasos, API, tracking, rutas, auth, backend, seed ni contratos.
+- No se tocaron pasos 3-4, geolocalizacion, categorias, horarios, upload, imagenes ni reglas de publicacion.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business (desktop\|mobile) baseline"` | Pass: `2 passed`; snapshots existentes estables. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests verdes (`web 19 files / 56 tests`, `api 24 files / 114 tests`). |
+
+Warnings no bloqueantes:
+
+- `run-with-qa-stack` levanto DB/Redis, ejecuto migraciones, seed y build API/web.
+- Prisma Client 7.8.0 se genero durante QA sin cambios de schema.
+- `qa:smoke` mantiene el warning conocido `Geoapify geocoding failed (HTTP 503)`.
+- Windows puede reportar LF/CRLF en archivos tocados.
+
+Riesgos pendientes:
+
+- El baseline visual actual de `RegisterBusiness` cubre el paso inicial; si se quieren cambios mas profundos en pasos 2-4, conviene agregar snapshots especificos por paso antes de tocar mas UI.
+- Paso 3 sigue siendo mas delicado por provincia/ciudad/sector y geolocalizacion.
+- Paso 4 sigue siendo mas delicado por categorias, features, horarios, resumen, imagenes y submit.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 21.10 como bloque separado.
+- Antes de tocar paso 3 o paso 4, disenar si conviene crear baseline visual especifico por paso para evitar cambios a ciegas.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
