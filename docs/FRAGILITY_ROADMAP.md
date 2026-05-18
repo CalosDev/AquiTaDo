@@ -2576,6 +2576,56 @@ Proximo paso recomendado:
 
 - Commit/push de Fase 21.3 y luego disenar un slice visual minimo para `RegisterBusiness` primer viewport.
 
+## Fase 21.4: RegisterBusiness first viewport cleanup
+
+Fase 21.4 aplico un slice visual minimo sobre el primer viewport de `RegisterBusiness`. El objetivo fue reducir la sensacion de tarjetas tecnicas/anidadas antes del formulario multi-step, sin cambiar comportamiento ni mover logica.
+
+Archivos tocados:
+
+- `apps/web/src/pages/RegisterBusiness.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-mobile.png`
+
+Cambios principales:
+
+- El bloque superior dejo de estar dentro de `AppCard` y paso a un `section` plano con padding lateral minimo.
+- Se redujo el spacing vertical general del `PageShell`.
+- La envoltura principal del formulario redujo padding para ganar contenido visible en el primer viewport.
+- Las cards de `Paso actual` y `Estado del registro` bajaron peso visual: radios/padding menores, fondo mas sobrio y sin sombra adicional.
+- Se actualizaron los snapshots visuales desktop/mobile de `RegisterBusiness`.
+
+Comportamiento preservado:
+
+- No se tocaron formulario, validaciones, submit, upload, geolocalizacion, duplicate precheck, tracking runtime, rutas, auth, API, backend, seed ni contratos.
+- No se tocaron handlers, estados, `useEffect`, datos base, ciudades/sectores, revision final ni publicacion.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business (desktop\|mobile) baseline"` | Diff visual esperado antes de actualizar snapshots. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests verdes (`web 19 files / 56 tests`, `api 24 files / 114 tests`). |
+
+Warnings no bloqueantes:
+
+- `run-with-qa-stack` levanto DB/Redis, ejecuto migraciones, seed y build API/web.
+- Prisma Client 7.8.0 se genero durante QA sin cambios de schema.
+- `qa:smoke` mantiene el warning conocido `Geoapify geocoding failed (HTTP 503)`.
+- `git diff --check` puede reportar LF/CRLF en Windows sin bloquear si sale con codigo 0.
+
+Riesgos pendientes:
+
+- El flujo completo de `RegisterBusiness` sigue siendo sensible por formulario multi-step, validaciones, duplicate precheck, upload, geolocalizacion y publicacion.
+- No tocar submit, validaciones, geolocalizacion, duplicados, API, tracking ni revision final sin fase dedicada.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 21.4 como bloque separado.
+- Luego iniciar diagnostico visual de `RegisterBusiness` paso/formulario interno o pasar a una vista menos riesgosa si se quiere reducir ruido visual sin tocar flujos de alta friccion.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

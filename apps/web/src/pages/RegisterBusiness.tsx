@@ -1068,8 +1068,8 @@ export function RegisterBusiness() {
     };
 
     return (
-        <PageShell width="wide" className="space-y-6">
-            <AppCard>
+        <PageShell width="wide" className="space-y-5">
+            <section className="px-1 sm:px-0">
                 <PageIntroCompact
                     eyebrow="Panel negocio"
                     title="Registra tu negocio"
@@ -1081,10 +1081,10 @@ export function RegisterBusiness() {
                         </ActionBar>
                     )}
                 />
-            </AppCard>
-            <div className="section-shell p-6 sm:p-8">
-                <div className="mb-8 grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,340px)]">
-                    <AppCard className="rounded-[28px] border-primary-100 bg-gradient-to-br from-primary-50 via-white to-white p-5 sm:p-6">
+            </section>
+            <div className="section-shell p-4 sm:p-6">
+                <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,340px)]">
+                    <AppCard className="rounded-[24px] border-primary-100 bg-white p-4 shadow-none sm:p-5">
                         <PageIntroCompact
                             eyebrow="Paso actual"
                             title={currentStepMeta.title}
@@ -1101,7 +1101,7 @@ export function RegisterBusiness() {
                     <AppCard
                         title="Estado del registro"
                         description="Revisa rapido si ya tienes lo necesario para publicar con buena presentacion."
-                        className="rounded-[28px] border-slate-200 bg-slate-950/[0.03] p-5"
+                        className="rounded-[24px] border-slate-200 bg-slate-50/80 p-4 shadow-none"
                     >
                         <div className="mt-4 grid grid-cols-2 gap-3">
                             <MetricCard label="Avance" value={`${progressPercentage}%`} className="border border-white bg-white shadow-sm" />
