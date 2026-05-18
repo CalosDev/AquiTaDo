@@ -1100,6 +1100,38 @@ test.describe('Visual baselines @visual', () => {
         await expect(page).toHaveScreenshot('register-desktop.png', { fullPage: true });
     });
 
+    test('forgot password mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await disableMotionForVisuals(page);
+        await page.goto('/forgot-password');
+        await expect(page.getByRole('heading', { name: /Recupera tu acceso/i })).toBeVisible();
+        await expect(page).toHaveScreenshot('forgot-password-mobile.png', { fullPage: true });
+    });
+
+    test('forgot password desktop baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 1200 });
+        await disableMotionForVisuals(page);
+        await page.goto('/forgot-password');
+        await expect(page.getByRole('heading', { name: /Recupera tu acceso/i })).toBeVisible();
+        await expect(page).toHaveScreenshot('forgot-password-desktop.png', { fullPage: true });
+    });
+
+    test('reset password mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await disableMotionForVisuals(page);
+        await page.goto('/reset-password?token=visual-token');
+        await expect(page.getByRole('heading', { name: /Define una contrase/i })).toBeVisible();
+        await expect(page).toHaveScreenshot('reset-password-mobile.png', { fullPage: true });
+    });
+
+    test('reset password desktop baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 1200 });
+        await disableMotionForVisuals(page);
+        await page.goto('/reset-password?token=visual-token');
+        await expect(page.getByRole('heading', { name: /Define una contrase/i })).toBeVisible();
+        await expect(page).toHaveScreenshot('reset-password-desktop.png', { fullPage: true });
+    });
+
     test('admin dashboard baseline @visual', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 1200 });
         await stabilizeVisualRuntime(page);

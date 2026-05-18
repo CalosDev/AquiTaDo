@@ -2343,8 +2343,55 @@ Riesgos pendientes:
 
 Proximo paso recomendado:
 
-- Correr `pnpm qa:smoke` y, si pasa, commit/push de Fase 20.1 como bloque separado.
-- Luego disenar Fase 20.2: simplificacion visual del `AuthPageShell` desktop/mobile, sin tocar logica de auth.
+- Fase 20.1 quedo cerrada, commiteada y pusheada como bloque separado.
+- Antes de simplificar `AuthPageShell`, agregar baseline visual de las pantallas de recuperacion para proteger el shell compartido.
+
+## Fase 20.2: Forgot/Reset password visual baselines
+
+Fase 20.2 agrego baseline visual para las pantallas de recuperacion de acceso antes de tocar el shell compartido de auth. No se cambio UI, copy, estilos, auth, API, runtime, rutas ni seed.
+
+Archivos tocados:
+
+- `playwright/specs/visual.spec.ts`
+- `playwright/specs/__snapshots__/visual.spec.ts/forgot-password-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/forgot-password-mobile.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/reset-password-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/reset-password-mobile.png`
+
+Baselines agregados:
+
+- `/forgot-password` mobile, viewport `390 x 844`, snapshot `forgot-password-mobile.png`.
+- `/forgot-password` desktop, viewport `1440 x 1200`, snapshot `forgot-password-desktop.png`.
+- `/reset-password?token=visual-token` mobile, viewport `390 x 844`, snapshot `reset-password-mobile.png`.
+- `/reset-password?token=visual-token` desktop, viewport `1440 x 1200`, snapshot `reset-password-desktop.png`.
+
+Comportamiento preservado:
+
+- No se tocaron formularios, validaciones, handlers, rutas, auth, backend, API real, seed, estilos ni componentes compartidos.
+- `reset-password` usa un token visual ficticio para renderizar el formulario sin depender de backend real.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(forgot password\|reset password) (desktop\|mobile) baseline" --update-snapshots` | Pass: `4 passed`; snapshots creados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(forgot password\|reset password) (desktop\|mobile) baseline"` | Pass final: `4 passed`. |
+
+Warnings no bloqueantes:
+
+- `run-with-qa-stack` levanto DB/Redis, ejecuto migraciones, seed, build API/web y uso Prisma Client 7.8.0 durante `prisma generate`, sin cambios de schema.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- `AuthPageShell` sigue siendo visualmente pesado en desktop por su panel lateral, sombras y composicion tipo landing.
+- Cualquier ajuste de `AuthPageShell` afecta Login, Register, ForgotPassword y ResetPassword, por eso debe hacerse en un slice visual separado y con los 8 baselines de auth.
+- No tocar auth, refresh, logout, session sync, Google auth, 2FA, validaciones ni API en ese slice.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 20.2 como bloque separado.
+- Luego ejecutar Fase 20.3: simplificacion visual minima de `AuthPageShell`, solo clases/estilos compartidos y con QA visual de Login/Register/Forgot/Reset desktop/mobile.
 
 ## QA recomendado para futuras fases
 
