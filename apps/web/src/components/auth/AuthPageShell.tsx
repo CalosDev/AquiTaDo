@@ -55,7 +55,7 @@ export function AuthPageShell({
                             AquiTa.do
                         </p>
                         <p className="mt-2 text-sm leading-6 text-slate-100">
-                            Discovery, operacion SaaS y administracion bajo un mismo sistema visual.
+                            Directorio local, perfiles de negocio y herramientas de gestión bajo una experiencia clara.
                         </p>
                     </div>
                 </aside>

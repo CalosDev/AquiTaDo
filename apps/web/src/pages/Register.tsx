@@ -137,13 +137,13 @@ export function Register() {
         <AuthPageShell
             eyebrow="Registro"
             title="Crea tu cuenta"
-            description="Elige claramente si entrarás como cliente o como negocio. La estructura es progresiva, directa y preparada para crecer sin saturarte."
-            asideTitle="Un registro que separa intención de superficie"
-            asideBody="AquiTa.do distingue discovery, operación SaaS y administración. Por eso el alta define desde el inicio qué tipo de experiencia necesitas."
+            description="Elige si usarás AquiTa.do para explorar negocios o para registrar y gestionar tu negocio local."
+            asideTitle="Elige cómo quieres usar AquiTa.do"
+            asideBody="Crea una cuenta para buscar opciones locales o para preparar la presencia de tu negocio en el directorio."
             asidePoints={[
                 'Cuenta cliente para explorar, guardar y reservar.',
-                'Cuenta negocio para publicar y operar tu presencia comercial.',
-                'Términos claros y onboarding más progresivo.',
+                'Cuenta negocio para registrar y gestionar tu presencia local.',
+                'Términos claros y alta directa desde el primer paso.',
             ]}
             footer={(
                 <p className="text-center">

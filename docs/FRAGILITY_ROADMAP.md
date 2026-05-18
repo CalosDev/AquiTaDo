@@ -2291,6 +2291,61 @@ Proximo paso recomendado:
 - Commit/push del bloque Home si el usuario quiere cerrar esta tanda.
 - Luego hacer una revision global por vistas y decidir el siguiente bloque de lanzamiento: `Login/Register`, `BusinessesList` o dashboards por rol. No abrir redisenos grandes sin baseline y contrato claro.
 
+## Fase 20.1: Login/Register copy product-first
+
+Fase 20.1 aplico un slice pequeno de copy visible en las pantallas de acceso y registro para retirar lenguaje tecnico/de demo y acercarlas a un producto real para usuarios y negocios. No se tocaron auth, formularios, validaciones, Google login, 2FA, rutas, tracking, API ni estado.
+
+Archivos tocados:
+
+- `apps/web/src/pages/Login.tsx`
+- `apps/web/src/pages/Register.tsx`
+- `apps/web/src/components/auth/AuthPageShell.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/login-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/login-mobile.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-mobile.png`
+
+Cambio aplicado:
+
+- Login removio lenguaje como `discovery`, `operacion SaaS`, `administracion`, `landing` y `ruido visual`.
+- Login ahora comunica acceso para explorar negocios, gestionar perfil o continuar con el negocio en AquiTa.do.
+- Register removio lenguaje como `intencion de superficie`, `operacion SaaS`, `administracion` y `onboarding`.
+- Register ahora separa de forma mas natural explorar negocios vs registrar/gestionar negocio local.
+- `AuthPageShell` removio el cierre tecnico `Discovery, operacion SaaS y administracion` y lo reemplazo por lenguaje de directorio local, perfiles de negocio y herramientas de gestion.
+- No se cambiaron estilos, componentes de formulario, props funcionales, copy de errores backend ni copy legal.
+
+Comportamiento preservado:
+
+- `login`, `loginWithGoogle`, `register`, `navigate('/app')`, 2FA, `pendingGoogleIdToken`, `trackGrowthEvent`, validaciones de password, terminos, account type, rutas `/login` y `/register`, recuperacion de acceso y links entre login/register.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `rg -n "SaaS|landing|ruido visual|superficie|onboarding|discovery|administraci[oó]n bajo|operaci[oó]n SaaS|Discovery" apps/web/src/pages/Login.tsx apps/web/src/pages/Register.tsx apps/web/src/components/auth/AuthPageShell.tsx` | Pass por ausencia de matches. |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.integration.config.ts src/tests/integration/Login.integration.test.tsx` | Pass: `1 file / 2 tests`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline" --update-snapshots` | Pass: `4 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "(login\|register) (desktop\|mobile) baseline"` | Pass final: `4 passed`. |
+
+Warnings no bloqueantes:
+
+- El primer visual fallo por diff esperado del cambio de copy.
+- `run-with-qa-stack` uso Prisma Client 7.8.0 durante `prisma generate`, sin cambios de schema.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- Login/Register aun comparten una composicion desktop con panel lateral pesado; si se decide seguir, debe ser otro slice visual sobre `AuthPageShell` con baseline antes/despues.
+- No tocar auth, refresh, logout, session sync, Google auth, 2FA ni validaciones sin fase especifica.
+- No cambiar el flujo de account type de Register sin pruebas de caracterizacion adicionales.
+
+Proximo paso recomendado:
+
+- Correr `pnpm qa:smoke` y, si pasa, commit/push de Fase 20.1 como bloque separado.
+- Luego disenar Fase 20.2: simplificacion visual del `AuthPageShell` desktop/mobile, sin tocar logica de auth.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

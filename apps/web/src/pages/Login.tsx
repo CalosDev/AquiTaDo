@@ -114,13 +114,13 @@ export function Login() {
         <AuthPageShell
             eyebrow="Acceso"
             title="Entra a tu cuenta"
-            description="Accede rápido a discovery, operación SaaS o administración según tu rol, sin ruido visual ni pasos innecesarios."
-            asideTitle="Todo el producto, desde el mismo acceso"
-            asideBody="El login ya no se siente como una landing. La prioridad es ubicarte rápido en tu área de trabajo y mostrar solo lo esencial."
+            description="Accede a tu cuenta para explorar negocios, gestionar tu perfil o continuar con tu negocio en AquiTa.do."
+            asideTitle="Tu acceso a AquiTa.do"
+            asideBody="Entra para seguir buscando opciones locales, administrar tu perfil o continuar la gestión de tu negocio desde un solo lugar."
             asidePoints={[
                 'Acceso con correo o Google, según disponibilidad.',
                 'Segundo factor solo cuando de verdad aplica.',
-                'Recuperación de acceso clara y sin fricción visual.',
+                'Recuperación de acceso clara cuando la necesites.',
             ]}
             footer={(
                 <p className="text-center">
