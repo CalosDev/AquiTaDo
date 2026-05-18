@@ -53,7 +53,7 @@ Este documento convierte el diagnostico de fragilidad en una base de trabajo seg
 | `/security` admin security | not-covered | Alto: 2FA/admin security y permisos. | No encontrada. | Acceptance basica ADMIN y bloqueo USER/BUSINESS_OWNER. |
 | Observability metrics | pass | Alto: endpoint sensible debe bloquear anonimo/no-admin. | `playwright/specs/admin-observability.e2e.spec.ts`, `apps/api/src/observability/observability.e2e.spec.ts` | Agregar summary/reset si se modifican metricas publicas. |
 | PWA offline/reconnect | partial | Alto: contenido stale, SW activo y refetch. | `offline.e2e.spec.ts`, `AppRuntimeStatus.integration.test.tsx`, `scripts/check-pwa-offline-contract.mjs` como check estatico report-only. | Caracterizar hard refresh offline en `/` y `/businesses`, luego offline privado con sesion valida. |
-| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home desktop/mobile, Login/Register desktop/mobile, admin, `/profile` desktop/mobile, `/businesses` desktop/mobile y `BusinessDetails` desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual a Dashboard, RegisterBusiness y vistas auth/profile por rol antes de refactors visuales mayores. |
+| Visual baselines | partial mejorado | Medio: protege cambios accidentales en home desktop/mobile, Login/Register desktop/mobile, admin, `/profile` desktop/mobile, `/businesses` desktop/mobile, `BusinessDetails` desktop/mobile y `RegisterBusiness` pasos 1-4 desktop/mobile. | `playwright/specs/visual.spec.ts` | Ampliar cobertura visual a vistas restantes por rol antes de refactors visuales mayores. |
 | Accessibility baseline | partial | Medio: solo home y login. | `playwright/specs/a11y.spec.ts` | Agregar businesses, register-business y admin. |
 | Public API businesses/search | partial | Alto: contratos publicos, filtros y ranking. | `apps/api/src/businesses/businesses.e2e.spec.ts`, `apps/api/src/search/discovery-ranking.spec.ts` | Snapshot contractual de shape publico para lista/detalle/search. |
 | Claims, ownership y catalogo admin | partial | Alto: permisos, auditoria, org ownership y mutaciones. | `apps/api/src/businesses/*helpers.spec.ts`, `businesses.e2e.spec.ts` | E2E de permisos por rol y org con payload minimo por endpoint critico. |
@@ -2818,6 +2818,61 @@ Proximo paso recomendado:
 
 - Commit/push de Fase 21.10 como bloque separado.
 - Antes de tocar paso 3 o paso 4, disenar si conviene crear baseline visual especifico por paso para evitar cambios a ciegas.
+
+## Fase 21.11: RegisterBusiness step visual baselines
+
+Fase 21.11 agrego baselines visuales deterministas para los pasos 2, 3 y 4 de `RegisterBusiness` antes de tocar mas UI del formulario. El objetivo fue dejar protegidos los estados intermedios del multi-step, especialmente contacto, ubicacion y categorias, sin modificar producto.
+
+Archivos tocados:
+
+- `playwright/specs/visual.spec.ts`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-step-2-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-step-2-mobile.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-step-3-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-step-3-mobile.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-step-4-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-step-4-mobile.png`
+
+Cambios principales:
+
+- Se agregaron snapshots visuales para pasos 2, 3 y 4 en desktop y mobile.
+- Se reutilizo la sesion visual de owner y los mocks deterministas existentes del flujo de `RegisterBusiness`.
+- Se agregaron mocks deterministas para ciudades y sectores, evitando dependencia de datos reales al avanzar al paso de ubicacion.
+- Se agrego un helper de avance de pasos dentro de `visual.spec.ts` que llena solo datos minimos necesarios para llegar a los pasos visuales.
+- Se estabilizo el screenshot de pasos intermedios con `scrollTo(0, 0)` antes de capturar, para evitar diferencias por posicion de viewport y barras sticky en full-page screenshots.
+
+Comportamiento preservado:
+
+- No se toco UI de producto, estilos runtime, copy, logica, validaciones, submit, `searchParams`, tracking, API real, seed, backend, auth, geolocalizacion, upload, categorias reales ni contratos.
+- La unica modificacion fue de test visual/snapshots.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business step (2\|3\|4)" --update-snapshots` | Pass final: `6 passed`; snapshots de pasos 2-4 regenerados. Un intento previo detecto un helper no determinista por texto de boton y se corrigio solo en `visual.spec.ts`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business step (2\|3\|4)"` | Pass final: `6 passed`. Un intento previo detecto inestabilidad de viewport/sticky bar en desktop steps 3/4 y se corrigio solo en el helper visual. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business"` | Pass: `8 passed`, incluyendo baselines existentes y nuevos. |
+| `pnpm --filter @aquita/web typecheck` | Pass. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests verdes (`web 19 files / 56 tests`, `api 24 files / 114 tests`). |
+
+Warnings no bloqueantes:
+
+- `run-with-qa-stack` levanto DB/Redis, ejecuto migraciones, seed y build API/web.
+- Prisma Client 7.8.0 se genero durante QA sin cambios de schema.
+- `qa:smoke` mantiene el warning conocido `Geoapify geocoding failed (HTTP 503)`.
+- Windows puede reportar LF/CRLF en archivos tocados.
+
+Riesgos pendientes:
+
+- Paso 3 sigue siendo delicado por provincia/ciudad/sector y geolocalizacion; ahora tiene baseline visual antes de cualquier cleanup.
+- Paso 4 sigue siendo delicado por categorias, features, horarios, resumen, imagenes y submit; ahora tiene baseline visual antes de cualquier cleanup.
+- No tocar validaciones, flujo real, geolocalizacion, upload, API, tracking, categorias reales ni reglas de publicacion sin fase dedicada.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 21.11 como bloque separado.
+- Luego disenar el primer slice visual de paso 3, limitado a labels/spacing/jerarquia local del bloque de ubicacion, sin tocar selects dependientes, geolocalizacion, handlers, validaciones ni submit.
 
 ## QA recomendado para futuras fases
 

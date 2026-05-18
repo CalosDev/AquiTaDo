@@ -14,6 +14,14 @@ const VISUAL_BUSINESS_PROVINCES = [
     { id: 'prov-santiago', name: 'Santiago', slug: 'santiago' },
 ] as const;
 
+const VISUAL_REGISTER_BUSINESS_CITIES = [
+    { id: 'city-santo-domingo', name: 'Santo Domingo', slug: 'santo-domingo' },
+] as const;
+
+const VISUAL_REGISTER_BUSINESS_SECTORS = [
+    { id: 'sector-piantini', name: 'Piantini', slug: 'piantini' },
+] as const;
+
 const VISUAL_REGISTER_BUSINESS_FEATURES = [
     { id: 'feature-delivery', name: 'Delivery' },
     { id: 'feature-whatsapp', name: 'WhatsApp' },
@@ -1062,9 +1070,59 @@ async function mockRegisterBusinessVisualApi(page: Page): Promise<void> {
         await route.fulfill(json(VISUAL_BUSINESS_PROVINCES));
     });
 
+    await page.route('**/api/provinces/*/cities', async (route) => {
+        await route.fulfill(json(VISUAL_REGISTER_BUSINESS_CITIES));
+    });
+
+    await page.route('**/api/cities/*/sectors', async (route) => {
+        await route.fulfill(json(VISUAL_REGISTER_BUSINESS_SECTORS));
+    });
+
     await page.route('**/api/telemetry/growth', async (route) => {
         await route.fulfill(json({ tracked: true }, 201));
     });
+}
+
+async function prepareRegisterBusinessVisualPage(page: Page, viewport: { width: number; height: number }): Promise<void> {
+    await page.setViewportSize(viewport);
+    await seedOwnerDashboardVisualSession(page);
+    await forceImmediateIntersections(page);
+    await stabilizeVisualRuntime(page);
+    await disableMotionForVisuals(page);
+    await mockRegisterBusinessVisualApi(page);
+    await page.goto('/register-business', { waitUntil: 'networkidle' });
+    await disableDeferredRenderingForVisuals(page);
+    await expect(page.getByRole('heading', { name: /Registra tu negocio/i })).toBeVisible();
+}
+
+async function advanceRegisterBusinessVisualStep(page: Page, step: 2 | 3 | 4): Promise<void> {
+    await page.getByLabel(/Nombre del negocio/i).fill('Cafe AquiTa Visual');
+    await page.getByLabel(/Descripcion/i).fill(
+        'Cafe local con comida rapida en Distrito Nacional y servicio directo para clientes cercanos.',
+    );
+    await page.locator('form button[type="submit"]').click();
+    await expect(page.getByLabel(/WhatsApp/i)).toBeVisible();
+
+    if (step === 2) {
+        return;
+    }
+
+    await page.locator('form button[type="submit"]').click();
+    await expect(page.getByLabel(/Direcci.n/i)).toBeVisible();
+
+    if (step === 3) {
+        return;
+    }
+
+    await page.getByLabel(/Direcci.n/i).fill('Av. Winston Churchill 101, Piantini');
+    await page.getByLabel(/Provincia/i).selectOption('prov-dn');
+    await page.locator('form button[type="submit"]').click();
+    await expect(page.getByRole('heading', { name: /Selecciona una o varias categor/i })).toBeVisible();
+}
+
+async function stabilizeRegisterBusinessStepVisual(page: Page): Promise<void> {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(250);
 }
 
 test.describe('Visual baselines @visual', () => {
@@ -1275,33 +1333,59 @@ test.describe('Visual baselines @visual', () => {
     });
 
     test('register business desktop baseline @visual', async ({ page }) => {
-        await page.setViewportSize({ width: 1440, height: 1400 });
-        await seedOwnerDashboardVisualSession(page);
-        await forceImmediateIntersections(page);
-        await stabilizeVisualRuntime(page);
-        await disableMotionForVisuals(page);
-        await mockRegisterBusinessVisualApi(page);
-        await page.goto('/register-business', { waitUntil: 'networkidle' });
-        await disableDeferredRenderingForVisuals(page);
-        await expect(page.getByRole('heading', { name: /Registra tu negocio/i })).toBeVisible();
+        await prepareRegisterBusinessVisualPage(page, { width: 1440, height: 1400 });
         await expect(page.getByLabel(/Nombre del negocio/i)).toBeVisible();
         await page.waitForTimeout(250);
         await expect(page).toHaveScreenshot('register-business-desktop.png', { fullPage: true });
     });
 
     test('register business mobile baseline @visual', async ({ page }) => {
-        await page.setViewportSize({ width: 390, height: 844 });
-        await seedOwnerDashboardVisualSession(page);
-        await forceImmediateIntersections(page);
-        await stabilizeVisualRuntime(page);
-        await disableMotionForVisuals(page);
-        await mockRegisterBusinessVisualApi(page);
-        await page.goto('/register-business', { waitUntil: 'networkidle' });
-        await disableDeferredRenderingForVisuals(page);
-        await expect(page.getByRole('heading', { name: /Registra tu negocio/i })).toBeVisible();
+        await prepareRegisterBusinessVisualPage(page, { width: 390, height: 844 });
         await expect(page.getByLabel(/Nombre del negocio/i)).toBeVisible();
         await page.waitForTimeout(250);
         await expect(page).toHaveScreenshot('register-business-mobile.png', { fullPage: true });
+    });
+
+    test('register business step 2 desktop baseline @visual', async ({ page }) => {
+        await prepareRegisterBusinessVisualPage(page, { width: 1440, height: 1400 });
+        await advanceRegisterBusinessVisualStep(page, 2);
+        await stabilizeRegisterBusinessStepVisual(page);
+        await expect(page).toHaveScreenshot('register-business-step-2-desktop.png', { fullPage: true });
+    });
+
+    test('register business step 2 mobile baseline @visual', async ({ page }) => {
+        await prepareRegisterBusinessVisualPage(page, { width: 390, height: 844 });
+        await advanceRegisterBusinessVisualStep(page, 2);
+        await stabilizeRegisterBusinessStepVisual(page);
+        await expect(page).toHaveScreenshot('register-business-step-2-mobile.png', { fullPage: true });
+    });
+
+    test('register business step 3 desktop baseline @visual', async ({ page }) => {
+        await prepareRegisterBusinessVisualPage(page, { width: 1440, height: 1400 });
+        await advanceRegisterBusinessVisualStep(page, 3);
+        await stabilizeRegisterBusinessStepVisual(page);
+        await expect(page).toHaveScreenshot('register-business-step-3-desktop.png', { fullPage: true });
+    });
+
+    test('register business step 3 mobile baseline @visual', async ({ page }) => {
+        await prepareRegisterBusinessVisualPage(page, { width: 390, height: 844 });
+        await advanceRegisterBusinessVisualStep(page, 3);
+        await stabilizeRegisterBusinessStepVisual(page);
+        await expect(page).toHaveScreenshot('register-business-step-3-mobile.png', { fullPage: true });
+    });
+
+    test('register business step 4 desktop baseline @visual', async ({ page }) => {
+        await prepareRegisterBusinessVisualPage(page, { width: 1440, height: 1400 });
+        await advanceRegisterBusinessVisualStep(page, 4);
+        await stabilizeRegisterBusinessStepVisual(page);
+        await expect(page).toHaveScreenshot('register-business-step-4-desktop.png', { fullPage: true });
+    });
+
+    test('register business step 4 mobile baseline @visual', async ({ page }) => {
+        await prepareRegisterBusinessVisualPage(page, { width: 390, height: 844 });
+        await advanceRegisterBusinessVisualStep(page, 4);
+        await stabilizeRegisterBusinessStepVisual(page);
+        await expect(page).toHaveScreenshot('register-business-step-4-mobile.png', { fullPage: true });
     });
 
     test('businesses desktop baseline @visual', async ({ page }) => {
