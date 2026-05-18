@@ -26,22 +26,22 @@ export function Footer({ compact = false }: FooterProps) {
     }
 
     return (
-        <footer className="mt-20 border-t border-slate-200/60 bg-gradient-to-b from-white/80 to-slate-50/50 backdrop-blur-md">
-            <div className="container-xl py-16">
-                <div className="grid gap-12 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]">
-                    <div className="space-y-6">
+        <footer className="mt-16 border-t border-slate-200 bg-white">
+            <div className="container-xl py-12">
+                <div className="grid gap-10 lg:grid-cols-[minmax(0,1.35fr)_repeat(3,minmax(0,1fr))]">
+                    <div className="space-y-5">
                         <div>
-                            <p className="font-display text-3xl font-black tracking-tight text-slate-900">
+                            <p className="font-display text-2xl font-black tracking-tight text-slate-900">
                                 Aqui<span className="text-accent-600">Ta</span><span className="text-primary-700">.do</span>
                             </p>
                             <p className="mt-4 max-w-sm text-base leading-relaxed text-slate-500">
-                                La plataforma líder en discovery local y gestión de negocios diseñada exclusivamente para el mercado dominicano.
+                                Directorio local para descubrir negocios confiables, comparar señales útiles y contactar opciones en RD.
                             </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            <span className="px-3 py-1 rounded-full bg-primary-50 text-primary-700 text-[10px] font-bold uppercase tracking-wider border border-primary-100/50">Discovery</span>
-                            <span className="px-3 py-1 rounded-full bg-accent-50 text-accent-700 text-[10px] font-bold uppercase tracking-wider border border-accent-100/50">SaaS</span>
-                            <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider border border-slate-200/50">RD</span>
+                            <span className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-700">Directorio</span>
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-700">Negocios</span>
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-700">RD</span>
                         </div>
                     </div>
 
@@ -73,7 +73,7 @@ export function Footer({ compact = false }: FooterProps) {
                     </div>
                 </div>
 
-                <div className="mt-16 flex flex-col gap-4 border-t border-slate-200/60 pt-8 text-sm font-medium text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-12 flex flex-col gap-4 border-t border-slate-200 pt-7 text-sm font-medium text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
                         <p>© {new Date().getFullYear()} AquiTa.do</p>
                         <span className="h-1 w-1 rounded-full bg-slate-300"></span>

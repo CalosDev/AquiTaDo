@@ -853,25 +853,24 @@ export function Home() {
 
             <HomeDifferenceSection points={OPERATING_POINTS} />
 
-            <section className="defer-render-section relative mt-8 overflow-hidden border-y border-slate-200 bg-slate-50/80 md:mt-10">
-                <div className="absolute inset-x-0 top-0 flag-ribbon opacity-45"></div>
-                <div className="relative mx-auto max-w-4xl px-4 py-10 text-center sm:px-6 lg:px-8 md:py-12">
-                    <p className="chip mx-auto flex w-fit items-center gap-2 !border-primary-100 !bg-primary-50 !text-primary-700">
+            <section className="defer-render-section mt-8 border-y border-slate-200 bg-white md:mt-10">
+                <div className="mx-auto max-w-4xl px-4 py-10 text-center sm:px-6 lg:px-8 md:py-12">
+                    <p className="chip mx-auto flex w-fit items-center gap-2 !border-slate-200 !bg-slate-50 !text-slate-700">
                         <span className="flex items-center gap-1.5" aria-hidden="true">
                             <span className="h-2 w-2 rounded-full bg-primary-900"></span>
                             <span className="h-2 w-2 rounded-full bg-white ring-1 ring-slate-300"></span>
                             <span className="h-2 w-2 rounded-full bg-accent-500"></span>
                         </span>
-                        Impulsa tu presencia local
+                        Para negocios locales
                     </p>
                     <h2 className="mx-auto mt-4 max-w-3xl font-display text-3xl font-extrabold text-slate-950 md:text-4xl">
-                        Lleva tu negocio del barrio al <span className="text-accent-600">siguiente nivel</span>
+                        Haz que encuentren tu negocio en <span className="text-primary-700">AquiTa.do</span>
                     </h2>
                     <p className="mx-auto mt-3 max-w-2xl text-base text-slate-600 md:text-lg">
-                        Crea una ficha mas completa, mejora tu visibilidad local y ayuda a que mas personas te encuentren.
+                        Crea una ficha clara para mostrar horarios, ubicación y contacto en un directorio local pensado para RD.
                     </p>
                     <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
-                        <Link to={registerBusinessPath} className="btn-accent inline-flex justify-center px-7 text-base">
+                        <Link to={registerBusinessPath} className="btn-primary inline-flex justify-center px-7 text-base">
                             {registerBusinessLabel}
                         </Link>
                         <Link to="/businesses" className="btn-secondary justify-center">

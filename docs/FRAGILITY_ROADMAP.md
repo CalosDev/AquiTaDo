@@ -2233,6 +2233,64 @@ Proximo paso recomendado:
 - Commit/push de Fase 19.5.
 - Luego disenar el siguiente slice visual antes de tocar otra pantalla; candidato seguro: footer/CTA final de Home o cierre temporal de Home y pasar a Login/Register/Profile segun prioridad de lanzamiento.
 
+## Fase 19.6: CTA final y footer de Home product-first
+
+Fase 19.6 aplico un slice visual/copy acotado al CTA final de Home y al footer no compacto para que el cierre de la pagina se sienta mas sobrio, local y orientado a producto real. No se tocaron rutas, busqueda, tracking, API, carga de datos ni estilos globales.
+
+Archivos tocados:
+
+- `apps/web/src/pages/Home.tsx`
+- `apps/web/src/components/Footer.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/home-mobile.png`
+
+Cambio aplicado:
+
+- El CTA final dejo de usar la cinta decorativa y la superficie gris/gradiente; ahora usa una banda blanca con borde sobrio.
+- El chip del CTA final paso a `Para negocios locales`, con tratamiento neutral.
+- El titulo del CTA final paso a enfocarse en aparecer y ser encontrado en AquiTa.do.
+- El texto del CTA final se ajusto hacia ficha clara, horarios, ubicacion y contacto en RD.
+- El CTA principal del bloque usa `btn-primary` en vez de `btn-accent` para reducir competencia visual.
+- El footer no compacto dejo de usar gradiente/backdrop y redujo spacing vertical.
+- El footer removio el lenguaje `SaaS` y lo reemplazo por tags mas utiles para usuario final: `Directorio`, `Negocios` y `RD`.
+- La descripcion del footer ahora habla de descubrir negocios confiables, comparar senales utiles y contactar opciones en RD.
+- Home desktop bajo de 3927px a 3851px en snapshot.
+- Home mobile bajo de 6182px a 6082px en snapshot.
+
+Comportamiento preservado:
+
+- `registerBusinessPath`, `registerBusinessLabel`, ruta `/businesses`, rutas de footer, busqueda, tracking, API, datos dinamicos, ranking, negocios recientes, auth, backend, PWA, searchParams y estilos globales.
+- No se tocaron componentes de listado, tarjetas de negocio, mapas, filtros, geolocalizacion, endpoints ni hooks de datos.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `pnpm --filter @aquita/web exec vitest run --config vitest.unit.config.ts src/pages/Home.test.tsx` | Pass: `1 file / 1 test`. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "home (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests. |
+
+Warnings no bloqueantes:
+
+- El primer visual fallo por diff esperado del cambio visual.
+- Geoapify 503 conocido en unit tests de API como warning no bloqueante.
+- `run-with-qa-stack` uso Prisma Client 7.8.0 durante `prisma generate`, sin cambios de schema.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- Home ya tiene un cierre mas limpio, pero la calidad percibida depende de datos publicos reales y estados utiles cuando hay poca data.
+- No agregar mas secciones a Home sin retirar o consolidar ruido existente.
+- No tocar geolocalizacion, ranking real, mapas, tracking ni busqueda sin fase especifica.
+
+Proximo paso recomendado:
+
+- Commit/push del bloque Home si el usuario quiere cerrar esta tanda.
+- Luego hacer una revision global por vistas y decidir el siguiente bloque de lanzamiento: `Login/Register`, `BusinessesList` o dashboards por rol. No abrir redisenos grandes sin baseline y contrato claro.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
