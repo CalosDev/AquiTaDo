@@ -631,8 +631,8 @@ export function RegisterBusiness() {
         if (currentStep === 1) {
             return (
                 <div className="space-y-4">
-                    <div>
-                        <label htmlFor="register-business-name" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-name" className="block text-sm font-semibold text-gray-800">
                             Nombre del negocio *
                         </label>
                         <input
@@ -646,8 +646,8 @@ export function RegisterBusiness() {
                             placeholder="Mi negocio RD"
                         />
                     </div>
-                    <div>
-                        <label htmlFor="register-business-description" className="text-sm font-medium text-gray-700 mb-1 block">
+                    <div className="space-y-2">
+                        <label htmlFor="register-business-description" className="block text-sm font-semibold text-gray-800">
                             Descripcion *
                         </label>
                         <textarea
@@ -660,21 +660,21 @@ export function RegisterBusiness() {
                             className="input-field"
                             placeholder="Describe claramente qué vendes, en qué zona operas y qué te diferencia"
                         />
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="text-xs leading-relaxed text-gray-500">
                             Mientras mas clara sea la descripcion, mas facil sera entender el negocio.
                         </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                            <span className={`rounded-full px-2 py-0.5 ${
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                                 descriptionLength >= 60
-                                    ? 'bg-primary-50 text-primary-700'
-                                    : 'bg-amber-50 text-amber-700'
+                                    ? 'bg-primary-100 text-primary-700'
+                                    : 'bg-amber-100 text-amber-700'
                             }`}>
                                 {descriptionLength} caracteres
                             </span>
                             <span>Objetivo recomendado: 60+ con propuesta, zona y diferenciador.</span>
                         </div>
                         {submissionGuidance.preventiveSignals.length > 0 ? (
-                            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 px-3 py-3 text-xs text-amber-900">
                                 <p className="font-semibold">Puntos a revisar en la descripcion</p>
                                 <ul className="mt-2 space-y-1">
                                     {submissionGuidance.preventiveSignals.map((signal) => (
