@@ -2448,6 +2448,81 @@ Riesgos pendientes:
 - No tocar auth, refresh/logout/session sync, Google auth, 2FA, recovery/reset backend ni validaciones sin fase dedicada.
 - Siguiente bloque visual recomendado: diagnostico de dashboards por rol, porque el usuario reporto pantallas amplias, cargadas y poco orientadas a producto.
 
+## Fase 21.1: diagnostico visual de dashboards por rol
+
+Fase 21.1 reviso los dashboards por rol antes de seguir redisenando vistas internas. El foco fue detectar que pantalla podia recibir un slice visual seguro sin tocar contratos, permisos, datos, `searchParams`, backend ni runtime.
+
+Pantallas revisadas:
+
+- `apps/web/src/pages/CustomerDashboard.tsx`
+- `apps/web/src/pages/DashboardBusiness.tsx`
+- `apps/web/src/pages/AdminDashboard.tsx`
+- Baselines visuales existentes de customer, owner y admin desktop/mobile.
+
+Hallazgos:
+
+- `CustomerDashboard` era el primer candidato seguro: tiene menos dependencias sensibles que owner/admin y ya contaba con baseline visual determinista.
+- `DashboardBusiness` sigue mezclando negocio activo, metricas, claims, verificacion, documentos, tabs y `searchParams`; no conviene tocarlo sin slice dedicado.
+- `AdminDashboard` sigue siendo zona de riesgo alto por tabs, permisos, contratos, acciones administrativas y response shapes variados.
+- En customer, el primer viewport tenia una sensacion de cards anidadas por el contenedor superior mas las metric cards internas.
+
+Decision:
+
+- Empezar por el primer viewport de `CustomerDashboard`.
+- No tocar `DashboardBusiness` ni `AdminDashboard` en esta fase.
+- No tocar layout global, auth, rutas, API, favoritos, listas, actividad profunda ni handlers.
+
+## Fase 21.2: CustomerDashboard first viewport cleanup
+
+Fase 21.2 aplico un slice visual minimo sobre el primer viewport del dashboard cliente. El objetivo fue reducir la sensacion de card tecnica/anidada y dejar el resumen inicial mas liviano sin cambiar comportamiento.
+
+Archivos tocados:
+
+- `apps/web/src/pages/CustomerDashboard.tsx`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-customer-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/dashboard-customer-mobile.png`
+
+Cambios principales:
+
+- El wrapper superior paso de `AppCard` a una `section` local sin contenedor visual pesado.
+- `PageIntroCompact`, `ActionBar` y `MetricCard` se conservaron con los mismos datos, enlaces y handlers.
+- Las metricas iniciales mantienen contenido, orden y calculos existentes.
+- El cambio reduce altura y ruido visual en desktop/mobile sin tocar los bloques profundos de actividad.
+
+Comportamiento preservado:
+
+- Favoritos, listas, reservas/check-ins, inbox, actividad, enlaces, handlers, estados, rutas, auth, API, copy, backend, tracking y datos.
+- No se tocaron `CustomerActivityWorkspace`, `DashboardLayout`, `AuthContext`, `api/client.ts`, `endpoints.ts`, backend, permisos ni seed.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm --filter @aquita/web typecheck` | Pass |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline"` | Diff esperado antes de actualizar snapshots. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots actualizados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "customer dashboard (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests verdes (`web 19 files / 56 tests`, `api 24 files / 114 tests`). |
+
+Warnings no bloqueantes:
+
+- El primer visual fallo por diff esperado del cambio de layout.
+- Geoapify 503 conocido en `IntegrationsService` sigue siendo warning no bloqueante.
+- `run-with-qa-stack` levanto DB/Redis, ejecuto migraciones, seed y build API/web.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- `CustomerDashboard` todavia tiene actividad profunda amplia; cualquier compactacion adicional debe ser otra fase.
+- `DashboardBusiness` debe tratarse en un slice independiente por su uso de `searchParams`, organizacion activa y workspaces lazy.
+- `AdminDashboard` no debe tocarse sin fase dedicada por permisos, tabs, acciones y contratos admin.
+- No tocar auth, API, backend, permisos, org context, `searchParams`, seed ni tracking en los siguientes slices visuales.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 21.2 como bloque separado.
+- Luego iniciar un slice de `DashboardBusiness` primer viewport, solo visual, sin tocar `searchParams`, workspaces, API ni permisos.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:

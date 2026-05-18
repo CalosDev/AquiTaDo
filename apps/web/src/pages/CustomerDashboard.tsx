@@ -263,26 +263,28 @@ export function CustomerDashboard() {
                 ]}
             />
 
-            <AppCard className="space-y-4 !px-5 !py-5 shadow-none">
-                <PageIntroCompact
-                    eyebrow="Panel cliente"
-                    title={`Hola, ${firstName}`}
-                    description="Guarda negocios, arma listas por zona y vuelve rapido a los perfiles que quieres comparar con calma."
-                />
+            <section className="space-y-5" aria-label="Resumen del panel cliente">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <PageIntroCompact
+                        eyebrow="Panel cliente"
+                        title={`Hola, ${firstName}`}
+                        description="Guarda negocios, arma listas por zona y vuelve rapido a los perfiles que quieres comparar con calma."
+                    />
 
-                <ActionBar className="gap-2">
-                    <Link className="btn-primary" to="/businesses">
-                        Explorar negocios
-                    </Link>
-                    <Link className="btn-secondary" to="/profile">
-                        Ajustar perfil
-                    </Link>
-                </ActionBar>
+                    <ActionBar className="gap-2 lg:justify-end">
+                        <Link className="btn-primary" to="/businesses">
+                            Explorar negocios
+                        </Link>
+                        <Link className="btn-secondary" to="/profile">
+                            Ajustar perfil
+                        </Link>
+                    </ActionBar>
+                </div>
 
                 {loading ? (
                     <LoadingState label="Cargando tu panel..." />
                 ) : (
-                    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <MetricCard
                             label="Favoritos guardados"
                             value={favorites.length}
@@ -297,7 +299,7 @@ export function CustomerDashboard() {
                         />
                     </div>
                 )}
-            </AppCard>
+            </section>
 
             <SplitPanelLayout
                 className="gap-3"
