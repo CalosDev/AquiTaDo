@@ -14,14 +14,14 @@ export function PublicationGuidancePanel({
     remainingPublishNeeds,
 }: PublicationGuidancePanelProps) {
     return (
-        <div className={`rounded-2xl border p-5 ${
+        <div className={`rounded-2xl border p-4 sm:p-5 ${
             submissionGuidance.blockedByLocalHeuristics
-                ? 'border-red-200 bg-red-50'
+                ? 'border-red-200 bg-red-50/70'
                 : submissionGuidance.readinessLevel === 'ALTA'
-                    ? 'border-primary-200 bg-primary-50'
-                    : 'border-amber-200 bg-amber-50'
+                    ? 'border-primary-200 bg-primary-50/70'
+                    : 'border-amber-200 bg-amber-50/60'
         }`}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Revision final</p>
                     <h2 className="mt-1 text-lg font-semibold text-gray-900">
@@ -32,17 +32,17 @@ export function PublicationGuidancePanel({
                         {submissionGuidance.riskClusters.length > 0 ? ` - Revisa: ${submissionGuidance.riskClusters.join(', ')}` : ''}
                     </p>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                <span className={`self-start rounded-full px-3 py-1 text-xs font-semibold ${
                     submissionGuidance.blockedByLocalHeuristics
                         ? 'bg-red-100 text-red-700'
-                        : 'bg-white text-gray-700'
+                        : 'bg-white/85 text-gray-700'
                 }`}>
                     Alertas {submissionGuidance.preventiveScore}/100 - {submissionGuidance.preventiveSeverity}
                 </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div>
+            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                <div className="border-l border-white/70 pl-3">
                     <p className="text-sm font-medium text-gray-900">En este paso conviene cuidar</p>
                     <ul className="mt-2 space-y-2 text-sm text-gray-700">
                         {currentStepTips.map((tip) => (
@@ -54,7 +54,7 @@ export function PublicationGuidancePanel({
                     <p className="text-sm font-medium text-gray-900">Checklist de publicacion</p>
                     <div className="mt-2 space-y-2">
                         {submissionGuidance.visibilityChecks.map((check) => (
-                            <div key={check.label} className="rounded-xl bg-white/80 px-3 py-2">
+                            <div key={check.label} className="rounded-xl bg-white/70 px-3 py-2">
                                 <p className="text-sm font-medium text-gray-900">
                                     {check.passed ? 'Listo' : 'Pendiente'} · {check.label}
                                 </p>
@@ -66,7 +66,7 @@ export function PublicationGuidancePanel({
             </div>
 
             {remainingPublishNeeds.length > 0 ? (
-                <div className="mt-4 rounded-xl bg-white/80 px-4 py-3">
+                <div className="mt-3 rounded-2xl bg-white/60 px-3 py-3 sm:px-4">
                     <p className="text-sm font-medium text-gray-900">Todavia falta antes de publicar</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                         {remainingPublishNeeds.map((item) => (
@@ -79,7 +79,7 @@ export function PublicationGuidancePanel({
             ) : null}
 
             {submissionGuidance.recommendedActions.length > 0 ? (
-                <div className="mt-4">
+                <div className="mt-3 border-t border-white/70 pt-3">
                     <p className="text-sm font-medium text-gray-900">Acciones sugeridas</p>
                     <ul className="mt-2 space-y-1 text-sm text-gray-700">
                         {submissionGuidance.recommendedActions.slice(0, 4).map((action) => (
