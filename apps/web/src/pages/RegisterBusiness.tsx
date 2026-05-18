@@ -1162,14 +1162,14 @@ export function RegisterBusiness() {
                         <AppCard
                             title="Navegacion por pasos"
                             description="Avanza cuando cada bloque tenga la informacion necesaria para publicar sin vacios."
-                            className="space-y-3"
+                            className="!p-4 space-y-3 shadow-none sm:!p-5 [&_.app-card__header]:mb-3"
                         >
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <p className="text-sm font-semibold text-primary-700">
                                     {progressPercentage}% completado
                                 </p>
                             </div>
-                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-gradient-to-r from-primary-600 to-accent-500 transition-all duration-300"
                                     style={{ width: `${progressPercentage}%` }}
