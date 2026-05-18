@@ -14,6 +14,12 @@ const VISUAL_BUSINESS_PROVINCES = [
     { id: 'prov-santiago', name: 'Santiago', slug: 'santiago' },
 ] as const;
 
+const VISUAL_REGISTER_BUSINESS_FEATURES = [
+    { id: 'feature-delivery', name: 'Delivery' },
+    { id: 'feature-whatsapp', name: 'WhatsApp' },
+    { id: 'feature-reservations', name: 'Reservaciones' },
+] as const;
+
 const VISUAL_BUSINESSES = [
     {
         id: 'biz-cafe-aquita',
@@ -1035,6 +1041,32 @@ async function mockCustomerDashboardVisualApi(page: Page): Promise<void> {
     });
 }
 
+async function mockRegisterBusinessVisualApi(page: Page): Promise<void> {
+    await page.route('**/api/users/me', async (route) => {
+        await route.fulfill(json(VISUAL_OWNER_USER));
+    });
+
+    await page.route('**/api/organizations/mine', async (route) => {
+        await route.fulfill(json([VISUAL_OWNER_ORGANIZATION]));
+    });
+
+    await page.route('**/api/categories', async (route) => {
+        await route.fulfill(json(VISUAL_BUSINESS_CATEGORIES));
+    });
+
+    await page.route('**/api/features', async (route) => {
+        await route.fulfill(json(VISUAL_REGISTER_BUSINESS_FEATURES));
+    });
+
+    await page.route('**/api/provinces', async (route) => {
+        await route.fulfill(json(VISUAL_BUSINESS_PROVINCES));
+    });
+
+    await page.route('**/api/telemetry/growth', async (route) => {
+        await route.fulfill(json({ tracked: true }, 201));
+    });
+}
+
 test.describe('Visual baselines @visual', () => {
     test('home desktop baseline @visual', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 1400 });
@@ -1240,6 +1272,36 @@ test.describe('Visual baselines @visual', () => {
         await expect(page.getByText(/Usuarios activos/i).first()).toBeVisible();
         await page.waitForTimeout(250);
         await expect(page).toHaveScreenshot('profile-mobile.png', { fullPage: true });
+    });
+
+    test('register business desktop baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 1400 });
+        await seedOwnerDashboardVisualSession(page);
+        await forceImmediateIntersections(page);
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await mockRegisterBusinessVisualApi(page);
+        await page.goto('/register-business', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /Registra tu negocio/i })).toBeVisible();
+        await expect(page.getByLabel(/Nombre del negocio/i)).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('register-business-desktop.png', { fullPage: true });
+    });
+
+    test('register business mobile baseline @visual', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await seedOwnerDashboardVisualSession(page);
+        await forceImmediateIntersections(page);
+        await stabilizeVisualRuntime(page);
+        await disableMotionForVisuals(page);
+        await mockRegisterBusinessVisualApi(page);
+        await page.goto('/register-business', { waitUntil: 'networkidle' });
+        await disableDeferredRenderingForVisuals(page);
+        await expect(page.getByRole('heading', { name: /Registra tu negocio/i })).toBeVisible();
+        await expect(page.getByLabel(/Nombre del negocio/i)).toBeVisible();
+        await page.waitForTimeout(250);
+        await expect(page).toHaveScreenshot('register-business-mobile.png', { fullPage: true });
     });
 
     test('businesses desktop baseline @visual', async ({ page }) => {

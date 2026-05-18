@@ -2523,6 +2523,59 @@ Proximo paso recomendado:
 - Commit/push de Fase 21.2 como bloque separado.
 - Luego iniciar un slice de `DashboardBusiness` primer viewport, solo visual, sin tocar `searchParams`, workspaces, API ni permisos.
 
+## Fase 21.3: RegisterBusiness visual baseline
+
+Fase 21.3 agrego baseline visual determinista para `RegisterBusiness` antes de cualquier redisenado del flujo de registro de negocio. La vista es sensible porque vive dentro de `DashboardLayout`, requiere rol `BUSINESS_OWNER`, carga datos base y tiene un formulario multi-step.
+
+Archivos tocados:
+
+- `playwright/specs/visual.spec.ts`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-desktop.png`
+- `playwright/specs/__snapshots__/visual.spec.ts/register-business-mobile.png`
+
+Baselines agregados:
+
+- `/register-business` desktop, viewport `1440 x 1400`, snapshot `register-business-desktop.png`.
+- `/register-business` mobile, viewport `390 x 844`, snapshot `register-business-mobile.png`.
+
+Mocks deterministas agregados:
+
+- Sesion visual owner reutilizando `seedOwnerDashboardVisualSession`.
+- `GET /api/users/me`.
+- `GET /api/organizations/mine`.
+- `GET /api/categories`.
+- `GET /api/features`.
+- `GET /api/provinces`.
+- `POST /api/telemetry/growth`.
+
+Comportamiento preservado:
+
+- No se tocaron UI runtime, estilos, copy, formulario, validaciones, submit, upload, geolocalizacion, tracking runtime, rutas, auth, API real, backend, seed ni contratos.
+- El baseline solo cubre el primer paso visible y no valida envio real, duplicados, carga de imagenes, ubicacion, ciudades/sectores ni publicacion.
+
+QA ejecutado:
+
+| Comando | Resultado |
+| --- | --- |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business (desktop\|mobile) baseline" --update-snapshots` | Pass: `2 passed`; snapshots creados. |
+| `node scripts/run-with-qa-stack.mjs -- pnpm exec playwright test playwright/specs/visual.spec.ts --grep "register business (desktop\|mobile) baseline"` | Pass final: `2 passed`. |
+| `pnpm qa:smoke` | Pass: lint, typecheck y unit tests verdes (`web 19 files / 56 tests`, `api 24 files / 114 tests`). |
+
+Warnings no bloqueantes:
+
+- `run-with-qa-stack` levanto DB/Redis, ejecuto migraciones, seed y build API/web.
+- Prisma Client 7.8.0 se genero durante QA sin cambios de schema.
+- `git diff` puede reportar LF/CRLF en archivos editados desde Windows.
+
+Riesgos pendientes:
+
+- `RegisterBusiness` sigue visualmente pesado: paso actual, estado, navegacion, formulario y revision final compiten en el primer viewport.
+- No redisenar este flujo sin fase propia; cualquier ajuste debe tocar una sola seccion por vez y preservar validaciones, submit, duplicados, upload, geolocalizacion, tracking y API.
+
+Proximo paso recomendado:
+
+- Commit/push de Fase 21.3 y luego disenar un slice visual minimo para `RegisterBusiness` primer viewport.
+
 ## QA recomendado para futuras fases
 
 Para cambios documentales futuros no hace falta levantar la pila completa. Comandos recomendados:
